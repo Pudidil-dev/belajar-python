@@ -9,9 +9,9 @@
     5.98
    ],
    "frames": 179,
-   "ms_mean": 9.6,
-   "ms_max": 24.6,
-   "ms_cold": 21.6,
+   "ms_mean": 9.5,
+   "ms_max": 17.9,
+   "ms_cold": 30,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 4.16,
@@ -39,9 +39,9 @@
     4.98
    ],
    "frames": 122,
-   "ms_mean": 69.1,
-   "ms_max": 280.4,
-   "ms_cold": 12.6,
+   "ms_mean": 64.1,
+   "ms_max": 274.2,
+   "ms_cold": 6.1,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 28.42,
@@ -60,13 +60,13 @@
     4.98
    ],
    "frames": 134,
-   "ms_mean": 15.1,
-   "ms_max": 26.9,
-   "ms_cold": 20.7,
+   "ms_mean": 11.5,
+   "ms_max": 18.2,
+   "ms_cold": 17.7,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 11.48,
-   "motion_max": 25.47,
+   "motion_pct": 11.55,
+   "motion_max": 25.65,
    "still_pairs_pct": 0.0,
    "spike_ratio": 2.1,
    "spikes_at_lt": [],
@@ -81,12 +81,12 @@
     5.98
    ],
    "frames": 155,
-   "ms_mean": 23.5,
-   "ms_max": 41.3,
-   "ms_cold": 28.8,
+   "ms_mean": 23.4,
+   "ms_max": 46.2,
+   "ms_cold": 46,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 15.27,
+   "motion_pct": 15.24,
    "motion_max": 32.61,
    "still_pairs_pct": 0.0,
    "spike_ratio": 2.3,
@@ -103,7 +103,7 @@
    ],
    "frames": 161,
    "ms_mean": 10.1,
-   "ms_max": 17.8,
+   "ms_max": 17.0,
    "ms_cold": 7.7,
    "deterministic": true,
    "det_maxdiff": 0,
@@ -123,9 +123,9 @@
     5.98
    ],
    "frames": 158,
-   "ms_mean": 17.4,
-   "ms_max": 29.0,
-   "ms_cold": 16.2,
+   "ms_mean": 16.9,
+   "ms_max": 34.9,
+   "ms_cold": 14.8,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 12.11,
@@ -154,20 +154,15 @@
    ],
    "frames": 182,
    "ms_mean": 12.0,
-   "ms_max": 28.6,
-   "ms_cold": 9.7,
+   "ms_max": 24.0,
+   "ms_cold": 8.9,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 9.49,
-   "motion_max": 36.62,
+   "motion_pct": 11.37,
+   "motion_max": 34.13,
    "still_pairs_pct": 0.0,
-   "spike_ratio": 6.4,
-   "spikes_at_lt": [
-    3.89,
-    3.923,
-    3.957,
-    3.99
-   ],
+   "spike_ratio": 4.1,
+   "spikes_at_lt": [],
    "camera_events_lt": [],
    "framing": [],
    "text_tracked": 0
@@ -179,9 +174,9 @@
     6.98
    ],
    "frames": 182,
-   "ms_mean": 20.0,
-   "ms_max": 41.9,
-   "ms_cold": 26.3,
+   "ms_mean": 18.6,
+   "ms_max": 47.6,
+   "ms_cold": 26.5,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 5.89,
@@ -205,15 +200,15 @@
     5.98
    ],
    "frames": 152,
-   "ms_mean": 12.7,
-   "ms_max": 27.3,
-   "ms_cold": 10.4,
+   "ms_mean": 11.8,
+   "ms_max": 20.3,
+   "ms_cold": 10,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 7.06,
-   "motion_max": 27.6,
+   "motion_max": 27.57,
    "still_pairs_pct": 0.0,
-   "spike_ratio": 8.1,
+   "spike_ratio": 8.0,
    "spikes_at_lt": [
     2.784,
     2.818,
@@ -242,8 +237,8 @@
    ],
    "frames": 167,
    "ms_mean": 20.4,
-   "ms_max": 47.8,
-   "ms_cold": 9.7,
+   "ms_max": 49.7,
+   "ms_cold": 8.8,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 19.07,
@@ -262,13 +257,13 @@
     6.98
    ],
    "frames": 197,
-   "ms_mean": 12.4,
-   "ms_max": 21.0,
-   "ms_cold": 11.8,
+   "ms_mean": 12.3,
+   "ms_max": 27.9,
+   "ms_cold": 10.2,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 8.19,
-   "motion_max": 34.58,
+   "motion_max": 34.59,
    "still_pairs_pct": 0.0,
    "spike_ratio": 5.3,
    "spikes_at_lt": [],
@@ -283,9 +278,9 @@
     6.98
    ],
    "frames": 182,
-   "ms_mean": 10.7,
-   "ms_max": 21.5,
-   "ms_cold": 8.4,
+   "ms_mean": 10.5,
+   "ms_max": 16.4,
+   "ms_cold": 11.6,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 14.04,
@@ -304,15 +299,15 @@
     5.98
    ],
    "frames": 155,
-   "ms_mean": 10.5,
-   "ms_max": 27.5,
-   "ms_cold": 10.5,
+   "ms_mean": 10.9,
+   "ms_max": 18.2,
+   "ms_cold": 8.7,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 9.97,
+   "motion_pct": 9.99,
    "motion_max": 27.66,
    "still_pairs_pct": 0.0,
-   "spike_ratio": 4.1,
+   "spike_ratio": 4.0,
    "spikes_at_lt": [],
    "camera_events_lt": [],
    "framing": [],
@@ -325,9 +320,9 @@
     5.98
    ],
    "frames": 164,
-   "ms_mean": 20.7,
-   "ms_max": 35.1,
-   "ms_cold": 31.1,
+   "ms_mean": 21.0,
+   "ms_max": 47.6,
+   "ms_cold": 19.6,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 7.33,
@@ -346,9 +341,9 @@
     4.98
    ],
    "frames": 131,
-   "ms_mean": 11.3,
-   "ms_max": 24.0,
-   "ms_cold": 13.8,
+   "ms_mean": 11.5,
+   "ms_max": 29.2,
+   "ms_cold": 15.9,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 5.07,
@@ -384,12 +379,12 @@
     4.98
    ],
    "frames": 137,
-   "ms_mean": 10.1,
-   "ms_max": 28.1,
-   "ms_cold": 5.7,
+   "ms_mean": 9.1,
+   "ms_max": 21.9,
+   "ms_cold": 5.8,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 2.58,
+   "motion_pct": 2.59,
    "motion_max": 14.34,
    "still_pairs_pct": 0.0,
    "spike_ratio": 18.6,
@@ -410,9 +405,9 @@
     5.98
    ],
    "frames": 161,
-   "ms_mean": 8.9,
-   "ms_max": 20.2,
-   "ms_cold": 9.6,
+   "ms_mean": 8.8,
+   "ms_max": 18.6,
+   "ms_cold": 8.4,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 8.04,
@@ -445,8 +440,8 @@
    ],
    "frames": 182,
    "ms_mean": 8.9,
-   "ms_max": 18.2,
-   "ms_cold": 6,
+   "ms_max": 22.1,
+   "ms_cold": 8.6,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 9.77,
@@ -467,12 +462,12 @@
     5.98
    ],
    "frames": 164,
-   "ms_mean": 15.8,
-   "ms_max": 98.6,
-   "ms_cold": 27.2,
+   "ms_mean": 15.4,
+   "ms_max": 29.5,
+   "ms_cold": 13.8,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 14.69,
+   "motion_pct": 14.7,
    "motion_max": 45.12,
    "still_pairs_pct": 0.0,
    "spike_ratio": 3.4,
@@ -488,9 +483,9 @@
     4.98
    ],
    "frames": 125,
-   "ms_mean": 14.8,
-   "ms_max": 28.2,
-   "ms_cold": 21.1,
+   "ms_mean": 17.1,
+   "ms_max": 34.4,
+   "ms_cold": 17.9,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 6.32,
@@ -514,31 +509,27 @@
     5.98
    ],
    "frames": 155,
-   "ms_mean": 16.2,
-   "ms_max": 37.3,
-   "ms_cold": 12.1,
+   "ms_mean": 14.5,
+   "ms_max": 22.0,
+   "ms_cold": 10.8,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 1.61,
-   "motion_max": 17.35,
+   "motion_pct": 1.8,
+   "motion_max": 12.41,
    "still_pairs_pct": 7.1,
-   "spike_ratio": 19.6,
+   "spike_ratio": 13.0,
    "spikes_at_lt": [
-    1.843,
     1.91,
     1.944,
     1.977,
     2.011,
-    2.045
+    2.045,
+    2.078
    ],
    "camera_events_lt": [
     [
-     1.675,
-     1.742
-    ],
-    [
-     3.76,
-     4.13
+     3.693,
+     4.063
     ]
    ],
    "framing": [],
@@ -551,9 +542,9 @@
     4.98
    ],
    "frames": 125,
-   "ms_mean": 14.7,
-   "ms_max": 26.1,
-   "ms_cold": 17.6,
+   "ms_mean": 12.6,
+   "ms_max": 20.7,
+   "ms_cold": 19,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 5.64,
@@ -577,15 +568,15 @@
     9.98
    ],
    "frames": 284,
-   "ms_mean": 20.3,
-   "ms_max": 36.8,
-   "ms_cold": 28,
+   "ms_mean": 18.1,
+   "ms_max": 37.3,
+   "ms_cold": 20.9,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 3.69,
-   "motion_max": 16.2,
+   "motion_pct": 3.67,
+   "motion_max": 15.34,
    "still_pairs_pct": 4.9,
-   "spike_ratio": 9.0,
+   "spike_ratio": 8.5,
    "spikes_at_lt": [
     2.074,
     2.242,
@@ -623,9 +614,9 @@
     6.98
    ],
    "frames": 197,
-   "ms_mean": 28.9,
-   "ms_max": 125.9,
-   "ms_cold": 13.1,
+   "ms_mean": 32.2,
+   "ms_max": 79.6,
+   "ms_cold": 42.2,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 17.2,
@@ -644,9 +635,9 @@
     4.98
    ],
    "frames": 131,
-   "ms_mean": 10.7,
-   "ms_max": 19.6,
-   "ms_cold": 13.9,
+   "ms_mean": 10.3,
+   "ms_max": 23.0,
+   "ms_cold": 18,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 9.26,
@@ -670,9 +661,9 @@
     4.98
    ],
    "frames": 125,
-   "ms_mean": 14.7,
-   "ms_max": 43.7,
-   "ms_cold": 16.3,
+   "ms_mean": 14.1,
+   "ms_max": 26.5,
+   "ms_cold": 14.6,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 21.35,
@@ -691,9 +682,9 @@
     5.98
    ],
    "frames": 164,
-   "ms_mean": 8.4,
-   "ms_max": 28.4,
-   "ms_cold": 11.5,
+   "ms_mean": 8.1,
+   "ms_max": 15.2,
+   "ms_cold": 11.2,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 6.43,
@@ -712,15 +703,15 @@
     5.98
    ],
    "frames": 155,
-   "ms_mean": 8.2,
-   "ms_max": 17.9,
-   "ms_cold": 13.9,
+   "ms_mean": 8.7,
+   "ms_max": 17.1,
+   "ms_cold": 9.9,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 10.14,
+   "motion_pct": 10.06,
    "motion_max": 29.32,
    "still_pairs_pct": 3.2,
-   "spike_ratio": 2.8,
+   "spike_ratio": 2.9,
    "spikes_at_lt": [],
    "camera_events_lt": [],
    "framing": [],
@@ -733,14 +724,14 @@
     12.98
    ],
    "frames": 374,
-   "ms_mean": 9.9,
-   "ms_max": 35.0,
-   "ms_cold": 15.3,
+   "ms_mean": 10.0,
+   "ms_max": 25.0,
+   "ms_cold": 14,
    "deterministic": true,
    "det_maxdiff": 0,
    "motion_pct": 5.0,
    "motion_max": 78.37,
-   "still_pairs_pct": 17.7,
+   "still_pairs_pct": 17.4,
    "spike_ratio": 52.8,
    "spikes_at_lt": [
     2.976,
@@ -775,23 +766,18 @@
     11.98
    ],
    "frames": 332,
-   "ms_mean": 28.0,
-   "ms_max": 61.1,
-   "ms_cold": 30.2,
+   "ms_mean": 14.8,
+   "ms_max": 36.9,
+   "ms_cold": 18.6,
    "deterministic": true,
    "det_maxdiff": 0,
-   "motion_pct": 4.31,
-   "motion_max": 24.03,
-   "still_pairs_pct": 6.3,
-   "spike_ratio": 107.4,
+   "motion_pct": 2.75,
+   "motion_max": 18.1,
+   "still_pairs_pct": 6.6,
+   "spike_ratio": 81.7,
    "spikes_at_lt": [
-    3.21,
-    3.243,
-    3.277,
-    3.31,
     3.344,
     3.377,
-    3.411,
     3.444,
     3.478,
     3.511,
@@ -884,12 +870,8 @@
     6.423,
     6.457,
     6.49,
-    6.524,
     6.557,
     6.591,
-    6.624,
-    6.658,
-    6.691,
     6.725,
     6.791,
     6.925
@@ -903,147 +885,147 @@
   {
    "id": "s02_lattice",
    "type": "iris",
-   "ms_max": 94.7
+   "ms_max": 108.7
   },
   {
    "id": "s03_conveyor",
    "type": "dither",
-   "ms_max": 22.6
+   "ms_max": 21.1
   },
   {
    "id": "s04_furnace",
    "type": "wipe",
-   "ms_max": 38.9
+   "ms_max": 38
   },
   {
    "id": "s05_reduction",
    "type": "flash",
-   "ms_max": 14.2
+   "ms_max": 18.3
   },
   {
    "id": "s06_tapping",
    "type": "wipe",
-   "ms_max": 24.8
+   "ms_max": 27.7
   },
   {
    "id": "s07_chlorosilane",
    "type": "slideV",
-   "ms_max": 17.5
+   "ms_max": 25.9
   },
   {
    "id": "s08_siemens",
    "type": "slideH",
-   "ms_max": 12.6
+   "ms_max": 13
   },
   {
    "id": "s09_melt",
    "type": "slideV",
-   "ms_max": 34.5
+   "ms_max": 45.4
   },
   {
    "id": "s10_seed",
    "type": "dither",
-   "ms_max": 23
+   "ms_max": 23.4
   },
   {
    "id": "s11_pull",
    "type": "dither",
-   "ms_max": 19.4
+   "ms_max": 32.4
   },
   {
    "id": "s12_saw",
    "type": "slideH",
-   "ms_max": 11.3
+   "ms_max": 13.8
   },
   {
    "id": "s13_polish",
    "type": "iris",
-   "ms_max": 24.1
+   "ms_max": 32.9
   },
   {
    "id": "s14_cleanroom",
    "type": "flash",
-   "ms_max": 20.4
+   "ms_max": 25.4
   },
   {
    "id": "s15_deposition",
    "type": "wipe",
-   "ms_max": 22.9
+   "ms_max": 34.7
   },
   {
    "id": "s16_spincoat",
    "type": "whip",
-   "ms_max": 16.2
+   "ms_max": 24.3
   },
   {
    "id": "s17_euv",
    "type": "dither",
-   "ms_max": 16.5
+   "ms_max": 15.1
   },
   {
    "id": "s18_tin",
    "type": "iris",
-   "ms_max": 17.3
+   "ms_max": 26.6
   },
   {
    "id": "s19_optics",
    "type": "flash",
-   "ms_max": 11.7
+   "ms_max": 21.6
   },
   {
    "id": "s20_exposure",
    "type": "slideV",
-   "ms_max": 11.9
+   "ms_max": 19.5
   },
   {
    "id": "s21_etch",
    "type": "iris",
-   "ms_max": 33.8
+   "ms_max": 32.9
   },
   {
    "id": "s22_implant",
    "type": "slideH",
-   "ms_max": 12.3
+   "ms_max": 25.1
   },
   {
    "id": "s23_transistor",
    "type": "flash",
-   "ms_max": 29.5
+   "ms_max": 23
   },
   {
    "id": "s24_interconnect",
    "type": "dither",
-   "ms_max": 48
+   "ms_max": 76.3
   },
   {
    "id": "s25_probe",
    "type": "dither",
-   "ms_max": 20.9
+   "ms_max": 19.8
   },
   {
    "id": "s26_dicing",
    "type": "slideH",
-   "ms_max": 16.7
+   "ms_max": 14.7
   },
   {
    "id": "s27_package",
    "type": "dither",
-   "ms_max": 30.3
+   "ms_max": 25.1
   },
   {
    "id": "s28_reflow",
    "type": "slideV",
-   "ms_max": 11.2
+   "ms_max": 8.3
   },
   {
    "id": "s29_phone",
    "type": "dither",
-   "ms_max": 19.2
+   "ms_max": 11.8
   },
   {
    "id": "s30_finale",
    "type": "iris",
-   "ms_max": 56.3
+   "ms_max": 51.3
   }
  ],
  "page_errors": []
