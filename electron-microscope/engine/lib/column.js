@@ -80,7 +80,6 @@ COL.draw = (c, cam, t, o = {}) => {
   shell(-300, -266, 32, 'gb', 2.2); fillR(c, X - 30, -297.8, 60, 31.8, 'n1');
   for (let k = 0; k < 9; k++) { const yy = -296 + k * 3.3; F(c, rr(X - 7 + (k % 2) * 0.5, yy, 14 - (k % 2), 2.6, 0.8), 'g9', 'g6', 'gb'); fillR(c, X - 6 + (k % 2) * 0.5, yy + 2.2, 12 - (k % 2), 0.4, 'y4'); }
   K.pipe(c, [[X + 12, -300], [X + 4, -296], [X + 2, -290]], 3, 'g2', 'g3', 'g1');
-  if (z > 2) PIX.text && K.wtext(c, 'SF6', X + 16, -292, 'n4', { shadow: null });
   // gun chamber
   shell(-266, -248, 17); fillR(c, X - 15.4, -264.4, 30.8, 14.8, 'k');
   F(c, rr(X - 41, -264, 24, 14, 2), 'g4', 'g2', 'g6'); fillR(c, X - 17, -260, 2, 6, 'k');                 // gun ion pump + port

@@ -62,7 +62,7 @@ SC.s03_column = {
       const k = U.clamp((lt - t0) / 0.12) * (1 - U.clamp((lt - t0 - 0.55) / 0.25));
       outline(c, cam, box, k * (Math.floor((lt - t0) * 16) % 2 || lt - t0 > 0.25 ? 1 : 0.4));
       const [sx, sy] = K.S(cam, ax, ay);
-      const tw = PIX.textWidth(name), tx = side === 'R' ? Math.min(W - 6 - tw, sx + 36) : Math.max(6 + tw, sx - 36);
+      const tw = PIX.textWidth(name), tx = side === 'R' ? Math.min(W - 6 - tw, sx + 36) : Math.min(W - 6, Math.max(6 + tw, sx - 36));
       CAP.note(c, lt, { text: name, x: tx, y: Math.max(76, sy - 16), ax: sx, ay: sy, t0, t1: name === 'SPECIMEN STAGE' || name === 'DETECTORS' ? 6.7 : t0 + 1.3, col: 'w', lineCol: 'c2', align: side === 'R' ? 'left' : 'right', box: true });
     }
     CAP.scene(c, lt, { title: 'INSIDE THE MICROSCOPE', ctx: 'THE ELECTRON PATH, TOP TO BOTTOM', t0: 1.0, t1: 6.8, acc: 'c2' });

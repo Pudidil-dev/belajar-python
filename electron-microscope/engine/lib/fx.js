@@ -120,17 +120,21 @@ FX.cloud = (img, sx, sy, Rr, t, o = {}) => {
 const LUM = rgb => rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11;
 FX.glowL = (c, sx, sy, r, ramp = ['r1', 'r2', 'u1', 'u2', 'y2'], a = 1, fall = 1.6) => {
   if (r <= 0 || a <= 0) return;
-  const cols = ramp.map(K.rgb), lums = cols.map(LUM), img = K.pbegin(c), d = img.data;
   const x0 = Math.max(0, Math.floor(sx - r)), x1 = Math.min(W - 1, Math.ceil(sx + r)), y0 = Math.max(0, Math.floor(sy - r)), y1 = Math.min(H - 1, Math.ceil(sy + r));
+  if (x1 < x0 || y1 < y0) return;
+  // read and write only the glow's own box (a full-frame getImageData per glow made atom-heavy frames take seconds)
+  const cols = ramp.map(K.rgb), lums = cols.map(LUM), bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  const img = c.getImageData(x0, y0, bw, bh), d = img.data;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const q = Math.hypot(x - sx, y - sy) / r; if (q >= 1) continue;
     const v = a * Math.pow(1 - q, fall) * cols.length + K.BAY(x, y);   // level + dither: level 0.3 → 30% of pixels get ramp[0]
     const k = Math.min(cols.length - 1, Math.floor(v) - 1); if (k < 0) continue;
-    const i = (y * W + x) * 4;
+    const i = ((y - y0) * bw + (x - x0)) * 4;
     if (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11 >= lums[k]) continue;
     d[i] = cols[k][0]; d[i + 1] = cols[k][1]; d[i + 2] = cols[k][2]; d[i + 3] = 255;     // opaque also on a transparent layer
   }
-  K.pend(c, img);
+  c.putImageData(img, x0, y0); c.restore();
 };
 // world-space version (centre and radius under the current canvas transform)
 FX.glowW = (c, x, y, r, ramp, a, fall) => { const m = c.getTransform(); FX.glowL(c, m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f, r * Math.hypot(m.a, m.b), ramp, a, fall); };

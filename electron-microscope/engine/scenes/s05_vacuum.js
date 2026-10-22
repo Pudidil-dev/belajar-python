@@ -112,7 +112,7 @@ SC.s05_vacuum = {
     // the gun end: 10⁻⁹ Pa
     if (lt > T_RISE) {
       const [gx, gy] = K.S(cam, X - 29, -257);
-      CAP.note(c, lt, { text: 'GUN: ~10⁻⁹ Pa', x: Math.max(70, gx - 4), y: gy + 30, ax: gx, ay: gy + 8, t0: T_RISE + 0.4, col: 'c4', lineCol: 'c1', box: true, align: 'right' });
+      CAP.note(c, lt, { text: 'GUN: ~10⁻⁹ Pa', x: Math.max(70, gx - 4), y: gy + 30, ax: gx, ay: gy + 8, t0: T_RISE + 0.72, col: 'c4', lineCol: 'c1', box: true, align: 'right' });
     }
   },
   cues: [[0.0, 'whoosh_back', 1, 0, 1.0], [T_SEAL, 'chamber_close'], [T_PUMP0 - 0.1, 'pump_spin', 1, 0.3, T_PUMP1 - T_PUMP0 + 1.0], [T_PUMP0, 'pump_hum', 1, -0.2, 4.6],

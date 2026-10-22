@@ -41,7 +41,7 @@ function pipe(c, lt) {
     const t0 = 0.1 + k * 0.085, a = lt - t0; if (a < 0) continue;
     const v = HA.D[(232 + Math.floor(k / n)) * HA.IW + 150 + (k % n) * 2];
     if (a < 0.35) { const x = U.lerp(0, 96, a / 0.35); PIX.rect(c, Math.round(x), yW - 3, 6, 9, 'e2'); PIX.rect(c, Math.round(x) + 2, yW - 1, 2, 5, 'e3'); }   // pulse
-    else if (a < 0.7) { const u = (a - 0.35) / 0.35, s = String(Math.round(v * 255)); PIX.text(c, s, U.lerp(150, gx + (k % n) * sz, u), yW - 20 - u * 6, 'c4', { shadow: 'k' }); }
+    else if (a < 0.55) { const u = (a - 0.35) / 0.2, s = String(Math.round(v * 255)); PIX.text(c, s, U.lerp(150, gx + (k % n) * sz, u), yW - 22 - (k % 3) * 10 - u * 4, 'c4', { shadow: 'k' }); }
     else { const g = Math.min(1, v), col = g > 0.86 ? 'w' : g > 0.6 ? 'ga' : g > 0.42 ? 'g8' : g > 0.3 ? 'g6' : g > 0.2 ? 'g4' : 'g2'; PIX.rect(c, gx + (k % n) * sz, gy + Math.floor(k / n) * sz, sz - 1, sz - 1, col); }
   }
   PIX.text(c, 'SCAN POSITION (x, y)', 18, yW + 58, 'c4'); PIX.text(c, '+ DETECTOR VALUE', 18, yW + 70, 'e3'); PIX.text(c, '= ONE PIXEL', 18, yW + 82, 'w');
@@ -85,7 +85,7 @@ SC.s15_image = {
     }
     CAP.note(c, lt, { text: 'THE DETECTOR BUILDS THE IMAGE', x: W / 2, y: 378, t0: T_BUILD + 1.4, t1: T_DONE - 0.2, col: 'w', box: true, align: 'center', rate: 60 });
     CAP.note(c, lt, { text: 'ONE PIXEL AT A TIME', x: W / 2, y: 391, t0: T_BUILD + 1.9, t1: T_DONE - 0.2, col: 'w', box: true, align: 'center', rate: 60 });
-    CAP.scene(c, lt, { title: lt < T_DONE ? 'IMAGE RECONSTRUCTION' : 'ATOMIC-RESOLUTION IMAGE', ctx: lt < T_DONE ? ['SCANNED PIXEL BY PIXEL'] : ['ISOLATED GOLD ATOMS ON CARBON'], t0: lt < T_DONE ? 0.2 : T_DONE + 0.05, t1: 8.85, acc: 'c2' });
+    CAP.scene(c, lt, { title: lt < T_DONE ? 'BUILDING THE IMAGE' : 'ATOMIC-RESOLUTION IMAGE', ctx: lt < T_DONE ? ['SCANNED PIXEL BY PIXEL'] : ['ISOLATED GOLD ATOMS ON CARBON'], t0: lt < T_DONE ? 0.2 : T_DONE + 0.05, t1: 8.85, acc: 'c2' });
   },
   mon(c, lt) {
     const n = scanned(lt), rows = Math.floor(n / HA.IW), cols = Math.floor(n - rows * HA.IW), T = 99 + lt;

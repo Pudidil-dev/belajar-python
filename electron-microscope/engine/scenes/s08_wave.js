@@ -57,7 +57,7 @@ SC.s08_wave = {
       let pv = null;
       for (let q = -L; q <= L; q++) { const env = Math.exp(-((q / (L * 0.5)) ** 2)), xx = ex + 14 * env * Math.sin(q * 0.9 - lt * 20) * kW, yy = ey + q; if (pv) PIX.bline(c, pv[0], pv[1], xx, yy, 'c3'); pv = [xx, yy]; }
       FX.e(c, ex, ey, 3, 1, true);
-      CAP.note(c, lt, { text: 'ELECTRONS HAVE WAVELENGTHS', x: W / 2, y: 120, t0: 0.15, t1: 1.2, col: 'c4', box: true, align: 'center' });
+      CAP.note(c, lt, { text: 'ELECTRONS HAVE WAVELENGTHS', x: W / 2, y: 120, t0: 0.15, t1: 0.62, col: 'c4', box: true, align: 'center' });
       if (lt > T_PANEL) window.dissolve(c, () => {}, cc => SC.s08_wave.panels(cc, lt), MO.smooth((lt - T_PANEL) / 0.25));
     } else if (lt < T_BACK) this.panels(c, lt);
     else {
@@ -91,10 +91,10 @@ SC.s08_wave = {
       FX.meter(c, 88, 388, 86, U.lerp(0.25, 1, pK(lt)), 'MOMENTUM p', '', 'c3', k);
     }
     CAP.note(c, lt, { text: 'SHORTER WAVELENGTH, FINER DETAIL', x: W / 2, y: 428, t0: T_SUM, col: 'c4', box: true, align: 'center' });
-    CAP.note(c, lt, { text: '~200,000x SHORTER THAN LIGHT  (NOT TO SCALE)', x: W / 2, y: 442, t0: T_SUM + 0.4, t1: 5.55, col: 'g7', box: true, align: 'center', rate: 70 });
-    CAP.note(c, lt, { text: 'BUT LENS FLAWS ALSO LIMIT DETAIL', x: W / 2, y: 442, t0: 5.75, col: 'u3', box: true, align: 'center', rate: 60 });
+    CAP.note(c, lt, { text: '~200,000x SHORTER THAN LIGHT  (NOT TO SCALE)', x: W / 2, y: 442, t0: T_SUM + 0.4, t1: 5.2, col: 'g7', box: true, align: 'center', rate: 70 });
+    CAP.note(c, lt, { text: 'BUT LENS FLAWS ALSO LIMIT DETAIL', x: W / 2, y: 442, t0: 5.9, col: 'u3', box: true, align: 'center', rate: 60 });
   },
   cues: [[0.1, 'wave_on', 1, 0, 0.9], [T_PANEL, 'swoosh', 0.8], [T_PANEL + 0.2, 'title_hit', 0.7], [T_LIGHT, 'light_wave', 1, -0.2, 1.4], [T_LIGHT + 0.9, 'blur_thud', 1, 0.3],
-    [T_ELEC, 'e_wave', 1, -0.2, 1.8], [T_P0, 'p_sweep', 1, 0, T_P1 - T_P0], [T_P1, 'crystal', 1, 0.3], [T_SUM, 'confirm', 0.9], [5.75, 'blip', 0.7], [T_BACK, 'whoosh_back', 0.8, 0, 0.7]],
+    [T_ELEC, 'e_wave', 1, -0.2, 1.8], [T_P0, 'p_sweep', 1, 0, T_P1 - T_P0], [T_P1, 'crystal', 1, 0.3], [T_SUM, 'confirm', 0.9], [5.9, 'blip', 0.7], [T_BACK, 'whoosh_back', 0.8, 0, 0.7]],
 };
 })();

@@ -126,7 +126,7 @@ SC.s11_scan = {
       const v = sideView(c, lt);
       CAP.note(c, lt, { text: 'SCAN COILS', x: 18, y: YU - 30, ax: DX - 30, ay: YU - 4, t0: 0.3, t1: T_TOP - 0.1, col: 'u3', lineCol: 'u2', box: true });
       CAP.note(c, lt, { text: 'THEY TILT THE BEAM', x: 18, y: YU - 18, t0: 0.7, t1: T_TOP - 0.1, col: 'g9', box: true });
-      CAP.note(c, lt, { text: 'THE PROBE MOVES - THE SAMPLE STAYS', x: W / 2, y: YS + 34, t0: 1.3, t1: T_TOP - 0.1, col: 'c4', box: true, align: 'center', rate: 60 });
+      CAP.note(c, lt, { text: 'THE PROBE MOVES - THE SAMPLE STAYS', x: W / 2, y: YS + 34, t0: 1.1, t1: T_TOP - 0.85, col: 'c4', box: true, align: 'center', rate: 60 });
       if (lt > T_TOP - 0.3) window.dissolve(c, () => {}, cc => topView(cc, lt), MO.smooth((lt - T_TOP + 0.3) / 0.3));
     } else topView(c, lt);
     if (lt > T_SCAN && lt < 4.6) CAP.note(c, lt, { text: 'POINT BY POINT', x: W - 14, y: 62, t0: T_SCAN + 0.1, t1: 4.1, col: 'c4', box: true, align: 'right' });

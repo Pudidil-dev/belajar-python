@@ -21,19 +21,20 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 
 HOOK = r"""
 () => {
-  const box = (s, x, y, o, n) => {
+  const box = (c, s, x, y, o, n) => {
+    if (!c || !c.canvas || c.canvas.width !== 270 || c.canvas.height !== 480) return;   // text inside textures (the monitor UI) is not screen text
     const sc = o.sc || 1, full = PIX.textWidth(s, sc);
     const X = Math.round(o.align === 'center' ? x - full / 2 : o.align === 'right' ? x - full : x), Y = Math.round(y);
     const w = PIX.textWidth([...s].slice(0, n).join(''), sc);
     if (w > 0) window.__boxes.push({ s, x0: X, y0: Y, x1: X + w + (o.shadow === null ? 0 : sc), y1: Y + 9 * sc });
   };
   const T = PIX.text, L = PIX.label;
-  PIX.text = (c, s, x, y, col, opt = {}) => { box(s, x, y, opt, opt.n ?? [...s].length); return T(c, s, x, y, col, opt); };
+  PIX.text = (c, s, x, y, col, opt = {}) => { box(c, s, x, y, opt, opt.n ?? [...s].length); return T(c, s, x, y, col, opt); };
   PIX.label = (c, o, t) => {
     const t0 = o.t0 ?? 0, t1 = o.t1 ?? 1e9;
     if (t >= t0 && t <= t1 + 0.6) {
-      const len = [...o.text].length, shown = t <= t1 ? Math.floor((t - t0 - 0.12) * 40) : len - Math.floor((t - t1) * 70);
-      const n = Math.max(0, Math.min(len, shown)); if (n > 0) box(o.text, o.tx, o.ty, o, n);
+      const len = [...o.text].length, shown = t <= t1 ? Math.floor((t - t0 - 0.12) * (o.rate || 40)) : len - Math.floor((t - t1) * 70);
+      const n = Math.max(0, Math.min(len, shown)); if (n > 0) box(c, o.text, o.tx, o.ty, o, n);
     }
     return L(c, o, t);
   };

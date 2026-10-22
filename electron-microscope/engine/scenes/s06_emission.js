@@ -79,7 +79,7 @@ SC.s06_emission = {
     } else if (lt < T_SURF) {
       const fov = fovIn(lt), rot = rollIn(lt); micro(c, fov, rot, lt);
       SAMPLE.scaleBar(c, fov, 1);
-      if (fov < 3e-6 && fov > 1.5e-7) CAP.note(c, lt, { text: 'APEX ~100 nm ACROSS', x: 150, y: 120, t0: 2.05, t1: 2.6, col: 'w', box: true });
+      if (fov < 3e-6 && fov > 1.5e-7) CAP.note(c, lt, { text: 'APEX RADIUS ~100 nm', x: 150, y: 120, t0: 2.05, t1: 2.6, col: 'w', box: true });
     } else if (lt < T_BACK) {
       const fov = 4.6e-9, s = W / (fov * 1e9), xs = W / 2 + OX;
       GUN.surface(c, fov, -Math.PI / 2, lt, { ox: OX });
@@ -111,7 +111,7 @@ SC.s06_emission = {
       if (k < 1) window.dissolve(c, cc => { micro(cc, fovOut(T_COL), 0, lt); jet(cc, lt, fovOut(T_COL), 0); }, cc => colView(cc, cam, 1), MO.smooth(k));
       else colView(c, cam, 1);
       const [tx, ty] = K.S(cam, X, -250);
-      CAP.note(c, lt, { text: 'A NARROW ELECTRON BEAM', x: tx + 18, y: ty - 6, ax: tx + 2, ay: ty, t0: T_COL + 0.4, col: 'c4', lineCol: 'c2', box: true });
+      CAP.note(c, lt, { text: 'A NARROW ELECTRON BEAM', x: W - 8, y: ty - 6, ax: tx + 2, ay: ty, t0: T_COL + 0.4, col: 'c4', lineCol: 'c2', box: true, align: 'right' });
     }
     CAP.scene(c, lt, { title: 'FIELD EMISSION', ctx: ['ELECTRONS TUNNEL OUT', 'OF A TUNGSTEN TIP'], t0: 0.3, acc: 'c2' });
   },
