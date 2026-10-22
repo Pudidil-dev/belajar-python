@@ -36,7 +36,8 @@ function panel(c, lt, P_, i) {
   // the pixel this makes
   const kP = U.clamp((lt - T_PIX - i * 0.2) / 0.3);
   if (kP > 0) {
-    const v = P_.Z > 20 ? 1 : 0.18, col = v > 0.9 ? 'w' : 'g3', s = Math.round(26 * MO.backOut(kP, 2));
+    // brightness follows the count (24 = the gold total): the pixel keeps brightening while hits still arrive
+    const f = P_.Z > 20 ? hits / 24 : 0, col = P_.Z > 20 ? (f >= 0.95 ? 'w' : f >= 0.75 ? 'g9' : f >= 0.5 ? 'g7' : 'g5') : 'g3', s = Math.round(26 * MO.backOut(kP, 2));
     PIX.rect(c, bx + 42 - s / 2 - 2, by + 92 - s / 2 - 2, s + 4, s + 4, 'g5'); PIX.rect(c, bx + 42 - s / 2, by + 92 - s / 2, s, s, col);
     if (kP > 0.8) PIX.text(c, 'PIXEL', bx + 42, by + 110, 'g7', { align: 'center', shadow: null });
   }
@@ -57,13 +58,11 @@ SC.s13_zcontrast = {
     for (const e of EV) for (const tr of e.tr) { tr.pts = tr.pts; tr.L = tr.L / SC_; }
   },
   draw(c, lt) {
-    const z = 1 + 0.05 * MO.smooth(U.clamp((lt - T_SUM) / 2.4));               // the slow push of the second shot
-    const body = cc => {
-      PIX.rect(cc, 0, 0, W, H, 'k');
-      PAN.forEach((P_, i) => panel(cc, lt, P_, i));
-    };
-    if (z > 1.001) { ZX.setTransform(1, 0, 0, 1, 0, 0); body(ZX); c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; c.drawImage(ZC, W / 2 - W / 2 * z, 240 - 240 * z, W * z, H * z); c.restore(); }
-    else body(c);
+    // the camera holds: this shot is read side by side (a bitmap push here smeared the pixel font)
+    PIX.rect(c, 0, 0, W, H, 'k');
+    PAN.forEach((P_, i) => panel(c, lt, P_, i));
+    const dk = lt - T_PIX - 0.2;                                                  // the bright pixel lands: a shock ring
+    if (dk >= 0 && dk < 0.35) FX.ring(c, 214, 364, 18 + dk * 110, 'y4', 1 - dk / 0.35);
     CAP.note(c, lt, { text: 'HEAVIER ATOMS SCATTER MORE STRONGLY', x: W / 2, y: 426, t0: T_SUM, col: 'y4', box: true, align: 'center', rate: 60 });
     CAP.note(c, lt, { text: 'HAADF SIGNAL ~ Z^1.7: GOLD ~80x CARBON', x: W / 2, y: 440, t0: T_SUM + 0.6, col: 'g9', box: true, align: 'center', rate: 70 });
     CAP.note(c, lt, { text: 'THICKNESS AND SETTINGS MATTER TOO', x: W / 2, y: 454, t0: T_SUM + 1.3, col: 'g6', box: true, align: 'center', rate: 70 });
@@ -71,10 +70,10 @@ SC.s13_zcontrast = {
   },
   cues: () => {
     const out = [[0.25, 'title_hit', 0.7]];
-    EV.forEach(e => { if (Math.abs(e.tr[1].ang) > HIT) out.push([e.t + 0.5, 'gold_ping', 0.8, 0.3]); else if (Math.abs(e.tr[0].ang) > HIT) out.push([e.t + 0.5, 'carbon_tick', 0.8, -0.3]); });
+    // a click when a high-angle electron reaches the detector bars, i.e. when the counter ticks up
+    EV.forEach(e => { if (Math.abs(e.tr[1].ang) > HIT) out.push([e.t + e.tr[1].L / 230, 'gold_ping', 0.8, 0.3]); if (Math.abs(e.tr[0].ang) > HIT) out.push([e.t + e.tr[0].L / 230, 'carbon_tick', 0.8, -0.3]); });
     out.push([T_PIX, 'pixel_dark', 1, -0.3], [T_PIX + 0.2, 'pixel_bright', 1, 0.3], [T_SUM, 'confirm', 0.9]);
     return out;
   },
 };
-const ZC = document.createElement('canvas'); ZC.width = W; ZC.height = H; const ZX = ZC.getContext('2d', { willReadFrequently: true });
 })();

@@ -8,10 +8,16 @@
 const { W, H } = PIX;
 const CX = 135, CY = 214, RC = 80;                                            // nucleus on screen, cloud radius (≈0.15 nm)
 const T_SIDE = 0.95, T_FIRST = 1.19, D_FIRST = 1.05, T_MANY = 2.6, T_FAN = 6.6, V = 340;
-let EV = [];
+let EV = [], KICKS = [];
+// camera kicks: a hard one when the first electron swings wide, small ones on the next big swings (HUD stays still)
+const kickAt = lt => {
+  let a = 0, ph = 0;
+  for (const k of KICKS) { const d = lt - k.t; if (d < 0 || d > 0.6) continue; const v = k.s * Math.exp(-d / 0.11); if (v > a) { a = v; ph = d; } }
+  return { a, dx: 4 * a * Math.sin(ph * 88), dy: 3 * a * Math.cos(ph * 69) };
+};
 const camK = lt => lt < T_FAN ? 1 : 1 - 0.36 * MO.smooth(U.clamp((lt - T_FAN) / 1.2));   // zoom-out factor at the end
-function sideView(c, lt) {
-  const z = camK(lt), S = (x, y) => [CX + x * z, CY + y * z], T = 74 + lt;
+function sideView(c, lt, ox = 0, oy = 0) {                                    // (ox, oy): whole-pixel camera shake
+  const z = camK(lt), S = (x, y) => [CX + ox + x * z, CY + oy + y * z], T = 74 + lt;
   PIX.rect(c, 0, 0, W, H, 'k');
   // incoming wavefronts: arcs converging on the atom from above; the scattered wave: faint expanding circles
   for (let i = 0; i < 4; i++) {
@@ -22,7 +28,7 @@ function sideView(c, lt) {
     const R = K.wrap((lt - T_FIRST) * 90 + i * 70, 210); if (R < RC * 0.6) continue;
     const n = Math.round(R * 1.6); c.save(); c.globalAlpha = U.clamp(1 - R / 210); for (let q = 0; q < n; q++) { if (q % 5 > 1) continue; const a = q / n * U.TAU, [x, y] = S(Math.cos(a) * R, Math.sin(a) * R); PIX.rect(c, Math.round(x), Math.round(y), 1, 1, 'c1'); } c.restore();
   }
-  ATOM.draw(c, CX, CY, RC * z, 79, { pot: U.clamp((lt - T_FIRST + 0.2) / 0.5) * 0.8, t: T });
+  ATOM.draw(c, CX + ox, CY + oy, RC * z, 79, { pot: U.clamp((lt - T_FIRST + 0.2) / 0.5) * 0.8, t: T });
   // finished paths pile up (dim); live electrons with trails
   let hi = 0, lo = 0;
   for (const e of EV) {
@@ -55,6 +61,11 @@ SC.s12_scatter = {
       for (let i = 1; i < pts.length; i++) { L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); const r_ = Math.hypot(pts[i][0], pts[i][1]); if (r_ < best) { best = r_; closeD = L; } }
       return { ...e, pts, L, ang: p.ang, closeD: best < 30 ? closeD : null };
     });
+    KICKS = [{ t: 2.0, s: 1 }];
+    for (const e of EV.slice(1)) {
+      if (Math.abs(e.ang) <= 0.5 || e.closeD == null) continue;
+      const t = e.t + e.closeD / V; if (t < T_FAN && t - KICKS[KICKS.length - 1].t > 0.4) KICKS.push({ t, s: 0.3 });
+    }
   },
   draw(c, lt) {
     if (lt < T_SIDE) {
@@ -66,7 +77,9 @@ SC.s12_scatter = {
       c.drawImage(ZC, U.lerp(0, CX - hx * z, 1), U.lerp(0, CY - hy * z, 1), W * z, H * z); c.restore();
       if (p > 0.45) window.dissolve(c, () => {}, cc => sideView(cc, lt), MO.smooth((p - 0.45) / 0.55));
     } else {
-      const st = sideView(c, lt), z = st.z;
+      // the shake redraws the view at a whole-pixel offset (shifting or scaling the finished bitmap would move the
+      // cloud's dither against the quantizer's fixed Bayer grid and change its colour)
+      const kk = kickAt(lt), st = sideView(c, lt, Math.round(kk.dx), Math.round(kk.dy)), z = st.z;
       // labels
       CAP.note(c, lt, { text: 'GOLD ATOM', x: 16, y: 96, t0: T_SIDE, t1: T_MANY + 0.6, col: 'y4', box: true });
       CAP.note(c, lt, { text: 'NUCLEUS +79', x: CX + 58, y: CY - 70, ax: CX + 3, ay: CY - 3, t0: T_SIDE + 0.15, t1: T_MANY + 0.6, col: 'r3', lineCol: 'r2', box: true });
