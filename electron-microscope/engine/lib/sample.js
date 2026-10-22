@@ -125,6 +125,28 @@ const auNm = () => { const a0 = HA.AU[HA.HOOK]; return HA.AU.map(p => [p.x - a0.
 SAMPLE.auNm = auNm;
 // soft atom: a cloud of density (dithered), radius r px
 SAMPLE.cloud = (c, sx, sy, r, ramp = ['y0', 'y1', 'y2', 'y3', 'y4'], a = 1) => FX.glowL(c, sx, sy, r, ramp, a, 1.25);
+// a gold atom as a solid ball lit from the upper left (dark rim on the shadow side) — never a glow: on a dark background
+// a glow reads as a light source, and atoms do not shine (glows are kept for detector hits and image pixels)
+const BALL = ['y0', 'y1', 'y2', 'y3', 'y4'];
+SAMPLE.ball = (c, sx, sy, r, a = 1) => {
+  if (a <= 0) return;
+  if (r < 1.6) { R(c, Math.round(sx), Math.round(sy), 1, 1, 'y3'); return; }
+  const x0 = Math.max(0, Math.floor(sx - r - 1)), x1 = Math.min(W - 1, Math.ceil(sx + r + 1)), y0 = Math.max(0, Math.floor(sy - r - 1)), y1 = Math.min(H - 1, Math.ceil(sy + r + 1));
+  if (x1 < x0 || y1 < y0) return;
+  const cols = BALL.map(K.rgb), bw = x1 - x0 + 1, bh = y1 - y0 + 1, Ln = [-0.5, -0.62, 0.6], ln = Math.hypot(...Ln);
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  const img = c.getImageData(x0, y0, bw, bh), d = img.data;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const dx = (x + 0.5 - sx) / r, dy = (y + 0.5 - sy) / r, q = dx * dx + dy * dy; if (q > 1) continue;
+    if (a < 1 && K.BAY(x, y) >= a) continue;                                  // dithered fade-in
+    const sh = Math.max(0, (dx * Ln[0] + dy * Ln[1] + Math.sqrt(1 - q) * Ln[2]) / ln);
+    let v = 0.08 + 0.92 * sh + (K.BAY(x, y) - 0.5) * 0.2;
+    if (q > 0.72 && dx + dy > 0.15) v = Math.min(v, 0.15);                   // rim on the shadow side
+    const k = Math.max(0, Math.min(4, Math.floor(v * 5))), i = ((y - y0) * bw + (x - x0)) * 4;
+    d[i] = cols[k][0]; d[i + 1] = cols[k][1]; d[i + 2] = cols[k][2]; d[i + 3] = 255;
+  }
+  c.putImageData(img, x0, y0); c.restore();
+};
 function lvNano(c, fov, t, o = {}) {
   const nm = fov * 1e9, s = W / nm;                                         // px per nm
   R(c, 0, 0, W, H, 'g1');
@@ -161,7 +183,7 @@ function lvNano(c, fov, t, o = {}) {
     const dot = (x, y) => {
       if (x < -20 || y < -20 || x > W + 20 || y > H + 20) return;
       if (rr_ < 2.5) { R(c, Math.round(x), Math.round(y), 1, 1, 'y3'); if (rr_ > 1.6) R(c, Math.round(x) + 1, Math.round(y), 1, 1, 'y2'); }
-      else SAMPLE.cloud(c, x, y, rr_, undefined, kAu);
+      else SAMPLE.ball(c, x, y, rr_ * 0.8, kAu);
     };
     for (let ty = -ny; ty <= ny; ty++) for (let tx_ = -nx; tx_ <= nx; tx_++) {
       if (tx_ === 0 && ty === 0) { for (const [ax, ay] of au) dot(W / 2 + ax * s, H / 2 + ay * s); continue; }
@@ -235,8 +257,7 @@ SAMPLE.slab = (c, cx, cy, s, t, o = {}) => {
   const pos = (o.atoms || [[0.18, 0.55], [0.42, 0.25], [0.66, 0.7], [0.82, 0.35], [0.3, 0.85], [0.55, 0.45]]).map(([u, v]) => top(u * wN, v * dN));
   pos.sort((a, b) => a[1] - b[1]);
   for (const [px, py] of pos) {
-    SAMPLE.cloud(c, px, py - 0.16 * s, 0.34 * s, ['y0', 'y1', 'y2', 'y3'], 0.9);
-    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P.y4; c.fillRect(Math.round(px) - 1, Math.round(py - 0.16 * s) - 1, 2, 2); c.restore();
+    SAMPLE.ball(c, px, py - 0.16 * s, 0.24 * s);
   }
   return { x0, y0, x1: x0 + wN * s, y1: y0 + th * s, dx, dy, top, atoms: pos };
 };

@@ -17,7 +17,7 @@ function panel(c, y0, lt, o) {
   const h = 150, ax = 92, ay = y0 + 78, d = 40;
   PIX.rect(c, 8, y0, W - 16, h, 'n0'); PIX.rect(c, 8, y0, W - 16, 1, 'n2'); PIX.rect(c, 8, y0 + h - 1, W - 16, 1, 'n2');
   // the two atoms
-  for (const s of [-1, 1]) { SAMPLE.cloud(c, ax + s * d / 2, ay, 11, ['y0', 'y1', 'y2', 'y3'], 1); PIX.rect(c, ax + s * d / 2 - 1, ay - 1, 2, 2, 'y4'); }
+  for (const s of [-1, 1]) SAMPLE.ball(c, ax + s * d / 2, ay, 8);
   // the wave: travels left → right across the atoms
   const k = o.k, lam = o.lam, A = o.amp, col = o.col, glow = o.glow;
   if (k > 0) {

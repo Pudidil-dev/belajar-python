@@ -93,7 +93,7 @@ SC.s06_emission = {
       if (k < 1) window.dissolve(c, cc => micro(cc, 4.6e-9, -Math.PI / 2, lt), cc => colView(cc, cam, 1), MO.smooth(k));
       else colView(c, cam, 1);
       const [tx, ty] = K.S(cam, X, -250);
-      CAP.note(c, lt, { text: 'A NARROW ELECTRON BEAM', x: W - 8, y: ty - 6, ax: tx + 2, ay: ty, t0: T_COL + 0.2, col: 'c4', lineCol: 'c2', box: true, align: 'right' });
+      CAP.note(c, lt, { text: 'A NARROW ELECTRON BEAM', x: W - 14, y: ty - 6, ax: tx + 2, ay: ty, t0: T_COL + 0.2, col: 'c4', lineCol: 'c2', box: true, align: 'right' });
     }
     if (lt > T_XF && lt < T_SURF + 0.9 + PIX.FADE && fovIn(Math.min(lt, T_SURF)) < 3e-6)
       CAP.note(c, lt, { text: 'APEX RADIUS ~100 nm', x: 150, y: 120, t0: 2.6, t1: T_SURF + 0.9, col: 'w', box: true });

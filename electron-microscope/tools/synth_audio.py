@@ -258,7 +258,7 @@ def roll(b0, b1, g0=0.14, g1=0.5):
 
 # ---------------------------------------------------------------- arrangement (beats; 2 beats = 1 s)
 # 0–6 (0–3 s) INSTANT HOOK: impact on frame 0, the groove from the first beat, filtered, rising to the drop
-drums(0, 6, 'game', 0.85); bass(0, 6, 'bounce', 0.6, cut=700); arp(0, 6, 0.25, 0.42, 3200)
+drums(0, 6, 'game', 1.0); bass(0, 6, 'bounce', 0.7, cut=950); arp(0, 6, 0.25, 0.42, 3200)       # the brief: a strong rhythmic pulse from frame 0
 put(MUS, crash(1.6), 0, 0.35, 0, 0.4); put(MUS, boom(70, 32, 1.2), 0, 0.5)
 put(MUS, riser(tb(2), 300, 7000), tb(4), 0.45)
 # 6–18 (3–9 s) DROP on the zoom-out: the whole groove and the hook

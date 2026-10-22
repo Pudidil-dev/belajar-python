@@ -29,6 +29,15 @@ const camAt = lt => {
 };
 // the chain of the whole process, lighting up along the cut-open column
 const CHAIN = [['ELECTRON SOURCE', [X, Y.tip], 'c3'], ['ELECTRON LENSES', [X, Y.c2], 'm4'], ['ATOM', [X, Y.spec], 'y3'], ['SCATTERING', [X + 8, Y.spec + 8], 'y4'], ['DETECTOR', [X - 8, Y.haadf], 'c4'], ['IMAGE', [LAB.MON.cx, LAB.MON.cy], 'w']];
+// small icons for the summary chain (the brief: "summarized with small visual icons"), 11 × 11 px, centred on (x, y)
+const ICON = [
+  (c, x, y, k) => { PIX.fill(c, PIX.polyPath([[x - 4, y - 5], [x + 4, y - 5], [x, y + 2]]), 'g8', k); PIX.rect(c, x, y + 3, 1, 1, 'c4', k); PIX.rect(c, x - 1, y + 4, 3, 1, 'c3', k); },                 // tip + electron
+  (c, x, y, k) => { for (const sg of [-1, 1]) { PIX.rect(c, x + sg * 3 - (sg < 0 ? 3 : 0), y - 4, 3, 9, 'u2', k); PIX.rect(c, x + sg * 3 - (sg < 0 ? 3 : 0), y - 4, 3, 1, 'u3', k); } PIX.rect(c, x, y - 5, 1, 11, 'c2', k); },   // lens (coil cut)
+  (c, x, y, k) => { if (k > 0.5) SAMPLE.ball(c, x, y, 4.5); },                                                                                                                    // gold atom
+  (c, x, y, k) => { PIX.rect(c, x - 1, y - 1, 2, 2, 'y4', k); PIX.bline(c, x, y, x, y + 6, 'c2'); PIX.bline(c, x, y, x - 5, y + 5, 'y3'); PIX.bline(c, x, y, x + 5, y + 4, 'y3'); PIX.bline(c, x, y - 6, x, y - 1, 'c2'); },   // scattering
+  (c, x, y, k) => { for (let a = 0; a < 24; a++) { const t = a / 24 * U.TAU; PIX.rect(c, Math.round(x + Math.cos(t) * 5), Math.round(y + Math.sin(t) * 2.2), 1, 1, 'c3', k); } PIX.rect(c, x - 1, y, 2, 1, 'k', k); },   // ring detector
+  (c, x, y, k) => { for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) PIX.rect(c, x - 5 + i * 4, y - 5 + j * 4, 3, 3, i === 1 && j === 1 ? 'w' : (i + j) % 2 ? 'g5' : 'g3', k); },                    // image pixels
+];
 SC.s16_final = {
   camAt,
   draw(c, lt) {
@@ -56,7 +65,11 @@ SC.s16_final = {
         const t0 = T_CHAIN + i * 0.2, k = U.clamp((lt - t0) / 0.15) * (1 - U.clamp((lt - T_BACK) / 0.2)); if (k <= 0) return;
         const [px, py] = K.S(cam, wx, wy), tx = i === 5 ? px - 4 : W - 16;
         PIX.rect(c, Math.round(px) - 2, Math.round(py) - 2, 5, 5, col, k);
-        CAP.note(c, lt, { text: name, x: tx, y: i === 5 ? py - 34 : py - 4, ax: px + 3, ay: py, t0, t1: T_BACK - 0.05, col, lineCol: 'g6', box: true, align: i === 5 ? 'left' : 'right', rate: 70 });
+        const ty = i === 5 ? py - 34 : py - 4;
+        CAP.note(c, lt, { text: name, x: tx, y: ty, ax: px + 3, ay: py, t0, t1: T_BACK - 0.05, col, lineCol: 'g6', box: true, align: i === 5 ? 'left' : 'right', rate: 70 });
+        // its icon, just outside the label (left of right-aligned labels, right of the IMAGE label)
+        const iw = PIX.textWidth(name), ix = i === 5 ? tx + iw + 10 : tx - iw - 10, kI = U.clamp((lt - t0 - 0.1) / 0.12) * (1 - U.clamp((lt - T_BACK + 0.05) / 0.25));
+        if (kI > 0) { PIX.rect(c, ix - 7, ty - 4, 14, 14, 'k', kI); ICON[i](c, ix, ty + 3, kI); }
       });
     }
     // title

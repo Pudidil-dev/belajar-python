@@ -11,9 +11,9 @@ const atomW = () => { const a = atom(), [px, py] = HA.px(a.x, a.y); return LAB.i
 const camAt = lt => {
   const c11 = LAB.cam11(), [ax, ay] = atomW(), z11 = c11.z;
   const zin = z11 * ZIN, s0 = CAM.toScreen(c11, ax, ay);
-  if (lt < T_IN) { const z = z11 * (1 + 0.03 * MO.smooth(lt / T_IN)); return CAM.anchor(ax, ay, z, s0[0], s0[1]); }
+  if (lt < T_IN) return c11;                                                // held at exactly 1:1 (a slow creep resampled the noise every frame)
   if (lt < T_OUT) {
-    const p = MO.cubicInOut(U.clamp((lt - T_IN) / D_IN)), z0 = z11 * 1.03, z = CAM.zlerp(z0, zin * (1 + 0.05 * U.clamp((lt - T_IN - D_IN) / (T_OUT - T_IN - D_IN))), p);
+    const p = MO.cubicInOut(U.clamp((lt - T_IN) / D_IN)), z0 = z11, z = CAM.zlerp(z0, zin * (1 + 0.05 * U.clamp((lt - T_IN - D_IN) / (T_OUT - T_IN - D_IN))), p);
     return CAM.anchor(ax, ay, z, U.lerp(s0[0], W / 2, p), U.lerp(s0[1], 196, p));
   }
   if (lt < T_MON) {

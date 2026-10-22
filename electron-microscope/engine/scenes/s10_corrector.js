@@ -96,9 +96,9 @@ SC.s10_corrector = {
     }
     // diagram labels
     if (lt < T_ZOOM) {
-      CAP.note(c, lt, { text: 'OBJECTIVE LENS', x: 14, y: YL - 64, ax: CX - 60, ay: YL - 30, t0: 0.45, t1: T_ON - 0.2, col: 'g9', lineCol: 'g6', box: true });
+      CAP.note(c, lt, { text: 'OBJECTIVE LENS', x: 14, y: YL - 64, ax: CX - 60, ay: YL - 30, t0: 0.45, t1: T_ON - 0.3, col: 'g9', lineCol: 'g6', box: true });
       CAP.note(c, lt, { text: 'OUTER RAYS FOCUS TOO SOON', x: 14, y: YS - 70, ax: CX - 3, ay: YS - 40, t0: 0.7, t1: T_ON + 0.4, col: 'u3', lineCol: 'u2', box: true });
-      CAP.note(c, lt, { text: 'MULTIPOLE CORRECTOR', x: 16, y: YC2 + 30, ax: CX - 58, ay: YC2 + 8, t0: T_ON - 0.2, t1: T_ZOOM - 0.1, col: 'm4', lineCol: 'm2', box: true });
+      CAP.note(c, lt, { text: 'MULTIPOLE CORRECTOR', x: 16, y: YC2 + 30, ax: CX - 58, ay: YC2 + 8, t0: T_ON, t1: T_ZOOM - 0.1, col: 'm4', lineCol: 'm2', box: true });
       CAP.note(c, lt, { text: '12 POLES', x: 228, y: 104, t0: T_ON + 0.1, t1: T_ZOOM - 0.1, col: 'g8', box: true, align: 'center' });
       CAP.note(c, lt, { text: 'ALL RAYS MEET', x: 14, y: YS - 70, ax: CX - 2, ay: YS - 2, t0: T_ON + 0.7, t1: T_ZOOM - 0.1, col: 'y4', lineCol: 'y2', box: true });
     }

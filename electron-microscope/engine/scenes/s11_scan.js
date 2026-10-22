@@ -75,7 +75,7 @@ function topView(c, lt) {
     let [x, y] = toS(a.x, a.y);
     if (HOP && k === HOP.k) { x += MO.backOut(hopT, 2) * 0.23 * S_NM; y += MO.backOut(hopT, 2) * 0.25 * S_NM; }
     if (x < OX + 4 || y < OY + 4 || x > OX + NX * PX - 4 || y > OY + NY * PX - 4) return;
-    SAMPLE.cloud(c, x, y, 0.2 * S_NM, ['y0', 'y1', 'y2', 'y3', 'y4'], 1); PIX.rect(c, Math.round(x) - 1, Math.round(y) - 1, 2, 2, 'y4');
+    SAMPLE.ball(c, x, y, 0.14 * S_NM);
   });
   // measured pixels behind the probe
   for (let p = 0; p < Math.min(cur, NX * NY); p++) {
