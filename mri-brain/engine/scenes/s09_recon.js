@@ -30,6 +30,7 @@ function kpanel(c, x, y, sc, L, t) {
   if (L > 0 && L < N) { const yy = Math.round(y + L * sc); PIX.rect(c, x, yy, N * sc, 1, 'c4'); for (let k = 0; k < 6; k++) PIX.rect(c, x - 10 - k * 6, yy - 1 + (k % 2), 3, 3, 'e2'); }
 }
 SC['s09_recon'] = {
+  xin: 0.3,
   init() { kspaces(); for (let k = 0; k < STACK.N; k++) STACK.tex(k, 'head'); },
   draw(c, t, S) {
     PIX.rect(c, 0, 0, W, H, 'n0');
@@ -55,7 +56,7 @@ SC['s09_recon'] = {
     }
     // the inverse Fourier transform: the image as a sum of waves, low to high frequency
     if (t >= T_FILL1 + 0.2 && t < T_SER0 + 0.4) {
-      const u = clamp((t - T_IF0) / (T_IF1 - T_IF0)), R = t < T_IF0 ? 0.6 : 1.2 * Math.pow(70 / 1.2, MO.sineInOut(u));
+      const u = clamp((t - T_IF0) / (T_IF1 - T_IF0)), R = 2.2 * Math.pow(70 / 2.2, MO.sineInOut(u));
       const img = KSP.recon(KQ, R), cvI = KSP.grayCanvas(img, 1.1);
       const go = sm(clamp((t - T_SER0 + 0.3) / 0.6)), [gx, gy] = cell(K0);
       const sc = lerp(2, (GS * 1.25 * 158 / 128) * 0.98, go), ix = lerp(135, gx, go), iy = lerp(292, gy, go);

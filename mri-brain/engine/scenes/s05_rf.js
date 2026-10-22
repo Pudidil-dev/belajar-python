@@ -41,6 +41,7 @@ function rfWaves(c, C, t, a) {
   }
 }
 SC['s05_rf'] = {
+  xin: 0.35,
   draw(c, t, S) {
     const C = camAt(Math.min(t, 2.65)), rf = t > 0.55 && t < T_P1 + 0.1 ? 0.6 + 0.4 * Math.sin(t * 25) : 0;
     if (t < 2.75) {

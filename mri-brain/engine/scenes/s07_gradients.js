@@ -30,6 +30,7 @@ const grid = () => {
 };
 const PH_K = 0.045, FR_K = 0.05;                                               // phase per mm, frequency (rad/s) per mm
 SC['s07_gradients'] = {
+  xin: 0.35,
   init() { grid(); },
   draw(c, t, S) {
     // A) the gradient coils knocking in the machine; field arrows in the bore get longer toward the head
@@ -110,7 +111,7 @@ function brainView(c, t, S) {
     CAP.note(c, t, { x: 135, y: 432, text: 'EACH ROW: ITS OWN PHASE', t0: 4.35, t1: 5.15, align: 'center', col: 'w', box: true, rate: 60 });
     CAP.note(c, t, { x: 135, y: 420, text: '3 · FREQUENCY ENCODING', t0: 5.3, t1: 6.4, align: 'center', col: 'c3', box: true });
     CAP.note(c, t, { x: 135, y: 432, text: 'EACH COLUMN: ITS OWN FREQUENCY', t0: 5.45, t1: 6.4, align: 'center', col: 'w', box: true, rate: 60 });
-    CAP.note(c, t, { x: 135, y: 426, text: 'POSITION → PHASE + FREQUENCY', t0: 6.5, align: 'center', col: 'c4', box: true, rate: 70 });
+    CAP.note(c, t, { x: 135, y: 446, text: 'POSITION → PHASE + FREQUENCY', t0: 6.5, align: 'center', col: 'c4', box: true, rate: 70 });
   }
 }
 })();

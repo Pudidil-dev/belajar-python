@@ -31,7 +31,7 @@ const scanCam = t => {
 };
 // micro scale, px per µm: continues the scanner's scale at the hand-off, then the long zoom
 const SM0 = 700 / (D_END * 1e6);
-const KS = [[T_SCAN, SM0], [2.6, 30], [2.95, 6750], [4.1, 150000], [4.6, 1.1e6]];
+const KS = [[T_SCAN, SM0], [2.95, 26], [3.25, 6750], [4.25, 150000], [4.7, 1.1e6]];
 const sAt = t => { if (t <= KS[0][0]) return KS[0][1]; for (let i = 1; i < KS.length; i++) if (t <= KS[i][0]) { const [ta, sa] = KS[i - 1], [tb, sb] = KS[i], u = (t - ta) / (tb - ta); return Math.exp(lerp(Math.log(sa), Math.log(sb), i === 2 ? u : io(u))); } return KS[KS.length - 1][1]; };
 // the molecule at the centre and its right-hand hydrogen
 const focusH = t => { const [x, y, a] = MICRO.waterAt(0, 0, t), [h1, h2] = MICRO.hPos(x, y, a); return { x, y, a, h1, h2, hR: h1[0] > h2[0] ? h1 : h2 }; };
@@ -59,36 +59,36 @@ SC['s03_hydrogen'] = {
       if (t > 0.8 && t < 1.6) CAP.note(c, t, { x: 135, y: 300, text: '1 VOXEL ≈ 1 mm', t0: 0.85, t1: 1.5, align: 'center', col: 'c4', box: true, rate: 60 });
     }
     // 2) tissue, 3) the fluid between cells, 4) water, 5) one atom, 6) the proton
-    else if (t < 2.95) {
+    else if (t < 3.25) {
       const s = sAt(t);
-      if (t < 2.62) MICRO.tissue(c, { x: 0, y: 0, s, r: 0 }, S.t);
+      if (t < 2.97) MICRO.tissue(c, { x: 0, y: 0, s, r: 0 }, S.t);
       else {                                                                     // the rush through the fluid: its contents stream past
         PIX.rect(c, 0, 0, W, H, 'n1');
-        const u = (t - 2.62) / 0.33;
+        const u = (t - 2.97) / 0.28;
         for (let k = 0; k < 420; k++) {
           const an = U.hash(k, 1) * U.TAU, sp = 0.6 + U.hash(k, 3), r0 = K.wrap(U.hash(k, 2) * 320 + u * 1100 * sp, 320), r1 = Math.max(0, r0 - 10 * sp * (0.4 + u));
           const x0 = W / 2 + Math.cos(an) * r1, y0 = H / 2 + Math.sin(an) * r1 * 1.6, x1 = W / 2 + Math.cos(an) * r0, y1 = H / 2 + Math.sin(an) * r0 * 1.6;
           PIX.bline(c, x0, y0, x1, y1, k % 7 === 0 ? 'q2' : k % 3 ? 'n3' : 'g6');
         }
       }
-      if (t > 2.45) { const a = sm((t - 2.45) / 0.5); c.save(); c.globalAlpha = a * 0.6; PIX.rect(c, 0, 0, W, H, 'n0'); c.restore(); }
+      if (t > 2.8) { const a = sm((t - 2.8) / 0.45); c.save(); c.globalAlpha = a * 0.6; PIX.rect(c, 0, 0, W, H, 'n0'); c.restore(); }
     }
     else if (t < 4.75) {
-      const sn = sAt(t) / 1000, F = focusH(t), u = sm(clamp((t - 3.0) / 1.0)), v = sm(clamp((t - 4.1) / 0.5));
+      const sn = sAt(t) / 1000, F = focusH(t), u = sm(clamp((t - 3.3) / 0.9)), v = sm(clamp((t - 4.25) / 0.45));
       const cx = lerp(lerp(0, F.x, u), F.hR[0], v), cy = lerp(lerp(0, F.y, u), F.hR[1], v), cam = { x: cx, y: cy, s: sn, r: 0 };
-      const nuc = sm(clamp((t - 3.85) / 0.25)), fadeM = 1 - sm(clamp((t - 4.15) / 0.3));
+      const nuc = sm(clamp((t - 3.9) / 0.25)), fadeM = 1 - sm(clamp((t - 4.3) / 0.28));
       if (fadeM > 0) MICRO.water(c, cam, S.t * 0.6, { nuc, a: fadeM });
       else PIX.rect(c, 0, 0, W, H, 'n0');
       // the two nuclei of the focus molecule ring out
-      if (t > 3.85 && t < 4.4) for (const hh of [F.h1, F.h2]) { const [px, py] = MICRO.S(cam, hh[0], hh[1]), q = ((t - 3.85) * 1.6) % 1; FX.ring(c, px, py, 3 + q * 26, 'y3', 1 - q); }
+      if (t > 3.9 && t < 4.45) for (const hh of [F.h1, F.h2]) { const [px, py] = MICRO.S(cam, hh[0], hh[1]), q = ((t - 3.85) * 1.6) % 1; FX.ring(c, px, py, 3 + q * 26, 'y3', 1 - q); }
       // entering the atom: its electron cloud (a soft haze around the nucleus — not the spin) grows past the screen
-      if (t > 4.1) {
-        const [px, py] = MICRO.S(cam, F.hR[0], F.hR[1]), Rr = 0.053 * sn * 2.6, k = sm(clamp((t - 4.1) / 0.25));
-        FX.glowL(c, px, py, Math.min(420, Rr), ['n2', 'n3', 'n4', 'g5'], 0.95 * k * (1 - sm(clamp((t - 4.42) / 0.3))), 1.1);
+      if (t > 4.25) {
+        const [px, py] = MICRO.S(cam, F.hR[0], F.hR[1]), Rr = 0.053 * sn * 2.6, k = sm(clamp((t - 4.25) / 0.2));
+        FX.glowL(c, px, py, Math.min(420, Rr), ['n2', 'n3', 'n4', 'g5'], 0.95 * k * (1 - sm(clamp((t - 4.5) / 0.25))), 1.1);
         c.save(); c.fillStyle = PIX.P.y3; c.fillRect(Math.round(px), Math.round(py), 1, 1); c.restore();
       }
-      if (t < 4.2) { const [px, py] = MICRO.S(cam, F.x, F.y); CAP.note(c, t, { x: px + 22, y: py - 30, text: 'H₂O', t0: 3.45, t1: 4.15, ax: px + 6, ay: py - 6, col: 'w', lineCol: 'g7', box: true }); }
-      if (t > 3.85 && t < 4.6) CAP.note(c, t, { x: 135, y: 392, text: 'HYDROGEN NUCLEI', t0: 3.9, t1: 4.5, align: 'center', col: 'y3', box: true, rate: 60 });
+      if (t < 4.2) { const [px, py] = MICRO.S(cam, F.x, F.y); CAP.note(c, t, { x: px + 22, y: py - 30, text: 'H₂O', t0: 3.55, t1: 4.2, ax: px + 6, ay: py - 6, col: 'w', lineCol: 'g7', box: true }); }
+      if (t > 3.9 && t < 4.6) CAP.note(c, t, { x: 135, y: 392, text: 'HYDROGEN NUCLEI', t0: 3.95, t1: 4.5, align: 'center', col: 'y3', box: true, rate: 60 });
     } else {
       // the jump through the empty atom to the nucleus
       PIX.rect(c, 0, 0, W, H, 'n0');
@@ -106,7 +106,7 @@ SC['s03_hydrogen'] = {
     MICRO.scaleBar(c, pxPerM, t < 0.3 ? 0 : 1);
     CAP.scene(c, t, { title: 'HYDROGEN NUCLEI', t0: 0.15, acc: 'y3' });
   },
-  cues: () => [[0, 'dive', 0.9, 0, 1.3], [0.85, 'voxel', 0.7, 0], [1.3, 'micro_whoosh', 0.8, 0, 1.2], [2.0, 'cell_ticks', 0.5, 0.2, 0.6], [2.6, 'rush', 0.8, 0, 0.35],
-    [2.95, 'water_ticks', 0.7, 0, 1.6], [3.45, 'type', 0.4], [3.85, 'nuclei_glow', 0.9, 0], [4.1, 'zoom_jump', 0.8, 0, 0.7], [4.95, 'proton_tone', 0.9, 0], [5.2, 'moment_on', 0.9, 0.1], [5.35, 'type', 0.35]],
+  cues: () => [[0, 'dive', 0.9, 0, 1.3], [0.85, 'voxel', 0.7, 0], [1.3, 'micro_whoosh', 0.8, 0, 1.2], [2.0, 'cell_ticks', 0.5, 0.2, 0.6], [2.97, 'rush', 0.8, 0, 0.3],
+    [3.25, 'water_ticks', 0.7, 0, 1.3], [3.55, 'type', 0.4], [3.9, 'nuclei_glow', 0.9, 0], [4.25, 'zoom_jump', 0.8, 0, 0.6], [4.95, 'proton_tone', 0.9, 0], [5.2, 'moment_on', 0.9, 0.1], [5.35, 'type', 0.35]],
 };
 })();

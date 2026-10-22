@@ -25,6 +25,7 @@ const sig = (tt, stage) => {
 };
 function wire(c, x0, y0, x1, y1, col = 'g6') { PIX.bline(c, x0, y0, x1, y1, col); PIX.bline(c, x0 + 1, y0, x1 + 1, y1, 'g3'); }
 SC['s08_signal'] = {
+  xin: 0.3,
   init() { slice(); },
   draw(c, t, S) {
     PIX.rect(c, 0, 0, W, H, 'n0');
@@ -45,7 +46,7 @@ SC['s08_signal'] = {
     const loopPt = a => [COIL.x + Math.cos(a) * COIL.rx, COIL.y + Math.sin(a) * COIL.ry];
     for (let k = 0; k < 48; k++) { const a0 = k / 48 * TAU, a1 = (k + 1) / 48 * TAU; if (Math.cos(a0) > 0) continue; const [x0, y0] = loopPt(a0), [x1, y1] = loopPt(a1); PIX.bline(c, x0, y0, x1, y1, 'u1'); }
     MICRO.arrow(c, SL.x, SL.y, SL.x + mx * 52 * m, SL.y + my * 52 * m * 0.55, 'w', 'w', 8, 3);
-    PIX.text(c, 'Mxy', SL.x + mx * 52 * m + (mx > 0 ? 4 : -22), SL.y + my * 29 * m - 4, 'w');
+    if (t < 2.4) PIX.text(c, 'Mxy', SL.x + mx * 52 * m + (mx > 0 ? 4 : -22), SL.y + my * 29 * m - 4, 'w');
     for (let k = 0; k < 48; k++) { const a0 = k / 48 * TAU, a1 = (k + 1) / 48 * TAU; if (Math.cos(a0) <= 0) continue; const [x0, y0] = loopPt(a0), [x1, y1] = loopPt(a1); PIX.bline(c, x0, y0, x1, y1, glow > 0.55 ? 'e2' : 'u2'); PIX.bline(c, x0 + 1, y0, x1 + 1, y1, 'u1'); }
     // --- the chain ---
     wire(c, WIRE_X, COIL.y + COIL.ry, WIRE_X, Y_AMP - 14); wire(c, WIRE_X, Y_AMP + 14, WIRE_X, Y_PROC - 22); wire(c, WIRE_X, Y_PROC + 22, WIRE_X, Y_ADC - 22); wire(c, WIRE_X, Y_ADC + 22, WIRE_X, Y_OUT);

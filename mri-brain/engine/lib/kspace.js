@@ -40,8 +40,8 @@ KSP.slice = z => {
 KSP.recon = (K, R = 1e9, rows = N) => {
   const re = new Float64Array(N * N), im = new Float64Array(N * N);
   for (let y = 0; y < Math.min(rows, N); y++) for (let x = 0; x < N; x++) {
-    if ((x - N / 2) ** 2 + (y - N / 2) ** 2 > R * R) continue;
-    const d = ((y + N / 2) % N) * N + ((x + N / 2) % N); re[d] = K.kr[y * N + x]; im[d] = K.ki[y * N + x];
+    const r = Math.hypot(x - N / 2, y - N / 2), wgt = Math.min(1, Math.max(0, R - r + 1)); if (wgt <= 0) continue;
+    const d = ((y + N / 2) % N) * N + ((x + N / 2) % N); re[d] = K.kr[y * N + x] * wgt; im[d] = K.ki[y * N + x] * wgt;
   }
   fft2(re, im, true);
   const out = new Float32Array(N * N); for (let i = 0; i < N * N; i++) out[i] = Math.min(1, Math.hypot(re[i], im[i]));

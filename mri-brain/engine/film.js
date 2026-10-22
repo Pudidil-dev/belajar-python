@@ -23,7 +23,13 @@ function drawScene(c, e, lt) {
   c.fillStyle = PIX.P.k; c.fillRect(0, 0, W, H);
   const s = SC[e.id];
   if (!s) { PIX.text(c, 'MISSING ' + e.id, 10, 10, 'w'); return; }
-  c.save(); s.draw(c, lt, { id: e.id, dur: e.dur, t: e.t0 + lt }); c.restore();
+  const cur = cc => { cc.save(); s.draw(cc, lt, { id: e.id, dur: e.dur, t: e.t0 + lt }); cc.restore(); cc.setTransform(1, 0, 0, 1, 0, 0); };
+  const i = ERAS.indexOf(e), pe = i > 0 ? ERAS[i - 1] : null;
+  if (s.xin && pe && lt < s.xin && SC[pe.id]) {
+    // a dithered dissolve from the previous scene's last frame: no hard cut between connected shots
+    const prev = cc => { cc.save(); SC[pe.id].draw(cc, pe.dur - 1 / 120, { id: pe.id, dur: pe.dur, t: pe.t1 - 1 / 120 }); cc.restore(); cc.setTransform(1, 0, 0, 1, 0, 0); };
+    window.dissolve(c, prev, cur, MO.smooth(lt / s.xin));
+  } else cur(c);
   c.setTransform(1, 0, 0, 1, 0, 0);
 }
 // dither dissolve inside a scene: draws A on c, B offscreen, then shows B where the Bayer threshold is below p

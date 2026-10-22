@@ -106,7 +106,7 @@ MICRO.water = (c, cam, t, o = {}) => {
   const i0 = Math.floor((cam.x - R) / sp), i1 = Math.ceil((cam.x + R) / sp), j0 = Math.floor((cam.y - R) / sp), j1 = Math.ceil((cam.y + R) / sp);
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     if (o.skip && i === o.skip[0] && j === o.skip[1]) continue;
-    const [x, y, a] = MICRO.waterAt(i, j, t);
+    const [x, y, a] = MICRO.waterAt(i, j, cam.s * 0.31 < 4 ? 0 : t);            // too fine to read motion: hold still (no shimmer)
     if (cam.s * 0.31 < 2.2) { c.fillStyle = (i + j) % 3 ? P.n4 : P.g8; c.fillRect(x - 0.6 / cam.s, y - 0.6 / cam.s, 1.2 / cam.s, 1.2 / cam.s); continue; }
     MICRO.h2o(c, x, y, a, { s: cam.s, nuc: o.nuc || 0 });
   }
