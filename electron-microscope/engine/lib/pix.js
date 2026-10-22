@@ -214,21 +214,32 @@ function vgrad(c, x, y, w, h, stops) {
 // ---------- Kurzgesagt label: leader line grows, text types at ~40 chars/s, holds, erases ----------
 // o: {ax, ay} anchor (screen px), {tx, ty} text cap-top position, t = local time, t0 start, t1 end,
 //    col, lineCol, align ('left'|'right'|'center'), sc (font scale), dot (bool)
+// Labels type on at RATE characters/s (after a 0.12 s lead-in for the leader line), hold, and leave with a short
+// dithered fade at t1 (FADE s) — never by un-typing, which erased long lines before anyone could read them.
+const RATE = 60, FADE = 0.25;
 function label(c, o, t) {
   const t0 = o.t0 ?? 0, t1 = o.t1 ?? 1e9;
-  if (t < t0 || t > t1 + 0.6) return;
-  const grow = MO.cubicOut(U.clamp((t - t0) / 0.22));
-  const shown = t <= t1 ? Math.floor((t - t0 - 0.12) * (o.rate || 40)) : o.text.length - Math.floor((t - t1) * 70);
-  const lineK = t <= t1 ? grow : U.clamp(1 - (t - t1 - 0.25) / 0.2);
-  const lc = o.lineCol || 'g6', sc = o.sc || 1;
-  if (o.ax != null && lineK > 0) {
-    const ex = o.lx ?? (o.align === 'right' ? o.tx + 2 : o.align === 'center' ? o.tx : o.tx - 2), ey = o.ly ?? (o.ty + 3 * sc);
-    bline(c, o.ax, o.ay, U.lerp(o.ax, ex, lineK), U.lerp(o.ay, ey, lineK), lc);
+  if (t < t0 || t > t1 + FADE) return;
+  const grow = MO.cubicOut(U.clamp((t - t0) / 0.22)), sc = o.sc || 1, len = [...o.text].length;
+  const n = U.clamp(Math.floor((t - t0 - 0.12) * (o.rate || RATE)), 0, len), a = t <= t1 ? 1 : U.clamp(1 - (t - t1) / FADE);
+  const lc = o.lineCol || 'g6';
+  c.save(); c.globalAlpha *= a;
+  if (o.ax != null) {
+    // the leader stops at the edge of the text box nearest its anchor (it never runs through the words)
+    const w = textWidth(o.text) * sc, x0 = o.align === 'right' ? o.tx - w : o.align === 'center' ? o.tx - w / 2 : o.tx, x1 = x0 + w;
+    const yT = o.ty - 2, yB = o.ty + 8 * sc;
+    let ex, ey;
+    if (o.lx != null) { ex = o.lx; ey = o.ly ?? (o.ty + 3 * sc); }
+    else if (o.ax < x0 - 2) { ex = x0 - 3; ey = o.ty + 3 * sc; }
+    else if (o.ax > x1 + 2) { ex = x1 + 3; ey = o.ty + 3 * sc; }
+    else { ex = U.clamp(o.ax, x0, x1); ey = o.ay < o.ty ? yT - 1 : yB + 1; }
+    bline(c, o.ax, o.ay, U.lerp(o.ax, ex, grow), U.lerp(o.ay, ey, grow), lc);
     if (o.dot !== false) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P[lc]; c.fillRect(Math.round(o.ax) - 1, Math.round(o.ay) - 1, 2, 2); c.restore(); }
   }
-  const n = U.clamp(shown, 0, o.text.length);
   if (n > 0) text(c, o.text, o.tx, o.ty, o.col || 'w', { n, align: o.align, sc, shadow: o.shadow });
+  c.restore();
 }
 
-window.PIX = { W, H, P, PAL, rgba, hex, quantize, text, textWidth, px, bline, cam, layer, toScreen, flat, rectPath, circPath, polyPath, fill, rect, circ, line, glow, vgrad, label, BAYER };
+window.PIX = { W, H, P, PAL, rgba, hex, quantize, text, textWidth, px, bline, cam, layer, toScreen, flat, rectPath, circPath, polyPath, fill, rect, circ, line, glow, vgrad, label, BAYER, RATE, FADE };
+window.CAP_RATE = RATE;
 })();

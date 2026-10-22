@@ -146,15 +146,18 @@ function lvNano(c, fov, t, o = {}) {
       const ox = W / 2 + (tx_ * L - L / 2) * s, oy = H / 2 + (ty * L - L / 2) * s;
       if (ox > W + 4 || oy > H + 4 || ox + L * s < -4 || oy + L * s < -4) continue;
       for (const [a, , dx, dy] of N.bonds) { const p = N.pts[a]; PIX.bline(c, ox + p[0] * s, oy + p[1] * s, ox + (p[0] + dx) * s, oy + (p[1] + dy) * s, 'g3'); }
-      if (s > 9) for (const p of N.pts) R(c, Math.round(ox + p[0] * s) - 1, Math.round(oy + p[1] * s) - 1, 2, 2, 'g5');
+      if (s > 8) { c.save(); c.globalAlpha = kNet * clamp((s - 8) / 5); for (const p of N.pts) R(c, Math.round(ox + p[0] * s) - 1, Math.round(oy + p[1] * s) - 1, 2, 2, 'g5'); c.restore(); }   // fade in, no pop
     }
     c.restore();
   }
-  // gold atoms: the micrograph's own atoms in the central tile, random single atoms in every other tile
-  const kAu = clamp((s - 0.8) / 2), au = auNm(), rr_ = Math.max(1.2, 0.17 * s);
+  // gold atoms: the micrograph's own atoms in the central tile, random single atoms in every other tile. They fade in
+  // only once single atoms can be told apart (≥ 7 px per nm, a ~40 nm field): drawn at larger fields as 1-px dots at
+  // the real density they flooded the whole frame for a frame (~10⁵ dots), which no microscope would show at that scale
+  const kAu = clamp((s - 7) / 13), au = auNm(), rr_ = Math.max(1.2, 0.17 * s);
   if (kAu > 0) {
     const span = HA.IW * HA.NM, spanY = HA.IH * HA.NM, a0 = HA.AU[HA.HOOK];
     const nx = Math.ceil(nm / span / 2) + 1, ny = Math.ceil(nm * H / W / spanY / 2) + 1;
+    c.save(); c.globalAlpha = kAu;
     const dot = (x, y) => {
       if (x < -20 || y < -20 || x > W + 20 || y > H + 20) return;
       if (rr_ < 2.5) { R(c, Math.round(x), Math.round(y), 1, 1, 'y3'); if (rr_ > 1.6) R(c, Math.round(x) + 1, Math.round(y), 1, 1, 'y2'); }
@@ -167,6 +170,7 @@ function lvNano(c, fov, t, o = {}) {
         dot(W / 2 + ax * s, H / 2 + ay * s);
       }
     }
+    c.restore();
   }
 }
 // draw the dive at fov (metres)

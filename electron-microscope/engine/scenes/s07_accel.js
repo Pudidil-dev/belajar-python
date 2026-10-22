@@ -59,12 +59,14 @@ SC.s07_accel = {
     // labels
     const [tx, ty] = K.S(cam, X - 13, COL.accY(0)), [bx, by] = K.S(cam, X - 13, -221);
     CAP.note(c, lt, { text: '-200 kV', x: 14, y: ty + 18, ax: tx, ay: ty, t0: 0.4, t1: 2.6, col: 'w', lineCol: 'g6', box: true });
-    CAP.note(c, lt, { text: 'E-FIELD PUSHES ELECTRONS DOWN', x: 12, y: 404, t0: 1.6, t1: 4.6, col: 'y4', box: true });
+    // the arrows show the field (up); electrons are negative, so the force on them points down
+    CAP.note(c, lt, { text: 'FIELD ↑  FORCE ON ELECTRONS ↓', x: 12, y: 398, t0: 1.6, t1: 4.8, col: 'y4', box: true });
+    CAP.note(c, lt, { text: '(ELECTRONS ARE NEGATIVE)', x: 12, y: 410, t0: 2.3, t1: 4.8, col: 'g9', box: true });
     if (lt > 3.4) CAP.note(c, lt, { text: 'GROUND (0 V)', x: 14, y: by + 16, ax: bx, ay: by, t0: 3.6, t1: 6.6, col: 'w', lineCol: 'g6', box: true });
     CAP.scene(c, lt, { title: 'ELECTRON ACCELERATION', ctx: ['ACCELERATING VOLTAGE: 200 kV'], t0: 0.25, acc: 'y3' });
-    CAP.note(c, lt, { text: '200 keV = 70% OF LIGHT SPEED', x: W / 2, y: 418, t0: T_END + 0.15, col: 'c4', box: true, align: 'center' });
+    CAP.note(c, lt, { text: '70% OF LIGHT SPEED', x: W / 2, y: 418, t0: T_END - 0.1, col: 'c4', box: true, align: 'center' });
   },
   cues: () => [[0.0, 'glide', 0.8, 0, 0.9], [0.25, 'title_hit', 0.7], [T_LOCK - 0.3, 'lock_click', 0.8], [T_RIDE, 'accel_sweep', 1, 0, T_END - T_RIDE + 0.3],
-    ...CROSS.map((t, k) => [t, 'kick', 1, (k % 2 ? 0.25 : -0.25), k]), [T_END + 0.15, 'confirm', 0.8]],
+    ...CROSS.map((t, k) => [t, 'kick', 1, (k % 2 ? 0.25 : -0.25), k]), [T_END - 0.1, 'confirm', 0.8]],
 };
 })();

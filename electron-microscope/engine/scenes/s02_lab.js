@@ -8,9 +8,16 @@ const T0 = 3.0, T1 = 9.0;                                                  // fi
 const S02 = window.S02 = {};
 S02.cam = T => {
   const p = U.clamp((T - T0) / (T1 - T0)), M = LAB.MON;
-  const a = { x: M.cx + 4, y: M.cy + 16, z: 4.3 }, b = { x: -2, y: -172, z: 1.32 };
+  const a = { x: M.cx + 4, y: M.cy + 16, z: 4.3 }, b = { x: 12, y: -172, z: 1.32 };      // b: desk at left, racks at the right edge
   const e = MO.sineInOut(p), ez = 1 - Math.pow(1 - p, 1.6) * (1 - p * 0.35);   // zoom leads, framing follows
   return { x: U.lerp(a.x, b.x, MO.smooth(p)), y: U.lerp(a.y, b.y, e), z: CAM.zlerp(a.z, b.z, MO.smooth(U.clamp(ez))) };
+};
+// the electronics racks just right of the column: their label starts here and carries into S03's first moments
+S02.racksNote = (c, cam, lt, t0, t1) => {
+  const [rx, ry] = K.S(cam, LAB.AX + 72, -150);
+  if (rx > W + 2) return;
+  CAP.note(c, lt, { text: 'CONTROL', x: W - 20, y: ry - 60, ax: rx, ay: ry, t0, t1, col: 'w', lineCol: 'c2', box: true, align: 'right' });
+  CAP.note(c, lt, { text: 'ELECTRONICS', x: W - 20, y: ry - 49, t0: t0 + 0.12, t1, col: 'w', box: true, align: 'right' });
 };
 SC.s02_lab = {
   draw(c, lt) {
@@ -26,7 +33,8 @@ SC.s02_lab = {
     CAP.scene(c, lt, { title: 'ELECTRON MICROSCOPE', ctx: ['ABERRATION-CORRECTED STEM', '200 kV'], t0: 2.0, acc: 'c2' });
     const [gx, gy] = K.S(cam, LAB.AX - 22, -125);
     CAP.note(c, lt, { text: 'THE SAMPLE IS IN HERE', x: gx - 6, y: gy - 30, ax: gx, ay: gy, t0: 3.3, col: 'w', lineCol: 'g6', box: true, align: 'right' });
+    S02.racksNote(c, cam, lt, 3.55, 1e9);
   },
-  cues: [[0.2, 'ui_ticks', 0.6, -0.3, 0.8], [0.4, 'lab_whoosh', 1, 0, 4.4], [0.6, 'room_tone', 1, 0, 4.4], [2.0, 'title_hit'], [2.6, 'machine_hum', 1, 0, 2.4], [3.3, 'blip']],
+  cues: [[0.2, 'ui_ticks', 0.6, -0.3, 0.8], [0.4, 'lab_whoosh', 1, 0, 4.4], [0.6, 'room_tone', 1, 0, 4.4], [2.0, 'title_hit'], [2.6, 'machine_hum', 1, 0, 2.4], [3.3, 'blip'], [3.55, 'blip', 0.6, 0.4]],
 };
 })();

@@ -1,46 +1,47 @@
 // CAP — the film's text: a small scene caption (the brief's wording) with one context line underneath, top left, inside
 // the vertical-video safe area; event notes that type on where and when something happens; part labels with leader lines.
-// All text is the bitmap font, typed on at ~40 characters/s and erased at ~70 characters/s.
+// All text is the bitmap font, typed on at PIX.RATE characters/s; it leaves with a short dithered fade (PIX.FADE).
 (() => {
 const { W, H, P } = PIX;
 const CAP = window.CAP = {};
 const X0 = 12, Y0 = 44, LH = 11;
-const typed = (s, t, t0, t1) => {                       // characters visible at t (types on from t0, erases before t1)
+const typed = (s, t, t0, t1) => {                       // characters visible at t (types on from t0; gone after t1 + fade)
   const n = [...s].length;
-  if (t < t0) return 0;
-  const on = Math.floor((t - t0) * 40);
-  if (t1 == null) return Math.min(n, on);
-  const off = n - Math.floor((t - (t1 - n / 70)) * 70);
-  return Math.max(0, Math.min(n, on, t < t1 - n / 70 ? n : off));
+  if (t < t0 || (t1 != null && t > t1 + PIX.FADE)) return 0;
+  return Math.min(n, Math.floor((t - t0) * PIX.RATE));
 };
+const fadeK = (t, t1) => t1 == null || t <= t1 ? 1 : U.clamp(1 - (t - t1) / PIX.FADE);
 CAP.typed = typed;
 // scene caption: o = {title, ctx: string | [lines], t0, t1, acc (accent colour)}
 CAP.scene = (c, t, o) => {
-  const t0 = o.t0 ?? 0.15, t1 = o.t1;
-  const nT = typed(o.title, t, t0, t1);
+  const t0 = o.t0 ?? 0.15, t1 = o.t1, fa = fadeK(t, t1);
+  if (fa <= 0) return;
+  c.save(); c.globalAlpha *= fa;
+  // o.held: the title is already on screen (only the context line changes) — no retyping
+  const nT = o.held ? [...o.title].length : typed(o.title, t, t0, t1);
   if (nT > 0) {
-    const a = U.clamp((t - t0) / 0.12) * (t1 != null ? U.clamp((t1 - t) / 0.12) : 1);
-    if (a > 0) { PIX.rect(c, X0, Y0, 2, 7, o.acc || 'c2'); }
+    PIX.rect(c, X0, Y0, 2, 7, o.acc || 'c2');
     PIX.rect(c, X0 + 3, Y0 - 2, PIX.textWidth([...o.title].slice(0, nT).join('')) + 5, 11, 'k');
     PIX.text(c, o.title, X0 + 5, Y0, 'w', { n: nT });
   }
   const lines = o.ctx == null ? [] : Array.isArray(o.ctx) ? o.ctx : [o.ctx];
-  let tc = t0 + [...o.title].length / 40 + 0.15;
+  let tc = o.held ? t0 : t0 + [...o.title].length / PIX.RATE + 0.15;
   lines.forEach((s, i) => {
     const n = typed(s, t, tc, t1);
     if (n > 0) { PIX.rect(c, X0 + 3, Y0 + LH + i * LH, PIX.textWidth([...s].slice(0, n).join('')) + 5, 11, 'k'); PIX.text(c, s, X0 + 5, Y0 + LH + 2 + i * LH, 'g9', { n }); }
-    tc += [...s].length / 40 + 0.05;
+    tc += [...s].length / PIX.RATE + 0.05;
   });
+  c.restore();
 };
 // event note: o = {text, x, y, t0, t1, col, align, ax, ay (leader anchor, screen px), box}
 CAP.note = (c, t, o) => {
-  if (t < o.t0 || (o.t1 != null && t > o.t1 + 1)) return;
+  if (t < o.t0 || (o.t1 != null && t > o.t1 + PIX.FADE)) return;
   if (o.box) {
-    const n = Math.min(Math.max(0, Math.floor((t - o.t0 - 0.12) * (o.rate || 40))), [...o.text].length, [...o.text].length - (t > (o.t1 ?? 1e9) ? Math.floor((t - o.t1) * 70) : 0));
+    const n = Math.min(Math.max(0, Math.floor((t - o.t0 - 0.12) * (o.rate || PIX.RATE))), [...o.text].length);
     if (n > 0) {
       const w = PIX.textWidth([...o.text].slice(0, n).join(''));
       const x = o.align === 'center' ? o.x - PIX.textWidth(o.text) / 2 : o.align === 'right' ? o.x - PIX.textWidth(o.text) : o.x;
-      PIX.rect(c, Math.round(x) - 2, Math.round(o.y) - 2, w + 5, 11, 'k');
+      c.save(); c.globalAlpha *= fadeK(t, o.t1); PIX.rect(c, Math.round(x) - 2, Math.round(o.y) - 2, w + 5, 11, 'k'); c.restore();
     }
   }
   PIX.label(c, { ax: o.ax, ay: o.ay, tx: o.x, ty: o.y, text: o.text, t0: o.t0, t1: o.t1 ?? 1e9, col: o.col || 'w', lineCol: o.lineCol || 'g6', align: o.align, rate: o.rate }, t);

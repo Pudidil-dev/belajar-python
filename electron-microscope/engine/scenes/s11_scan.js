@@ -6,7 +6,7 @@
 // at each point. Once, the beam knocks an atom to a new site — electron beams can alter what they image.
 (() => {
 const { W, H } = PIX;
-const T_TOP = 2.75, T_SCAN = 3.1, T_DONE = 7.1;
+const T_TOP = 3.15, T_SCAN = 3.5, T_DONE = 7.1;
 let T_HOP = 6;
 // ---------- side diagram: deflection coils, pivot, objective, specimen plane ----------
 const DX = 135, YU = 118, YD = 178, YP = 232, YO = 290, YS = 372;
@@ -45,9 +45,9 @@ function measure() {
     for (let dy = -2; dy < 2; dy++) for (let dx = -2; dx < 2; dx++) { const X = Math.round(px + dx), Y = Math.round(py + dy); if (X >= 0 && Y >= 0 && X < HA.IW && Y < HA.IH) { s += HA.D[Y * HA.IW + X]; n++; } }
     VAL[j * NX + i] = n ? s / n : 0;
   }
-  // the atom that hops: the gold atom nearest the window's lower-left quarter
+  // the atom that hops: a gold atom in the upper part of the window (scanned early enough for its note to be read)
   let best = null;
-  HA.AU.forEach((a, k) => { if (k === HA.HOOK) return; const i = (a.x - (A0().x - NX * 0.05)) / 0.1, j = (a.y - (A0().y - NY * 0.05)) / 0.1; if (i > 3 && i < NX - 4 && j > 4 && j < NY - 4 && (!best || j > best.j)) best = { k, i, j }; });
+  HA.AU.forEach((a, k) => { if (k === HA.HOOK) return; const i = (a.x - (A0().x - NX * 0.05)) / 0.1, j = (a.y - (A0().y - NY * 0.05)) / 0.1; if (i > 3 && i < NX - 4 && j > 4 && j < NY - 4 && (!best || Math.abs(j - 6) < Math.abs(best.j - 6))) best = { k, i, j }; });
   HOP = best;
 }
 // scan progress: points visited — the first 8 points one per 16th note, then faster and faster until the frame is done
@@ -126,19 +126,21 @@ SC.s11_scan = {
       const v = sideView(c, lt);
       CAP.note(c, lt, { text: 'SCAN COILS', x: 18, y: YU - 30, ax: DX - 30, ay: YU - 4, t0: 0.3, t1: T_TOP - 0.1, col: 'u3', lineCol: 'u2', box: true });
       CAP.note(c, lt, { text: 'THEY TILT THE BEAM', x: 18, y: YU - 18, t0: 0.7, t1: T_TOP - 0.1, col: 'g9', box: true });
-      CAP.note(c, lt, { text: 'THE PROBE MOVES - THE SAMPLE STAYS', x: W / 2, y: YS + 34, t0: 1.1, t1: T_TOP - 0.85, col: 'c4', box: true, align: 'center', rate: 60 });
       if (lt > T_TOP - 0.3) window.dissolve(c, () => {}, cc => topView(cc, lt), MO.smooth((lt - T_TOP + 0.3) / 0.3));
     } else topView(c, lt);
-    if (lt > T_SCAN && lt < 4.6) CAP.note(c, lt, { text: 'POINT BY POINT', x: W - 14, y: 62, t0: T_SCAN + 0.1, t1: 4.1, col: 'c4', box: true, align: 'right' });
-    if (lt > 4.1 && lt < 6.2) CAP.note(c, lt, { text: 'LINE BY LINE', x: W - 14, y: 62, t0: 4.3, t1: 5.9, col: 'c4', box: true, align: 'right' });
-    CAP.note(c, lt, { text: 'HUNDREDS OF ELECTRONS PER POINT', x: W / 2, y: 462, t0: 3.6, t1: 5.1, col: 'g9', box: true, align: 'center', rate: 60 });
-    CAP.note(c, lt, { text: 'THE BEAM CAN MOVE ATOMS', x: W / 2, y: 462, t0: T_HOP + 0.1, t1: 7.8, col: 'y4', box: true, align: 'center', rate: 60 });
-    CAP.scene(c, lt, { title: 'RASTER SCANNING', ctx: lt < T_TOP ? ['ELECTRON OPTICS STEER THE PROBE'] : ['SCANNED PIXEL BY PIXEL'], t0: lt < T_TOP ? 0.2 : T_TOP + 0.05, t1: lt < T_TOP ? T_TOP - 0.05 : 7.9, acc: 'c2' });
+    // bottom rows (below the detector trace): the key line runs from the side view into the top view, where the probe
+    // visibly moves over atoms that stay put; then the electron count, then the hop (t1 leaves it gone before s12's dive)
+    CAP.note(c, lt, { text: 'THE PROBE MOVES - THE SAMPLE STAYS', x: W / 2, y: 462, t0: 1.1, t1: 3.85, col: 'c4', box: true, align: 'center' });
+    CAP.note(c, lt, { text: 'HUNDREDS OF ELECTRONS PER POINT', x: W / 2, y: 450, t0: 3.85, t1: 6.6, col: 'g9', box: true, align: 'center' });
+    CAP.note(c, lt, { text: 'THE BEAM CAN MOVE ATOMS', x: W / 2, y: 462, t0: Math.max(4.15, T_HOP + 0.05), t1: 7.7, col: 'y4', box: true, align: 'center' });
+    if (lt > T_SCAN && lt < 5.1) CAP.note(c, lt, { text: 'POINT BY POINT', x: W - 14, y: 62, t0: T_SCAN + 0.05, t1: 4.8, col: 'c4', box: true, align: 'right' });
+    if (lt > 4.8 && lt < 6.9) CAP.note(c, lt, { text: 'LINE BY LINE', x: W - 14, y: 62, t0: 5.1, t1: 6.6, col: 'c4', box: true, align: 'right' });
+    CAP.scene(c, lt, { title: 'RASTER SCANNING', ctx: lt < T_TOP ? ['ELECTRON OPTICS STEER THE PROBE'] : ['SCANNED PIXEL BY PIXEL'], t0: lt < T_TOP ? 0.2 : T_TOP + 0.05, held: lt >= T_TOP, t1: lt < T_TOP ? null : 7.75, acc: 'c2' });
   },
   cues: () => {
-    const out = [[0.2, 'title_hit', 0.7], [0.0, 'scan_sweep', 1, 0, 2.6], [0.3, 'blip', 0.6, -0.3], [T_TOP - 0.3, 'swoosh', 0.7]];
+    const out = [[0.2, 'title_hit', 0.7], [0.0, 'scan_sweep', 1, 0, T_TOP - 0.2], [0.3, 'blip', 0.6, -0.3], [1.1, 'blip', 0.5, 0.2], [T_TOP - 0.3, 'swoosh', 0.7]];
     for (let k = 0; k < 8; k++) out.push([T_SCAN + k / 8, 'scan_tick', 1, (k / 8 - 0.5) * 0.8, k]);
-    out.push([T_SCAN + NX / 8, 'scan_roll', 1, 0, 7.9 - T_SCAN - NX / 8],  [3.6, 'blip', 0.5, 0.2]);
+    out.push([T_SCAN + NX / 8, 'scan_roll', 1, 0, 7.9 - T_SCAN - NX / 8], [3.85, 'blip', 0.5, 0.2]);
     return out;
   },
 };

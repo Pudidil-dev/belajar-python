@@ -2,12 +2,12 @@
 // on and its lines crowd onto the tip's point. The camera dives down the tip to its apex (radius ~100 nm, field
 // ~5 V/nm) and rolls so the surface faces right. The barrier diagram appears over the surface atoms: the metal's
 // electrons sit below a 4.5 eV wall; when the field tilts it, the wall is only ~1 nm thick and the electron's wave
-// leaks through — tunnelling. Past the barrier each one becomes a cyan electron. Then back out: a narrow jet leaves
-// the apex and threads the anode's hole toward the accelerator.
+// leaks through — tunnelling. Past the barrier each one becomes a cyan electron. Then a quick dissolve back to the
+// column: a narrow beam leaves the tip and threads the anode's hole toward the accelerator.
 (() => {
 const { W, H } = PIX;
 const X = LAB.AX, Y = COL.Y;
-const T_FIELD = 0.55, T_DIVE = 1.3, T_XF = 1.85, T_SURF = 2.75, T_FON = 3.45, T_LEAK = 3.95, T_BACK = 5.6, T_COL = 6.75;
+const T_FIELD = 0.45, T_DIVE = 1.5, T_XF = 2.0, T_SURF = 3.25, T_FON = 3.75, T_LEAK = 4.25, T_BACK = 6.0, T_COL = 6.0;
 const fieldK = lt => MO.smooth(U.clamp((lt - T_FIELD) / 0.5));
 // column-world camera (before the dive and after the return)
 const camIn = lt => {
@@ -22,9 +22,7 @@ const camOut = lt => {
 };
 // dive / return field of view (m) and roll
 const fovIn = lt => Math.exp(Math.log(2.6e-3) + (Math.log(4.6e-9) - Math.log(2.6e-3)) * MO.smooth(U.clamp((lt - T_XF) / (T_SURF - T_XF))));
-const fovOut = lt => Math.exp(Math.log(4.6e-9) + (Math.log(2.6e-3) - Math.log(4.6e-9)) * MO.cubicIn(U.clamp((lt - T_BACK) / (T_COL + 0.1 - T_BACK))));
 const rollIn = lt => -Math.PI / 2 * MO.smooth(U.clamp((lt - T_XF - 0.25) / 0.6));
-const rollOut = lt => -Math.PI / 2 * (1 - MO.smooth(U.clamp((lt - T_BACK - 0.1) / 0.7)));
 const OX = -38;                                                              // apex offset (px) in the rolled views
 // the tip/apex/surface views for a field of view
 function micro(c, fov, rot, lt, o = {}) {
@@ -36,20 +34,7 @@ function micro(c, fov, rot, lt, o = {}) {
   }
 }
 // electrons tunnelled out (barrier phase): born at the exit point at fixed times, accelerating to the right
-const BORN = [4.05, 4.32, 4.5, 4.78, 4.93, 5.12, 5.3, 5.42, 5.55];
-// electrons leaving the apex during the return (tip frame px)
-function jet(c, lt, fov, rot) {
-  const s = W / (fov * 1e9), cx = W / 2 + OX * Math.abs(rot) / (Math.PI / 2), cy = H / 2;
-  for (let i = 0; i < 26; i++) {
-    const t0 = T_BACK - 0.6 + i * 0.07, age = lt - t0; if (age < 0) continue;
-    const d = 0.5 + age * age * 60 * Math.pow(fov / 4.6e-9, 0.5);          // nm from the apex, growing with time and scale
-    const ang = (U.hash(i, 5) - 0.5) * 0.5;
-    const lx = Math.sin(ang) * d * s, ly = d * s;                            // tip frame: +y away from the apex
-    const X_ = cx + lx * Math.cos(rot) - ly * Math.sin(rot), Y_ = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
-    if (X_ < -10 || Y_ < -10 || X_ > W + 10 || Y_ > H + 10) continue;
-    FX.e(c, X_, Y_, 2, 1);
-  }
-}
+const BORN = [4.35, 4.62, 4.8, 5.08, 5.23, 5.42, 5.6, 5.72, 5.85];
 SC.s06_emission = {
   camAt: lt => lt < T_XF ? camIn(lt) : camOut(lt),
   draw(c, lt) {
@@ -72,14 +57,13 @@ SC.s06_emission = {
     if (lt < T_XF) {
       const cam = camIn(lt); colView(c, cam, 0);
       const [tx, ty] = K.S(cam, X, Y.tip), [ax, ay] = K.S(cam, X + 9, Y.anode);
-      CAP.note(c, lt, { text: 'TUNGSTEN TIP', x: tx + 46, y: ty - 40, ax: tx + 3, ay: ty - 4, t0: 0.35, t1: T_XF - 0.2, col: 'w', lineCol: 'g6', box: true });
-      CAP.note(c, lt, { text: 'EXTRACTION ANODE', x: Math.min(W - 100, ax + 10), y: ay + 22, ax, ay: ay + 2, t0: 0.6, t1: T_XF - 0.2, col: 'w', lineCol: 'g6', box: true });
-      CAP.note(c, lt, { text: 'STRONG ELECTRIC FIELD', x: 30, y: ty + 46, ax: tx - 6, ay: ty + 12, t0: 0.85, t1: T_XF - 0.2, col: 'u3', lineCol: 'u2', box: true });
+      CAP.note(c, lt, { text: 'TUNGSTEN TIP', x: tx + 46, y: ty - 40, ax: tx + 3, ay: ty - 4, t0: 0.3, t1: T_XF - 0.15, col: 'w', lineCol: 'g6', box: true });
+      CAP.note(c, lt, { text: 'STRONG ELECTRIC FIELD', x: 30, y: ty + 46, ax: tx - 6, ay: ty + 12, t0: 0.45, t1: T_XF - 0.15, col: 'u3', lineCol: 'u2', box: true });
+      CAP.note(c, lt, { text: 'ANODE', x: Math.min(W - 40, ax + 10), y: ay + 22, ax, ay: ay + 2, t0: 0.7, t1: T_XF - 0.15, col: 'w', lineCol: 'g6', box: true });
       if (lt > T_XF - 0.22) { const k = (lt - (T_XF - 0.22)) / 0.22; window.dissolve(c, () => {}, cc => micro(cc, fovIn(T_XF), 0, lt), MO.smooth(k)); }
     } else if (lt < T_SURF) {
       const fov = fovIn(lt), rot = rollIn(lt); micro(c, fov, rot, lt);
       SAMPLE.scaleBar(c, fov, 1);
-      if (fov < 3e-6 && fov > 1.5e-7) CAP.note(c, lt, { text: 'APEX RADIUS ~100 nm', x: 150, y: 120, t0: 2.05, t1: 2.6, col: 'w', box: true });
     } else if (lt < T_BACK) {
       const fov = 4.6e-9, s = W / (fov * 1e9), xs = W / 2 + OX;
       GUN.surface(c, fov, -Math.PI / 2, lt, { ox: OX });
@@ -102,21 +86,21 @@ SC.s06_emission = {
       CAP.note(c, lt, { text: 'BARRIER', x: xs + 40, y: 164, ax: xs + 6, ay: info.yF - 70, t0: T_SURF + 0.55, t1: T_BACK - 0.1, col: 'w', lineCol: 'g6', box: true });
       CAP.note(c, lt, { text: 'FIELD THINS IT TO ~1 nm', x: xs + 40, y: 176, t0: T_FON + 0.3, t1: T_BACK - 0.1, col: 'u3', box: true });
       CAP.note(c, lt, { text: 'THE WAVE LEAKS THROUGH', x: W - 8, y: 350, ax: Math.min(W - 30, info.xTurn + 14), ay: info.yF + 8, t0: T_LEAK + 0.1, t1: T_BACK - 0.1, col: 'c3', lineCol: 'c2', box: true, align: 'right' });
-      if (lt > T_LEAK + 0.6) PIX.text(c, 'wave amplitude exaggerated', W - 6, 452, 'g5', { align: 'right', shadow: null });
-    } else if (lt < T_COL) {
-      const fov = fovOut(lt), rot = rollOut(lt); micro(c, fov, rot, lt); jet(c, lt, fov, rot);
-      SAMPLE.scaleBar(c, fov, 1 - U.clamp((lt - T_COL + 0.3) / 0.3));
+      if (lt > T_LEAK + 0.6) PIX.text(c, 'wave amplitude exaggerated', W - 6, 452, 'g8', { align: 'right', shadow: null });
     } else {
-      const cam = camOut(lt), k = U.clamp((lt - T_COL) / 0.25);
-      if (k < 1) window.dissolve(c, cc => { micro(cc, fovOut(T_COL), 0, lt); jet(cc, lt, fovOut(T_COL), 0); }, cc => colView(cc, cam, 1), MO.smooth(k));
+      // a quick dissolve back to the column (no second powers-of-ten zoom): the beam leaves the tip
+      const cam = camOut(lt), k = U.clamp((lt - T_COL) / 0.3);
+      if (k < 1) window.dissolve(c, cc => micro(cc, 4.6e-9, -Math.PI / 2, lt), cc => colView(cc, cam, 1), MO.smooth(k));
       else colView(c, cam, 1);
       const [tx, ty] = K.S(cam, X, -250);
-      CAP.note(c, lt, { text: 'A NARROW ELECTRON BEAM', x: W - 8, y: ty - 6, ax: tx + 2, ay: ty, t0: T_COL + 0.4, col: 'c4', lineCol: 'c2', box: true, align: 'right' });
+      CAP.note(c, lt, { text: 'A NARROW ELECTRON BEAM', x: W - 8, y: ty - 6, ax: tx + 2, ay: ty, t0: T_COL + 0.2, col: 'c4', lineCol: 'c2', box: true, align: 'right' });
     }
+    if (lt > T_XF && lt < T_SURF + 0.9 + PIX.FADE && fovIn(Math.min(lt, T_SURF)) < 3e-6)
+      CAP.note(c, lt, { text: 'APEX RADIUS ~100 nm', x: 150, y: 120, t0: 2.6, t1: T_SURF + 0.9, col: 'w', box: true });
     CAP.scene(c, lt, { title: 'FIELD EMISSION', ctx: ['ELECTRONS TUNNEL OUT', 'OF A TUNGSTEN TIP'], t0: 0.3, acc: 'c2' });
   },
-  cues: () => [[0.0, 'glide', 1, 0, 1.2], [T_FIELD, 'field_on', 1, 0, 0.6], [0.35, 'blip', 0.6, 0.3], [0.6, 'blip', 0.6, -0.3], [0.3, 'title_hit', 0.7],
+  cues: () => [[0.0, 'glide', 1, 0, 1.2], [T_FIELD, 'field_on', 1, 0, 0.6], [0.45, 'blip', 0.6, -0.3], [0.7, 'blip', 0.6, 0.3], [0.3, 'title_hit', 0.7], [2.6, 'blip', 0.5, 0.3],
     [T_DIVE, 'dive', 1, 0, T_SURF - T_DIVE], [T_SURF, 'reveal', 0.7], [T_FON, 'tilt_tone', 1, 0, 0.6], [T_LEAK, 'leak', 1, 0.2, 0.8],
-    ...BORN.map((t, i) => [t, 'emit', 1, 0.2 + i * 0.05, i]), [T_BACK, 'whoosh_back', 1, 0, 1.2], [T_COL, 'beam_on', 1, 0, 1.2]],
+    ...BORN.map((t, i) => [t, 'emit', 1, 0.2 + i * 0.05, i]), [T_BACK, 'whoosh_back', 0.8, 0, 0.5], [T_COL + 0.05, 'beam_on', 1, 0, 1.4]],
 };
 })();

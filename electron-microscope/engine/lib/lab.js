@@ -40,7 +40,7 @@ LAB.screen = (t, o = {}) => {
   c.save(); c.translate(MON.ix, MON.iy); HA.draw(c, 0, 0, HA.IW, HA.IH, { rows: o.rows, cols: o.cols }); c.restore();
   if ((o.rows ?? HA.IH) < HA.IH - 1) { const y = MON.iy + Math.floor(o.rows) + 1; R(c, MON.ix, y, HA.IW, 1, 'c0'); }
   const sb = 1 / HA.NM;                                                   // 1 nm = 40 px
-  R(c, MON.ix + 14, MON.iy + HA.IH - 16, sb, 3, 'w'); PIX.text(c, '1 nm', MON.ix + 14 + sb / 2, MON.iy + HA.IH - 27, 'w', { align: 'center' });
+  R(c, MON.ix + 26, MON.iy + HA.IH - 16, sb, 3, 'w'); PIX.text(c, '1 nm', MON.ix + 26 + sb / 2, MON.iy + HA.IH - 27, 'w', { align: 'center' });   // clear of the atom at the corner
   // scan settings
   const X = 296;
   box(c, X, 32, 270, 116, 'SCAN SETTINGS');

@@ -71,14 +71,15 @@ SC.s09_lens = {
     CAP.note(c, lt, { text: 'IRON POLE PIECE', x: 12, y: p1y - 74, ax: p1x, ay: p1y, t0: T_DIAG + 0.55, t1: 4.2, col: 'g9', lineCol: 'g6', box: true });
     CAP.note(c, lt, { text: 'MAGNETIC FIELD', x: 150, y: m1y + 66, ax: m1x, ay: m1y, t0: T_FIELD + 0.4, t1: 4.2, col: 'm4', lineCol: 'm2', box: true });
     CAP.note(c, lt, { text: 'FOCUS', x: fx + 22, y: fy - 3, ax: fx + 8, ay: fy, t0: T_RAYS + 1.25, col: 'w', lineCol: 'g6', box: true });
-    CAP.note(c, lt, { text: 'EACH ELECTRON SPIRALS AS IT FOCUSES', x: W / 2, y: 392, t0: T_RAYS + 0.9, t1: T_CUR0 - 1.0, col: 'y4', box: true, align: 'center', rate: 60 });
-    CAP.note(c, lt, { text: 'NO GLASS - ONLY A MAGNETIC FIELD', x: W / 2, y: 406, t0: T_RAYS + 1.4, t1: T_CUR0 - 1.0, col: 'g9', box: true, align: 'center', rate: 60 });
+    // three bottom lines that can share the screen; the current meter sits up by the coil
+    CAP.note(c, lt, { text: 'EACH ELECTRON SPIRALS AS IT FOCUSES', x: W / 2, y: 392, t0: T_RAYS + 0.4, t1: T_CUR0 + 0.8, col: 'y4', box: true, align: 'center' });
+    CAP.note(c, lt, { text: 'NO GLASS - ONLY A MAGNETIC FIELD', x: W / 2, y: 406, t0: T_RAYS + 0.8, t1: T_CUR0 + 1.0, col: 'g9', box: true, align: 'center' });
     // coil current meter: more current, stronger lens, focus moves up
     const kM = U.clamp((lt - T_CUR0 + 0.4) / 0.3);
     if (kM > 0) {
-      PIX.rect(c, 16, 384, 128, 34, 'k', kM);
-      FX.meter(c, 22, 388, 116, 0.55 + 0.45 * curK(lt), 'COIL CURRENT', curK(lt) > 0.02 ? '↑' : '', 'u2', kM);
-      CAP.note(c, lt, { text: 'MORE CURRENT = STRONGER FOCUS', x: W / 2, y: 428, t0: T_CUR0 + 0.3, col: 'u3', box: true, align: 'center', rate: 60 });
+      PIX.rect(c, 162, 84, 102, 32, 'k', kM);
+      FX.meter(c, 168, 88, 90, 0.55 + 0.45 * curK(lt), 'COIL CURRENT', curK(lt) > 0.02 ? '↑' : '', 'u2', kM);
+      CAP.note(c, lt, { text: 'MORE CURRENT = STRONGER FOCUS', x: W / 2, y: 428, t0: T_CUR0 + 0.3, col: 'u3', box: true, align: 'center' });
     }
     CAP.scene(c, lt, { title: 'ELECTROMAGNETIC LENS', ctx: ['MAGNETIC LENSES FOCUS ELECTRONS'], t0: 0.35, acc: 'm3' });
   },

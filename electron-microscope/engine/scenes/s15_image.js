@@ -81,11 +81,11 @@ SC.s15_image = {
         const [px, py] = HA.px(a.x, a.y), [wx, wy] = LAB.imgW(px, py), [sx, sy] = K.S(cam, wx, wy);
         const r = 5; for (let q = 0; q < 24; q++) { const an = q / 24 * U.TAU; PIX.rect(c, Math.round(sx + Math.cos(an) * r), Math.round(sy + Math.sin(an) * r), 1, 1, 'r2'); }
       });
-      PIX.rect(c, W - 104, 402, 92, 14, 'k'); PIX.text(c, `ATOMS FOUND: ${Math.round(HA.AU.length * k)}`, W - 16, 405, 'r3', { align: 'right' });
+      PIX.rect(c, W - 104, 334, 92, 14, 'k'); PIX.text(c, `ATOMS FOUND: ${Math.round(HA.AU.length * k)}`, W - 16, 337, 'r3', { align: 'right' });   // clear of the raft
     }
     CAP.note(c, lt, { text: 'THE DETECTOR BUILDS THE IMAGE', x: W / 2, y: 378, t0: T_BUILD + 1.4, t1: T_DONE - 0.2, col: 'w', box: true, align: 'center', rate: 60 });
     CAP.note(c, lt, { text: 'ONE PIXEL AT A TIME', x: W / 2, y: 391, t0: T_BUILD + 1.9, t1: T_DONE - 0.2, col: 'w', box: true, align: 'center', rate: 60 });
-    CAP.scene(c, lt, { title: lt < T_DONE ? 'BUILDING THE IMAGE' : 'ATOMIC-RESOLUTION IMAGE', ctx: lt < T_DONE ? ['SCANNED PIXEL BY PIXEL'] : ['ISOLATED GOLD ATOMS ON CARBON'], t0: lt < T_DONE ? 0.2 : T_DONE + 0.05, t1: 8.85, acc: 'c2' });
+    CAP.scene(c, lt, { title: lt < T_DONE ? 'BUILDING THE IMAGE' : 'ATOMIC-RESOLUTION IMAGE', ctx: lt < T_DONE ? ['SCANNED PIXEL BY PIXEL'] : ['GOLD ATOMS ON CARBON'], t0: lt < T_DONE ? 0.2 : T_DONE + 0.05, t1: 8.95, acc: 'c2' });
   },
   mon(c, lt) {
     const n = scanned(lt), rows = Math.floor(n / HA.IW), cols = Math.floor(n - rows * HA.IW), T = 99 + lt;

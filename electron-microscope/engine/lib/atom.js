@@ -28,7 +28,7 @@ ATOM.path = (b, Z, kappa, o = {}) => {
 };
 // coupling such that an electron passing gold at b = 10 px leaves at ~30°
 ATOM.KAPPA = (() => { let lo = 1e-4, hi = 10; for (let i = 0; i < 40; i++) { const m = Math.sqrt(lo * hi), a = Math.abs(ATOM.path(10, 79, m).ang); if (a < 0.52) lo = m; else hi = m; } return Math.sqrt(lo * hi); })();
-// the atom (screen px): r = cloud radius, Z for labels and the nucleus size; o: {pot (equipotential rings 0..1), t}
+// the atom (screen px): r = cloud radius, Z for labels and the nucleus size; o: {pot (equipotential rings 0..1), potCol, t}
 const SHELLS = { 79: [[0.06, 0.04, 1.0], [0.16, 0.06, 0.9], [0.3, 0.08, 0.8], [0.5, 0.1, 0.65], [0.72, 0.12, 0.45], [0.92, 0.1, 0.22]], 6: [[0.22, 0.1, 0.9], [0.75, 0.22, 0.55]] };
 ATOM.draw = (c, cx, cy, r, Z, o = {}) => {
   const t = o.t ?? 0, gold = Z > 20;
@@ -44,7 +44,7 @@ ATOM.draw = (c, cx, cy, r, Z, o = {}) => {
       let lo = 1, hi = 200; for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2, v = Z / 79 * 40 * Math.exp(-m / a) / m; if (v > V / 10) lo = m; else hi = m; }
       const rr = (lo + hi) / 2; if (rr < 2) continue;
       const n = Math.max(24, Math.round(rr * 2.4));
-      for (let q = 0; q < n; q++) { if (q % 3 === 2) continue; const an = q / n * U.TAU + t * 0.2; PIX.rect(c, Math.round(cx + Math.cos(an) * rr), Math.round(cy + Math.sin(an) * rr), 1, 1, 'r2'); }
+      for (let q = 0; q < n; q++) { if (q % 3 === 2) continue; const an = q / n * U.TAU + t * 0.2; PIX.rect(c, Math.round(cx + Math.cos(an) * rr), Math.round(cy + Math.sin(an) * rr), 1, 1, o.potCol || 'r2'); }
     }
     c.restore();
   }

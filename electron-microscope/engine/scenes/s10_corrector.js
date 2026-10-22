@@ -10,7 +10,7 @@ const { W, H } = PIX;
 const CX = 135, YC1 = 106, YC2 = 150, YC = 128, YL = 252, YS = 372, F = YS - YL, SL = 0.95;
 const HS = [-17, -12.5, -8, -3.5, 3.5, 8, 12.5, 17];
 const CSD = (1 / (F - 40) - 1 / F) / (17 * 17);
-const T_RAYS = 0.45, T_ON = 2.1, D_ON = 1.0, T_ZOOM = 3.55, T_PROBE = 4.15;
+const T_RAYS = 0.45, T_ON = 1.95, D_ON = 1.0, T_ZOOM = 4.0, T_PROBE = 4.5;
 const kOn = lt => MO.smooth(U.clamp((lt - T_ON) / D_ON));
 const ZC = document.createElement('canvas'); ZC.width = W; ZC.height = H; const ZX = ZC.getContext('2d', { willReadFrequently: true });
 function rays(c, lt, k) {
@@ -58,7 +58,7 @@ function diagram(c, lt) {
 // the probe's cross-section, full frame (s px per nm)
 function probeView(c, lt) {
   PIX.rect(c, 0, 0, W, H, 'k');
-  const s = 440, cy = 214, mix = MO.smooth(U.clamp((lt - T_PROBE - 0.35) / 1.0));
+  const s = 440, cy = 214, mix = MO.smooth(U.clamp((lt - T_PROBE - 0.2) / 0.8));
   // the gold atom for scale: dashed circle 0.29 nm across
   const ra = 0.145 * s; for (let q = 0; q < 64; q++) { if (q % 4 === 3) continue; const a = q / 64 * U.TAU; PIX.rect(c, Math.round(CX + Math.cos(a) * ra), Math.round(cy + Math.sin(a) * ra), 1, 1, 'y2'); }
   OPT.heat(c, CX, cy, s, OPT.BEFORE, OPT.AFTER, mix, OPT.AFTER.peak, { gamma: 0.5 });
@@ -89,22 +89,22 @@ SC.s10_corrector = {
       if (p > 0.55) window.dissolve(c, () => {}, cc => probeView(cc, lt), MO.smooth((p - 0.55) / 0.45));
     } else {
       const v = probeView(c, lt);
-      CAP.note(c, lt, { text: 'GOLD ATOM ~0.3 nm', x: CX + 24, y: v.cy - v.ra - 26, ax: CX + v.ra * 0.62, ay: v.cy - v.ra * 0.78, t0: T_PROBE + 0.2, col: 'y3', lineCol: 'y2', box: true });
-      CAP.note(c, lt, { text: 'PROBE SIZE: ~0.07 nm', x: CX, y: v.cy + 50, t0: T_PROBE + 1.25, col: 'w', box: true, align: 'center' });
-      CAP.note(c, lt, { text: 'STILL LIMITED BY DIFFRACTION', x: 16, y: 306, ax: CX - 0.17 * v.s, ay: v.cy + 8, t0: T_PROBE + 1.8, col: 'g8', lineCol: 'g5', box: true });
-      CAP.note(c, lt, { text: 'ILLUSTRATIVE BEST-CASE VALUE', x: W - 10, y: 452, t0: T_PROBE + 1.6, col: 'g6', box: true, align: 'right', rate: 70 });
+      CAP.note(c, lt, { text: 'GOLD ATOM ~0.3 nm', x: CX + 24, y: v.cy - v.ra - 26, ax: CX + v.ra * 0.62, ay: v.cy - v.ra * 0.78, t0: T_PROBE + 0.15, col: 'y3', lineCol: 'y2', box: true });
+      CAP.note(c, lt, { text: 'PROBE SIZE: ~0.07 nm', x: CX, y: v.cy + 50, t0: T_PROBE + 0.55, col: 'w', box: true, align: 'center' });
+      CAP.note(c, lt, { text: 'ILLUSTRATIVE BEST-CASE VALUE', x: CX, y: v.cy + 63, t0: T_PROBE + 0.75, col: 'g8', box: true, align: 'center' });
+      CAP.note(c, lt, { text: 'DIFFRACTION LIMIT', x: 16, y: 306, ax: CX - 0.17 * v.s, ay: v.cy + 8, t0: T_PROBE + 1.0, col: 'g9', lineCol: 'g5', box: true });
     }
     // diagram labels
     if (lt < T_ZOOM) {
-      CAP.note(c, lt, { text: 'OBJECTIVE LENS', x: 14, y: YL - 64, ax: CX - 60, ay: YL - 30, t0: 0.5, t1: T_ON - 0.3, col: 'g9', lineCol: 'g6', box: true });
-      CAP.note(c, lt, { text: 'OUTER RAYS FOCUS TOO SOON', x: 14, y: YS - 70, ax: CX - 3, ay: YS - 40, t0: 1.0, t1: T_ON + 0.4, col: 'u3', lineCol: 'u2', box: true });
-      CAP.note(c, lt, { text: 'MULTIPOLE CORRECTOR', x: 16, y: YC2 + 30, ax: CX - 58, ay: YC2 + 8, t0: T_ON - 0.1, t1: T_ZOOM - 0.15, col: 'm4', lineCol: 'm2', box: true });
-      CAP.note(c, lt, { text: '12 POLES', x: 228, y: 104, t0: T_ON + 0.2, t1: T_ZOOM - 0.15, col: 'g8', box: true, align: 'center' });
-      CAP.note(c, lt, { text: 'ALL RAYS MEET', x: 14, y: YS - 70, ax: CX - 2, ay: YS - 2, t0: T_ON + D_ON - 0.1, t1: T_ZOOM - 0.15, col: 'y4', lineCol: 'y2', box: true });
+      CAP.note(c, lt, { text: 'OBJECTIVE LENS', x: 14, y: YL - 64, ax: CX - 60, ay: YL - 30, t0: 0.45, t1: T_ON - 0.2, col: 'g9', lineCol: 'g6', box: true });
+      CAP.note(c, lt, { text: 'OUTER RAYS FOCUS TOO SOON', x: 14, y: YS - 70, ax: CX - 3, ay: YS - 40, t0: 0.7, t1: T_ON + 0.4, col: 'u3', lineCol: 'u2', box: true });
+      CAP.note(c, lt, { text: 'MULTIPOLE CORRECTOR', x: 16, y: YC2 + 30, ax: CX - 58, ay: YC2 + 8, t0: T_ON - 0.2, t1: T_ZOOM - 0.1, col: 'm4', lineCol: 'm2', box: true });
+      CAP.note(c, lt, { text: '12 POLES', x: 228, y: 104, t0: T_ON + 0.1, t1: T_ZOOM - 0.1, col: 'g8', box: true, align: 'center' });
+      CAP.note(c, lt, { text: 'ALL RAYS MEET', x: 14, y: YS - 70, ax: CX - 2, ay: YS - 2, t0: T_ON + 0.7, t1: T_ZOOM - 0.1, col: 'y4', lineCol: 'y2', box: true });
     }
-    CAP.scene(c, lt, { title: 'ABERRATION CORRECTION', ctx: lt < T_PROBE ? ['ROUND LENSES BEND OUTER RAYS TOO MUCH'] : ['ATOMIC-SCALE ELECTRON PROBE'], t0: lt < T_PROBE ? 0.35 : T_PROBE + 0.1, acc: 'm3' });
+    CAP.scene(c, lt, { title: 'ABERRATION CORRECTION', ctx: lt < T_PROBE ? ['ROUND LENSES BEND OUTER RAYS TOO MUCH'] : ['ATOMIC-SCALE ELECTRON PROBE'], t0: lt < T_PROBE ? 0.35 : T_PROBE + 0.1, held: lt >= T_PROBE, acc: 'm3' });
   },
-  cues: [[0.35, 'title_hit', 0.7], [T_RAYS, 'beam_focus', 0.8, 0, 1.4], [1.0, 'blip', 0.6, -0.3], [T_ON - 0.1, 'tune_clicks', 1, 0, D_ON], [T_ON + 0.1, 'field_hum', 0.8, 0, 1.2],
-    [T_ON + D_ON - 0.1, 'focus_lock'], [T_ZOOM, 'zoom_punch', 1, 0, T_PROBE - T_ZOOM], [T_PROBE + 0.35, 'focus_sweep', 1, 0, 1.0], [T_PROBE + 1.25, 'crystal', 1, 0], [T_PROBE + 1.8, 'blip', 0.6, -0.3]],
+  cues: [[0.35, 'title_hit', 0.7], [T_RAYS, 'beam_focus', 0.8, 0, 1.4], [0.7, 'blip', 0.6, -0.3], [T_ON - 0.1, 'tune_clicks', 1, 0, D_ON], [T_ON + 0.1, 'field_hum', 0.8, 0, 1.2],
+    [T_ON + D_ON - 0.1, 'focus_lock'], [T_ZOOM, 'zoom_punch', 1, 0, T_PROBE - T_ZOOM], [T_PROBE + 0.2, 'focus_sweep', 1, 0, 0.8], [T_PROBE + 0.55, 'crystal', 1, 0], [T_PROBE + 1.0, 'blip', 0.6, -0.3]],
 };
 })();

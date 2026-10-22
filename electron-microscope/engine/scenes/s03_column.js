@@ -14,7 +14,6 @@ const camAt = lt => CAM.at(KEYS(), lt);
 const cutY = lt => U.lerp(-306, 2, MO.sineInOut(U.clamp((lt - T_CUT0) / (T_CUT1 - T_CUT0))));
 // parts: [label, t, anchor (cm), box [x0, y0, x1, y1] (cm), side]
 const PARTS = [
-  ['CONTROL ELECTRONICS', 0.35, [X + 88, -150], [X + 66, -206, X + 158, 0], 'L'],
   ['VACUUM PUMPS', 1.0, [X - 40, -131], [X - 46, -140, X - 22, -122], 'L'],
   ['ELECTRON GUN', 2.75, [X, Y.tip], [X - 17, -266, X + 17, -248], 'R'],
   ['ACCELERATOR', 3.25, [X - 14, -236], [X - 16, -248, X + 16, -222], 'L'],
@@ -63,11 +62,12 @@ SC.s03_column = {
       outline(c, cam, box, k * (Math.floor((lt - t0) * 16) % 2 || lt - t0 > 0.25 ? 1 : 0.4));
       const [sx, sy] = K.S(cam, ax, ay);
       const tw = PIX.textWidth(name), tx = side === 'R' ? Math.min(W - 6 - tw, sx + 36) : Math.min(W - 6, Math.max(6 + tw, sx - 36));
-      CAP.note(c, lt, { text: name, x: tx, y: Math.max(76, sy - 16), ax: sx, ay: sy, t0, t1: name === 'SPECIMEN STAGE' || name === 'DETECTORS' ? 6.7 : t0 + 1.3, col: 'w', lineCol: 'c2', align: side === 'R' ? 'left' : 'right', box: true });
+      CAP.note(c, lt, { text: name, x: tx, y: Math.max(76, sy - 16), ax: sx, ay: sy, t0, t1: name === 'SPECIMEN STAGE' || name === 'DETECTORS' ? 6.9 : t0 + 1.55, col: 'w', lineCol: 'c2', align: side === 'R' ? 'left' : 'right', box: true });
     }
+    S02.racksNote(c, cam, lt, -1.45, 0.7);                                       // carried over from S02, still in view
     CAP.scene(c, lt, { title: 'INSIDE THE MICROSCOPE', ctx: 'THE ELECTRON PATH, TOP TO BOTTOM', t0: 1.0, t1: 6.8, acc: 'c2' });
   },
-  cues: [[0.0, 'approach', 1, 0, 2.6], [0.35, 'blip', 0.7, 0.4], [0.55, 'cut_sweep', 1, 0, 1.9], [1.0, 'blip', 0.7, -0.4], [1.0, 'title_hit', 0.7],
+  cues: [[0.0, 'approach', 1, 0, 2.6], [0.55, 'cut_sweep', 1, 0, 1.9], [1.0, 'blip', 0.7, -0.4], [1.0, 'title_hit', 0.7],
     [2.75, 'part', 1, 0.3, 0], [3.25, 'part', 1, -0.3, 1], [3.8, 'part', 1, 0.3, 2], [4.35, 'part', 1, -0.3, 3], [4.9, 'part', 1, 0.3, 4], [5.4, 'part', 1, 0.3, 5], [5.9, 'part', 1, -0.3, 6],
     [2.6, 'machine_hum', 0.8, 0, 4.2], [2.7, 'path_trace', 1, 0, 3.6]],
 };

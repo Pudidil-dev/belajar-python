@@ -2,11 +2,12 @@
 // matter wave. Two panels, same two gold atoms 0.29 nm apart: a visible-light wave (λ ≈ 500 nm) is far too coarse to
 // tell them apart, so its image is one blur; the 200 keV electron's wave (λ = h/p ≈ 0.0025 nm) is finer than the
 // atoms and its image shows both. More momentum, shorter wave: the electron's wave visibly tightens as p rises and its
-// image sharpens. Drawn not to scale (the real ratio is ~200,000×). Then back to the beam, heading for the lenses.
+// image sharpens. Drawn not to scale (light is drawn far too short, the electron ~9× too long; the real ratio is
+// ~200,000×), and each panel says so. Then back to the beam, heading for the lenses — whose flaws also limit detail.
 (() => {
 const { W, H } = PIX;
 const X = LAB.AX, Y = COL.Y;
-const T_PANEL = 1.05, T_LIGHT = 1.35, T_ELEC = 2.5, T_P0 = 3.0, T_P1 = 4.3, T_SUM = 4.6, T_BACK = 6.3;
+const T_PANEL = 1.05, T_LIGHT = 1.35, T_ELEC = 2.5, T_P0 = 3.0, T_P1 = 4.3, T_SUM = 4.5, T_FLAW = 5.0, T_BACK = 6.3;
 const pK = lt => MO.smooth(U.clamp((lt - T_P0) / (T_P1 - T_P0)));            // momentum ramp
 const kVAt = lt => 4 * Math.pow(50, pK(lt));                                   // 4 kV → 200 kV
 const lamNm = V => 1.2264 / Math.sqrt(V * 1000 * (1 + 0.97848e-6 * V * 1000));   // relativistic de Broglie wavelength, nm
@@ -43,6 +44,7 @@ function panel(c, y0, lt, o) {
     c.putImageData(img, ix, iy);
   }
   PIX.text(c, 'IMAGE', ix + iw / 2, iy - 10, 'g7', { align: 'center', shadow: null });
+  PIX.text(c, 'NOT TO SCALE', W - 12, y0 + 5, 'g8', { align: 'right', shadow: null });
   return { ax, ay, ix, iy, iw, ih };
 }
 SC.s08_wave = {
@@ -57,7 +59,6 @@ SC.s08_wave = {
       let pv = null;
       for (let q = -L; q <= L; q++) { const env = Math.exp(-((q / (L * 0.5)) ** 2)), xx = ex + 14 * env * Math.sin(q * 0.9 - lt * 20) * kW, yy = ey + q; if (pv) PIX.bline(c, pv[0], pv[1], xx, yy, 'c3'); pv = [xx, yy]; }
       FX.e(c, ex, ey, 3, 1, true);
-      CAP.note(c, lt, { text: 'ELECTRONS HAVE WAVELENGTHS', x: W / 2, y: 120, t0: 0.15, t1: 0.62, col: 'c4', box: true, align: 'center' });
       if (lt > T_PANEL) window.dissolve(c, () => {}, cc => SC.s08_wave.panels(cc, lt), MO.smooth((lt - T_PANEL) / 0.25));
     } else if (lt < T_BACK) this.panels(c, lt);
     else {
@@ -69,19 +70,26 @@ SC.s08_wave = {
       const k = U.clamp((lt - T_BACK) / 0.25);
       if (k < 1) window.dissolve(c, cc => this.panels(cc, T_BACK), col, MO.smooth(k)); else col(c);
     }
+    // the brief's line, from the wave packet into the panels (between the caption and the top panel)
+    CAP.note(c, lt, { text: 'ELECTRONS HAVE WAVELENGTHS', x: W / 2, y: 84, t0: 0.1, t1: 2.25, col: 'c4', box: true, align: 'center' });
     CAP.scene(c, lt, { title: 'WHY ELECTRONS?', ctx: ['THEY HAVE MUCH SHORTER WAVELENGTHS', 'THAN VISIBLE LIGHT'], t0: T_PANEL + 0.2, t1: 6.9, acc: 'c2' });
+    // the summary and the caveat share the bottom (two lines) and stay through the move back to the column
+    CAP.note(c, lt, { text: 'SHORTER WAVELENGTH, FINER DETAIL', x: W / 2, y: 428, t0: T_SUM, col: 'c4', box: true, align: 'center' });
+    CAP.note(c, lt, { text: 'BUT LENS FLAWS ALSO LIMIT DETAIL', x: W / 2, y: 442, t0: T_FLAW, col: 'u3', box: true, align: 'center' });
   },
   camEnd: () => ({ x: LAB.AX, y: -204, z: 7.5 }),
   panels(c, lt) {
     PIX.rect(c, 0, 0, W, H, 'k');
     const kL = U.clamp((lt - T_LIGHT) / 0.7), kE = U.clamp((lt - T_ELEC) / 0.5);
-    const a = panel(c, 96, lt, { k: kL, lam: 150, amp: 30, col: 'l2', glow: 'l0', fill: true, speed: 90, img: U.clamp((lt - T_LIGHT - 0.5) / 0.5), blur: 15 });
-    PIX.text(c, 'VISIBLE LIGHT', 16, 100, 'l2'); PIX.text(c, 'λ ≈ 500 nm', 16, 112, 'g8');
+    // light: one wave is ~1,700× the atom gap; even drawn far too short it spans the panel, so both atoms sit on one crest
+    const a = panel(c, 96, lt, { k: kL, lam: 380, amp: 34, col: 'l2', glow: 'l0', fill: true, speed: 160, img: U.clamp((lt - T_LIGHT - 0.5) / 0.5), blur: 15 });
+    PIX.text(c, 'VISIBLE LIGHT', 16, 100, 'l2'); PIX.text(c, 'λ ≈ 500 nm', 16, 112, 'g8'); PIX.text(c, 'ATOMS 0.29 nm APART', 16, 232, 'g8', { shadow: null });
     CAP.note(c, lt, { text: 'ONE BLUR', x: a.ix + a.iw / 2, y: a.iy + a.ih + 8, t0: T_LIGHT + 0.9, col: 'w', box: true, align: 'center' });
     const lam = lamE(lt);
     const b = panel(c, 262, lt, { k: kE, lam, amp: 9, col: 'c3', glow: 'c0', fill: false, speed: 55, img: U.clamp((lt - T_ELEC - 0.3) / 0.4), blur: U.lerp(9, 3.2, pK(lt)) });
     const kv = kVAt(lt), lnm = lamNm(kv);
     PIX.text(c, `ELECTRON  ${Math.round(kv)} keV`, 16, 266, 'c3'); PIX.text(c, `λ ≈ ${lnm < 0.0026 ? '0.0025' : lnm.toFixed(4)} nm`, 16, 278, 'g8');
+    if (lt > T_P1) PIX.text(c, '200,000x SHORTER THAN LIGHT', 16, 290, 'c4', { n: Math.floor((lt - T_P1) * PIX.RATE) });
     CAP.note(c, lt, { text: 'TWO ATOMS', x: b.ix + b.iw / 2, y: b.iy + b.ih + 8, t0: T_P1 - 0.1, col: 'w', box: true, align: 'center' });
     // λ = h / p, and a momentum meter that squeezes the wave
     if (lt > T_P0 - 0.3) {
@@ -90,11 +98,8 @@ SC.s08_wave = {
       PIX.text(c, 'λ = h / p', 26, 392, 'w', { sc: 1 });
       FX.meter(c, 88, 388, 86, U.lerp(0.25, 1, pK(lt)), 'MOMENTUM p', '', 'c3', k);
     }
-    CAP.note(c, lt, { text: 'SHORTER WAVELENGTH, FINER DETAIL', x: W / 2, y: 428, t0: T_SUM, col: 'c4', box: true, align: 'center' });
-    CAP.note(c, lt, { text: '~200,000x SHORTER THAN LIGHT  (NOT TO SCALE)', x: W / 2, y: 442, t0: T_SUM + 0.4, t1: 5.2, col: 'g7', box: true, align: 'center', rate: 70 });
-    CAP.note(c, lt, { text: 'BUT LENS FLAWS ALSO LIMIT DETAIL', x: W / 2, y: 442, t0: 5.9, col: 'u3', box: true, align: 'center', rate: 60 });
   },
   cues: [[0.1, 'wave_on', 1, 0, 0.9], [T_PANEL, 'swoosh', 0.8], [T_PANEL + 0.2, 'title_hit', 0.7], [T_LIGHT, 'light_wave', 1, -0.2, 1.4], [T_LIGHT + 0.9, 'blur_thud', 1, 0.3],
-    [T_ELEC, 'e_wave', 1, -0.2, 1.8], [T_P0, 'p_sweep', 1, 0, T_P1 - T_P0], [T_P1, 'crystal', 1, 0.3], [T_SUM, 'confirm', 0.9], [5.9, 'blip', 0.7], [T_BACK, 'whoosh_back', 0.8, 0, 0.7]],
+    [T_ELEC, 'e_wave', 1, -0.2, 1.8], [T_P0, 'p_sweep', 1, 0, T_P1 - T_P0], [T_P1, 'crystal', 1, 0.3], [T_SUM, 'confirm', 0.9], [T_FLAW, 'blip', 0.7], [T_BACK, 'whoosh_back', 0.8, 0, 0.7]],
 };
 })();

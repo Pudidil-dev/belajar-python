@@ -54,7 +54,7 @@ SC.s16_final = {
     if (lt > T_CHAIN && lt < T_BACK + 0.2) {
       CHAIN.forEach(([name, [wx, wy], col], i) => {
         const t0 = T_CHAIN + i * 0.2, k = U.clamp((lt - t0) / 0.15) * (1 - U.clamp((lt - T_BACK) / 0.2)); if (k <= 0) return;
-        const [px, py] = K.S(cam, wx, wy), tx = i === 5 ? px - 4 : W - 10;
+        const [px, py] = K.S(cam, wx, wy), tx = i === 5 ? px - 4 : W - 16;
         PIX.rect(c, Math.round(px) - 2, Math.round(py) - 2, 5, 5, col, k);
         CAP.note(c, lt, { text: name, x: tx, y: i === 5 ? py - 34 : py - 4, ax: px + 3, ay: py, t0, t1: T_BACK - 0.05, col, lineCol: 'g6', box: true, align: i === 5 ? 'left' : 'right', rate: 70 });
       });

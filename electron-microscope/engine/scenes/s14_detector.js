@@ -106,9 +106,9 @@ SC.s14_detector = {
   draw(c, lt) {
     if (lt < T_CUT + 0.3) {
       const v = ringView(c, lt);
-      CAP.note(c, lt, { text: 'LOW ANGLE: THROUGH THE HOLE', x: 12, y: v.by + 26, ax: 135 - 8, ay: v.by - 2, t0: 1.2, t1: T_CUT, col: 'c4', lineCol: 'c2', box: true });
-      CAP.note(c, lt, { text: 'HIGH ANGLE: HITS THE RING', x: W - 10, y: v.ry - 58, ax: 135 + 76, ay: v.ry - 8, t0: 1.6, t1: T_CUT, col: 'y4', lineCol: 'y2', box: true, align: 'right' });
-      CAP.note(c, lt, { text: 'BF DETECTOR', x: W - 12, y: v.by + 6, ax: 135 + 24, ay: v.by, t0: 2.0, t1: T_CUT, col: 'g8', lineCol: 'g5', box: true, align: 'right' });
+      CAP.note(c, lt, { text: 'LOW ANGLE: THROUGH THE HOLE', x: 12, y: v.by + 26, ax: 135 - 8, ay: v.by - 2, t0: 0.85, t1: T_CUT, col: 'c4', lineCol: 'c2', box: true });
+      CAP.note(c, lt, { text: 'HIGH ANGLE: HITS THE RING', x: W - 10, y: v.ry - 58, ax: 135 + 76, ay: v.ry - 8, t0: 1.2, t1: T_CUT, col: 'y4', lineCol: 'y2', box: true, align: 'right' });
+      CAP.note(c, lt, { text: 'BF DETECTOR', x: W - 12, y: v.by + 6, ax: 135 + 24, ay: v.by, t0: 1.6, t1: T_CUT, col: 'g8', lineCol: 'g5', box: true, align: 'right' });
       if (lt > T_CUT) {
         // zoom into the ring's face, then the cut-open chain
         const p = MO.cubicIn(U.clamp((lt - T_CUT) / 0.3)), z = Math.pow(5, p);

@@ -67,8 +67,8 @@ SC.s04_sample = {
       if (k < 1) window.dissolve(c, cc => { SAMPLE.dive(cc, fovAt(T_SLAB - 0.01), T); }, slab, MO.smooth(k));
       else slab(c);
       const ax = x0 + 2.94 * S + 0.25 * ddx, ay = y0 + 0.25 * ddy - 0.16 * S;
-      CAP.note(c, lt, { text: 'GOLD ATOMS', x: 168, y: 150, ax, ay: ay - 6, t0: T_SLAB + 0.35, col: 'y4', lineCol: 'y2', box: true });
-      CAP.note(c, lt, { text: 'CARBON FILM ~3 nm', x: 112, y: 334, ax: x0 + 46, ay: y0 + 2.4 * S, t0: T_SLAB + 0.6, col: 'g9', lineCol: 'g6', box: true });
+      CAP.note(c, lt, { text: 'GOLD ATOMS', x: 168, y: 150, ax, ay: ay - 6, t0: T_SLAB + 0.25, col: 'y4', lineCol: 'y2', box: true });
+      CAP.note(c, lt, { text: 'CARBON FILM ~3 nm', x: 112, y: 334, ax: x0 + 46, ay: y0 + 2.4 * S, t0: T_SLAB + 0.45, col: 'g9', lineCol: 'g6', box: true });
       if (lt > T_SLAB + 0.5) { const yA = Math.round(y0), yB = Math.round(y0 + 3 * S), xb = Math.round(x0) - 7; PIX.rect(c, xb, yA, 1, yB - yA, 'g8'); PIX.rect(c, xb, yA, 3, 1, 'g8'); PIX.rect(c, xb, yB - 1, 3, 1, 'g8'); PIX.text(c, '3 nm', xb - 1, yA - 11, 'g8'); }
     }
     CAP.scene(c, lt, { title: 'ULTRATHIN SAMPLE', ctx: 'ELECTRONS MUST PASS THROUGH IT', t0: 3.0, acc: 'u2' });
