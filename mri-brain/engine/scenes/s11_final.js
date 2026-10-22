@@ -18,7 +18,7 @@ const CHAIN = [['HYDROGEN', 'y3'], ['MAGNETIC FIELD', 'c3'], ['RADIO WAVES', 'v3
 SC['s11_final'] = {
   draw(c, t, S) {
     if (t >= T_RW) {                                                           // rewind: the opening played backwards, landing on frame 0
-      const u = clamp((t - T_RW) / (4.95 - T_RW)), t01 = 2.0 * (1 - MO.cubicIn(u) * 0.85 - 0.15 * u);
+      const u = clamp((t - T_RW) / (4.95 - T_RW)), t01 = u >= 1 ? 0 : 2.0 * (1 - MO.cubicIn(u) * 0.85 - 0.15 * u);
       SC['s01_monitor'].draw(c, Math.max(0, t01), S);
       return;
     }

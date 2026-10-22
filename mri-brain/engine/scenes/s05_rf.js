@@ -8,7 +8,7 @@ const { W, H } = PIX;
 const lerp = U.lerp, clamp = U.clamp, io = MO.sineInOut, sm = MO.smooth, TAU = U.TAU;
 const S2 = window.S02, S4 = window.S04, G = SCAN.GEO;
 const W_L = S4.W_L;                                                           // one precession turn per beat
-const T_P0 = 3.4, T_P1 = 5.2;                                                 // the 90° pulse
+const T_P0 = 3.5, T_P1 = 5.5;                                                 // the 90° pulse (beats 47–51)
 const flip = t => (Math.PI / 2) * sm(clamp((t - T_P0) / (T_P1 - T_P0)));
 const prec = t => W_L * (t - T_P0);                                           // phase of the precession
 // M in the lab frame: tipping from z while it precesses (clockwise seen from the tip of B0)

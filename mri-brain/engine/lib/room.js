@@ -78,7 +78,7 @@ function monitor(c, t, o = {}) {
     c.save(); c.imageSmoothingEnabled = false; c.globalAlpha = fade; c.drawImage(o.img, ax, ay); c.restore();
   }
   // refresh beam sweeping down the image
-  if (o.scan > 0 && o.scan < 1) {
+  if (o.scan > 0.004 && o.scan < 1) {
     const yb = ay + o.scan * IMG.h;
     PIX.rect(c, ax, Math.round(yb), IMG.w, 1, 'c4'); PIX.rect(c, ax, Math.round(yb) - 2, IMG.w, 1, 'c2', 0.6);
   }
