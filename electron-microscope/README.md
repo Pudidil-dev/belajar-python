@@ -46,7 +46,7 @@ The finished film is `output/How_Electron_Microscopes_See_Atoms.mp4`.
 
 `engine/lib/haadf.js` synthesizes the image the way the instrument records it:
 
-- **The specimen.** Isolated gold atoms (a few pairs and a 13-atom raft) sit on a 3 nm amorphous carbon film, about
+- **The specimen.** Isolated gold atoms (a few pairs and a 20-atom raft) sit on a 3 nm amorphous carbon film, about
   300 carbon atoms per nm² in projection, with the thickness wandering ±25%.
 - **The signal.** Each pixel is the probe intensity summed over the atoms, weighted by high-angle scattering strength
   ∝ Z^1.7: gold (Z = 79) gives 1683 and carbon (Z = 6) gives 21. The probe is a 0.07 nm core broadened by thermal
@@ -68,8 +68,9 @@ a line profile with a Gaussian fit, atom-finding rings, and HAADF bright against
 - **Acceleration.** Eight ring electrodes step from −200 kV to ground, 25 keV per gap. At 200 keV the electron
   reaches v = 0.70 c and λ = h/p = 2.51 pm (relativistic), about 200,000× shorter than visible light. The wavelength
   panel shows λ at every voltage of the ramp.
-- **Vacuum.** The pressure falls from 10⁵ Pa (1 atm) to 10⁻⁵ Pa in the column and ~10⁻⁹ Pa at the gun: ten billion
-  times fewer molecules, but still billions per cm³.
+- **Vacuum.** The gun stays sealed behind its closed valve at ~10⁻⁹ Pa. Below it, the turbo pump takes the column from
+  10⁵ Pa (1 atm), and under ~10⁻² Pa the ion pumps take over, down to 10⁻⁵ Pa: ten billion times fewer molecules, but
+  still billions per cm³. Then the valve opens.
 - **Lenses.** Each magnetic lens is a copper coil in an iron yoke whose pole pieces concentrate the field in the gap.
   Rays are traced through a bell-shaped (Glaser) field, r'' = −K·b(z)²·r in the rotating frame. Each electron spirals
   by θ' = √K·b(z) as it focuses, and more current means a shorter focus.
@@ -82,8 +83,13 @@ a line profile with a Gaussian fit, atom-finding rings, and HAADF bright against
   gives one pixel. About 30 pA means roughly one electron in the column at a time, hundreds per pixel. One atom is
   knocked to a new site by the beam, and the image records it half in each place.
 - **Scattering.** Electrons are integrated through a screened Coulomb potential V ∝ −Z·e^{−r/a}/r with
-  a ∝ Z^{−1/3}. Far passes barely deflect; close passes swing wide. The same stream of electrons is sent at gold and
-  at carbon, and the high-angle hits are counted. Drawn angles are exaggerated and labelled as such (real HAADF
+  a ∝ Z^{−1/3}. Far passes barely deflect; close passes swing wide. Impact points are sampled from the probe's profile
+  in 3D (σ ≈ 0.032 nm, narrower than the atom), so the fraction that reaches the HAADF range is honest:
+  - with the probe on one gold atom, only passes within ~0.01 nm of the nucleus reach ≥ 70 mrad;
+  - a screened-Rutherford estimate gives ~2–4 % of electrons.
+
+  On screen that is 3 of 72 electrons, and gold scores 6 hits out of 150 against carbon's 0 (Z^1.7 predicts about 0.08).
+  Hits count only when they land on the detector bars. Drawn angles are exaggerated and labelled as such (real HAADF
   angles are ~70–200 mrad).
 - **Detection.** The HAADF annulus catches the high-angle electrons; low-angle ones drop through the hole toward the
   bright-field detector. The chain is scintillator → light guide → photomultiplier (×3 per dynode) → current pulse →
@@ -106,11 +112,11 @@ At 120 BPM one beat is 0.5 s; every scene boundary in the brief falls on a beat.
 | 9 | 52–59 | ELECTROMAGNETIC LENS | The condenser lens becomes a diagram: current, field lines, spiralling rays meeting at a focus that moves up as the current rises. |
 | 10 | 59–66 | ABERRATION CORRECTION | Outer rays focus too soon, the probe is blurred; the 12-pole corrector switches on; all rays meet; extreme zoom into the probe: 0.14 → 0.07 nm, next to a gold atom's size. |
 | 11 | 66–74 | RASTER SCANNING | Scan coils tilt the beam; from above, the probe steps across atoms on carbon, leaving measured pixels; a detector trace; an atom hops under the beam. |
-| 12 | 74–83 | ELECTRON SCATTERING | Side view of one gold atom (nucleus, cloud, potential); a held beat, then the first electron swings wide; a stream builds a fan of mostly-straight and a few high-angle paths. |
-| 13 | 83–91 | WHY GOLD ATOMS APPEAR BRIGHT | The same electrons at carbon (Z = 6) and gold (Z = 79): 0 vs ~20 high-angle hits → a dark and a bright pixel. |
-| 14 | 91–99 | HAADF DETECTOR | The ring and its hole; inside: scintillator flash → light guide → photomultiplier cascade → current pulses. |
+| 12 | 74–83 | ELECTRON SCATTERING | Side view of one gold atom (nucleus, cloud, potential); a held beat, then the first electron swings wide, and the view shakes on each hard swing; a stream builds a fan of mostly straight paths and a few high-angle ones (3 of 72). |
+| 13 | 83–91 | WHY GOLD ATOMS APPEAR BRIGHT | The same 150 electrons at carbon (Z = 6) and gold (Z = 79): 0 vs 6 hits on the detector → a dark and a bright pixel. |
+| 14 | 91–99 | HAADF DETECTOR | The ring and its hole; the same atoms bright in HAADF and dark in BF; inside the ring: scintillator flash → light guide → photomultiplier cascade → current pulses. |
 | 15 | 99–108 | ATOMIC-RESOLUTION IMAGE | Pulse → ADC → number → pixel; the micrograph builds on the monitor, first pixel by pixel, then row by row; rings mark every atom found. |
-| 16 | 108–115 | HOW ELECTRON MICROSCOPES SEE ATOMS | Back on the same atom; a fast pull-back to the cut-open microscope with the chain source → lenses → atom → scattering → detector → image; the title; a rush back into the first frame. |
+| 16 | 108–115 | HOW ELECTRON MICROSCOPES SEE ATOMS | Back on the same atom; a fast pull-back to the cut-open microscope with the chain source → lenses → atom → scattering → detector → image, each with a small icon; the title; a rush back into the first frame. |
 
 ## Files
 
@@ -129,6 +135,7 @@ engine/
 tools/
   render.py                    headless render (frames → ffmpeg), stills, contact sheets, cue sheet
   synth_audio.py               score and sound effects from the cue sheet
+  caption_audit.py             how long every caption stays fully readable (subtitle reading speed)
   text_check.py, video_diffs.py, frame_diffs.py, pair_diff.py   checks
 镜头表.md                      shot list (storyboard lint: green)
 output/                        the film and its delivery note
