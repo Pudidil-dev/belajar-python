@@ -46,7 +46,8 @@ S.draw = (c, lt, info) => {
   PROBE.drawMicro(c, cam, t, st);
   S.graph(c, cam, t, st, U.clamp((lt - 4.2) / 0.3));
   // without gel
-  const air = K.S(cam, 120, M.SKIN - 9), rf = K.S(cam, M.ex(1), M.GND + 4 + M.V * Math.max(0, Math.min(tFace, (t - F1) - tFace)) * 0 + 30);
+  // the 99.9% leader runs down the gap between two elements (never across a crystal or its wire) into the lens
+  const air = K.S(cam, 120, M.SKIN - 9), rf = K.S(cam, M.ex(1) + M.PITCH / 2, M.GND + 30);
   CAP.note(c, lt, { x: CAP.X0 + 5, y: CAP.Y0, text: 'WITHOUT GEL', t0: 0.15, t1: 2.2, col: 'w', box: true });
   CAP.note(c, lt, { ax: air[0], ay: air[1], x: 14, y: air[1] + 30, text: 'AIR GAP', t0: 0.35, t1: 2.2, col: 'w', lineCol: 'g6', box: true });
   CAP.note(c, lt, { ax: rf[0], ay: rf[1], x: 128, y: 70, text: '99.9% BOUNCES BACK', t0: 0.75, t1: 2.25, col: 'y4', lineCol: 'y2', box: true });
