@@ -223,7 +223,7 @@ CT.blit = (c, w, h, o) => {
       const q00 = o.val(j * w + i), q10 = o.val(j * w + i + 1), q01 = o.val((j + 1) * w + i), q11 = o.val((j + 1) * w + i + 1);
       if (q00 == null || q10 == null || q01 == null || q11 == null) lv = q00 ?? q10 ?? q01 ?? q11; else lv = (q00 * (1 - du) + q10 * du) * (1 - dv) + (q01 * (1 - du) + q11 * du) * dv;
     }
-    if (lv == null) continue;
+    if (lv == null || lv !== lv) continue;
     const k = Math.max(0, Math.min(nR - 1, Math.round(clamp(lv) * (nR - 1) + bay - 0.5))), col = R[k], p = ((sy - y0) * W2 + (sx - x0)) * 4;
     D[p] = col[0]; D[p + 1] = col[1]; D[p + 2] = col[2]; D[p + 3] = 255;
   }
