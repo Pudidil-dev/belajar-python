@@ -16,9 +16,9 @@ const G = ROOM.G = {
   FLOOR: -1050, R_BORE: 350, R_OUT: 1000, ZF: -390, ZB: 390,                  // gantry cover
   HY: 0, HZ: -CT_Z(),                                                          // the head's slice level sits in the scan plane
   TOP: -128,                                                                   // table top (under the head)
-  WALL_X: 2600, WIN: [-250, 620, -2500, -700],                                  // control-room wall at X = +2600, window (y0, y1, z0, z1)
-  DESK: [3150, 3700, -1050, -330, -2350, -1050],                                // desk box (x0, x1, y0, y1, z0, z1)
-  MON: { x: 3300, y: -330, z: -1700, w: 330, h: 560, t: 40 },                   // monitor: screen centre x, bottom y, z; size; thickness
+  WALL_Z: 3000, WIN: [-2500, -150, -250, 640],                                  // control-room wall at Z = 3000, window (x0, x1, y0, y1)
+  DESK: [-2350, -350, -1050, -320, 3400, 3950],                                 // desk box (x0, x1, y0, y1, z0, z1)
+  MON: { x: -1250, y: -320, z: 3560, w: 330, h: 560, t: 40 },                   // monitor: screen centre x, bottom y, z (back face); size; thickness
 };
 function CT_Z() { return (window.CT && CT.Z) || 20; }
 // ---------- camera ----------
@@ -125,15 +125,15 @@ function sector(o, d, cx, cy, r0, r1, half, z0, z1) {
 // [id, kind, params...]; the detector arc is a sector of radius SDD round the focal spot
 const FS = 570;                                                                 // focal spot radius
 const FRAME = [
-  [20, 'ann', 0, 0, 640, 900, -70, 70],                                          // the rotating disc (drum)
-  [21, 'cyl', 0, FS + 40, 92, -178, 178],                                         // X-ray tube housing (axis along Z)
-  [22, 'box', -70, 70, FS - 122, FS - 52, -95, 95],                              // filter + bowtie + collimator assembly
-  [23, 'box', 470, 760, 300, 620, -200, 200],                                     // high-voltage generator (on the frame, beside the tube)
+  [20, 'ann', 0, 0, 720, 900, -80, 80],                                          // the rotating drum
+  [21, 'cyl', 0, FS + 40, 92, -178, 178],                                         // X-ray tube housing (axis along Z), focal spot 40 mm under its axis
+  [22, 'box', -48, 48, FS - 122, FS - 52, -62, 62],                              // filter + bowtie + collimator assembly under the port
+  [23, 'box', 300, 560, 470, 700, -200, 200],                                     // high-voltage generator beside the tube
   [24, 'sec', 0, FS, 1040, 1100, 26.5 * Math.PI / 180, -46, 46],                 // detector arc (curved round the focal spot)
-  [25, 'box', -330, 330, -700, -560, -120, 120],                                  // data acquisition electronics (DAS) behind it
-  [26, 'box', -760, -470, 280, 600, -180, 180],                                   // cooling unit (oil–air heat exchanger)
-  [27, 'cyl', -260, FS + 120, 26, -180, 120],                                      // HV cable (anode side)
-  [28, 'box', -520, -380, -560, -380, -90, 90],                                   // counterweight
+  [25, 'box', -330, 330, -705, -575, -110, 110],                                  // data acquisition electronics (DAS) behind it
+  [26, 'box', -600, -330, 420, 680, -170, 170],                                   // cooling unit (oil–air heat exchanger)
+  [27, 'box', 140, 300, 600, 640, -40, 40],                                       // HV cable run from the generator to the tube
+  [28, 'box', -560, -400, -520, -330, -90, 90],                                   // counterweight
 ];
 ROOM.FRAME = FRAME;
 const rotLocal = (o, d, phi) => { const c = Math.cos(-phi), s = Math.sin(-phi); return [[o[0] * c - o[1] * s, o[0] * s + o[1] * c, o[2]], [d[0] * c - d[1] * s, d[0] * s + d[1] * c, d[2]]]; };
@@ -157,10 +157,9 @@ function frameHit(o, d, phi, best) {
 }
 // ---------- the patient ----------
 const bodyParts = tz => [
-  [10, [0, -20, -560 + tz], [205, 115, 330]],                                    // torso under the blanket
-  [10, [0, -55, -1300 + tz], [170, 75, 470]],                                    // legs
-  [10, [0, -15, -1760 + tz], [140, 95, 55]],                                     // feet
-  [10, [0, 10, -330 + tz], [215, 75, 95]],                                       // shoulders
+  [10, [0, -20, -620 + tz], [210, 118, 420]],                                    // shoulders → hips under the blanket
+  [10, [0, -48, -1290 + tz], [175, 82, 480]],                                    // legs
+  [10, [0, -6, -1700 + tz], [135, 92, 70]],                                      // feet
 ];
 // ---------- materials ----------
 let MAT = null;
@@ -182,132 +181,158 @@ const BAY = (x, y) => PIX.BAYER[(y & 3) << 2 | (x & 3)] + 0.5;
 // o = {t, cover (1 opaque … 0 gone), body (1 … 0), spin (frame angle, rad), tz (table travel: 0 = head at the isocentre,
 //      negative = out toward the feet), screen ({w, h, data} texture for the monitor), room (draw walls/floor/desk),
 //      led (0..1), x0, y0, x1, y1 (screen rect), hideIds (Set), light}
-let IDB = null, VB = null, TB = null, NB = null;
+let IDB = null, VB = null, TB = null, CB = null, CI = null, CV = null, BB = null, BV = null;
+// the cover (ring + base − bore) seen along a ray; returns {t, id, n} or null. Faces: 4 shell, 5 face, 6 bore liner, 7 LED ring, 16 panel
+function coverHit(ob, d, o) {
+  let best = null;
+  const take = (h, id) => { if (h && (!best || h[0] < best.t)) best = { t: h[0], id, n: [h[1], h[2], h[3]] }; };
+  take(annZ(ob, d, 0, 0, G.R_BORE, G.R_OUT, G.ZF, G.ZB), 4);
+  take(boxHole(ob, d, [-G.R_OUT + 40, G.R_OUT - 40, G.FLOOR, 0, G.ZF + 30, G.ZB - 30], 0, 0, G.R_BORE), 4);
+  if (best && best.n[2] !== 0) {                                                 // front/back faces: the face material + LED ring
+    const hx = ob[0] + d[0] * best.t, hy = ob[1] + d[1] * best.t, r = Math.hypot(hx, hy);
+    best.id = r < G.R_BORE + 70 ? (r < G.R_BORE + 14 && (o.led ?? 1) > 0 ? 7 : 5) : 4;
+  } else if (best) {
+    const hx = ob[0] + d[0] * best.t, hy = ob[1] + d[1] * best.t;
+    if (Math.hypot(hx, hy) < G.R_BORE + 5) best.id = 6;                          // the bore liner
+  }
+  take(box(ob, d, [-560, -360, 360, 520, G.ZF - 14, G.ZF]), 16);                 // control panel on the front face
+  take(box(ob, d, [-560, -360, 360, 520, G.ZB, G.ZB + 14]), 16);                 // and on the back face
+  return best;
+}
+function bodyHit(ob, d, parts, hz, tmax) {
+  let best = null;
+  for (const [id, c, r] of parts) { const h = ell(ob, d, c, r); if (h && h[0] < tmax && (!best || h[0] < best.t)) best = { t: h[0], id, n: [h[1], h[2], h[3]] }; }
+  // the head and neck: sphere-traced through HEAD's skin
+  const lim = best ? best.t : tmax, hb = box(ob, d, [-100, 100, -125, 140, hz - 230, hz + 120]);
+  if (hb && hb[0] < lim) {
+    let t = hb[0], ok = false;
+    for (let k = 0; k < 64 && t < Math.min(hb[4], lim); k++) {
+      const sd = HEAD.skinSD(-(ob[0] + d[0] * t), ob[1] + d[1] * t - G.HY, ob[2] + d[2] * t - hz);
+      if (sd < 0.4) { ok = true; break; }
+      t += Math.max(0.5, sd * 0.85);
+    }
+    if (ok && t < lim) {
+      const X = ob[0] + d[0] * t, Y = ob[1] + d[1] * t, Z = ob[2] + d[2] * t, e = 1.2, f = (a, b, c) => HEAD.skinSD(-a, b - G.HY, c - hz);
+      best = { t, id: 11, n: norm([f(X + e, Y, Z) - f(X - e, Y, Z), f(X, Y + e, Z) - f(X, Y - e, Z), f(X, Y, Z + e) - f(X, Y, Z - e)]) };
+    }
+  }
+  return best;
+}
+// o = {t, cover (1 opaque … 0 gone: below 1 the cover is a dithered veil with its outline), body (same for the patient),
+//      spin (frame angle, rad), frame (show the rotating frame even with the cover on), tz (table travel: 0 = head at the
+//      isocentre, negative = out toward the feet), cutX (remove the gantry where X > cutX: a cutaway seen from +X),
+//      screen ({w, h, data} texture for the monitor), room (walls/floor/desk), led (0..1), x0, y0, x1, y1, light}
 ROOM.render = (img, C, o = {}) => {
   const R = ramps(), data = img.data, x0 = o.x0 ?? 0, y0 = o.y0 ?? 0, x1 = o.x1 ?? W, y1 = o.y1 ?? H;
-  if (!IDB) { IDB = new Int16Array(W * H); VB = new Float32Array(W * H); TB = new Float32Array(W * H); }
-  const cover = o.cover ?? 1, bodyA = o.body ?? 1, phi = o.spin || 0, tz = o.tz ?? 0, showRoom = o.room !== false;
-  const L = norm(o.light || [-0.35, 0.8, -0.45]), amb = 0.3;
+  if (!IDB) { IDB = new Int16Array(W * H); VB = new Float32Array(W * H); TB = new Float32Array(W * H); CB = new Float32Array(W * H); CI = new Int16Array(W * H); CV = new Float32Array(W * H); BB = new Float32Array(W * H); BV = new Float32Array(W * H); }
+  const cover = o.cover ?? 1, bodyA = o.body ?? 1, headA = o.head ?? bodyA, phi = o.spin || 0, tz = o.tz ?? 0, showRoom = o.room !== false, cutX = o.cutX ?? 1e9;
+  const L = norm(o.light || [-0.35, 0.8, 0.45]), amb = 0.3, shade = n => amb + 0.75 * Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
   const parts = bodyParts(tz), hz = G.HZ + tz;
   const showFrame = cover < 1 || o.frame;
   const scr = o.screen, M = G.MON;
   for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) {
     const ux = px + 0.5 - W / 2, uy = H / 2 - py - 0.5;
-    let d = [C.fz[0] * C.f + C.fx[0] * ux + C.fy[0] * uy, C.fz[1] * C.f + C.fx[1] * ux + C.fy[1] * uy, C.fz[2] * C.f + C.fx[2] * ux + C.fy[2] * uy];
-    d = norm(d);
-    const ob = C.o, bay = BAY(px, py);
-    const skipCover = cover < 1 && bay > cover, skipBody = bodyA < 1 && bay > bodyA;
-    const best = { t: 1e12, id: 0, n: null, v: 0.6, tex: null };
-    const hit = (h, id) => { if (h && h[0] < best.t) { best.t = h[0]; best.id = id; best.n = [h[1], h[2], h[3]]; } };
-    // gantry cover: a ring on a base, minus the bore
-    if (!skipCover) {
-      hit(annZ(ob, d, 0, 0, G.R_BORE, G.R_OUT, G.ZF, G.ZB), 4);
-      hit(boxHole(ob, d, [-G.R_OUT + 40, G.R_OUT - 40, G.FLOOR, 0, G.ZF + 30, G.ZB - 30], 0, 0, G.R_BORE), 4);
-      if (best.id === 4 && best.n[2] !== 0) {                                   // front/back faces: the face material + LED ring
-        const hx = ob[0] + d[0] * best.t, hy = ob[1] + d[1] * best.t, r = Math.hypot(hx, hy);
-        best.id = r < G.R_BORE + 70 ? (r < G.R_BORE + 14 && (o.led ?? 1) > 0 ? 7 : 5) : 4;
-        if (r > 820 && hy > 0 && Math.abs(hx) < 260 && best.n[2] < 0) best.id = 5;
-      }
-      if (best.id === 4 && Math.abs(best.n[2]) < 0.5 && best.n[0] * 0 === 0) {
-        const hx = ob[0] + d[0] * best.t, hy = ob[1] + d[1] * best.t;
-        if (Math.hypot(hx, hy) < G.R_BORE + 5) best.id = 6;                    // the bore liner
-      }
-      // control panel on the front face (upper right as seen from the feet)
-      hit(box(ob, d, [-560, -360, 360, 520, G.ZF - 14, G.ZF]), 16);
+    const d = norm([C.fz[0] * C.f + C.fx[0] * ux + C.fy[0] * uy, C.fz[1] * C.f + C.fx[1] * ux + C.fy[1] * uy, C.fz[2] * C.f + C.fx[2] * ux + C.fy[2] * uy]);
+    const ob = C.o;
+    // the gantry parts start where the ray crosses the cutaway plane (and are skipped entirely on the cut side)
+    let o2 = ob, off = 0, gantryOn = true;
+    if (ob[0] > cutX) { if (d[0] < -1e-9) { const tc = (cutX - ob[0]) / d[0]; o2 = [ob[0] + d[0] * tc, ob[1] + d[1] * tc, ob[2] + d[2] * tc]; off = tc; } else gantryOn = false; }
+    const best = { t: 1e12, id: 0, n: null, tex: null };
+    const hit = (h, id, add = 0) => { if (h && h[0] + add < best.t) { best.t = h[0] + add; best.id = id; best.n = [h[1], h[2], h[3]]; } };
+    let cv = null;
+    if (gantryOn && cover > 0) { cv = coverHit(o2, d, o); if (cv) cv.t += off; }
+    if (cv && cover >= 1) { best.t = cv.t; best.id = cv.id; best.n = cv.n; }
+    if (gantryOn && showFrame) {
+      const save = best.t; best.t -= off; const id0 = best.id;
+      frameHit(o2, d, phi, best);
+      if (best.id !== id0 || best.t !== save - off) best.t += off; else best.t = save;
+      hit(annZ(o2, d, 0, 0, 915, 975, -230, 230), 30, off);                      // stationary frame with the slip ring
     }
-    if (showFrame) frameHit(ob, d, phi, best);
-    if (showFrame) hit(annZ(ob, d, 0, 0, 915, 975, -230, 230), 30);              // stationary frame and slip ring
     // table: the sliding top, the pedestal
     hit(box(ob, d, [-235, 235, G.TOP - 45, G.TOP, -2300 + tz, 520 + tz]), 8);
     hit(box(ob, d, [-180, 180, G.FLOOR, -560, -2150, -1000]), 9);
     hit(box(ob, d, [-150, 150, -560, G.TOP - 45, -2050, -1150]), 9);
     // the patient
-    if (!skipBody) {
-      for (const [id, c, r] of parts) hit(ell(ob, d, c, r), id);
-      // the head and neck: sphere-traced through HEAD's skin
-      const hb = box(ob, d, [-100, 100, -125, 140, hz - 230, hz + 120]);
-      if (hb && hb[0] < best.t) {
-        let t = hb[0], ok = false;
-        for (let k = 0; k < 60 && t < Math.min(hb[4], best.t); k++) {
-          const X = ob[0] + d[0] * t, Y = ob[1] + d[1] * t, Z = ob[2] + d[2] * t;
-          const sd = HEAD.skinSD(-X, Y - G.HY, Z - hz);
-          if (sd < 0.4) { ok = true; break; }
-          t += Math.max(0.5, sd * 0.8);
-        }
-        if (ok && t < best.t) {
-          const X = ob[0] + d[0] * t, Y = ob[1] + d[1] * t, Z = ob[2] + d[2] * t, e = 1.2, f = (a, b, c) => HEAD.skinSD(-a, b - G.HY, c - hz);
-          const n = norm([f(X + e, Y, Z) - f(X - e, Y, Z), f(X, Y + e, Z) - f(X, Y - e, Z), f(X, Y, Z + e) - f(X, Y, Z - e)]);
-          best.t = t; best.id = 11; best.n = n;
-        }
-      }
-    }
+    let bv = null;
+    if (bodyA > 0 || headA > 0) { bv = bodyHit(ob, d, parts, hz, best.t); if (bv && (bv.id === 11 ? headA >= 1 : bodyA >= 1)) { best.t = bv.t; best.id = bv.id; best.n = bv.n; bv = null; } }
     if (showRoom) {
-      // control room: the wall with its window, desk, keyboard, monitor
-      if (Math.abs(d[0]) > 1e-9) {
-        const tw = (G.WALL_X - ob[0]) / d[0];
+      if (Math.abs(d[2]) > 1e-9) {                                              // the control-room wall with its window
+        const tw = (G.WALL_Z - ob[2]) / d[2];
         if (tw > EPS && tw < best.t) {
-          const Y = ob[1] + d[1] * tw, Z = ob[2] + d[2] * tw, [wy0, wy1, wz0, wz1] = G.WIN;
-          const inWin = Y > wy0 && Y < wy1 && Z > wz0 && Z < wz1;
-          if (!inWin) { best.t = tw; best.id = (Y > wy0 - 40 && Y < wy1 + 40 && Z > wz0 - 40 && Z < wz1 + 40) ? 3 : 2; best.n = [-Math.sign(d[0]) || -1, 0, 0]; }
+          const X = ob[0] + d[0] * tw, Y = ob[1] + d[1] * tw, [wx0, wx1, wy0, wy1] = G.WIN;
+          if (!(X > wx0 && X < wx1 && Y > wy0 && Y < wy1)) { best.t = tw; best.id = (X > wx0 - 50 && X < wx1 + 50 && Y > wy0 - 50 && Y < wy1 + 50) ? 3 : 2; best.n = [0, 0, -Math.sign(d[2]) || -1]; }
         }
       }
-      hit(box(ob, d, [G.WALL_X, G.WALL_X + 160, G.WIN[0] - 40, G.WIN[0], G.WIN[2], G.WIN[3]]), 3);     // window sill
-      hit(box(ob, d, G.DESK), 12);
-      hit(box(ob, d, [G.DESK[0] + 40, G.DESK[0] + 210, G.DESK[3], G.DESK[3] + 22, -1960, -1440]), 15);   // keyboard
-      hit(box(ob, d, [M.x + 10, M.x + 70, M.y, M.y + 140, M.z - 30, M.z + 30]), 13);                     // stand
-      hit(box(ob, d, [M.x + 0, M.x + 110, M.y - 10, M.y + 10, M.z - 110, M.z + 110]), 13);              // foot
-      const mh = box(ob, d, [M.x - M.t, M.x, M.y + 120, M.y + 120 + M.h + 30, M.z - M.w / 2 - 15, M.z + M.w / 2 + 15]);
-      if (mh && mh[0] < best.t) {
-        best.t = mh[0]; best.id = 13; best.n = [mh[1], mh[2], mh[3]]; best.tex = null;
-        if (mh[1] < 0) {                                                        // the screen faces −X (the operator)
-          const Y = ob[1] + d[1] * mh[0], Z = ob[2] + d[2] * mh[0];
-          const u = (Z - (M.z - M.w / 2)) / M.w, v = 1 - (Y - (M.y + 135)) / M.h;
-          if (u >= 0 && u < 1 && v >= 0 && v < 1) { best.id = 14; best.tex = [u, v]; }
+      if (ob[2] > G.WALL_Z || box(ob, d, [-2800, 600, G.FLOOR, 400, G.WALL_Z, 4900])) {
+        hit(box(ob, d, [G.WIN[0], G.WIN[1], G.WIN[2] - 45, G.WIN[2], G.WALL_Z, G.WALL_Z + 170]), 3);     // window sill
+        hit(box(ob, d, G.DESK), 12);
+        hit(box(ob, d, [M.x - 260, M.x + 260, G.DESK[3], G.DESK[3] + 22, G.DESK[5] - 230, G.DESK[5] - 60]), 15);   // keyboard
+        hit(box(ob, d, [M.x - 30, M.x + 30, M.y, M.y + 140, M.z - 70, M.z - 10]), 13);                    // stand
+        hit(box(ob, d, [M.x - 110, M.x + 110, M.y - 10, M.y + 10, M.z - 120, M.z + 10]), 13);             // foot
+        const mh = box(ob, d, [M.x - M.w / 2 - 15, M.x + M.w / 2 + 15, M.y + 120, M.y + 120 + M.h + 30, M.z - M.t, M.z]);
+        if (mh && mh[0] < best.t) {
+          best.t = mh[0]; best.id = 13; best.n = [mh[1], mh[2], mh[3]]; best.tex = null;
+          if (mh[3] > 0) {                                                      // the screen faces +Z (the operator)
+            const X = ob[0] + d[0] * mh[0], Y = ob[1] + d[1] * mh[0];
+            const u = (X - (M.x - M.w / 2)) / M.w, v = 1 - (Y - (M.y + 135)) / M.h;
+            if (u >= 0 && u < 1 && v >= 0 && v < 1) { best.id = 14; best.tex = [u, v]; }
+          }
         }
       }
-      // floor
       if (d[1] < -1e-9) { const tf = (G.FLOOR - ob[1]) / d[1]; if (tf > EPS && tf < best.t) { best.t = tf; best.id = 1; best.n = [0, 1, 0]; } }
-      // back wall of the scan room and the far wall of the control room
-      if (best.id === 0 && Math.abs(d[2]) > 1e-9) { const tb = (2300 - ob[2]) / d[2]; if (tb > EPS) { best.t = tb; best.id = 2; best.n = [0, 0, -1]; } }
-      if (best.id === 0 && d[0] > 1e-9) { const tb = (4200 - ob[0]) / d[0]; if (tb > EPS) { best.t = tb; best.id = 2; best.n = [-1, 0, 0]; } }
-      if (best.id === 0 && d[0] < -1e-9) { const tb = (-2800 - ob[0]) / d[0]; if (tb > EPS) { best.t = tb; best.id = 2; best.n = [1, 0, 0]; } }
+      if (best.id === 0 && Math.abs(d[0]) > 1e-9) { const tb = ((d[0] > 0 ? 2600 : -3000) - ob[0]) / d[0]; if (tb > EPS) { best.t = tb; best.id = 2; best.n = [-Math.sign(d[0]), 0, 0]; } }
+      if (best.id === 0 && d[2] < -1e-9) { const tb = (-3200 - ob[2]) / d[2]; if (tb > EPS) { best.t = tb; best.id = 2; best.n = [0, 0, 1]; } }
+      if (best.id === 0 && d[2] > 1e-9) { const tb = (5000 - ob[2]) / d[2]; if (tb > EPS) { best.t = tb; best.id = 2; best.n = [0, 0, -1]; } }
     }
     const p = py * W + px;
     IDB[p] = best.id; TB[p] = best.t;
+    CB[p] = cv && cover < 1 && cv.t < best.t ? cv.t : 1e12; CI[p] = cv ? cv.id : 0; CV[p] = cv ? shade(cv.n) : 0;
+    BB[p] = bv && bv.t < best.t ? bv.t : 1e12; BV[p] = bv ? (bv.id === 11 ? 1100 : 1000) + shade(bv.n) : 0;
     if (!best.id) { VB[p] = -1; continue; }
-    let v;
     if (best.id === 14) {
-      // the monitor screen: a texture (nearest texel; the scene supplies a pre-filtered one when far away)
       if (scr) { const tx = Math.min(scr.w - 1, Math.floor(best.tex[0] * scr.w)), ty = Math.min(scr.h - 1, Math.floor(best.tex[1] * scr.h)), q = (ty * scr.w + tx) * 4;
         data[p * 4] = scr.data[q]; data[p * 4 + 1] = scr.data[q + 1]; data[p * 4 + 2] = scr.data[q + 2]; data[p * 4 + 3] = 255; }
       else { const c = hex('n1'); data[p * 4] = c[0]; data[p * 4 + 1] = c[1]; data[p * 4 + 2] = c[2]; data[p * 4 + 3] = 255; }
       VB[p] = -2; continue;
     }
-    const n = best.n, lam = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
-    v = amb + 0.75 * lam;
-    if (best.id === 1) {                                                         // floor tiles, darker far away
-      const X = ob[0] + d[0] * best.t, Z = ob[2] + d[2] * best.t;
-      v = 0.55 + 0.1 * (((Math.floor(X / 600) + Math.floor(Z / 600)) & 1) ? 1 : -1) - Math.min(0.35, Math.hypot(X, Z) / 9000);
-    }
+    let v = shade(best.n);
+    if (best.id === 1) { const X = ob[0] + d[0] * best.t, Z = ob[2] + d[2] * best.t; v = 0.55 + 0.1 * (((Math.floor(X / 600) + Math.floor(Z / 600)) & 1) ? 1 : -1) - Math.min(0.35, Math.hypot(X, Z) / 9000); }
     if (best.id === 2) { const Y = ob[1] + d[1] * best.t; v = 0.45 + 0.1 * clamp((Y + 600) / 2000); }
     if (best.id === 7) v = 0.55 + 0.45 * (o.led ?? 1);
     VB[p] = v;
   }
-  // compose with outlines
-  const K0 = hex('k');
+  // compose: objects with outlines; then the see-through cover and patient as dithered veils with their outlines
+  const edgeCol = hex('g7'), bodyEdge = hex('h2');
   for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) {
-    const p = py * W + px, id = IDB[p]; if (!id || VB[p] === -2) continue;
-    const r = R[id] || R[4], f = clamp(VB[p]) * (r.length - 1) + BAY(px, py) - 0.5;
-    let col = r[clamp(Math.round(f), 0, r.length - 1)];
-    // outline where two objects meet (the farther one's edge darkens), and depth breaks within an object
-    if (px > x0 && py > y0) {
-      const l = p - 1, u = p - W;
-      const edge = (q) => IDB[q] !== id ? (TB[q] < TB[p] || !IDB[q]) : Math.abs(TB[q] - TB[p]) > 0.06 * TB[p];
-      if (edge(l) || edge(u)) col = id === 7 ? col : [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5];
+    const p = py * W + px, id = IDB[p], bay = BAY(px, py), i4 = p * 4;
+    let col = null;
+    if (id && VB[p] !== -2) {
+      const r = R[id] || R[4], f = clamp(VB[p]) * (r.length - 1) + bay - 0.5;
+      col = r[clamp(Math.round(f), 0, r.length - 1)];
+      if (px > x0 && py > y0) {
+        const edge = q => IDB[q] !== id ? (TB[q] < TB[p] || !IDB[q]) : Math.abs(TB[q] - TB[p]) > 0.06 * TB[p];
+        if (edge(p - 1) || edge(p - W)) col = id === 7 ? col : [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5];
+      }
     }
-    const i4 = p * 4; data[i4] = col[0]; data[i4 + 1] = col[1]; data[i4 + 2] = col[2]; data[i4 + 3] = 255;
+    if (cover < 1 && px > x0 && py > y0) {
+      const has = q => CB[q] < 1e11, e = has(p) !== has(p - 1) || has(p) !== has(p - W) || (has(p) && has(p - 1) && Math.abs(CB[p] - CB[p - 1]) > 0.05 * CB[p]) || (has(p) && has(p - W) && Math.abs(CB[p] - CB[p - W]) > 0.05 * CB[p]);
+      if (has(p) && bay < cover) { const r = R[CI[p]] || R[4], f = clamp(CV[p]) * (r.length - 1) + bay - 0.5; col = r[clamp(Math.round(f), 0, r.length - 1)]; }
+      else if (e && (has(p) || has(p - 1) || has(p - W))) col = edgeCol;
+    }
+    if ((bodyA < 1 || headA < 1) && px > x0 && py > y0) {
+      const has = q => BB[q] < 1e11, e = has(p) !== has(p - 1) || has(p) !== has(p - W);
+      if (has(p) && bay < (BV[p] >= 1100 ? headA : bodyA)) { const sk = BV[p] >= 1100, r = R[sk ? 11 : 10], f = clamp(BV[p] - (sk ? 1100 : 1000)) * (r.length - 1) + bay - 0.5; col = r[clamp(Math.round(f), 0, r.length - 1)]; }
+      else if (e && (has(p) || has(p - 1) || has(p - W))) col = bodyEdge;
+    }
+    if (col) { data[i4] = col[0]; data[i4 + 1] = col[1]; data[i4 + 2] = col[2]; data[i4 + 3] = 255; }
   }
   return { IDB, TB };
+};
+// the X-ray fan of the rotating frame in world coordinates: focal spot and the two ends of the detector arc
+ROOM.fan = phi => {
+  const toW = (x, y) => { const c = Math.cos(phi), s = Math.sin(phi); return [-(x * c + y * s) * 1, -x * s + y * c]; };
+  const g = 26 * Math.PI / 180, fs = [0, FS], a = [-1040 * Math.sin(g), FS - 1040 * Math.cos(g)], b = [1040 * Math.sin(g), FS - 1040 * Math.cos(g)];
+  return [fs, a, b].map(([x, y]) => toW(x, y));
 };
 ROOM.init = async () => { ramps(); G.HZ = -CT.Z; };
 })();

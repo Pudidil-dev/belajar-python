@@ -24,7 +24,7 @@ TW.draw = (c, cam, t, o = {}) => {
   if (o.surface !== false) {                            // metal region a touch lighter than vacuum
     c.setTransform(1, 0, 0, 1, 0, 0);
     const [sx0] = K.S(cam, 0, 0);
-    if (sx0 < W) K.dith(c, Math.max(0, sx0), 0, W - Math.max(0, sx0), H, 'd0', 0.5, 0);
+    if (sx0 < W) K.dith(c, Math.max(0, sx0), 0, W - Math.max(0, sx0), H, 'g1', 0.6, 0);
     if (o.heat > 0 && sx0 < W) { K.dith(c, Math.max(0, sx0), 0, W - Math.max(0, sx0), H, 'r0', Math.min(1, 1.1 * o.heat), 1); K.dith(c, Math.max(0, sx0), 0, W - Math.max(0, sx0), H, 'r1', 0.45 * o.heat, 2); }
   }
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -34,7 +34,7 @@ TW.draw = (c, cam, t, o = {}) => {
     const [sx, sy] = K.S(cam, a.x + jx, a.y + jy), R = R_CLOUD * cam.z;
     if (sx < -R || sx > W + R || sy < -R || sy > H + R) continue;
     const ex = o.excite ? o.excite(a) : 0;
-    FX.cloud(img, sx, sy, R, t, { gain: (o.gain ?? 0.82) + 0.5 * ex, seed: a.seed, shells: o.shells ? o.shells(a) : undefined, ramp: o.ramp ? o.ramp(a) : 'y', grain: 0.5, hole: o.hole ? o.hole(a, sx, sy, R) : undefined });
+    FX.cloud(img, sx, sy, R, t, { gain: (o.gain ?? 0.82) + 0.5 * ex, seed: a.seed, shells: o.shells ? o.shells(a) : undefined, ramp: o.ramp ? o.ramp(a) : 'w', grain: 0.5, hole: o.hole ? o.hole(a, sx, sy, R) : undefined });
     vis.push([a, sx, sy, R]);
   }
   K.pend(c, img);

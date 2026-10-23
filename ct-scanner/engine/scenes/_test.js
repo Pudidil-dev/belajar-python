@@ -26,3 +26,32 @@ SC['_ct'] = {
     }
   },
 };
+
+SC['_room'] = {
+  draw(c, t) {
+    const v = window.__testView || 0, M = ROOM.G.MON;
+    let C, o = { t, tz: 0 };
+    if (v === 0) { C = ROOM.camera([M.x, M.y + 420, M.z + 620], [M.x, M.y + 420, M.z], [0, 1, 0], 300); }
+    else if (v === 1) { C = ROOM.camera([M.x + 600, M.y + 1100, M.z + 2000], [0, -150, 0], [0, 1, 0], 260); o.tz = -700; }
+    else if (v === 2) { C = ROOM.orbit([0, -100, -500], 4200, -0.75, 0.22, 260); o.tz = -900; }
+    else if (v === 3) { C = ROOM.orbit([0, 0, 0], 2100, Math.PI, 0.05, 300); }
+    else if (v === 4) { C = ROOM.orbit([0, 0, 0], 2100, Math.PI, 0.0, 300); o.cover = 0.18; o.body = 0.0; o.spin = 0.0; }
+    else { C = ROOM.orbit([0, 610, 0], 430, Math.PI / 2, 0.0, 300); o.cover = 0.0; o.body = 0.0; o.cutX = 110; o.frame = true; }
+    PIX.rect(c, 0, 0, 270, 480, 'k');
+    const img = K.pbegin(c); ROOM.render(img, C, o); K.pend(c, img);
+  },
+};
+
+SC['_tube'] = {
+  draw(c, t) {
+    const v = window.__testView || 0;
+    PIX.rect(c, 0, 0, 270, 480, 'k');
+    if (v < 3) {
+      const cam = [{ x: 0, y: -40, z: 0.70 }, { x: -10, y: -30, z: 1.0 }, { x: -21.4, y: 0, z: 9 }][v];
+      K.cam(c, cam); TUBE.draw(c, { z: cam.z, t, cut: v === 0 ? 0 : 1, spin: 1.2, fil: v === 2 ? 1 : 0.35, hv: 1, heat: 0.5 });
+    } else {
+      const cam = { x: TW.A.x, y: TW.A.y, z: 3 };
+      TW.draw(c, cam, t, { vib: 0.5 });
+    }
+  },
+};

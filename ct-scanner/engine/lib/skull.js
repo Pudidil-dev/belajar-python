@@ -124,9 +124,21 @@ S.render = (img, o) => {
   ZB.fill(-1e9); ID.fill(-1);
   const view = S.view(o), s = o.s, k = Math.max(1, Math.ceil(s * vs * 1.42)), h0 = Math.floor(k / 2);
   const [rxx, rxy, rxd] = view(1, 0, 0), [ryx, ryy, ryd] = view(0, 1, 0), [rzx, rzy, rzd] = view(0, 0, 1);
-  const clipZ = o.clipZ ?? 1e9, showZ = o.showZ ?? 1e9, sl = o.slabs, show = o.show;
+  const clipZ = o.clipZ ?? 1e9, showZ = o.showZ ?? 1e9, show = o.show;
+  // layers: [{lo, hi, dz, a, face}] — voxels with lo ≤ z < hi move up by dz, show with coverage a (per-voxel dissolve),
+  // and face: true draws the CT section on the layer's top (z = hi). clipZ, showZ and slabs are shorthands for layers.
+  let layers = o.layers ? o.layers.slice() : null;
+  if (!layers) {
+    const top = Math.min(clipZ, showZ);
+    if (o.slabs) { const sl = o.slabs; layers = [{ lo: -1e9, hi: Math.min(top, sl.z0), dz: 0, face: top > sl.z0 && false }];
+      for (let kk = 0; sl.z0 + kk * sl.T < top; kk++) layers.push({ lo: sl.z0 + kk * sl.T, hi: Math.min(top, sl.z0 + (kk + 1) * sl.T), dz: (kk + 1) * sl.gap, face: true });
+      layers[0].face = true; layers[0].hi = sl.z0; }
+    else layers = [{ lo: -1e9, hi: top, dz: 0, face: top < 1e8 && o.cut !== false }];
+  }
+  const layerOf = z => { for (let i = 0; i < layers.length; i++) if (z >= layers[i].lo && z < layers[i].hi) return i; return -1; };
+  const band = o.band, bandCol = band ? hex(globalThis.P[band.col || 'c4']) : null;
   let bx0 = W, by0 = H, bx1 = -1, by1 = -1;
-  const NX = new Float32Array(V.n), NY = new Float32Array(V.n), ND = new Float32Array(V.n), SH = sl ? new Float32Array(V.n) : null;
+  const NX = new Float32Array(V.n), NY = new Float32Array(V.n), ND = new Float32Array(V.n), ZO = new Float32Array(V.n);
   const splat = (X, Y, D, id) => {
     const sx = Math.floor(o.cx + s * X) - h0, sy = Math.floor(o.cy - s * Y) - h0;
     if (sx + k <= 0 || sy + k <= 0 || sx >= W || sy >= H) return;
@@ -136,28 +148,25 @@ S.render = (img, o) => {
     if (sx < bx0) bx0 = sx; if (sy < by0) by0 = sy; if (sx + k > bx1) bx1 = sx + k; if (sy + k > by1) by1 = sy + k;
   };
   for (let m = 0; m < V.n; m++) {
-    const z = V.z[m];
-    if (z > clipZ || z > showZ) continue;
+    const z = V.z[m], li = layerOf(z);
+    if (li < 0) continue;
+    const L_ = layers[li];
+    if (L_.a != null && V.h[m] >= L_.a) continue;
     if (show && !show(m)) continue;
-    let dz = 0;
-    if (sl) { const kk = Math.floor((z - sl.z0) / sl.T); dz = Math.max(0, kk) * sl.gap; SH[m] = dz; }
     const nd = V.nx[m] * rxd + V.ny[m] * ryd + V.nz[m] * rzd;
     if (nd < -0.35) continue;
-    const x = V.x[m], y = V.y[m], zz = z + dz;
-    NX[m] = V.nx[m] * rxx + V.ny[m] * ryx + V.nz[m] * rzx; NY[m] = V.nx[m] * rxy + V.ny[m] * ryy + V.nz[m] * rzy; ND[m] = nd;
+    const x = V.x[m], y = V.y[m], zz = z + (L_.dz || 0);
+    NX[m] = V.nx[m] * rxx + V.ny[m] * ryx + V.nz[m] * rzx; NY[m] = V.nx[m] * rxy + V.ny[m] * ryy + V.nz[m] * rzy; ND[m] = nd; ZO[m] = z;
     splat(x * rxx + y * ryx + zz * rzx, x * rxy + y * ryy + zz * rzy, x * rxd + y * ryd + zz * rzd, m);
   }
-  // section faces: at the clip plane, at the assembly front, and on every slab top
-  const faces = [];
-  if (o.clipZ != null && o.cut !== false) faces.push([o.clipZ, 0]);
-  if (o.showZ != null && o.cut !== false && o.showZ < 1e8) faces.push([o.showZ, 0]);
-  if (sl) { const top = Math.min(clipZ, showZ); for (let kk = 0; sl.z0 + kk * sl.T < top; kk++) { const zt = Math.min(top, sl.z0 + (kk + 1) * sl.T) - 0.01; if (zt <= sl.z0 + kk * sl.T) continue; if (zt < top - 0.02) faces.push([zt, kk * sl.gap]); } }
+  // section faces on the layer tops (the CT section at that height, inside the skull)
   const secs = [];
-  for (const [zc, dz] of faces) {
-    const sec = S.section(Math.floor(zc / vs) * vs + vs * 0.5 > zc ? zc : zc);
-    const si = secs.length; secs.push(sec);
-    const ze = zc + dz;
+  for (const L_ of layers) {
+    if (!L_.face || L_.hi > 1e8) continue;
+    const zc = L_.hi - 0.01, sec = S.section(zc), si = secs.length; secs.push(sec);
+    const ze = zc + (L_.dz || 0), fa = L_.fa ?? L_.a ?? 1;
     for (let c = 0; c < sec.n; c++) {
+      if (fa < 1 && ((c * 2654435761) >>> 0) % 1000 / 1000 >= fa) continue;
       const x = sec.x[c], y = sec.y[c];
       const X = x * rxx + y * ryx + ze * rzx, Y = x * rxy + y * ryy + ze * rzy, D = x * rxd + y * ryd + ze * rzd;
       const sx = Math.floor(o.cx + s * X) - h0, sy = Math.floor(o.cy - s * Y) - h0;
@@ -203,7 +212,8 @@ S.render = (img, o) => {
       v *= gain;
       if (o.tint) v = o.tint(m, v);
       const r = V.lab[m] === 2 ? Rr.tooth : Rr.bone;
-      if (front > 0 && V.z[m] > showZ - front) { const c3 = hex(globalThis.P.c4); col = c3; }
+      if (band && Math.abs(ZO[m] - band.z) < band.w) col = bandCol;
+      else if (front > 0 && V.z[m] > showZ - front) { const c3 = hex(globalThis.P.c4); col = c3; }
       else { const f = clamp(v) * (r.length - 1) + b - 0.5; col = r[clamp(Math.round(f), 0, r.length - 1)]; }
     }
     data[i4] = col[0]; data[i4 + 1] = col[1]; data[i4 + 2] = col[2]; data[i4 + 3] = 255;
@@ -217,6 +227,31 @@ S.render = (img, o) => {
       }
     }
   }
+  S.last = { o, R: [rxx, rxy, rxd, ryx, ryy, ryd, rzx, rzy, rzd], ZB, ID, W, H };
   return { bx0, by0, bx1, by1, ZB, ID, W };
+};
+// a horizontal plane z = zp drawn into the last render with a depth test (the scan plane): its rectangle (half sizes hx, hy
+// in mm) as a dithered fill and an outline, hidden where the skull is in front of it
+S.plane = (img, zp, o = {}) => {
+  const Lr = S.last; if (!Lr) return;
+  const { o: v, R, ZB: Z, W, H } = Lr, [rxx, rxy, rxd, ryx, ryy, ryd, rzx, rzy, rzd] = R, s = v.s;
+  const hx = o.hx ?? 105, hy = o.hy ?? 128, cy0 = o.cy0 ?? 8, d = img.data, fillA = o.fill ?? 0.18;
+  const fc = hex(globalThis.P[o.col || 'c2']), ec = hex(globalThis.P[o.edge || 'c4']);
+  const inside = (sx, sy) => {
+    // view (X, Y) of the pixel, then the depth where the ray meets the plane, then the plane point in head coordinates
+    const X = (sx + 0.5 - v.cx) / s, Y = -(sy + 0.5 - v.cy) / s;
+    if (Math.abs(rzd) < 1e-6) return null;
+    const D = (zp - rzx * X - rzy * Y) / rzd;
+    const x = rxx * X + rxy * Y + rxd * D, y = ryx * X + ryy * Y + ryd * D;
+    return [x, y - cy0, D];
+  };
+  for (let sy = 0; sy < H; sy++) for (let sx = 0; sx < W; sx++) {
+    const q = inside(sx, sy); if (!q) return;
+    const [x, y, D] = q; if (Math.abs(x) > hx || Math.abs(y) > hy) continue;
+    const p = sy * W + sx; if (ZB[p] > D + 0.5) continue;
+    const edge = Math.abs(x) > hx - 1.6 / s * 1.2 || Math.abs(y) > hy - 1.6 / s * 1.2;
+    if (!edge && bay(sx, sy) > fillA) continue;
+    const c = edge ? ec : fc, i4 = p * 4; d[i4] = c[0]; d[i4 + 1] = c[1]; d[i4 + 2] = c[2]; d[i4 + 3] = 255;
+  }
 };
 })();

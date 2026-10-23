@@ -35,7 +35,7 @@ FX.trail = (c, pts, a = 1, cols = ['c2', 'c1', 'c1', 'c0', 'c0']) => {
 };
 
 // ---------- X-ray photon: a violet wave packet moving along ang. lam = wavelength (px), len = half length (px) ----------
-FX.ph = (c, sx, sy, ang, lam = 6, len = 12, amp = 3, a = 1, ramp = ['v0', 'v1', 'v2', 'v3']) => {
+FX.ph = (c, sx, sy, ang, lam = 6, len = 12, amp = 3, a = 1, ramp = ['y0', 'y1', 'y2', 'y3']) => {
   if (a <= 0 || !inScreen(sx, sy, len + 8)) return;
   const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx;
   c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
@@ -70,7 +70,7 @@ FX.nuc = (c, sx, sy, r, seed = 1, a = 1, hot = 0) => {
   c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = a;
   const x = Math.round(sx), y = Math.round(sy);
   if (r < 2.6) {
-    R(c, x - 1, y - 1, 3, 3, 'u1'); R(c, x - 1, y - 1, 2, 2, 'u2'); R(c, x - 1, y - 1, 1, 1, 'u3');
+    R(c, x - 1, y - 1, 3, 3, 'r1'); R(c, x - 1, y - 1, 2, 2, 'r2'); R(c, x - 1, y - 1, 1, 1, 'r3');
     c.restore(); return;
   }
   const rn = Math.max(1.4, r * 0.27), n = Math.max(5, Math.min(60, Math.round(0.86 * (r / rn) * (r / rn))));
@@ -82,9 +82,9 @@ FX.nuc = (c, sx, sy, r, seed = 1, a = 1, hot = 0) => {
   pts.sort((p, q) => (p[0] + p[1]) - (q[0] + q[1]));                // light from the upper left
   for (const [px, py, isP] of pts) {
     const rr = rn * 1.08;
-    c.fillStyle = P[isP ? 'u1' : 'r2']; c.beginPath(); c.arc(Math.round(px * 2) / 2, Math.round(py * 2) / 2, rr, 0, TAU); c.fill();
-    c.fillStyle = P[isP ? 'u2' : 'u1']; c.beginPath(); c.arc(Math.round(px * 2) / 2 - rr * 0.25, Math.round(py * 2) / 2 - rr * 0.25, rr * 0.72, 0, TAU); c.fill();
-    if (rr > 1.6) R(c, Math.round(px - rr * 0.5), Math.round(py - rr * 0.5), 1, 1, isP ? 'u3' : 'u2');
+    c.fillStyle = P[isP ? 'r1' : 'g5']; c.beginPath(); c.arc(Math.round(px * 2) / 2, Math.round(py * 2) / 2, rr, 0, TAU); c.fill();
+    c.fillStyle = P[isP ? 'r2' : 'g7']; c.beginPath(); c.arc(Math.round(px * 2) / 2 - rr * 0.25, Math.round(py * 2) / 2 - rr * 0.25, rr * 0.72, 0, TAU); c.fill();
+    if (rr > 1.6) R(c, Math.round(px - rr * 0.5), Math.round(py - rr * 0.5), 1, 1, isP ? 'r3' : 'g9');
   }
   if (hot > 0) { c.restore(); FX.glowL(c, sx, sy, r * 2.2, ['r1', 'r2', 'u1'], 0.5 * hot); return; }
   c.restore();
@@ -93,7 +93,7 @@ FX.nuc = (c, sx, sy, r, seed = 1, a = 1, hot = 0) => {
 // ---------- electron cloud of an atom (per pixel, into an ImageData) ----------
 // shells: [[radius fraction, width fraction, weight], …]; the density is drawn as a shimmering golden stipple.
 const SHELLS_W = [[0.10, 0.06, 1.0], [0.24, 0.08, 0.85], [0.43, 0.11, 0.7], [0.66, 0.14, 0.5], [0.88, 0.13, 0.3]];
-const RAMP = { y: ['y0', 'y1', 'y2', 'y3'], r: ['r1', 'r2', 'u1', 'u2'], d: ['g2', 'g3', 'g5', 'g7'], c: ['c0', 'c1', 'c2', 'c3'] };
+const RAMP = { y: ['y0', 'y1', 'y2', 'y3'], r: ['r1', 'r2', 'u1', 'u2'], d: ['g2', 'g3', 'g5', 'g7'], w: ['g2', 'g4', 'g6', 'g8'], c: ['c0', 'c1', 'c2', 'c3'], b: ['q1', 'q3', 'q4', 'q6'] };
 FX.cloud = (img, sx, sy, Rr, t, o = {}) => {
   const shells = o.shells || SHELLS_W, gain = o.gain ?? 1, ramp = (RAMP[o.ramp || 'y']).map(K.rgb), d = img.data;
   const x0 = Math.max(0, Math.floor(sx - Rr * 1.1)), x1 = Math.min(W - 1, Math.ceil(sx + Rr * 1.1));

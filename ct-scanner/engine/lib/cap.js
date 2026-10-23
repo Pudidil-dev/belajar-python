@@ -4,7 +4,7 @@
 (() => {
 const { W, H, P } = PIX;
 const CAP = window.CAP = {};
-const X0 = 12, Y0 = 44, LH = 11;
+const X0 = 12, Y0 = 66, LH = 11;
 const typed = (s, t, t0, t1) => {                       // characters visible at t (types on from t0; gone after t1 + fade)
   const n = [...s].length;
   if (t < t0 || (t1 != null && t > t1 + PIX.FADE)) return 0;
@@ -57,6 +57,27 @@ CAP.steps = (c, t, o) => {
     if (o.arrow !== false && i > 0) PIX.text(c, '↓', o.x, y - 7, 'g5', { shadow: null });
     PIX.text(c, s, o.x + 6, y, i === o.items.findLastIndex(q => t >= q[0]) ? 'w' : 'g8', { n });
   });
+};
+// the brief's two-level caption: a short LEVEL 1 heading (accent colour) first; when the mechanism shows, it is replaced
+// by the LEVEL 2 line(s) (white, up to two lines) in the same place — never both at once.
+// o = {l1, l2: string | [lines], t0, tSwap (L1 → L2), t1 (fade out), acc}
+CAP.cap = (c, t, o) => {
+  const t0 = o.t0 ?? 0.12, t1 = o.t1, acc = o.acc || 'c3';
+  const lines = o.l2 == null ? [] : Array.isArray(o.l2) ? o.l2 : [o.l2];
+  const swap = o.l1 ? (o.tSwap ?? 1e9) : t0;
+  const box = (s, n, y, col) => { const w = PIX.textWidth([...s].slice(0, n).join('')); PIX.rect(c, X0 + 3, y - 2, w + 5, 11, 'k'); PIX.text(c, s, X0 + 5, y, col, { n }); };
+  if (o.l1 && t >= t0 && t < swap + PIX.FADE) {
+    const fa = t <= swap ? 1 : U.clamp(1 - (t - swap) / PIX.FADE), n = typed(o.l1, t, t0, null);
+    if (n > 0) { c.save(); c.globalAlpha *= fa; PIX.rect(c, X0, Y0, 2, 7, acc); box(o.l1, n, Y0, acc); c.restore(); }
+  }
+  if (t >= swap && lines.length) {
+    const fa = fadeK(t, t1); if (fa <= 0) return;
+    c.save(); c.globalAlpha *= fa;
+    let tc = swap + (o.l1 ? PIX.FADE + 0.02 : 0);
+    PIX.rect(c, X0, Y0, 2, 7 + LH * (lines.length - 1), 'w');
+    lines.forEach((s, i) => { const n = typed(s, t, tc, t1); if (n > 0) box(s, n, Y0 + i * LH, 'w'); tc += [...s].length / PIX.RATE + 0.04; });
+    c.restore();
+  }
 };
 CAP.X0 = X0; CAP.Y0 = Y0; CAP.LH = LH;
 })();

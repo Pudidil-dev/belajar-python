@@ -31,7 +31,7 @@ TUBE.ENV = ENV;
 // filament coil (helix seen from the side): returns points along the wire
 const COIL = (() => { const pts = []; const n = 15, L = 9.4, r = 0.8; for (let k = 0; k <= n * 24; k++) { const a = k / 24 * TAU, y = -L / 2 + L * k / (n * 24); pts.push([-21.4 + Math.cos(a) * r, y, Math.sin(a)]); } return pts; })();
 TUBE.COIL = COIL;
-const COIL_RAMP = [[0, 'd6'], [0.2, 'r1'], [0.36, 'r2'], [0.52, 'o0'], [0.66, 'o1'], [0.82, 'y2'], [1, 'y3']].map(([g, k]) => [g, PIX.hex(PIX.P[k])]);
+const COIL_RAMP = [[0, 'g6'], [0.2, 'r1'], [0.36, 'r2'], [0.52, 'o0'], [0.66, 'o1'], [0.82, 'y2'], [1, 'y3']].map(([g, k]) => [g, PIX.hex(PIX.P[k])]);
 TUBE.coilColor = g => {                                 // continuous: an RGB between ramp stops (the quantizer dithers it)
   g = clamp(g); let i = 0; while (i < COIL_RAMP.length - 2 && g > COIL_RAMP[i + 1][0]) i++;
   const [g0, c0] = COIL_RAMP[i], [g1, c1] = COIL_RAMP[i + 1], q = clamp((g - g0) / (g1 - g0));
@@ -45,26 +45,26 @@ TUBE.draw = (c, o) => {
   const z = o.z || 1, t = o.t || 0, cut = o.cut ?? 1;
   // HV cables (behind the housing); electrons flow in through the cathode cable and out through the anode cable
   for (const [x, sgn] of [[-140, -1], [140, 1]]) {
-    K.pipe(c, [[x, -126], [x, -175], [x + sgn * 12, -215], [x + sgn * 12, -330]], 16, 'd3', 'd5', 'd1');
+    K.pipe(c, [[x, -126], [x, -175], [x + sgn * 12, -215], [x + sgn * 12, -330]], 16, 'g3', 'g5', 'g1');
     if (o.hv > 0) for (let k = 0; k < 6; k++) {
       const q = K.wrap(t * 1.2 * -sgn + k / 6, 1), y = lerp(-330, -140, q);
       const xx = y < -215 ? x + sgn * 12 : y < -175 ? lerp(x, x + sgn * 12, (-175 - y) / 40) : x;
-      PIX.circ(c, xx, y, 2.6, 'c2', 0.85 * o.hv);
+      PIX.circ(c, xx, y, 2.6, 'c3', 0.85 * o.hv);
     }
-    F(c, rr(x - 12, -140, 24, 14, 3), 'd5'); F(c, rr(x - 12, -140, 24, 3, 2), 'd7');
+    F(c, rr(x - 12, -140, 24, 14, 3), 'g5'); F(c, rr(x - 12, -140, 24, 3, 2), 'g7');
   }
   // housing shell
   const HOUS = rr(-178, -132, 356, 184, 52);
-  F(c, HOUS, 'd5');
+  F(c, HOUS, 'g5');
   const wipe = cut <= 0 ? 0 : cut >= 1 ? 999 : 200 * MO.cubicInOut(cut);      // half-width of the opened part (mm)
   if (cut > 0) {
     c.save(); c.globalAlpha = 1;
-    F(c, rr(-171, -125, 342, 170, 46), 'd2');                        // lead lining
+    F(c, rr(-171, -125, 342, 170, 46), 'g2');                        // lead lining
     F(c, rr(-169, -123, 338, 166, 44), 'k');                         // oil space
     c.restore();
     if (z > 0.3) {                                                   // insulating oil: a faint warm stipple that drifts
       const m = c.getTransform(), A = 1;
-      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P.y0;
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P.u0;
       const sx0 = Math.max(0, Math.floor(m.e + m.a * -169)), sx1 = Math.min(PIX.W, Math.ceil(m.e + m.a * 169));
       const sy0 = Math.max(0, Math.floor(m.f + m.d * -123)), sy1 = Math.min(PIX.H, Math.ceil(m.f + m.d * 43));
       for (let sy = sy0; sy < sy1; sy++) for (let sx = sx0; sx < sx1; sx++) {
@@ -91,11 +91,11 @@ TUBE.draw = (c, o) => {
     // vacuum inside the envelope
     F(c, ENV_PATH, 'k');
     // cathode stem and arm
-    K.pipe(c, [[-150, AX], [-84, AX], [-62, -3], [-34, -3]], 7, 'd5', 'd7', 'd3');
-    K.pipe(c, [[-150, AX], [-84, AX], [-62, 3], [-34, 3]], 3, 'd4', 'd6', 'd2');
+    K.pipe(c, [[-150, AX], [-84, AX], [-62, -3], [-34, -3]], 7, 'g5', 'g7', 'g3');
+    K.pipe(c, [[-150, AX], [-84, AX], [-62, 3], [-34, 3]], 3, 'g4', 'g6', 'g2');
     // focusing cup with its slot
-    F(c, rr(-35, -11, 20, 22, 2), 'd5'); F(c, rr(-35, -11, 20, 4, 2), 'd7'); F(c, rr(-35, 7, 20, 4, 2), 'd4');
-    F(c, rr(-23, -5.6, 8, 11.2, 0.8), 'd1');
+    F(c, rr(-35, -11, 20, 22, 2), 'g5'); F(c, rr(-35, -11, 20, 4, 2), 'g7'); F(c, rr(-35, 7, 20, 4, 2), 'g4');
+    F(c, rr(-23, -5.6, 8, 11.2, 0.8), 'g1');
     // filament
     const g = o.fil || 0;
     if (z < 6) { c.save(); c.fillStyle = TUBE.coilColor(g); c.fill(rr(-22.6, -4.8, 2.4, 9.6, 0.6)); c.restore(); }
@@ -108,11 +108,11 @@ TUBE.draw = (c, o) => {
         c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
       }
       c.restore();
-      PIX.line(c, -21.4, -4.7, -32, -4.7, 'd6', 0.4); PIX.line(c, -21.4, 4.7, -32, 4.7, 'd6', 0.4);   // filament leads
+      PIX.line(c, -21.4, -4.7, -32, -4.7, 'g6', 0.4); PIX.line(c, -21.4, 4.7, -32, 4.7, 'g6', 0.4);   // filament leads
     }
-    if (g > 0.2) FX.glowW(c, -21.4, 0, Math.min(8 + 8 * g, 150 / z), ['r0', 'r1', 'r2', 'o0', 'o1', 'y2'], 0.95 * (g - 0.2), 1.8);
+    if (g > 0.2) FX.glowW(c, -21.4, 0, Math.min(5 + 4 * g, 70 / z), ['r1', 'r2', 'o0', 'o1', 'y2'], 0.85 * (g - 0.2), 2.2);
     // anode: stem, rotor, bearing, terminal
-    F(c, rr(17, AX - 4, 26, 8, 2), 'd6');
+    F(c, rr(17, AX - 4, 26, 8, 2), 'g6');
     F(c, rr(42, AX - 22, 80, 44, 6), 'u1'); F(c, rr(42, AX - 22, 80, 6, 4), 'u2'); F(c, rr(42, AX + 14, 80, 8, 4), 'u0');
     if (z > 0.45) {                                                  // stripes rolling over the rotor = it spins
       const ph = t * (o.spin ?? 0);
@@ -121,18 +121,18 @@ TUBE.draw = (c, o) => {
         if (Math.sin(a) > 0) F(c, rr(46, yy - 0.8, 72, 1.6, 0), 'u0', 0.7);
       }
     }
-    F(c, rr(122, AX - 6, 30, 12, 3), 'd5'); F(c, rr(150, AX - 14, 26, 28, 4), 'd4');
+    F(c, rr(122, AX - 6, 30, 12, 3), 'g5'); F(c, rr(150, AX - 14, 26, 28, 4), 'g4');
     // the disc: molybdenum body, tungsten track on the bevel, graphite backing
     if (!o.noDisc) {
-    F(c, poly(DISC), 'd6');
-    F(c, rr(9, -84, 9, 88, 2), 'd2'); F(c, rr(9, -84, 2, 88, 0), 'd3');                 // graphite heat-storage backing
-    F(c, poly(TRACK), 'y1'); F(c, poly(TRACK2), 'y1'); PIX.line(c, faceX(10), 10, faceX(-16), -16, 'y2', Math.min(0.5, 1.2 / z)); PIX.line(c, faceX(-90), -90, faceX(-64), -64, 'y2', Math.min(0.5, 1.2 / z));
+    F(c, poly(DISC), 'g6');
+    F(c, rr(9, -84, 9, 88, 2), 'g2'); F(c, rr(9, -84, 2, 88, 0), 'g3');                 // graphite heat-storage backing
+    F(c, poly(TRACK), 'g8'); F(c, poly(TRACK2), 'g8'); PIX.line(c, faceX(10), 10, faceX(-16), -16, 'g9', Math.min(0.5, 1.2 / z)); PIX.line(c, faceX(-90), -90, faceX(-64), -64, 'g9', Math.min(0.5, 1.2 / z));
     if (z > 0.6) {                                                  // the track moving past on the spinning disc face
       const ph = t * (o.spin ?? 0) * 3;
       const n = z > 8 ? 40 : 8, sz = Math.min(z > 8 ? 0.35 : 1.2, 3 / z);
-      for (let k = 0; k < n; k++) { const q = K.wrap(ph * 8 / n + k / n + h(k, 9) * 0.3 / n, 1); const y = lerp(-15, 9, q); F(c, rr(faceX(y) + 0.15 + h(k, 8) * 1.1, y, sz, sz * 0.6, 0), h(k, 7) < 0.5 ? 'y2' : 'y0'); }
+      for (let k = 0; k < n; k++) { const q = K.wrap(ph * 8 / n + k / n + h(k, 9) * 0.3 / n, 1); const y = lerp(-15, 9, q); F(c, rr(faceX(y) + 0.15 + h(k, 8) * 1.1, y, sz, sz * 0.6, 0), h(k, 7) < 0.5 ? 'g9' : 'g6'); }
     }
-    PIX.line(c, faceX(-90), -90, faceX(AX), AX, 'd8', 1.2 / z); PIX.line(c, faceX(AX), AX, faceX(10), 10, 'd8', 1.2 / z);
+    PIX.line(c, faceX(-90), -90, faceX(AX), AX, 'g8', 1.2 / z); PIX.line(c, faceX(AX), AX, faceX(10), 10, 'g8', 1.2 / z);
     }
     // focal spot heat
     if (o.heat > 0) FX.glowW(c, 0, 0, Math.min(2 + 3 * o.heat, 70 / z), ['r1', 'r2', 'o0', 'o1', 'y2', 'y3'], 1.05 * o.heat, 1.3);
@@ -149,26 +149,26 @@ TUBE.draw = (c, o) => {
   }
   if (cut < 1) {                                                     // closed shell over everything outside the wipe
     c.save(); const keep = new Path2D(); keep.rect(-400, -400, 400 - wipe, 800); keep.rect(wipe, -400, 400, 800); c.clip(keep);
-    F(c, HOUS, 'd5'); F(c, rr(-175, -130, 350, 178, 50), 'd6'); F(c, rr(-170, -128, 340, 42, 44), 'd7'); F(c, rr(-178, 18, 356, 34, 30), 'd4');
-    for (const x of [-120, 120]) F(c, rr(x - 1, -130, 2, 180, 0), 'd5');
-    F(c, rr(-40, -112, 80, 26, 3), 'd3'); F(c, rr(-36, -108, 72, 18, 2), 'd2');
-    for (let k = 0; k < 4; k++) F(c, rr(-30 + k * 16, -103, 10, 2, 0), 'y1');
+    F(c, HOUS, 'g5'); F(c, rr(-175, -130, 350, 178, 50), 'g6'); F(c, rr(-170, -128, 340, 42, 44), 'g7'); F(c, rr(-178, 18, 356, 34, 30), 'g4');
+    for (const x of [-120, 120]) F(c, rr(x - 1, -130, 2, 180, 0), 'g5');
+    F(c, rr(-40, -112, 80, 26, 3), 'g3'); F(c, rr(-36, -108, 72, 18, 2), 'g2');
+    for (let k = 0; k < 4; k++) F(c, rr(-30 + k * 16, -103, 10, 2, 0), 'c1');
     c.restore();
     if (wipe > 0 && wipe < 200) for (const sg of [-1, 1]) F(c, rr(sg * wipe - 1.2, -132, 2.4, 184, 0), 'c3', 0.9);   // the cut edge
   }
   // collimator box under the port
   if (o.coll !== false) {
-    F(c, rr(-38, 52, 76, 70, 4), 'd5'); F(c, rr(-38, 52, 76, 5, 3), 'd7'); F(c, rr(-38, 114, 76, 8, 3), 'd3');
+    F(c, rr(-38, 52, 76, 70, 4), 'g5'); F(c, rr(-38, 52, 76, 5, 3), 'g7'); F(c, rr(-38, 114, 76, 8, 3), 'g3');
     if (cut >= 1 || o.collCut) {
       c.save();
-      F(c, rr(-33, 57, 66, 60, 2), 'd1');
-      F(c, rr(-33, 63, 66, 3, 0), 'd8');                             // aluminium filter
+      F(c, rr(-33, 57, 66, 60, 2), 'g1');
+      F(c, rr(-33, 63, 66, 3, 0), 'g8');                             // aluminium filter
       const s = o.shut ?? 0, gap = lerp(30, 12, s);                  // lead shutter pairs
-      for (const y of [84, 104]) { F(c, rr(-33, y, 33 - gap, 6, 1), 'd3'); F(c, rr(gap, y, 33 - gap, 6, 1), 'd3'); F(c, rr(-33, y, 33 - gap, 1.5, 0), 'd6'); F(c, rr(gap, y, 33 - gap, 1.5, 0), 'd6'); }
-      F(c, rr(-30, 118, 60, 3, 0), 'd2');
+      for (const y of [84, 104]) { F(c, rr(-33, y, 33 - gap, 6, 1), 'g3'); F(c, rr(gap, y, 33 - gap, 6, 1), 'g3'); F(c, rr(-33, y, 33 - gap, 1.5, 0), 'g6'); F(c, rr(gap, y, 33 - gap, 1.5, 0), 'g6'); }
+      F(c, rr(-30, 118, 60, 3, 0), 'g2');
       c.restore();
     } else {
-      F(c, rr(-30, 66, 22, 14, 2), 'd3'); PIX.circ(c, 18, 74, 6, 'd3'); PIX.circ(c, 18, 74, 3, 'd6');
+      F(c, rr(-30, 66, 22, 14, 2), 'g3'); PIX.circ(c, 18, 74, 6, 'g3'); PIX.circ(c, 18, 74, 3, 'g6');
     }
   }
 };
