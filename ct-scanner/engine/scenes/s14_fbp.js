@@ -7,11 +7,14 @@
 (() => {
 const { W, H, P } = PIX;
 const lerp = U.lerp, clamp = U.clamp, TAU = U.TAU;
-const IMG = { cx: 135, cy: 268, s: 0.93 };                           // the image grid: px per mm (220 mm field → ≈ 205 px)
+const IMG = { cx: 135, cy: 268, s: 0.93 };                           // the image grid: px per mm (240 mm field → ≈ 223 px)
 const ROW = 40;                                                       // the lifted view (index into the sinogram)
 const STEPS = [[3.0, 2], [3.5, 4], [4.0, 8], [4.5, 16], [5.0, 32], [5.6, 64], [6.3, 128], [7.0, 360]];
 const nAt = t => { let n = 1; for (const [tt, k] of STEPS) if (t >= tt) n = k; return n; };
-const pushAt = t => 1 + 0.07 * MO.sineInOut(clamp((t - 3.0) / 4.0)) + 0.1 * MO.cubicInOut(clamp((t - 7.0) / 0.28)) * (1 - MO.sineInOut(clamp((t - 8.4) / 1.4)));
+// a slow push while the views accumulate, a punch on the finished slice; from 8.3 s the camera eases back and slides left to
+// S15's framing (the HU scale needs the right edge), so the cut into S15 is invisible
+const backAt = t => MO.sineInOut(clamp((t - 8.3) / 1.5));
+const pushAt = t => 1 + (0.07 * MO.sineInOut(clamp((t - 3.0) / 4.0)) + 0.1 * MO.cubicInOut(clamp((t - 7.0) / 0.28))) * (1 - backAt(t));
 function profile(c, x, y, w, h, arr, a, col, base = 0.5, scale = 1) {
   if (a <= 0) return; c.save(); c.globalAlpha = a;
   let prev = null; for (let j = 0; j < CT.ND; j += 2) { const v = arr[j] * scale, px = x + j / CT.ND * w, py = y + h * (1 - base) - v * h; if (prev) PIX.bline(c, prev[0], prev[1], px, py, col); prev = [px, py]; }
@@ -20,11 +23,13 @@ function profile(c, x, y, w, h, arr, a, col, base = 0.5, scale = 1) {
 SC['s14_fbp'] = {
   draw(c, t, S) {
     PIX.rect(c, 0, 0, W, H, 'k');
-    const z = IMG.s * pushAt(t), gx = IMG.cx, gy = IMG.cy;
+    const z = IMG.s * pushAt(t), gx = lerp(IMG.cx, 122, backAt(t)), gy = IMG.cy, ga = 1 - MO.smooth(clamp((t - 8.6) / 1.1));
     // the empty grid (field of view)
     const half = CT.FOV / 2 * z;
+    c.save(); c.globalAlpha = ga;
     PIX.rect(c, Math.round(gx - half) - 1, Math.round(gy - half) - 1, Math.round(2 * half) + 2, Math.round(2 * half) + 2, 'g2');
     PIX.rect(c, Math.round(gx - half), Math.round(gy - half), Math.round(2 * half), Math.round(2 * half), 'n0');
+    c.restore();
     // S13's sinogram slides up and away; the chosen row lights up and lifts out as the profile
     const sa = 1 - MO.smooth(clamp((t - 0.35) / 0.45));
     if (sa > 0) {
@@ -51,22 +56,24 @@ SC['s14_fbp'] = {
       if (t - STEPS.find(s => s[1] === n)[0] < 0.12) PIX.rect(c, Math.round(gx - half), Math.round(gy - half), Math.round(2 * half), Math.round(2 * half), 'b4', 0.12);
     }
     // counter
-    if (t > 0.6) {
+    const ca = 1 - MO.smooth(clamp((t - 9.1) / 0.5));
+    if (t > 0.6 && ca > 0) {
       const n = t < 3.0 ? 1 : nAt(t);
-      PIX.rect(c, 150, 98, 98, 14, 'k'); PIX.text(c, `VIEWS: ${n}`, 245, 101, n >= 360 ? 'e2' : 'w', { align: 'right', shadow: null });
+      c.save(); c.globalAlpha = ca; PIX.rect(c, 150, 98, 98, 14, 'k'); PIX.text(c, `VIEWS: ${n}`, 245, 101, n >= 360 ? 'e2' : 'w', { align: 'right', shadow: null }); c.restore();
     }
-    CAP.note(c, t, { x: 30, y: 158, text: 'FILTER', t0: 0.95, t1: 1.6, col: 'b4', box: true });
-    CAP.note(c, t, { x: 30, y: 158, text: 'BACKPROJECT', t0: 1.65, t1: 2.9, col: 'b4', box: true });
+    CAP.note(c, t, { x: 30, y: 158, text: 'FILTER', t0: 0.9, t1: 1.95, col: 'b4', box: true });
+    CAP.note(c, t, { x: 30, y: 169, text: 'BACKPROJECT', t0: 1.5, t1: 2.95, col: 'b4', box: true });
     CAP.note(c, t, { x: 30, y: 158, text: 'ADD MORE DIRECTIONS', t0: 3.05, t1: 6.9, col: 'b4', box: true });
-    CAP.note(c, t, { x: 20, y: 384, text: 'FILTERED BACKPROJECTION;', t0: 7.6, t1: 9.85, col: 'g8', box: true });
-    CAP.note(c, t, { x: 20, y: 395, text: 'ITERATIVE METHODS ALSO EXIST', t0: 7.9, t1: 9.85, col: 'g8', box: true });
-    CAP.cap(c, t, { l1: 'RECONSTRUCTION', l2: ['MATH RECONSTRUCTS', 'THE INSIDE OF THE BODY'], t0: 0.12, tSwap: 3.0, t1: 9.85, acc: 'b4' });
+    CAP.note(c, t, { x: 20, y: 384, text: 'FILTERED BACKPROJECTION;', t0: 7.3, t1: 9.6, col: 'g8', box: true });
+    CAP.note(c, t, { x: 20, y: 395, text: 'ITERATIVE METHODS ALSO EXIST', t0: 7.5, t1: 9.6, col: 'g8', box: true });
+    CAP.cap(c, t, { l1: 'RECONSTRUCTION', l2: ['MATH RECONSTRUCTS', 'THE INSIDE OF THE BODY'], t0: 0.12, tSwap: 3.0, t1: 9.6, acc: 'b4' });
   },
   cues: () => {
     const q = [[0.3, 'lift_row', 0.6, 0], [0.9, 'filter_sweep', 0.8, 0, 0.5], [1.4, 'smear', 0.8, 0, 0.9], [3.0, 'build_rise', 0.8, 0, 4.0]];
     STEPS.forEach(([tt, n], k) => q.push([tt, n >= 360 ? 'recon_complete' : 'assemble_hit', n >= 360 ? 1 : 0.55 + 0.05 * k, (k % 2 ? 0.25 : -0.25), k]));
-    q.push([7.0, 'punch', 0.9, 0]);
+    q.push([7.0, 'punch', 0.9, 0], [8.3, 'pull_back', 0.45, 0, 1.4]);
     return q;
   },
+  xin: 0.25,
 };
 })();

@@ -12,7 +12,7 @@
 const CT = window.CT = { NAME: 'CT' };
 const clamp = U.clamp, lerp = U.lerp, TAU = U.TAU;
 CT.Z = 20;                       // slice level (mm): lateral ventricles, falx, a clean skull ring
-CT.N = 192; CT.FOV = 220;        // image matrix and field of view (mm)
+CT.N = 192; CT.FOV = 240;        // image matrix and field of view (mm): the whole head, back of the skull included
 CT.OX = 5; CT.OY = -14;          // the head lies a little left of and below the isocentre (its traces in the sinogram swing)
 CT.PX = CT.FOV / CT.N;           // mm per pixel
 CT.D = 570;                      // source → isocentre (mm)
@@ -176,9 +176,13 @@ CT.init = async () => {
   let sfm = 0, sff = 0, sum_ = 0, suu = 0;
   for (let i = 0; i < N * N; i++) { if (CT.MU[i] <= 0) continue; sfm += f[i] * CT.MU[i]; sff += f[i] * f[i]; sum_ += u[i] * CT.MU[i]; suu += u[i] * u[i]; }
   CT.CAL = sfm / sff; CT.CALU = sum_ / suu;
-  // offset: the reconstruction's soft-tissue level against the phantom's (brain pixels)
+  // offset (the scanner's water calibration): the reconstruction's level in brain tissue against the phantom's — interior
+  // pixels only (true 15–45 HU, no bone within ≈ 6 mm), so the blurred skull edge does not bias it
+  const nearBone = new Uint8Array(N * N), RB = 5;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (CT.HUP[r * N + c] > 200)
+    for (let dr = -RB; dr <= RB; dr++) for (let dc = -RB; dc <= RB; dc++) { const rr = r + dr, cc = c + dc; if (rr >= 0 && cc >= 0 && rr < N && cc < N) nearBone[rr * N + cc] = 1; }
   let so = 0, no = 0;
-  for (let i = 0; i < N * N; i++) { const h = CT.HUP[i]; if (h > 0 && h < 60) { so += CT.MU[i] - f[i] * CT.CAL; no++; } }
+  for (let i = 0; i < N * N; i++) { const h = CT.HUP[i]; if (h > 15 && h < 45 && !nearBone[i]) { so += CT.MU[i] - f[i] * CT.CAL; no++; } }
   CT.OFS = no ? so / no : 0;
   for (let i = 0; i < N * N; i++) { f[i] = f[i] * CT.CAL + CT.OFS; u[i] *= CT.CALU; }
   CT.FULL = f; CT.BLUR = u;
@@ -205,7 +209,7 @@ CT.blit = (c, w, h, o) => {
   let x0 = Math.floor(Math.min(...pts.map(p => p[0]))), x1 = Math.ceil(Math.max(...pts.map(p => p[0])));
   let y0 = Math.floor(Math.min(...pts.map(p => p[1]))), y1 = Math.ceil(Math.max(...pts.map(p => p[1])));
   const cl = o.clip || [0, 0, PIX.W, PIX.H];
-  x0 = Math.max(x0, cl[0], 0); y0 = Math.max(y0, cl[1], 0); x1 = Math.min(x1, cl[2], PIX.W); y1 = Math.min(y1, cl[3], PIX.H);
+  x0 = Math.max(x0, Math.floor(cl[0]), 0); y0 = Math.max(y0, Math.floor(cl[1]), 0); x1 = Math.min(x1, Math.ceil(cl[2]), PIX.W); y1 = Math.min(y1, Math.ceil(cl[3]), PIX.H);   // whole pixels
   if (x1 <= x0 || y1 <= y0) return;
   const R = o.ramp || ramps().gray, nR = R.length, alpha = o.alpha ?? 1;
   const img = c.getImageData(x0, y0, x1 - x0, y1 - y0), D = img.data, W2 = x1 - x0;

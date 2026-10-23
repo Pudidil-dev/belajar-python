@@ -68,8 +68,8 @@ SC['s08_attenuation'] = {
     // names above the blocks (all three at once: they are one comparison)
     LANES.forEach((L, li) => CAP.note(c, t, { x: L.x, y: BY0 - 16, text: L.name, t0: 1.55 + li * 0.15, t1: 7.85, col: ['g8', 'p3', 'q5'][li], align: 'center', box: true }));
     CAP.note(c, t, { x: 135, y: BY0 + BH + 8, text: 'same thickness: 2 cm', t0: 1.9, t1: 4.2, col: 'g7', align: 'center', box: true });
-    CAP.note(c, t, { x: 20, y: 372, text: 'MORE WEAKENING: DENSER, THICKER,', t0: 5.4, t1: 7.85, col: 'g9', box: true });
-    CAP.note(c, t, { x: 20, y: 383, text: 'HIGHER ATOMIC NUMBER, LOWER ENERGY', t0: 5.75, t1: 7.85, col: 'g9', box: true });
+    CAP.note(c, t, { x: 20, y: 372, text: 'MORE WEAKENING: DENSER, THICKER,', t0: 5.1, t1: 7.85, col: 'g9', box: true });
+    CAP.note(c, t, { x: 20, y: 383, text: 'HIGHER ATOMIC NUMBER, LOWER ENERGY', t0: 5.35, t1: 7.85, col: 'g9', box: true });
     CAP.cap(c, t, { l1: 'ATTENUATION', l2: ['DIFFERENT TISSUES WEAKEN', 'X-RAYS DIFFERENTLY'], t0: 0.12, tSwap: 2.2, t1: 7.85, acc: 'y3' });
   },
   cues: () => {

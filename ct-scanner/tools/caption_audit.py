@@ -32,7 +32,7 @@ JS = """(ids) => {
   const L = PIX.label, N = CAP.note, S = CAP.scene;
   // attribute each text to the scene whose draw() is running (a scene's dissolve-in also draws the previous scene)
   let active = null; const DUR = Object.fromEntries(ERAS.map(e => [e.id, e.dur])), orig = {};
-  for (const id of Object.keys(SC)) if (SC[id].draw) { orig[id] = SC[id].draw; SC[id].draw = function (c, lt) { const s = active; active = id; try { return orig[id].call(this, c, lt); } finally { active = s; } }; }
+  for (const id of Object.keys(SC)) if (SC[id].draw) { orig[id] = SC[id].draw; SC[id].draw = function (c, lt, S) { const s = active; active = id; try { return orig[id].call(this, c, lt, S); } finally { active = s; } }; }
   const put = (kind, text, t0, t1, rate, lt) => {
     if (!active || !(active in DUR)) return;
     const k = active + '|' + kind + '|' + text + '|' + t0;
@@ -46,11 +46,21 @@ JS = """(ids) => {
     for (const s of (o.ctx == null ? [] : Array.isArray(o.ctx) ? o.ctx : [o.ctx])) { put('ctx', s, tc, o.t1, rate0, t); tc += [...s].length / rate0 + 0.05; }
     return S(c, t, o);
   };
+  // the two-level scene caption: LEVEL 1 holds until the swap; each LEVEL 2 line types after the L1 fade, holds to t1
+  const C = CAP.cap;
+  CAP.cap = (c, t, o) => {
+    const t0 = o.t0 ?? 0.12, lines = o.l2 == null ? [] : Array.isArray(o.l2) ? o.l2 : [o.l2];
+    const swap = o.l1 ? (o.tSwap ?? 1e9) : t0;
+    if (o.l1) put('cap1', o.l1, t0, swap < 1e8 ? swap : o.t1, PIX.RATE, t);
+    let tc = swap + (o.l1 ? PIX.FADE + 0.02 : 0);
+    for (const s of lines) { put('cap2', s, tc, o.t1, PIX.RATE, t); tc += [...s].length / PIX.RATE + 0.04; }
+    return C(c, t, o);
+  };
   for (const e of ERAS) {
     if (ids && !ids.includes(e.id)) continue;
     for (let lt = 0; lt < e.dur; lt += 1 / 30) renderSolo(e.id, lt);
   }
-  PIX.label = L; CAP.note = N; CAP.scene = S; for (const id in orig) SC[id].draw = orig[id];
+  PIX.label = L; CAP.note = N; CAP.scene = S; CAP.cap = C; for (const id in orig) SC[id].draw = orig[id];
   return Object.values(recs);
 }"""
 

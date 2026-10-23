@@ -62,7 +62,7 @@ SC['s16_volume'] = {
     }
     if (chrome > 0) MON.chrome(c, v, chrome);
     // labels
-    if (t < 1.75) FIRST.forEach((z, k) => { const p = SKULL.proj(v, -FOVI / 2, 0, z); CAP.note(c, t, { ax: p[0] + 6, ay: p[1], x: 20, y: Math.round(p[1]) - 4, text: `SLICE ${k + 1}`, t0: k === 0 ? 0.6 : 0.4 + k * 0.45 + 0.1, t1: 1.7, col: 'g9', box: true }); });
+    if (t < 2.35) FIRST.forEach((z, k) => { const p = SKULL.proj(v, -FOVI / 2, 0, z); CAP.note(c, t, { ax: p[0] + 6, ay: p[1], x: 20, y: Math.round(p[1]) - 4, text: `SLICE ${k + 1}`, t0: 0.3 + 0.35 * k, t1: 2.05, col: 'g9', box: true }); });
     CAP.note(c, t, { x: 20, y: 384, text: 'BONE: CT VALUE > 300 HU', t0: 2.1, t1: 3.9, col: 'q6', box: true });
     CAP.cap(c, t, { l1: '3D VOLUME', l2: ['2D SLICES BECOME', 'A 3D VOLUME'], t0: 0.12, tSwap: 1.4, t1: 5.85, acc: 'q6' });
   },

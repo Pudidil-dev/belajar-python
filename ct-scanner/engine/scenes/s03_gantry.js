@@ -68,8 +68,8 @@ SC['s03_gantry'] = {
     // part labels (one at a time)
     const tube = ROOM.proj(C, ROOM.fan(phi)[0].concat(0)), arc = ROOM.proj(C, [0, -470, 0].map((v, i) => i === 1 ? ROOM.fan(phi)[0][1] - 1040 : v));
     const [fs, A, B] = ROOM.fan(phi), mid = ROOM.proj(C, [(A[0] + B[0]) / 2 * 1.02, (A[1] + B[1]) / 2 * 1.06, 0]);
-    if (tube) CAP.note(c, t, { ax: tube[0], ay: tube[1] - 22, x: 30, y: 112, text: 'X-RAY TUBE', t0: 1.05, t1: 1.95, col: 'y3', lineCol: 'g7', box: true });
-    if (mid) CAP.note(c, t, { ax: mid[0], ay: mid[1] + 6, x: 30, y: 352, text: 'DETECTORS', t0: 2.0, t1: 2.95, col: 'e3', lineCol: 'g7', box: true });
+    if (tube) CAP.note(c, t, { ax: tube[0], ay: tube[1] - 22, x: 30, y: 112, text: 'X-RAY TUBE', t0: 1.05, t1: 2.4, col: 'y3', lineCol: 'g7', box: true });
+    if (mid) CAP.note(c, t, { ax: mid[0], ay: mid[1] + 6, x: 30, y: 352, text: 'DETECTORS', t0: 2.0, t1: 3.3, col: 'e3', lineCol: 'g7', box: true });
     dial(c, t, phi, MO.smooth(clamp((t - 1.9) / 0.2)) * (1 - MO.smooth(clamp((t - 5.0) / 0.25))));
     CAP.note(c, t, { x: 216, y: 160, text: 'SLOWED: 1 TURN ≈ 0.3 s', t0: 2.6, t1: 4.9, col: 'g8', align: 'right', box: true });
     CAP.cap(c, t, { l1: 'CT GANTRY', l2: ['THE X-RAY TUBE', 'ROTATES AROUND YOU'], t0: 0.15, tSwap: 2.0, t1: 6.6, acc: 'c3' });

@@ -90,14 +90,14 @@ SC['s04_cathode'] = {
     else dissolve(c, cc => drawTube(cc, t, S), cc => drawLattice(cc, t, camB(t)), lat);
     c.setTransform(1, 0, 0, 1, 0, 0);
     const cam = camA(t), L = (x, y) => K.S(cam, x, y);
-    // part labels, one at a time, while the whole insert is in view
-    if (t < 2.3) {
-      { const [ax, ay] = L(-30, -12); CAP.note(c, t, { ax, ay, x: 22, y: 330, text: 'CATHODE (−)', t0: 0.75, t1: 1.45, col: 'c3', box: true }); }
-      { const [ax, ay] = L(4, -66); CAP.note(c, t, { ax, ay, x: 250, y: 126, text: 'ANODE (+)', t0: 1.5, t1: 2.2, col: 'o2', align: 'right', box: true }); }
+    // part labels while the whole insert is in view
+    if (t < 2.9) {
+      { const [ax, ay] = L(-30, -12); CAP.note(c, t, { ax, ay, x: 22, y: 330, text: 'CATHODE (−)', t0: 0.75, t1: 2.1, col: 'c3', box: true }); }
+      { const [ax, ay] = L(4, -66); CAP.note(c, t, { ax, ay, x: 250, y: 126, text: 'ANODE (+)', t0: 1.5, t1: 2.6, col: 'o2', align: 'right', box: true }); }
     }
-    if (t > 2.6 && t < 3.9) { const [ax, ay] = L(-20.8, -3.8); CAP.note(c, t, { ax, ay, x: 250, y: 330, text: 'TUNGSTEN FILAMENT', t0: 2.6, t1: 3.75, col: 'w', align: 'right', box: true }); }
-    if (t > 4.2 && t < 5.6) CAP.note(c, t, { x: 135, y: 340, text: 'THERMIONIC EMISSION', t0: 4.45, t1: 5.5, col: 'c3', align: 'center', box: true });
-    if (t > 5.9) { const [ax, ay] = L(-27, -9); CAP.note(c, t, { ax, ay, x: 22, y: 330, text: 'FOCUSING CUP', t0: 6.0, t1: 6.85, col: 'g9', box: true }); }
+    if (t > 2.6 && t < 4.35) { const [ax, ay] = L(-20.8, -3.8); CAP.note(c, t, { ax, ay, x: 250, y: 330, text: 'TUNGSTEN FILAMENT', t0: 2.6, t1: 4.05, col: 'w', align: 'right', box: true }); }
+    if (t > 4.3 && t < 6.3) CAP.note(c, t, { x: 135, y: 340, text: 'THERMIONIC EMISSION', t0: 4.4, t1: 5.95, col: 'c3', align: 'center', box: true });
+    if (t > 5.6) { const [ax, ay] = L(-27, -9); CAP.note(c, t, { ax, ay, x: 22, y: 316, text: 'FOCUSING CUP', t0: 5.7, t1: 6.85, col: 'g9', box: true }); }
     CAP.cap(c, t, { l1: 'X-RAY TUBE', l2: 'HEAT RELEASES ELECTRONS', t0: 0.12, tSwap: 2.6, t1: 6.85, acc: 'y3' });
   },
   cues: () => {

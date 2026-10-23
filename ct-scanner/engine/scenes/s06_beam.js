@@ -140,13 +140,14 @@ SC['s06_beam'] = {
     v = v || viewAt(t);
     c.setTransform(1, 0, 0, 1, 0, 0);
     const L = (x, y, z) => proj(v, x, y, z);
-    if (t < 3.4) {
-      { const [ax, ay] = L(0, YF + 1, 34); CAP.note(c, t, { ax, ay, x: 250, y: 150, text: 'FILTER', t0: 0.8, t1: 1.95, col: 'g9', align: 'right', box: true }); }
-      CAP.note(c, t, { x: 250, y: 161, text: 'stops low-energy X-rays', t0: 1.0, t1: 1.95, col: 'r3', align: 'right', box: true });
-      { const [ax, ay] = L(0, YJ + 4, gapAt(t) + 6); CAP.note(c, t, { ax, ay, x: 250, y: 150, text: 'COLLIMATOR', t0: 2.05, t1: 3.3, col: 'g9', align: 'right', box: true }); }
-      CAP.note(c, t, { x: 250, y: 161, text: 'sets the beam thickness', t0: 2.25, t1: 3.3, col: 'g8', align: 'right', box: true });
+    // the pairs alternate sides, so each explanation can stay up long enough to read
+    if (t < 4.35) {
+      { const [ax, ay] = L(0, YF + 1, 34); CAP.note(c, t, { ax, ay, x: 250, y: 150, text: 'FILTER', t0: 0.8, t1: 2.8, col: 'g9', align: 'right', box: true }); }
+      CAP.note(c, t, { x: 250, y: 161, text: 'stops low-energy X-rays', t0: 1.0, t1: 2.8, col: 'r3', align: 'right', box: true });
+      { const [ax, ay] = L(0, YJ + 4, gapAt(t) + 6); CAP.note(c, t, { ax, ay, x: 20, y: 161, text: 'COLLIMATOR', t0: 2.05, t1: 4.05, col: 'g9', box: true }); }
+      CAP.note(c, t, { x: 20, y: 172, text: 'sets the beam thickness', t0: 2.25, t1: 4.05, col: 'g8', box: true });
     }
-    if (t > 3.9 && t < 5.0) { const [ax, ay] = L(60, YB0 + 14, 0); CAP.note(c, t, { ax, ay, x: 250, y: 150, text: 'BOWTIE FILTER', t0: 4.0, t1: 4.95, col: 'g9', align: 'right', box: true }); CAP.note(c, t, { x: 250, y: 161, text: 'less dose at the edges', t0: 4.15, t1: 4.95, col: 'g8', align: 'right', box: true }); }
+    if (t > 3.9 && t < 6.2) { const [ax, ay] = L(60, YB0 + 14, 0); CAP.note(c, t, { ax, ay, x: 250, y: 150, text: 'BOWTIE FILTER', t0: 4.0, t1: 5.9, col: 'g9', align: 'right', box: true }); CAP.note(c, t, { x: 250, y: 161, text: 'less dose at the edges', t0: 4.15, t1: 5.9, col: 'g8', align: 'right', box: true }); }
     if (t > 5.4) {
       const [ax, ay] = L(Math.sin(0.35) * SDD, Math.cos(0.35) * SDD, ZDET * 0.7);
       CAP.note(c, t, { ax, ay, x: 20, y: 372, text: 'DETECTOR ROWS', t0: 5.5, t1: 6.85, col: 'e3', box: true });

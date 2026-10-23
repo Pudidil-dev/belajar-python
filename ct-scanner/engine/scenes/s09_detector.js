@@ -81,9 +81,9 @@ SC['s09_detector'] = {
     // the chain, lit step by step
     if (t > 1.6 && t < 5.9) CAP.steps(c, t, { x: 14, y: 100, t1: 5.75, gap: 12, items: [[1.85, 'X-RAY', 'y3'], [2.05, 'SCINTILLATOR', 'g9'], [2.15, 'VISIBLE LIGHT', 'e2'], [2.35, 'PHOTODIODE', 'g7'], [2.6, 'ELECTRICAL SIGNAL', 'c3']] });
     const L = (x, y) => K.S(cam, x, y);
-    if (t > 1.4 && t < 2.9) { const [ax, ay] = L(-EW, -50); CAP.note(c, t, { ax, ay, x: 250, y: 160, text: 'ANTI-SCATTER PLATES', t0: 1.45, t1: 2.8, col: 'g9', align: 'right', box: true }); }
-    if (t > 3.6 && t < 5.6) CAP.note(c, t, { x: 20, y: 372, text: 'ENERGY-INTEGRATING:', t0: 3.65, t1: 5.5, col: 'c4', box: true });
-    if (t > 3.6 && t < 5.6) CAP.note(c, t, { x: 20, y: 383, text: 'ONE TOTAL PER VIEW, NOT COUNTS', t0: 3.95, t1: 5.5, col: 'g9', box: true });
+    if (t > 1.4 && t < 3.35) { const [ax, ay] = L(-EW, -50); CAP.note(c, t, { ax, ay, x: 250, y: 160, text: 'ANTI-SCATTER PLATES', t0: 1.45, t1: 3.05, col: 'g9', align: 'right', box: true }); }
+    if (t > 3.6 && t < 6.25) CAP.note(c, t, { x: 20, y: 372, text: 'ENERGY-INTEGRATING:', t0: 3.65, t1: 5.95, col: 'c4', box: true });
+    if (t > 3.6 && t < 6.25) CAP.note(c, t, { x: 20, y: 383, text: 'ONE TOTAL PER VIEW, NOT COUNTS', t0: 3.75, t1: 5.95, col: 'g9', box: true });
     CAP.cap(c, t, { l1: 'DETECTION', l2: ['X-RAYS BECOME', 'ELECTRICAL SIGNALS'], t0: 0.12, tSwap: 2.6, t1: 7.85, acc: 'e2' });
   },
   cues: () => {

@@ -132,6 +132,7 @@ const MINI = { 0: '###/#.#/#.#/#.#/###', 1: '.#./##./.#./.#./###', 2: '###/..#/#
 def('⁺', MINI['+'], 0); def('⁻', MINI['-'], 1);
 '⁰¹²³⁴⁵⁶⁷⁸⁹'.split('').forEach((ch, i) => def(ch, MINI[i], -1));
 G['−'] = G['-'];                                                    // the minus sign draws like a hyphen
+G['μ'] = G['µ'];                                                    // Greek mu (U+03BC) draws like the micro sign (U+00B5)
 const gw = ch => ch === ' ' ? 3 : G[ch] ? Math.max(...G[ch].rows.map(r => r.length)) : 4;
 const textWidth = (s, sc = 1) => { let w = 0; for (const ch of s) w += (gw(ch) + 1) * sc; return Math.max(0, w - sc); };
 // Draw text with its cap-top at (x, y), in screen pixels. opt: {sc, shadow (palette key or null), align, n (chars shown)}
