@@ -141,7 +141,6 @@ function drawCompton(c, t, a) {
   c.save(); c.globalAlpha = a;
   CAP.note(c, t, { x: 20, y: 352, text: 'COMPTON SCATTERING', t0: 6.35, t1: 8.45, col: 'v3', box: true });
   CAP.note(c, t, { x: 20, y: 363, text: 'less energy, new path', t0: 6.95, t1: 8.62, col: 'g9', box: true });
-  CAP.note(c, t, { x: 250, y: 132, text: 'AN OUTER ELECTRON', t0: 6.3, t1: 8.45, col: 'c3', align: 'right', box: true });
   c.restore();
 }
 SC['s07_tissue'] = {
@@ -166,16 +165,11 @@ SC['s07_tissue'] = {
     }
     if (t > 1.2 && t < 2.75) { const [ax, ay] = G2.S(cam, FB.x, FB.y); CAP.note(c, t, { ax, ay, x: 20, y: 140, text: 'SKULL', t0: 1.3, t1: 2.45, col: 'q5', box: true }); }
     if (t > 5.1 && t < 6.5) { const [ax, ay] = G2.S(cam, FC.x, FC.y); CAP.note(c, t, { ax, ay, x: 20, y: 140, text: 'BRAIN', t0: 5.2, t1: 6.25, col: 'p3', box: true }); }
-    if (t > 8.5) {
-      CAP.note(c, t, { x: 20, y: 140, text: 'A  PASSES', t0: 8.6, t1: 9.85, col: 'y3', box: true });
-      CAP.note(c, t, { x: 20, y: 151, text: 'B  ABSORBED', t0: 8.65, t1: 9.85, col: 'r3', box: true });
-      CAP.note(c, t, { x: 20, y: 162, text: 'C  SCATTERED', t0: 8.7, t1: 9.85, col: 'v3', box: true });
-    }
-    CAP.cap(c, t, { l1: 'X-RAYS IN TISSUE', l2: ['SOME PHOTONS PASS THROUGH.', 'OTHERS ARE ABSORBED', 'OR SCATTERED.'], t0: 0.15, tSwap: 1.4, t1: 9.85, acc: 'y3' });
+    CAP.cap(c, t, { l1: 'X-RAYS IN TISSUE', l2: ['SOME PHOTONS PASS THROUGH.', 'OTHERS ARE ABSORBED OR SCATTERED.'], t0: 0.15, tSwap: 1.4, t1: 9.85, acc: 'y3' });
   },
   cues: () => {
     const q = [[0.1, 'push_in', 0.7, 0, 1.1], [1.2, 'tag', 0.4, 0.4], [2.45, 'zoom_rush', 0.8, -0.2, 0.6], [3.6, 'photoelectric', 1, -0.2], [5.15, 'pull_back', 0.6, 0, 0.6], [5.2, 'tag', 0.35, -0.4],
-      [5.75, 'zoom_rush', 0.8, 0.2, 0.6], [6.9, 'compton', 1, 0.2], [8.65, 'pull_back', 0.6, 0, 0.6], [8.6, 'tag', 0.4, -0.4], [8.72, 'tag', 0.4, -0.4]];
+      [5.75, 'zoom_rush', 0.8, 0.2, 0.6], [6.9, 'compton', 1, 0.2], [8.65, 'pull_back', 0.6, 0, 0.6]];
     // soft pulses for transmitted photons, grouped on 8th notes
     const seen = new Set();
     for (const ph of PHS) { if (ph.kind !== 'A') continue; const tt = ph.te + 0.9; const k = Math.round(tt * 4); if (tt < 0.8 || tt > 9.8 || (tt > 3 && tt < 8.4) || seen.has(k)) continue; seen.add(k); q.push([k / 4, 'transmit_pulse', 0.3, ph.g * 3]); }

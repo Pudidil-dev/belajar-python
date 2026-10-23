@@ -37,11 +37,10 @@ SC['s11_helical'] = {
     // labels
     if (pts.length > 40) { const [a] = pts[Math.floor(pts.length * 0.35)]; CAP.note(c, t, { ax: a[0], ay: a[1], x: 248, y: 150, text: 'TUBE PATH (HELIX)', t0: 2.4, t1: 6.85, col: 'y3', align: 'right', box: true }); }
     { const Hd = ROOM.proj(C, [0, 40, hz + 60]); if (Hd) CAP.note(c, t, { ax: Hd[0], ay: Hd[1], x: 20, y: 352, text: 'SCANNED VOLUME', t0: 3.6, t1: 6.85, col: 'c3', box: true }); }
-    CAP.note(c, t, { x: 20, y: 363, text: 'the table moves; the frame spins', t0: 1.0, t1: 3.4, col: 'g8', box: true });
     CAP.cap(c, t, { l1: 'SCANNING A VOLUME', l2: ['ROTATION + TABLE MOVEMENT', '= HELICAL SCAN'], t0: 0.12, tSwap: 2.2, t1: 6.85, acc: 'y3' });
   },
   cues: () => {
-    const q = [[0, 'swing', 0.6, 0, 1.0], [0.6, 'table_motor', 0.7, 0, 6.2], [0.6, 'spin_motor', 0.8, 0, 6.3], [1.0, 'tag', 0.3, -0.4], [2.4, 'tag', 0.4, 0.4], [3.6, 'tag', 0.4, -0.4]];
+    const q = [[0, 'swing', 0.6, 0, 1.0], [0.6, 'table_motor', 0.7, 0, 6.2], [0.6, 'spin_motor', 0.8, 0, 6.3], [2.4, 'tag', 0.4, 0.4], [3.6, 'tag', 0.4, -0.4]];
     // a rhythmic pulse per rotation
     let k = 0; for (let tt = 0.6; tt < 6.9; tt += 1 / REV / 2) q.push([Math.round(tt * 4) / 4, 'rot_pulse', 0.45, (k++ % 2) ? 0.3 : -0.3]);
     q.push([2.2, 'spiral_sweep', 0.8, 0, 2.0]);
