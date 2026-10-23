@@ -35,6 +35,10 @@ CT.buildPhantom = () => {
     hu[r * N + c] = a / (ss * ss); mu[r * N + c] = HEAD.muOf(a / (ss * ss));
   }
   CT.MU = mu; CT.HUP = hu;
+  // tissue classes for the illustrated cross-section (0 air, 1 skin/soft, 2 fat, 3 bone, 4 brain, 5 CSF, 6 eye, 7 tooth), 2× finer
+  const n2 = N * 2, cls = new Uint8Array(n2 * n2), px2 = PX / 2;
+  for (let r = 0; r < n2; r++) for (let c = 0; c < n2; c++) cls[r * n2 + c] = HEAD.cls((c + 0.5 - n2 / 2) * px2 - CT.OX, (n2 / 2 - r - 0.5) * px2 - CT.OY, CT.Z);
+  CT.CLS = cls; CT.N2 = n2;
 };
 // bilinear μ at gantry-plane mm (X right = patient's left, Y up = anterior)
 const muAt = (X, Y) => {

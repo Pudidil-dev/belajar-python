@@ -167,7 +167,7 @@ const mats = () => MAT || (MAT = {
   1: ['floor', ['k', 'n0', 'n1', 'n2', 'n3']], 2: ['wall', ['k', 'g0', 'g1', 'g2', 'g3']], 3: ['frame', ['g2', 'g3', 'g4', 'g5', 'g6', 'g7']],
   4: ['cover', ['g3', 'g5', 'g7', 'g8', 'g9', 'ga', 'gb', 'w']], 5: ['face', ['g4', 'g6', 'g8', 'g9', 'ga', 'gb', 'w']], 6: ['bore', ['g2', 'g4', 'g6', 'g7', 'g8', 'g9']],
   7: ['led', ['c1', 'c2', 'c3', 'c4']], 8: ['table', ['g2', 'g3', 'g4', 'g5', 'g6']], 9: ['base', ['g1', 'g2', 'g3', 'g4', 'g5']],
-  10: ['blanket', ['h0', 'h1', 'h2', 'h3']], 11: ['skin', ['s0', 's1', 's2', 's3', 's4']], 12: ['desk', ['g0', 'g1', 'g2', 'g3', 'g4']],
+  10: ['blanket', ['h0', 'h1', 'h2', 'h3']], 11: ['skin', ['s0', 's1', 's2', 's3', 's4']], 17: ['scanned', ['c0', 'c1', 'c2', 'c3', 'c4']], 12: ['desk', ['g0', 'g1', 'g2', 'g3', 'g4']],
   13: ['monitor', ['k', 'g0', 'g1', 'g2', 'g3']], 15: ['keys', ['g1', 'g2', 'g3', 'g4']], 16: ['panel', ['k', 'g1', 'g2', 'c1']],
   20: ['drum', ['g1', 'g2', 'g3', 'g4', 'g5', 'g6']], 21: ['tube', ['g3', 'g5', 'g6', 'g7', 'g8', 'g9']], 22: ['coll', ['g2', 'g3', 'g4', 'g5', 'g6']],
   23: ['hv', ['u0', 'u1', 'u2', 'u3']], 24: ['det', ['e0', 'e1', 'e2', 'e3']], 25: ['das', ['c0', 'c1', 'c2']], 26: ['cool', ['g1', 'g2', 'g3', 'g4']],
@@ -213,7 +213,7 @@ function bodyHit(ob, d, parts, hz, tmax) {
     }
     if (ok && t < lim) {
       const X = ob[0] + d[0] * t, Y = ob[1] + d[1] * t, Z = ob[2] + d[2] * t, e = 1.2, f = (a, b, c) => HEAD.skinSD(-a, b - G.HY, c - hz);
-      best = { t, id: 11, n: norm([f(X + e, Y, Z) - f(X - e, Y, Z), f(X, Y + e, Z) - f(X, Y - e, Z), f(X, Y, Z + e) - f(X, Y, Z - e)]) };
+      best = { t, id: 11, n: norm([f(X + e, Y, Z) - f(X - e, Y, Z), f(X, Y + e, Z) - f(X, Y - e, Z), f(X, Y, Z + e) - f(X, Y, Z - e)]), zh: Z - hz };
     }
   }
   return best;
@@ -254,7 +254,7 @@ ROOM.render = (img, C, o = {}) => {
     hit(box(ob, d, [-150, 150, -560, G.TOP - 45, -2050, -1150]), 9);
     // the patient
     let bv = null;
-    if (bodyA > 0 || headA > 0) { bv = bodyHit(ob, d, parts, hz, best.t); if (bv && (bv.id === 11 ? headA >= 1 : bodyA >= 1)) { best.t = bv.t; best.id = bv.id; best.n = bv.n; bv = null; } }
+    if (bodyA > 0 || headA > 0) { bv = bodyHit(ob, d, parts, hz, best.t); if (bv && o.scan && bv.id === 11 && bv.zh <= o.scan[1] && bv.zh >= o.scan[0] && K.BAY(px, py) < (o.scanA ?? 0.6)) bv.id = 17; if (bv && (bv.id === 11 || bv.id === 17 ? headA >= 1 : bodyA >= 1)) { best.t = bv.t; best.id = bv.id; best.n = bv.n; bv = null; } }
     if (showRoom) {
       if (Math.abs(d[2]) > 1e-9) {                                              // the control-room wall with its window
         const tw = (G.WALL_Z - ob[2]) / d[2];
