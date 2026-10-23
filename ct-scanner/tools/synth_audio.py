@@ -321,13 +321,14 @@ drums(192, 198, 'lite', 0.8); bass(192, 198, 'sub', 0.55); chords(192, 198, 'pad
 drums(198, 205.5, 'build', 0.95); bass(198, 205.5, 'pulse', 0.75, cut=900); chords(198, 206, 'swell', 0.26, cut=3600); roll(202, 205.5, 0.12, 0.55)
 put(MUS, riser(tb(7.5), 250, 10000), tb(198), 0.45); breath(205.5, 206)
 drums(206, 212, 'four'); bass(206, 212, 'roll', 0.9, cut=1300); stabs(206, 212, 0.36); bleeps(206, 212, 1.0); arp(206, 212, 0.25, 0.2, 6000)
-CRASH(206, 0.6, 2.4); put(MUS, boom(62, 30, 1.2), tb(206), 0.45)
+CRASH(206, 0.5, 2.2); put(MUS, boom(62, 30, 1.2), tb(206), 0.32)
 # 212–224 (106–112 s) S15 CT NUMBERS: the groove under a filter so the three calibrated tones ring; it opens for the windows
 drums(212, 224, 'four', 0.85); bass(212, 224, 'off', 0.7); stabs(216, 224, 0.24); chords(212, 216, 'pad', 0.22); dip(212, 217, 900)
 # 224–236 (112–118 s) S16 VOLUME: slices stack; a build under the rising arpeggio; held breath; the success hit an eighth early
 drums(224, 230, 'four', 0.95); bass(224, 230, 'roll', 0.8); stabs(224, 230, 0.3); bleeps(224, 230, 0.65)
 drums(230, 235, 'build', 0.95); bass(230, 235, 'pulse', 0.75, cut=1000); roll(232, 235, 0.12, 0.5); put(MUS, riser(tb(5), 300, 10000), tb(230), 0.4)
-breath(235, 235.5); put(PUMP, rbass(45, BEAT * 0.45, 1100, 6), tb(235.5), 0.9); CRASH(235.5, 0.5, 1.8)
+breath(235, 235.5); put(PUMP, rbass(45, BEAT * 0.45, 1100, 6), tb(235.5), 0.9); CRASH(235.5, 0.6, 2.4); put(MUS, boom(58, 28, 1.6), tb(235.5), 0.5)
+put(PUMP, supersaw(CH['Am'][1], tb(4.5), 3600, att=0.02), tb(235.5), 0.3, 0, 0.4)
 # 236–240 (118–120 s) S17 FINAL: the opening groove again under the title; a reverse cymbal runs into the loop's impact
 drums(236, 240, 'four'); bass(236, 240, 'roll', 0.85); stabs(236, 240, 0.32); bleeps(236, 240, 0.9)
 put(MUS, revcym(BEAT * 1.5), tb(238.5), 0.4)
@@ -576,7 +577,7 @@ def make(name, cu):
         d = 0.5; u = tv(d) / d
         return R(S(bp(noise(d), 400, 2600) * np.sin(np.pi * u) ** 3 * 0.6, np.sin(phase(sweep(520, 380, d), d)) * np.sin(np.pi * u) ** 3 * 0.25), 0.3)
     # ---- the measurement
-    if name == 'ray_on': d = 0.6; tt = tv(d); return R((np.sin(2 * np.pi * 1760 * tt) * 0.4 + np.sin(2 * np.pi * 3520 * tt) * 0.15) * env(d, 0.04, r=0.3), 0.4)
+    if name == 'ray_on': d = 0.6; tt = tv(d); return R((np.sin(2 * np.pi * mf(76) * tt) * 0.4 + np.sin(2 * np.pi * mf(88) * tt) * 0.12) * env(d, 0.08, r=0.35), 0.4)
     if name == 'signal_pulse': d = 0.18; return R(S(sweep_lp(osc('sq', mf(84), d, 0.3), 6000, 700, 2, 12) * np.exp(-tv(d) * 14) * 0.5, tick(2400, 0.015) * 0.4), 0.35)
     if name == 'calc_click':
         i = nth('calc_click'); x = np.zeros(int(0.1 * SR)); ins(x, chip(96 - 3 * i, 0.025, 0.5, 90), 0); ins(x, chip(91 - 3 * i, 0.03, 0.5, 80), 0.035 * SR); return R(x, 0.2)
@@ -650,8 +651,9 @@ def make(name, cu):
             ins(x, S(chip(m, 0.1, 0.25, 22) * (0.4 + 0.4 * i / n), pluck(m + 12, 0.15) * 0.25), i * S16 * SR)
         return R(x, 0.3)
     if name == 'assemble_tick': return R(S(tick(1500 + 200 * k, 0.015) * 0.4, np.sin(phase(sweep(300, 150, 0.04), 0.04)) * np.exp(-tv(0.04) * 60) * 0.3), 0.2)
-    if name == 'success_impact':
-        x = np.zeros(int(2.6 * SR)); ins(x, S(boom(66, 30, 1.4) * 0.7, kick(1.4, 1.2) * 0.6, crash(2.2) * 0.35), 0)
+    if name == 'success_impact':                          # the 3D skull is complete: the film's biggest moment
+        x = np.zeros(int(2.6 * SR)); ins(x, S(boom(66, 30, 1.8) * 0.8, kick(1.4, 1.2) * 0.6, crash(2.4) * 0.35), 0)
+        ins(x, supersaw(CH['Am'][1], 1.2, 3200, att=0.005) * 0.9, 0); ins(x, supersaw([m + 12 for m in CH['Am'][1][:3]], 0.9, 4200, att=0.005) * 0.5, 0)
         for i, m in enumerate((69, 76, 81, 84, 88, 93)): ins(x, chip(m + 12, 0.07, 0.25, 26) * 0.25, (0.02 + i * 0.04) * SR)
         for i, m in enumerate((81, 88, 93)): ins(x, bell(m, 1.8, 2.0) * 0.3, i * 0.03 * SR)
         return R(x, 0.55)
@@ -670,8 +672,8 @@ GAIN = {'room_tone': 0.35, 'table_motor': 0.45, 'spin_motor': 0.55, 'motor_spin'
         'whoosh_out': 1.45, 'whoosh_in': 1.3, 'dive': 1.23, 'turn': 1.08, 'dissolve_in': 1.35, 'stack_out': 2.5, 'segment': 1.7,
         'signal_pulse': 1.8, 'calc_click': 1.5, 'data_stream': 1.36, 'chirp_e': 1.1, 'slice_click': 1.45, 'photon': 1.3, 'hit_tick': 1.2,
         'tone_air': 0.9, 'tone_tissue': 0.9 * 0.67, 'tone_bone': 0.9 * 0.37, 'xray_hit': 0.7, 'crystal_ping': 0.8,
-        'impact': 1.0, 'hv_on': 1.0, 'photon_big': 1.0, 'recon_complete': 1.0, 'success_impact': 1.0, 'title_hit': 1.0, 'chime_complete': 1.0,
-        'punch': 0.9, 'photoelectric': 1.0, 'compton': 1.0}
+        'impact': 1.0, 'hv_on': 1.0, 'photon_big': 0.75, 'bend': 0.7, 'recon_complete': 0.78, 'success_impact': 1.6, 'title_hit': 0.85, 'chime_complete': 0.8,
+        'punch': 0.55, 'photoelectric': 1.0, 'compton': 1.0, 'ray_on': 0.55}
 QLATE = {'success_impact', 'chime_complete', 'confirm', 'calc_confirm', 'chime_small', 'title_hit', 'recon_complete'}   # may land up to 55 ms late
 QANY = {'arp_rise', 'pixel_place'}                                                                                     # musical runs: on the grid
 missing = set(); stamp = {}
