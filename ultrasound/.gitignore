@@ -1,0 +1,3 @@
+build/
+qa/*.jpg
+__pycache__/
