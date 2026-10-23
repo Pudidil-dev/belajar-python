@@ -47,5 +47,6 @@ SC['s11_helical'] = {
     q.push([2.2, 'spiral_sweep', 0.8, 0, 2.0]);
     return q;
   },
+  xin: 0.35,
 };
 })();

@@ -25,10 +25,17 @@ SC['s14_fbp'] = {
     const half = CT.FOV / 2 * z;
     PIX.rect(c, Math.round(gx - half) - 1, Math.round(gy - half) - 1, Math.round(2 * half) + 2, Math.round(2 * half) + 2, 'g2');
     PIX.rect(c, Math.round(gx - half), Math.round(gy - half), Math.round(2 * half), Math.round(2 * half), 'n0');
+    // S13's sinogram slides up and away; the chosen row lights up and lifts out as the profile
+    const sa = 1 - MO.smooth(clamp((t - 0.35) / 0.45));
+    if (sa > 0) {
+      const q = MO.cubicIn(clamp(t / 0.8)), SX = lerp(40, 30, q), SY = lerp(132, 70, q), SW = lerp(200, 210, q), SH = lerp(250, 60, q);
+      CT.blit(c, CT.ND, CT.NA, { M: [SW / CT.ND, 0, 0, SH / CT.NA, SX, SY], val: i => Math.pow(Math.max(0, CT.SINO[i] / CT.PMAX), 0.85), ramp: CT.ramps().blue, alpha: sa });
+      const ry = Math.round(SY + SH * (ROW + 0.5) / CT.NA); c.save(); c.globalAlpha = sa; PIX.rect(c, Math.round(SX) - 3, ry, Math.round(SW) + 6, 1, 'w'); c.restore();
+    }
     // the lifted row: raw profile, then the filtered one
     const row = CT.SINO.subarray(ROW * CT.ND, (ROW + 1) * CT.ND), qrow = CT.Q.subarray(ROW * CT.ND, (ROW + 1) * CT.ND);
     let qmax = 0; for (const v of qrow) qmax = Math.max(qmax, Math.abs(v));
-    const pa = MO.smooth(clamp((t - 0.1) / 0.3)) * (1 - MO.smooth(clamp((t - 2.9) / 0.3))), fq = MO.smooth(clamp((t - 0.9) / 0.4));
+    const pa = MO.smooth(clamp((t - 0.45) / 0.3)) * (1 - MO.smooth(clamp((t - 2.9) / 0.3))), fq = MO.smooth(clamp((t - 0.95) / 0.4));
     const mix = new Float32Array(CT.ND); for (let j = 0; j < CT.ND; j++) mix[j] = lerp(row[j] / CT.PMAX * 0.9, qrow[j] / qmax * 0.55, fq);
     profile(c, 30, 104, 210, 44, mix, pa, fq > 0.5 ? 'b4' : 'b3', fq > 0.5 ? 0.45 : 0.05, 1);
     // backprojection of that one view: the smear sweeps in along the ray direction
@@ -48,7 +55,7 @@ SC['s14_fbp'] = {
       const n = t < 3.0 ? 1 : nAt(t);
       PIX.rect(c, 150, 98, 98, 14, 'k'); PIX.text(c, `VIEWS: ${n}`, 245, 101, n >= 360 ? 'e2' : 'w', { align: 'right', shadow: null });
     }
-    CAP.note(c, t, { x: 30, y: 158, text: 'FILTER', t0: 0.9, t1: 1.6, col: 'b4', box: true });
+    CAP.note(c, t, { x: 30, y: 158, text: 'FILTER', t0: 0.95, t1: 1.6, col: 'b4', box: true });
     CAP.note(c, t, { x: 30, y: 158, text: 'BACKPROJECT', t0: 1.65, t1: 2.9, col: 'b4', box: true });
     CAP.note(c, t, { x: 30, y: 158, text: 'ADD MORE DIRECTIONS', t0: 3.05, t1: 6.9, col: 'b4', box: true });
     CAP.note(c, t, { x: 20, y: 384, text: 'FILTERED BACKPROJECTION;', t0: 7.6, t1: 9.85, col: 'g8', box: true });
@@ -56,7 +63,7 @@ SC['s14_fbp'] = {
     CAP.cap(c, t, { l1: 'RECONSTRUCTION', l2: ['MATH RECONSTRUCTS', 'THE INSIDE OF THE BODY'], t0: 0.12, tSwap: 3.0, t1: 9.85, acc: 'b4' });
   },
   cues: () => {
-    const q = [[0.1, 'lift_row', 0.6, 0], [0.9, 'filter_sweep', 0.8, 0, 0.5], [1.4, 'smear', 0.8, 0, 0.9], [3.0, 'build_rise', 0.8, 0, 4.0]];
+    const q = [[0.3, 'lift_row', 0.6, 0], [0.9, 'filter_sweep', 0.8, 0, 0.5], [1.4, 'smear', 0.8, 0, 0.9], [3.0, 'build_rise', 0.8, 0, 4.0]];
     STEPS.forEach(([tt, n], k) => q.push([tt, n >= 360 ? 'recon_complete' : 'assemble_hit', n >= 360 ? 1 : 0.55 + 0.05 * k, (k % 2 ? 0.25 : -0.25), k]));
     q.push([7.0, 'punch', 0.9, 0]);
     return q;
