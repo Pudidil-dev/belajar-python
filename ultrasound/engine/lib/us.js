@@ -231,7 +231,7 @@ US.frame = t => {
     B[i * NS + j] = Math.max(0, Math.min(1, (20 * Math.log10(a + 1e-5) + 46) / 42));
   }
   const out = { t, B, A, TID, F };
-  FCACHE.set(key, out); if (FCACHE.size > 48) FCACHE.delete(FCACHE.keys().next().value);
+  FCACHE.set(key, out); if (FCACHE.size > 128) FCACHE.delete(FCACHE.keys().next().value);
   return out;
 };
 // the machine's frame clock: lines are acquired in sweeps; the display quantizes acquisition times to 1/30 s
@@ -252,8 +252,12 @@ US.sampleAt = (fr, x, z, nLines = NL) => {
   const i0 = Math.floor(fi), j0 = Math.max(0, Math.floor(fj)), di = fi - i0, dj = Math.max(0, fj - j0);
   if (i0 >= nLines) return -2;
   const i1 = Math.min(NL - 1, i0 + 1, nLines - 1), j1 = Math.min(NS - 1, j0 + 1);
-  const Ba = (Array.isArray(fr) ? fr[i0] : fr).B, Bb = (Array.isArray(fr) ? fr[i1] : fr).B;
-  const a = Ba[i0 * NS + j0] * (1 - dj) + Ba[i0 * NS + j1] * dj, b = Bb[i1 * NS + j0] * (1 - dj) + Bb[i1 * NS + j1] * dj;
+  const fa = Array.isArray(fr) ? fr[i0] : fr, fb = Array.isArray(fr) ? fr[i1] : fr;
+  if (!fa) return -2;                                                           // line not acquired (image build)
+  const Ba = fa.B, Bb = (fb || fa).B;
+  const a = Ba[i0 * NS + j0] * (1 - dj) + Ba[i0 * NS + j1] * dj;
+  if (!fb) return a;
+  const b = Bb[i1 * NS + j0] * (1 - dj) + Bb[i1 * NS + j1] * dj;
   return a * (1 - di) + b * di;
 };
 // gray level → one of the palette's 14 grays, ordered-dithered between neighbours (display gamma 1.15)

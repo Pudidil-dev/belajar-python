@@ -1,0 +1,283 @@
+{
+ "project": "/home/user/belajar-python/ultrasound/engine",
+ "spec": null,
+ "segments": [
+  {
+   "id": "s01_hook",
+   "window_lt": [
+    0.0,
+    2.98
+   ],
+   "frames": 89,
+   "ms_mean": 23.5,
+   "ms_max": 146.2,
+   "ms_cold": 223.1,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 5.7,
+   "motion_max": 54.19,
+   "still_pairs_pct": 5.7,
+   "spike_ratio": 40.6,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     1.998,
+     2.337
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s02_reveal",
+   "window_lt": [
+    0.35,
+    3.98
+   ],
+   "frames": 108,
+   "ms_mean": 20.0,
+   "ms_max": 163.1,
+   "ms_cold": 23.6,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 18.08,
+   "motion_max": 46.39,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.5,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s03_crystals",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 15.2,
+   "ms_max": 80.5,
+   "ms_cold": 15,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 10.63,
+   "motion_max": 44.98,
+   "still_pairs_pct": 5.1,
+   "spike_ratio": 12.0,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.35,
+     1.999
+    ],
+    [
+     5.028,
+     6.576
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s04_waves",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 10.4,
+   "ms_max": 33.7,
+   "ms_cold": 14.5,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 9.93,
+   "motion_max": 32.44,
+   "still_pairs_pct": 4.4,
+   "spike_ratio": 10.2,
+   "spikes_at_lt": [
+    5.392,
+    5.425,
+    5.459,
+    5.493,
+    5.526,
+    5.56,
+    5.594,
+    5.627,
+    5.661,
+    5.694,
+    5.728,
+    5.762,
+    5.795,
+    5.829,
+    5.862,
+    5.896,
+    5.93,
+    5.963,
+    5.997,
+    6.03,
+    6.064,
+    6.098,
+    6.131,
+    6.165,
+    6.199,
+    6.232,
+    6.266,
+    6.299,
+    6.333,
+    6.367,
+    6.4,
+    6.434,
+    6.467,
+    6.501,
+    6.535,
+    6.568,
+    6.602,
+    6.636,
+    6.669,
+    6.703,
+    6.736,
+    6.77,
+    6.804,
+    6.837,
+    6.871,
+    6.904,
+    6.938,
+    6.972,
+    7.005,
+    7.039,
+    7.072,
+    7.106,
+    7.14,
+    7.173,
+    7.207,
+    7.241,
+    7.274,
+    7.308,
+    7.341,
+    7.375,
+    7.409,
+    7.442,
+    7.476,
+    7.509,
+    7.543,
+    7.577,
+    7.61,
+    7.644,
+    7.677,
+    7.711,
+    7.745,
+    7.778,
+    7.812,
+    7.846
+   ],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s05_echoes",
+   "window_lt": [
+    0.35,
+    8.98
+   ],
+   "frames": 258,
+   "ms_mean": 21.6,
+   "ms_max": 62.3,
+   "ms_cold": 49.9,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 4.41,
+   "motion_max": 15.95,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 3.5,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s06_receive",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 9.5,
+   "ms_max": 24.0,
+   "ms_cold": 27.7,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 5.97,
+   "motion_max": 44.04,
+   "still_pairs_pct": 4.0,
+   "spike_ratio": 15.1,
+   "spikes_at_lt": [
+    4.148,
+    4.182,
+    4.215,
+    4.249,
+    4.283,
+    4.316,
+    4.35,
+    4.383
+   ],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s07_build",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 17.6,
+   "ms_max": 47.3,
+   "ms_cold": 166.4,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.96,
+   "motion_max": 11.32,
+   "still_pairs_pct": 14.1,
+   "spike_ratio": 6.1,
+   "spikes_at_lt": [
+    5.627
+   ],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s08_final",
+   "window_lt": [
+    0.35,
+    2.98
+   ],
+   "frames": 78,
+   "ms_mean": 22.8,
+   "ms_max": 137.7,
+   "ms_cold": 160.4,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.22,
+   "motion_max": 11.03,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 7.6,
+   "spikes_at_lt": [
+    2.536,
+    2.57,
+    2.604,
+    2.638,
+    2.673,
+    2.707
+   ],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  }
+ ],
+ "transitions": [],
+ "page_errors": []
+}

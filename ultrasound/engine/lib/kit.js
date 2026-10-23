@@ -100,3 +100,8 @@ K.dith = (c, x0, y0, w, h_, col, a, ph = 0) => {
   c.restore();
 };
 })();
+// zoom between two cameras along the path that keeps the on-screen pan speed constant (log zoom, centre ∝ 1/z)
+K.zoomPath = (a, b, p) => {
+  const z = K.zl(a.z, b.z, p), d = 1 / b.z - 1 / a.z, s = Math.abs(d) < 1e-12 ? p : (1 / z - 1 / a.z) / d;
+  return { x: U.lerp(a.x, b.x, s), y: U.lerp(a.y, b.y, s), z };
+};

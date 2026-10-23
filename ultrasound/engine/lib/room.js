@@ -13,6 +13,10 @@ const FAN = { ax: 0, ay: -177, k: 1.35 };                      // the image on t
 const PRB = { ax: 0, ay: -105.2 };                             // the probe's virtual apex (its face has radius US.RP)
 Object.assign(ROOM, { SCR, FAN, PRB });
 ROOM.HOOK = { x: 0, y: -166, z: 12 };                          // the opening shot: screen 1:1 with its texture
+// body point (bx, bz) of the image on the monitor → world
+ROOM.fanW = (bx, bz) => [FAN.ax + FAN.k * bx, FAN.ay + FAN.k * (bz + US.RP)];
+ROOM.MACHINE = { x: 0, y: -147, z: 3.3 };                      // monitor, deck and the probe on the belly
+ROOM.PROBEV = { x: 0, y: -106, z: 5.4 };                       // the probe, the hand, the cutaway fan
 const TX = 12, TW = 432, TH = 324;                             // texture scale (px/cm) and size
 const FL = (c, z, path, base, sh, hi, s = 1.5, hs = 1) => PIX.flat(c, path, base, sh, hi, [s / z, s / z], [hs / z, hs / z]);
 const R = (x, y, w, h, r = 0) => PIX.rectPath(x, y, w, h, r);
@@ -194,6 +198,7 @@ const probePath = (ax, ay) => {
   return U.poly(out);
 };
 ROOM.probeTop = [PRB.ax, PRB.ay - 16.4];
+ROOM.probePath = probePath;
 // o: {lit (0..1, the face glows when it fires), cut (0..1: the housing opens to show the layers inside)}
 ROOM.drawProbe = (c, cam, t, o = {}) => {
   PIX.cam(c, cam); const z = cam.z, ax = PRB.ax, ay = PRB.ay;

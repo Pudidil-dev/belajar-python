@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""Score + sound design for "How Electron Microscopes See Atoms" — pure code synthesis, no samples.
+"""Score + sound design for "How Ultrasound Machines Work" — pure code synthesis, no samples.
 
   uv run --no-project --with numpy --with scipy --with soundfile --with pillow python tools/synth_audio.py build/cues.json build/score.wav [build/loudness.png]
 
-A game-soundtrack groove: 120 BPM, A minor, chip-style square and pulse voices over a modern kick, sidechain pump and
-a bouncing octave bass. One four-chord loop (Am–F–C–G) and one lead hook carry the whole film, so the ear has
-something to come back to; each scene re-orchestrates them. 230 beats = exactly 115 s; scene boundaries fall on beats.
-Structure from the brief: an instant hook (impact on frame 0, the drop on the zoom-out at 3 s) → mysterious, precise
-curiosity through the machine, the sample and the vacuum (9–30 s) → acceleration: arpeggios and subdivisions that
-speed up through the gun and the accelerator, a drop on the wave comparison (30–52 s) → tight mechanical optics and
-the raster scan (52–74 s) → a held breath before the first scattering event, then a heavy half-time drop (74–91 s) →
-rapid digital percussion building through detection and the image (91–106 s) → the climax and the strongest
-resolution on the final reveal, an A-major final hit at 112 s, and a rewind that runs into the opening impact (loop).
-Sound effects come from the cue sheet (tools/render.py --cues).
+A clean, punchy electronic groove: 120 BPM, A minor, chip-style pulse voices over a modern kick, sidechain pump and a
+bouncing octave bass. One chord loop and one lead hook come back through the film; each scene re-orchestrates them.
+100 beats = exactly 50 s = 25 bars; every scene boundary falls on a beat. The beat is there on frame 0 with the impact;
+the drop lands on the pull-back out of the image (3 s); tight mechanical 16ths inside the probe, a held breath before
+the crystals fire (9.5 s); a pulsing groove for the waves; lighter bells under the echoes so the bounces read; a build
+of accelerating arpeggios and rolls while the image assembles line by line; the strongest groove on the final monitor
+shot; the last bar resolves on A minor and a reverse swell runs into the opening impact, so the loop is seamless.
+Sound effects come from the cue sheet (tools/render.py --cues); they are artistic, not the sound of the process itself.
 """
 import json, sys
 import numpy as np
@@ -26,7 +24,7 @@ OUT = sys.argv[2]
 TOTAL = cuesheet['total']
 N = int(TOTAL * SR) + 2 * SR
 MUS = np.zeros((2, N)); PUMP = np.zeros((2, N)); SFX = np.zeros((2, N)); VERB = np.zeros((2, N))
-rng = np.random.default_rng(1931)                         # Knoll and Ruska, the first electron microscope
+rng = np.random.default_rng(1942)                         # Karl Dussik's first medical ultrasound images
 def tb(beat): return beat * BEAT
 
 # ---------------------------------------------------------------- helpers
@@ -150,28 +148,20 @@ def boom(f0=55, f1=28, d=1.8):
 
 # ---------------------------------------------------------------- harmony: A minor, one loop for the whole film
 CH = {'Am': (45, [57, 60, 64, 69]), 'F': (41, [57, 60, 65, 69]), 'C': (36, [55, 60, 64, 67]), 'G': (43, [55, 59, 62, 67]),
-      'E': (40, [56, 59, 64, 68]), 'Dm': (38, [57, 62, 65, 69]), 'A': (45, [57, 61, 64, 69])}
-PROG = [(0, 'Am'), (4, 'F'), (8, 'C'), (12, 'G'), (16, 'Am'),
-        (20, 'Am'), (24, 'F'), (28, 'E'), (32, 'Am'), (36, 'F'), (40, 'Dm'), (44, 'E'),          # curiosity
-        (48, 'Dm'), (52, 'Am'), (56, 'E'),                                                          # vacuum
-        (60, 'Am'), (64, 'F'), (68, 'C'), (72, 'G'), (76, 'F'), (80, 'G'), (84, 'Am'), (88, 'E'),   # emission → acceleration
-        (92, 'C'), (96, 'G'), (100, 'Am'),                                                          # the wave drop
-        (104, 'Am'), (108, 'F'), (112, 'C'), (116, 'G'), (120, 'Am'), (124, 'F'), (128, 'C'), (132, 'G'),
-        (136, 'Am'), (140, 'F'), (144, 'C'), (148, 'Am'), (152, 'Am'), (156, 'F'), (160, 'C'), (164, 'G'),
-        (168, 'Am'), (172, 'F'), (176, 'C'), (180, 'G'), (184, 'F'), (188, 'G'), (192, 'Am'), (196, 'Am'),
-        (200, 'F'), (204, 'G'), (208, 'E'), (212, 'Am'), (216, 'Am'), (220, 'F'), (224, 'A'), (228, 'G')]
+      'E': (40, [56, 59, 64, 68]), 'Dm': (38, [57, 62, 65, 69])}
+PROG = [(0, 'Am'), (4, 'F'), (8, 'C'), (12, 'G'), (16, 'Am'), (20, 'F'), (24, 'E'), (28, 'Am'), (32, 'F'), (36, 'C'), (40, 'G'),
+        (44, 'Am'), (48, 'F'), (52, 'C'), (56, 'G'), (60, 'Am'), (64, 'Dm'), (68, 'Am'), (72, 'F'), (76, 'E'), (80, 'Am'), (84, 'F'),
+        (88, 'G'), (92, 'E'), (96, 'Am')]
+HOOK = {'Am': [(0, 76, .5), (0.75, 74, .25), (1.5, 72, .5), (2.0, 69, .5), (2.75, 72, .25), (3.5, 74, .5)],
+        'F': [(0, 77, .5), (0.75, 76, .25), (1.5, 72, .5), (2.0, 69, .5), (2.75, 72, .25), (3.25, 76, .75)],
+        'C': [(0, 79, .5), (0.75, 76, .25), (1.5, 72, .5), (2.0, 76, .5), (2.75, 79, .25), (3.5, 81, .5)],
+        'G': [(0, 79, .5), (0.75, 74, .25), (1.5, 71, .5), (2.0, 74, .25), (2.5, 79, .5), (3.25, 76, .75)],
+        'E': [(0, 76, .5), (0.75, 74, .25), (1.5, 71, .5), (2.0, 68, 1.5)], 'Dm': [(0, 77, .5), (0.75, 74, .25), (1.5, 69, .5), (2.0, 74, 1.5)]}
 def chord_at(beat):
     c = PROG[0][1]
     for b, n in PROG:
         if beat >= b - 1e-9: c = n
     return c
-# the hook: a 4-bar lead over Am–F–C–G (beat offsets within the bar, MIDI)
-HOOK = {'Am': [(0, 76, .5), (0.75, 74, .25), (1.5, 72, .5), (2.0, 69, .5), (2.75, 72, .25), (3.5, 74, .5)],
-        'F': [(0, 77, .5), (0.75, 76, .25), (1.5, 72, .5), (2.0, 69, .5), (2.75, 72, .25), (3.25, 76, .75)],
-        'C': [(0, 79, .5), (0.75, 76, .25), (1.5, 72, .5), (2.0, 76, .5), (2.75, 79, .25), (3.5, 81, .5)],
-        'G': [(0, 79, .5), (0.75, 74, .25), (1.5, 71, .5), (2.0, 74, .25), (2.5, 79, .5), (3.25, 76, .75)],
-        'A': [(0, 81, 1.5), (1.5, 76, .5), (2.0, 73, 1.0)], 'E': [(0, 76, .5), (0.75, 74, .25), (1.5, 71, .5), (2.0, 68, 1.5)],
-        'Dm': [(0, 77, .5), (0.75, 74, .25), (1.5, 69, .5), (2.0, 74, 1.5)]}
 ARP = [0, 2, 1, 3, 2, 1, 3, 2]                            # chord-tone pattern for the 16th arpeggio (up-down-skip)
 KICKS = []
 
@@ -256,59 +246,40 @@ def roll(b0, b1, g0=0.14, g1=0.5):
         if tt >= tb(b1): break
         put(MUS, chipsnare(0.9), tt, g0 + (g1 - g0) * k / (n + half), (k % 2 - 0.5) * 0.3)
 
+
 # ---------------------------------------------------------------- arrangement (beats; 2 beats = 1 s)
-# 0–6 (0–3 s) INSTANT HOOK: impact on frame 0, the groove from the first beat, filtered, rising to the drop
-drums(0, 6, 'game', 1.0); bass(0, 6, 'bounce', 0.7, cut=950); arp(0, 6, 0.25, 0.42, 3200)       # the brief: a strong rhythmic pulse from frame 0
-put(MUS, crash(1.6), 0, 0.35, 0, 0.4); put(MUS, boom(70, 32, 1.2), 0, 0.5)
-put(MUS, riser(tb(2), 300, 7000), tb(4), 0.45)
-# 6–18 (3–9 s) DROP on the zoom-out: the whole groove and the hook
-drums(6, 18, 'game', 1.0); bass(6, 18, 'bounce', 0.8); arp(6, 18, 0.25, 0.38, 5200); chords(6, 18, 'stabs', 0.3)
-hook(8, 16, 'lead', 0.9); put(MUS, crash(), tb(6), 0.55, 0, 0.4)
-# 18–46 (9–23 s) SCIENTIFIC CURIOSITY: the machine and the sample — mysterious, precise
-drums(18, 46, 'mystery', 0.95); bass(18, 46, 'sub', 0.55); chords(18, 46, 'pad', 0.34, cut=1300)
-arp(18, 32, 0.5, 0.3, inst='glass', pattern=(0, 2, 1, 3)); arp(32, 46, 0.25, 0.26, 3000, inst='pluck', pattern=(0, 1, 2, 1, 3, 2, 1, 2))
-hook(32, 44, 'bell', 0.45, -12)
-# 46–60 (23–30 s) VACUUM: a slow pump pulse under a drone; a rise toward the gun
-drums(46, 58, 'pulse', 0.9); bass(46, 60, 'sub', 0.5); chords(46, 60, 'pad', 0.38, cut=900)
-arp(50, 58, 0.5, 0.22, inst='glass', pattern=(3, 2, 1, 0)); put(MUS, riser(tb(4), 250, 6000), tb(56), 0.4)
-# 60–92 (30–46 s) ELECTRON ACCELERATION: arpeggios and subdivisions that speed up; the drop lands on the waves
-drums(60, 68, 'tick', 1.0); bass(60, 76, 'pulse16', 0.6, cut=900); arp(60, 68, 0.5, 0.32, 4200); chords(60, 76, 'pad', 0.3, cut=1800)
-drums(68, 76, 'game', 0.8); arp(68, 76, 0.25, 0.34, 4800)
-drums(76, 90, 'drive', 0.95); bass(76, 92, 'reese', 0.72, cut=1600); chords(76, 92, 'swell', 0.32, cut=3200)
-arp(76, 84, 0.25, 0.36, 5600); arp(84, 91.5, 0.125, 0.38, 7000)
-put(MUS, riser(tb(10), 250, 9000), tb(80), 0.55); roll(86, 91.5, 0.14, 0.5); put(MUS, revcym(BEAT * 0.5), tb(91.5), 0.5)
-# 92–104 (46–52 s) THE WAVE DROP: bright, melodic
-drums(92, 104, 'game', 1.0); bass(92, 104, 'bounce', 0.8); chords(92, 104, 'stabs', 0.34); arp(92, 104, 0.25, 0.32, 5600)
-hook(92, 104, 'lead', 0.85); put(MUS, crash(), tb(92), 0.55, 0, 0.4)
-# 104–148 (52–74 s) MICROSCOPE OPTICS and the raster scan: tight, mechanical, locked to the beam
-drums(104, 132, 'mech', 0.95); bass(104, 132, 'pulse16', 0.72, cut=1200); chords(104, 132, 'pad', 0.3, cut=2000); arp(104, 132, 0.25, 0.3, 4800, inst='chip')
-hook(120, 128, 'glass', 0.5)
-drums(132, 148, 'game', 0.95); bass(132, 148, 'bounce', 0.75); arp(132, 148, 0.25, 0.32, 5200); chords(132, 148, 'pad', 0.3, cut=2400)
-for k in range(16): put(MUS, metal(4200 + 200 * (k % 4)), tb(140 + k * 0.5), 0.14, (k % 2 - 0.5) * 0.6)
-# 148–150 the dive to the atom; 150–152 held breath; 152–166 the heavy half-time drop on the first scattering
-drums(148, 150, 'game', 0.8); bass(148, 150, 'bounce', 0.6); put(MUS, riser(tb(2), 300, 8000), tb(149), 0.4)
-chords(150, 152, 'swell', 0.25, cut=1500)
-drums(152, 166, 'half', 1.0); bass(152, 166, 'reese', 0.8, cut=1300); chords(152, 166, 'pad', 0.32, cut=1600); arp(156, 166, 0.5, 0.26, 3800, inst='glass')
-put(MUS, crash(2.4), tb(152), 0.6, 0, 0.5); put(MUS, boom(52, 26, 1.8), tb(152), 0.7)
-# 166–182 (83–91 s) gold vs carbon: full groove, the hook on bells
-drums(166, 182, 'game', 0.95); bass(166, 182, 'bounce', 0.78); arp(166, 182, 0.25, 0.3, 5200); chords(166, 182, 'stabs', 0.28); hook(168, 180, 'bell', 0.55)
-# 182–212 (91–106 s) SIGNAL DETECTION: rapid digital percussion building to the finished image
-drums(182, 198, 'drive', 0.9); bass(182, 198, 'pulse16', 0.7, cut=1300); arp(182, 198, 0.25, 0.32, 5600, inst='chip'); chords(182, 198, 'pad', 0.3, cut=2600)
-drums(198, 211.5, 'build', 0.95); bass(198, 212, 'pulse16', 0.75, cut=1700); arp(198, 206, 0.25, 0.34, 6400); arp(206, 211.5, 0.125, 0.36, 8000)
-chords(198, 212, 'swell', 0.36, cut=4200); put(MUS, riser(tb(14), 250, 10000), tb(198), 0.6); roll(204, 211.5, 0.16, 0.55); put(MUS, revcym(BEAT * 0.5), tb(211.5), 0.55)
-# 212–216 the image is complete; 216–224 FINAL REVEAL: the strongest groove and the hook; 224 the A-major final hit
-drums(212, 224, 'game', 1.0); bass(212, 224, 'reese', 0.8, cut=1900); chords(212, 224, 'stabs', 0.42); arp(212, 224, 0.25, 0.34, 6000)
-hook(212, 216, 'bell', 0.6, 12); hook(216, 224, 'lead', 0.95); hook(216, 224, 'bell', 0.35, 12)
-put(MUS, crash(), tb(212), 0.55, 0, 0.4); put(MUS, crash(2.4), tb(216), 0.6, 0, 0.5); put(MUS, boom(54, 27, 1.6), tb(216), 0.6)
-ring_ = lambda x: x * np.exp(-tv(len(x) / SR) * 1.0)
-put(MUS, ring_(supersaw(CH['A'][1] + [73, 76], 2.2, 5600, 0.005)), tb(224), 0.85, 0, 0.5)
-put(MUS, ring_(pad([45, 57, 61, 64, 69], 2.2, 2600, 0.6, att=0.02)), tb(224), 0.8, 0, 0.6)
-put(MUS, ring_(subbass(33, 2.0)), tb(224), 0.85); put(MUS, crash(2.4), tb(224), 0.55, 0, 0.5); put(MUS, boom(46, 23, 2.0), tb(224), 0.7)
-drums(225, 227.5, 'tick', 1.0); hook(224, 227.5, 'bell', 0.4, 12)
-# 227.5–230 the rewind: a reverse swell and a roll into the opening impact (loop)
-put(MUS, revcym(BEAT * 2.5), tb(227.5), 0.6); roll(228, 230, 0.12, 0.45)
+# 0–6 (0–3 s) INSTANT HOOK: impact on frame 0 and the full groove from the first beat; a riser into the punch-in (beat 4)
+drums(0, 6, 'game', 1.0); bass(0, 6, 'bounce', 0.75, cut=1200); arp(0, 6, 0.25, 0.36, 4200)
+put(MUS, crash(1.6), 0, 0.35, 0, 0.4); put(MUS, boom(70, 32, 1.2), 0, 0.5); put(MUS, riser(tb(1.5), 400, 8000), tb(2.5), 0.4)
+# 6–14 (3–7 s) THE DROP on the pull-back out of the image: the hook on the lead
+drums(6, 14, 'game', 1.0); bass(6, 14, 'bounce', 0.8); arp(6, 14, 0.25, 0.32, 5200); chords(6, 14, 'stabs', 0.28)
+hook(8, 14, 'lead', 0.85); put(MUS, crash(), tb(6), 0.5, 0, 0.4)
+# 14–28 (7–14 s) INSIDE THE TRANSDUCER: tight and mechanical; a held breath, then the crystals fire on beat 19
+drums(14, 18.5, 'mech', 0.9); bass(14, 18.5, 'pulse16', 0.65, cut=1000); arp(14, 18.5, 0.25, 0.26, 4200, inst='chip'); chords(14, 19, 'pad', 0.28, cut=1500)
+put(MUS, riser(tb(1.5), 300, 7000), tb(17), 0.35)
+drums(19, 28, 'mech', 0.95); bass(19, 28, 'pulse16', 0.72, cut=1300); arp(19, 28, 0.25, 0.28, 5200, inst='chip'); chords(19, 28, 'pad', 0.3, cut=2200)
+hook(20, 28, 'glass', 0.45); put(MUS, crash(1.8), tb(19), 0.45, 0, 0.4); put(MUS, boom(60, 30, 1.0), tb(19), 0.45)
+# 28–44 (14–22 s) WAVES: a pumping pulse through the gel demo, then the full drive as the wave travels into the body
+drums(28, 36, 'pulse', 0.9); bass(28, 36, 'sub', 0.55); chords(28, 36, 'pad', 0.32, cut=1300); arp(28, 36, 0.5, 0.24, inst='glass', pattern=(0, 2, 1, 3))
+drums(36, 44, 'drive', 0.95); bass(36, 44, 'reese', 0.7, cut=1500); chords(36, 44, 'swell', 0.28, cut=3000); arp(36, 44, 0.25, 0.3, 5600)
+put(MUS, crash(), tb(36), 0.45, 0, 0.4)
+# 44–62 (22–31 s) ECHOES: a lighter, bouncing groove under the echo accents; bells carry the hook
+drums(44, 62, 'game', 0.85); bass(44, 62, 'bounce', 0.7, cut=1100); chords(44, 62, 'pad', 0.28, cut=1800); hook(48, 60, 'bell', 0.45)
+arp(44, 62, 0.5, 0.2, inst='glass', pattern=(0, 2, 1, 3)); put(MUS, crash(), tb(44), 0.45, 0, 0.4)
+# 62–78 (31–39 s) RECEIVE: switch to listening — sparse ticks and sub, then a driving pulse under the receiver trace
+drums(62, 70, 'tick', 1.0); bass(62, 70, 'sub', 0.6); chords(62, 70, 'pad', 0.3, cut=1400); arp(62, 70, 0.5, 0.24, 3800, inst='chip')
+drums(70, 78, 'drive', 0.9); bass(70, 78, 'pulse16', 0.7, cut=1300); arp(70, 78, 0.25, 0.3, 5200, inst='chip'); chords(70, 78, 'pad', 0.3, cut=2400)
+# 78–94 (39–47 s) TIME OF FLIGHT, then the IMAGE BUILD: accelerating arpeggios, a riser and a roll into the final shot
+drums(78, 84, 'mech', 0.9); bass(78, 84, 'pulse16', 0.7, cut=1200); arp(78, 84, 0.25, 0.28, 4800, inst='chip'); chords(78, 84, 'pad', 0.3, cut=2000)
+drums(84, 93.5, 'build', 0.95); bass(84, 94, 'pulse16', 0.75, cut=1700); arp(84, 89, 0.25, 0.32, 6000); arp(89, 93.5, 0.125, 0.34, 8000)
+chords(84, 94, 'swell', 0.34, cut=4200); put(MUS, riser(tb(9.5), 250, 10000), tb(84), 0.55); roll(90, 93.5, 0.14, 0.5); put(MUS, revcym(BEAT * 0.5), tb(93.5), 0.5)
+# 94–100 (47–50 s) FINAL: the strongest groove and the hook; Am resolves; a reverse swell runs into the opening impact
+drums(94, 100, 'game', 1.0); bass(94, 100, 'reese', 0.8, cut=1900); chords(94, 100, 'stabs', 0.4); arp(94, 100, 0.25, 0.32, 6000)
+hook(94, 98, 'lead', 0.95); hook(96, 100, 'bell', 0.4, 12)
+put(MUS, crash(2.4), tb(94), 0.55, 0, 0.5); put(MUS, boom(54, 27, 1.6), tb(95), 0.55)
+put(MUS, revcym(BEAT * 2), tb(98), 0.5); roll(98.5, 100, 0.12, 0.42)
 # held breaths
-for a_, b_ in ((tb(150) + 0.03, tb(152)), (tb(211.75), tb(212)), (tb(91.75), tb(92))):
+for a_, b_ in ((tb(18.5) + 0.03, tb(19)), (tb(93.75), tb(94))):
     for bus in (MUS, PUMP): bus[:, int(a_ * SR):int(b_ * SR)] *= 0.0
 # sidechain pump under every kick
 g = np.ones(N)
@@ -316,10 +287,9 @@ for tk in KICKS:
     s = int(tk * SR); L = min(int(0.28 * SR), N - s)
     if L > 0: g[s:s + L] = np.minimum(g[s:s + L], 1 - 0.6 * np.exp(-np.arange(L) / SR / 0.075))
 MUS += PUMP * g
-# the opening: the groove is filtered until the drop (0–3 s); the vacuum section is darker
+# the gel demo is darker (14–19 s)
 for i in range(2):
-    a_, b_ = 0, int(tb(6) * SR); MUS[i, a_:b_] = sweep_lp(MUS[i, a_:b_], 900, 9000, 2, 48)
-    a_, b_ = int(tb(46) * SR), int(tb(58) * SR); MUS[i, a_:b_] = sweep_lp(MUS[i, a_:b_], 5000, 1400, 2, 48)
+    a_, b_ = int(tb(28) * SR), int(tb(38) * SR); MUS[i, a_:b_] = sweep_lp(MUS[i, a_:b_], 4200, 1800, 2, 48)
 
 # ---------------------------------------------------------------- sound effects (from the cue sheet)
 def tick(f=3000, d=0.02): return np.sin(2 * np.pi * f * tv(d)) * np.exp(-tv(d) * 180)
@@ -327,153 +297,66 @@ def whoosh(d, up=True, f0=300, f1=4000):
     t = tv(d) / d; return sweep_lp(noise(d), f0 if up else f1, f1 if up else f0, 2) * np.sin(np.pi * t) ** 1.5
 def zip_(f0=2000, f1=9000, d=0.06): return np.sin(phase(sweep(f0, f1, d), d)) * np.exp(-tv(d) * 40)
 def blipn(m, d=0.12): return S(fm(mf(m), d, 2.0, 1.2, 14) * 0.8, tick(mf(m) * 2, 0.01) * 0.3)
-def clicks(d, n, f0=2400, f1=5200, accel=1.0):
-    x = np.zeros(int((d + 0.1) * SR))
-    for k in range(n):
-        tt = d * (k / max(1, n - 1)) ** accel
-        ins(x, S(tick(f0 + (f1 - f0) * k / max(1, n - 1), 0.012) * 0.7, crush(osc('sq', (f0 + (f1 - f0) * k / n) / 3, 0.02) * np.exp(-tv(0.02) * 120), 4, 4) * 0.25), tt * SR)
-    return x
 def hum(d, f0=60, am=0.0):
     t = tv(d); x = sum(np.sin(2 * np.pi * f0 * k * t) / k ** 1.3 for k in range(1, 7))
     return x * (1 + am * np.sin(2 * np.pi * 8 * t)) * env(d, min(0.5, d * 0.2), r=min(0.6, d * 0.3))
 PENT = [69, 72, 74, 76, 79, 81, 84, 86, 88, 91, 93, 96]   # A minor pentatonic
-BEDS = {'room_tone', 'machine_hum', 'pump_hum', 'field_hum', 'gas_ticks', 'pass_through', 'scan_sweep'}
-def make(name, a):
-    d = a if isinstance(a, (int, float)) and a else None
+BEDS = {'hum'}
+def make(name, a, t):
     k = int(a) if isinstance(a, (int, float)) and a is not None else 0
-    # ---- hook, zooms, transitions
-    if name == 'impact_digital':
-        return S(boom(62, 30, 1.3) * 0.9, crush(noise(0.25) * np.exp(-tv(0.25) * 14), 4, 6) * 0.25, kick(1.3, 1.0) * 0.6, glass(93, 0.8) * 0.15), 0.4
-    if name == 'lock_click': return S(tick(4200, 0.015) * 0.7, crush(osc('sq', 1320, 0.05) * np.exp(-tv(0.05) * 60), 4, 3) * 0.4, zip_(2500, 6000, 0.04) * 0.3), 0.2
-    if name == 'crystal':
+    if name == 'impact': return S(boom(62, 30, 1.3) * 0.9, crush(noise(0.25) * np.exp(-tv(0.25) * 14), 4, 6) * 0.25, kick(1.3, 1.0) * 0.6, glass(93, 0.8) * 0.15), 0.4
+    if name == 'click': return S(tick(4200, 0.015) * 0.7, crush(osc('sq', 1320, 0.05) * np.exp(-tv(0.05) * 60), 4, 3) * 0.4, zip_(2500, 6000, 0.04) * 0.3), 0.2
+    if name == 'scan': dd = 0.3; tt = tv(dd); return np.sin(phase(sweep(1800, 3600, dd), dd)) * (0.5 + 0.5 * np.sin(2 * np.pi * 24 * tt)) * env(dd, 0.01, r=0.1) * 0.4, 0.3
+    if name == 'whoosh': dd = 0.5; x = whoosh(dd, True, 300, 10000) * 1.1; x += osc('saw', sweep(90, 1400, dd), dd) * (tv(dd) / dd) ** 2 * 0.12; return x, 0.4
+    if name == 'thud': return S(np.sin(phase(sweep(140, 55, 0.3), 0.3)) * np.exp(-tv(0.3) * 10) * 0.8, lp(noise(0.3), 400) * np.exp(-tv(0.3) * 12) * 0.4), 0.4
+    if name == 'hum': dd = 2.6; return S(hum(dd, 50, 0.05) * 0.35, whoosh(dd, False, 300, 6000) * 0.3), 0.3
+    if name == 'gel':                                       # a soft wet contact: a damped low squelch and a little high fizz
+        dd = 0.35; tt = tv(dd); return S(np.sin(phase(sweep(320, 120, dd), dd)) * np.exp(-tt * 12) * 0.6, bp(noise(dd), 900, 3500) * np.exp(-tt * 18) * 0.35 * (1 + np.sin(2 * np.pi * 38 * tt))), 0.3
+    if name == 'tone':
         x = np.zeros(int(1.4 * SR))
-        for i, m in enumerate((88, 93, 100)): ins(x, glass(m, 1.0) * 0.45, i * 0.035 * SR)
-        return x, 0.7
-    if name == 'zoom_punch': dd = d or 0.45; x = whoosh(dd, True, 300, 10000) * 1.1; x += osc('saw', sweep(90, 1400, dd), dd) * (tv(dd) / dd) ** 2 * 0.12; return x, 0.4
-    if name == 'scan_pulse': dd = 0.5; t = tv(dd); return np.sin(phase(sweep(1800, 3600, dd), dd)) * (0.5 + 0.5 * np.sin(2 * np.pi * 24 * t)) * env(dd, 0.02, r=0.15) * 0.4, 0.4
-    if name == 'whoosh_rise': dd = d or 1.0; x = whoosh(dd, True, 250, 9000) * 1.1; x += np.sin(phase(sweep(mf(57), mf(81), dd), dd)) * (tv(dd) / dd) ** 2 * 0.15; return x, 0.5
-    if name == 'bass_drop': return S(boom(64, 26, 1.8) * 1.1, sweep_lp(noise(0.6), 3000, 200, 2, 16) * np.exp(-tv(0.6) * 5) * 0.3), 0.3
-    if name == 'ui_ticks': dd = d or 0.8; return clicks(dd, int(dd * 14), 3000, 4200) * 0.5, 0.2
-    if name in ('lab_whoosh', 'whoosh_back'): dd = d or 1.0; return whoosh(dd, False, 300, 7000), 0.4
-    if name == 'room_tone': dd = d or 4.0; return (hum(dd, 50, 0.02) * 0.2 + lp(noise(dd), 300) * env(dd, 0.4, r=0.6) * 0.25), 0.3
-    if name == 'title_hit': return S(crush(osc('sq', mf(81), 0.08) * np.exp(-tv(0.08) * 30), 5, 3) * 0.35, bell(81, 0.9, 2.0) * 0.35, tick(5000, 0.012) * 0.3), 0.5
-    if name == 'machine_hum': dd = d or 2.4; return hum(dd, 50, 0.05) * 0.35, 0.3
-    if name == 'blip': return S(blipn(88, 0.1), tick(5200, 0.01) * 0.3), 0.3
-    if name == 'approach': dd = d or 2.6; return whoosh(dd, True, 200, 4000) * 0.8, 0.4
-    if name == 'cut_sweep': dd = d or 1.9; return S(np.sin(phase(sweep(400, 2400, dd), dd)) * env(dd, 0.05, r=0.4) * 0.35, whoosh(dd, True, 1500, 9000) * 0.45), 0.4
-    if name == 'part': m = PENT[(k * 2) % len(PENT)]; return S(crush(osc('sq', mf(m), 0.07) * np.exp(-tv(0.07) * 35), 5, 3) * 0.35, glass(m + 12, 0.5) * 0.3), 0.4
-    if name == 'path_trace': dd = d or 3.6; return clicks(dd, int(dd * 8), 2600, 5000, 1.0) * 0.45, 0.2
-    if name == 'glide': dd = d or 0.8; return whoosh(dd, True, 400, 3500) * 0.6, 0.4
-    if name == 'servo':
-        dd = d or 0.5; t = tv(dd); f = 420 + 160 * np.sin(np.pi * t / dd)
-        return (osc('saw', f, dd) * 0.25 + osc('sq', f * 2, dd, 0.3) * 0.1) * env(dd, 0.04, r=0.1) * (1 + 0.2 * np.sin(2 * np.pi * 30 * t)), 0.2
-    if name == 'place': return S(tick(2600, 0.02) * 0.6, np.sin(phase(sweep(300, 120, 0.08), 0.08)) * np.exp(-tv(0.08) * 40) * 0.6), 0.3
-    if name == 'slide': dd = d or 1.0; return S(bp(noise(dd), 600, 2600) * env(dd, 0.08, r=0.2) * 0.35, osc('saw', sweep(90, 140, dd), dd) * env(dd, 0.1, r=0.2) * 0.12), 0.3
-    if name == 'seat': x = np.zeros(int(0.5 * SR)); ins(x, tick(2200, 0.02) * 0.7, 0); ins(x, S(tick(1800, 0.02) * 0.7, np.sin(phase(sweep(160, 60, 0.15), 0.15)) * np.exp(-tv(0.15) * 18) * 0.8), 0.07 * SR); return x, 0.3
-    if name == 'dive': dd = d or 2.4; x = whoosh(dd, True, 200, 10000) * 1.1; x += osc('saw', sweep(60, 1500, dd), dd) * (tv(dd) / dd) ** 2 * 0.12; return x, 0.4
-    if name == 'reveal':
-        x = np.zeros(int(1.6 * SR))
-        for i, m in enumerate((81, 88, 93)): ins(x, bell(m, 1.3, 2.0) * 0.4, i * 0.05 * SR)
+        for i, m in enumerate((76, 81, 88)): ins(x, bell(m, 1.1, 1.8) * 0.4, i * 0.04 * SR)
         return x, 0.6
-    if name == 'pass_through':
-        dd = d or 1.4; x = np.zeros(int((dd + 0.2) * SR))
-        for i in range(int(dd * 10)): ins(x, tick(rng.uniform(4000, 7000), 0.008) * rng.uniform(0.2, 0.5), rng.uniform(0, dd) * SR)
+    if name == 'chirp': dd = 0.12; return S(np.sin(phase(sweep(1500, 3800, dd), dd)) * env(dd, 0.005, curve=5) * 0.5, tick(4800, 0.01) * 0.3), 0.3
+    if name == 'trigger': return S(zip_(1200, 7000, 0.07) * 0.5, crush(osc('sq', 880, 0.06) * np.exp(-tv(0.06) * 50), 4, 3) * 0.35, tick(5200, 0.01) * 0.4), 0.2
+    if name == 'crystal': return S(tick(5200, 0.012) * 0.6, glass(93, 0.5) * 0.4, crush(osc('sq', mf(81), 0.04) * np.exp(-tv(0.04) * 60), 5, 3) * 0.25), 0.4
+    if name == 'buzz':                                      # the crystal ringing: a tone pulsing 4 times a second, dying away
+        dd = 0.75; tt = tv(dd); return np.sin(2 * np.pi * mf(88) * tt) * np.abs(np.sin(2 * np.pi * 4 * tt)) * np.exp(-tt / 0.24) * 0.5, 0.4
+    if name == 'sweep': dd = 0.9; return S(np.sin(phase(sweep(mf(64), mf(88), dd), dd)) * env(dd, 0.1, r=0.2) * 0.3, whoosh(dd, True, 500, 7000) * 0.35), 0.4
+    if name == 'bounce':                                    # an echo turning back: a light pitched ping, higher for stronger echoes
+        m = PENT[min(len(PENT) - 1, 3 + int(6 * min(1, a or 0)))]
+        return S(np.sin(phase(sweep(mf(m) * 1.5, mf(m), 0.09), 0.09)) * np.exp(-tv(0.09) * 30) * 0.6, tick(mf(m) * 2, 0.01) * 0.3), 0.4
+    if name == 'pass': return S(lp(noise(0.4), 600) * env(0.4, 0.02, curve=7) * 0.5, np.sin(phase(sweep(90, 160, 0.3), 0.3)) * np.exp(-tv(0.3) * 9) * 0.6), 0.3
+    if name == 'wave':                                      # a pressure pulse going out: a soft swelling burst
+        dd = 0.35; tt = tv(dd); return np.sin(2 * np.pi * mf(64) * tt) * np.sin(np.pi * tt / dd) ** 2 * (1 + 0.5 * np.sin(2 * np.pi * 16 * tt)) * 0.4, 0.4
+    if name == 'ret': dd = 0.32; return S(np.sin(phase(sweep(mf(91), mf(74), dd), dd)) * env(dd, 0.01, r=0.1) * 0.3, whoosh(dd, False, 800, 6000) * 0.2), 0.5
+    if name == 'recv': return S(np.sin(phase(sweep(mf(57), mf(69), 0.12), 0.12)) * np.exp(-tv(0.12) * 18) * 0.6, tick(3600, 0.012) * 0.4), 0.3
+    if name == 'switch': x = np.zeros(int(0.4 * SR)); ins(x, blipn(88, 0.08), 0); ins(x, blipn(81, 0.12), 0.08 * SR); return x, 0.3
+    if name == 'tick': return S(tick(4600, 0.012) * 0.6, crush(osc('sq', 2300, 0.02) * np.exp(-tv(0.02) * 120), 4, 3) * 0.25), 0.2
+    if name == 'build':
+        x = np.zeros(int(0.9 * SR))
+        for i, m in enumerate((69, 72, 76, 81, 84)): ins(x, crush(osc('sq', mf(m), 0.06) * np.exp(-tv(0.06) * 40), 5, 3) * 0.35, i * 0.1 * SR)
         return x, 0.3
-    if name == 'chamber_close':
-        return S(np.sin(phase(sweep(120, 40, 0.4), 0.4)) * np.exp(-tv(0.4) * 9) * 1.0, lp(noise(0.5), 700) * np.exp(-tv(0.5) * 7) * 0.6, tick(1500, 0.03) * 0.6,
-                 np.concatenate([np.zeros(int(0.15 * SR)), hp(noise(0.6), 3000) * env(0.6, 0.1, r=0.3) * 0.15])), 0.4
-    if name == 'pump_spin':
-        dd = d or 5.0; t = tv(dd); f = 80 + 1400 * (1 - np.exp(-t / (dd * 0.35)))
-        return (np.sin(phase(f, dd)) * 0.25 + np.sin(phase(f * 2.01, dd)) * 0.1) * env(dd, 0.3, r=0.6) * 0.8, 0.3
-    if name == 'pump_hum': dd = d or 4.6; return S(hum(dd, 47, 0.1) * 0.35, lp(noise(dd), 220) * env(dd, 0.5, r=0.8) * 0.3), 0.3
-    if name == 'gas_ticks':
-        dd = d or 3.6; x = np.zeros(int((dd + 0.2) * SR))
-        for i in range(140):
-            tt = dd * (i / 140) ** 2.4                       # collisions grow rare as the gas thins
-            ins(x, tick(rng.uniform(3500, 7500), 0.007) * rng.uniform(0.2, 0.5) * (1 - 0.7 * i / 140), tt * SR)
-        return x, 0.3
-    if name == 'pressure_fall': dd = d or 4.2; t = tv(dd); return np.sin(phase(sweep(1600, 120, dd), dd)) * env(dd, 0.2, r=0.6) * 0.25 + np.sin(phase(sweep(2400, 180, dd), dd)) * env(dd, 0.2, r=0.6) * 0.1, 0.5
-    if name == 'confirm': x = np.zeros(int(0.5 * SR)); ins(x, blipn(84, 0.1), 0); ins(x, blipn(91, 0.14), 0.09 * SR); return x, 0.4
-    if name == 'rise': dd = d or 1.1; return whoosh(dd, True, 300, 8000) * 0.8, 0.4
-    # ---- the gun
-    if name == 'field_on': dd = d or 0.6; t = tv(dd); return S(np.sin(phase(sweep(200, 1600, dd), dd)) * env(dd, 0.05, r=0.15) * 0.4, hp(noise(dd), 5000) * (t / dd) ** 2 * 0.15 * (1 + np.sin(2 * np.pi * 60 * t))), 0.4
-    if name == 'tilt_tone': dd = d or 0.6; return np.sin(phase(sweep(mf(69), mf(62), dd), dd)) * env(dd, 0.05, r=0.2) * 0.45, 0.5
-    if name == 'leak': dd = d or 0.8; t = tv(dd); return S(np.sin(phase(sweep(mf(81), mf(93), dd), dd)) * env(dd, 0.2, r=0.3) * 0.3, glass(93, dd) * 0.2), 0.6
-    if name == 'emit': m = PENT[(k * 3 + 4) % len(PENT)] + 12; return S(tick(mf(m), 0.012) * 0.6, crush(osc('sq', mf(m) / 2, 0.03) * np.exp(-tv(0.03) * 90), 4, 3) * 0.3), 0.3
-    if name == 'beam_on': dd = d or 1.2; t = tv(dd); return (osc('saw', 110, dd) * 0.2 + np.sin(2 * np.pi * 880 * t) * 0.1) * env(dd, 0.05, r=0.4) * (0.7 + 0.3 * np.sin(2 * np.pi * 16 * t)), 0.3
-    if name == 'accel_sweep': dd = d or 4.5; t = tv(dd); f = sweep(110, 1760, dd); return sweep_lp(osc('saw', f, dd) * 0.3 + osc('sq', f * 1.5, dd, 0.3) * 0.12, 600, 7000, 2, 48) * env(dd, 0.2, r=0.15) * 0.8, 0.4
-    if name == 'kick':                                      # a gap of the accelerator: a zap that climbs with each stage
-        m = 52 + 3 * k; return S(np.sin(phase(sweep(mf(m + 24), mf(m), 0.12), 0.12)) * np.exp(-tv(0.12) * 25) * 0.7, zip_(1500 + 300 * k, 6000 + 600 * k, 0.05) * 0.35, kick(0.6, 0.6) * 0.3), 0.3
-    # ---- waves, lenses, correction
-    if name == 'wave_on': dd = d or 0.9; t = tv(dd); return np.sin(phase(mf(76) * (1 + 0.03 * np.sin(2 * np.pi * 7 * t)), dd)) * env(dd, 0.1, r=0.3) * 0.35, 0.6
-    if name == 'swoosh': return whoosh(0.35, True, 800, 8000) * 0.6, 0.3
-    if name == 'light_wave': dd = d or 1.4; t = tv(dd); return np.sin(phase(mf(52) * (1 + 0.05 * np.sin(2 * np.pi * 1.5 * t)), dd)) * env(dd, 0.2, r=0.4) * 0.35, 0.5
-    if name == 'blur_thud': return S(np.sin(phase(sweep(140, 60, 0.3), 0.3)) * np.exp(-tv(0.3) * 10) * 0.8, lp(noise(0.3), 400) * np.exp(-tv(0.3) * 12) * 0.4), 0.4
-    if name == 'e_wave': dd = d or 1.8; t = tv(dd); return np.sin(phase(mf(88) * (1 + 0.02 * np.sin(2 * np.pi * 21 * t)), dd)) * env(dd, 0.1, r=0.3) * 0.22, 0.5
-    if name == 'p_sweep': dd = d or 1.3; return S(np.sin(phase(sweep(mf(64), mf(100), dd), dd)) * env(dd, 0.1, r=0.1) * 0.3, whoosh(dd, True, 800, 9000) * 0.25), 0.4
-    if name == 'current_on': return S(tick(1200, 0.02) * 0.5, np.sin(phase(sweep(40, 90, 0.5), 0.5)) * env(0.5, 0.1, r=0.2) * 0.5), 0.3
-    if name == 'field_hum': dd = d or 3.0; t = tv(dd); return (np.sin(2 * np.pi * 73 * t) * 0.4 + np.sin(2 * np.pi * 146.3 * t) * 0.2) * (0.8 + 0.2 * np.sin(2 * np.pi * 0.5 * t)) * env(dd, 0.4, r=0.6) * 0.6, 0.4
-    if name == 'beam_focus': dd = d or 1.4; t = tv(dd); return sweep_lp(osc('saw', sweep(mf(57), mf(69), dd), dd) * 0.3 + osc('saw', sweep(mf(57), mf(69), dd) * 1.006, dd) * 0.3, 4000, 600, 2, 32) * env(dd, 0.1, r=0.2), 0.5
-    if name == 'focus_lock':
-        x = S(tick(5200, 0.012) * 0.6, crush(osc('sq', mf(88), 0.05) * np.exp(-tv(0.05) * 40), 5, 3) * 0.35)
-        ins(x := np.concatenate([x, np.zeros(int(1.0 * SR))]), bell(93, 0.9, 2.0) * 0.35, 0.03 * SR); return x, 0.5
-    if name == 'current_up': dd = d or 1.2; return np.sin(phase(sweep(60, 160, dd), dd)) * env(dd, 0.1, r=0.2) * 0.5 + hum(dd, 60) * 0.1, 0.3
-    if name == 'tune_clicks': dd = d or 1.0; return clicks(dd, 10, 3200, 4400, 0.9) * 0.6, 0.2
-    if name == 'focus_sweep': dd = d or 1.0; return np.sin(phase(sweep(mf(100), mf(76), dd), dd)) * env(dd, 0.05, r=0.3) * 0.35, 0.6
-    # ---- scanning and scattering
-    if name == 'scan_sweep': dd = d or 2.6; t = tv(dd); return np.sin(2 * np.pi * 5200 * t) * (0.5 + 0.5 * np.sin(2 * np.pi * 2.2 * t)) * env(dd, 0.2, r=0.3) * 0.06, 0.2
-    if name == 'scan_tick': m = PENT[k % 8] + 12; return S(tick(mf(m), 0.012) * 0.5, crush(osc('sq', mf(m), 0.035) * np.exp(-tv(0.035) * 70), 4, 3) * 0.3), 0.2
-    if name == 'scan_roll': dd = d or 3.0; return clicks(dd, int(dd * 40), 3400, 6800, 0.55) * 0.45, 0.2
-    if name == 'hop': return S(np.sin(phase(sweep(300, 1200, 0.08), 0.08)) * np.exp(-tv(0.08) * 30) * 0.6, tick(3800, 0.01) * 0.4), 0.4
-    if name == 'approach_tone':
-        dd = d or 0.9; t = tv(dd); f = sweep(mf(57), mf(69), dd)
-        return (np.sin(phase(f, dd)) * 0.3 + np.sin(phase(f * 1.5, dd)) * 0.12) * (t / dd) ** 1.5 * np.clip((dd - t) / 0.02, 0, 1), 0.5
-    if name == 'scatter_big': return S(zip_(6000, 1500, 0.12) * 0.5, tick(5600, 0.015) * 0.5, glass(PENT[rng.integers(4, 9)] + 12, 0.6) * 0.35, np.sin(phase(sweep(400, 90, 0.15), 0.15)) * np.exp(-tv(0.15) * 18) * 0.4), 0.5
-    if name == 'scatter_tick': return S(tick(rng.uniform(3000, 5000), 0.01) * 0.5, crush(osc('sq', rng.uniform(1400, 2200), 0.02) * np.exp(-tv(0.02) * 120), 4, 3) * 0.25), 0.2
-    if name == 'gold_ping': m = PENT[rng.integers(5, 10)]; return S(glass(m + 12, 0.45) * 0.45, tick(mf(m) * 2, 0.01) * 0.3), 0.5
-    if name == 'carbon_tick': return tick(1600, 0.02) * 0.5, 0.2
-    if name == 'pixel_dark': return S(crush(osc('sq', mf(57), 0.12) * np.exp(-tv(0.12) * 20), 4, 4) * 0.4, np.sin(phase(sweep(200, 90, 0.12), 0.12)) * np.exp(-tv(0.12) * 20) * 0.4), 0.3
-    if name == 'pixel_bright': return S(crush(osc('sq', mf(93), 0.12) * np.exp(-tv(0.12) * 16), 5, 3) * 0.35, glass(100, 0.7) * 0.4), 0.5
-    # ---- detection and the image
-    if name == 'det_tick': return S(tick(rng.uniform(4800, 6200), 0.01) * 0.5, crush(osc('sq', 2400, 0.02) * np.exp(-tv(0.02) * 140), 4, 3) * 0.2), 0.2
-    if name == 'scint_flash': return S(glass(100, 0.5) * 0.4, hp(noise(0.15), 6000) * np.exp(-tv(0.15) * 30) * 0.25, tick(6000, 0.01) * 0.3), 0.5
-    if name == 'pmt_cascade':
-        dd = d or 0.55; x = np.zeros(int((dd + 0.2) * SR))
-        for i in range(7): ins(x, crush(osc('sq', mf(64 + i * 4), 0.05) * np.exp(-tv(0.05) * 50), 5, 3) * (0.15 + 0.05 * i), i * 0.085 * SR)
-        return x, 0.3
-    if name == 'signal_pulse': return S(np.sin(phase(sweep(mf(76), mf(64), 0.15), 0.15)) * np.exp(-tv(0.15) * 14) * 0.45, tick(2800, 0.012) * 0.3), 0.3
-    if name == 'adc_tick': m = PENT[k % 8] + 12; return S(crush(osc('sq', mf(m), 0.04) * np.exp(-tv(0.04) * 60), 3, 5) * 0.35, tick(4000, 0.008) * 0.3), 0.2
-    if name == 'pixel_click': m = PENT[k % 10] + 12; return S(tick(mf(m), 0.014) * 0.6, crush(osc('sq', mf(m), 0.05) * np.exp(-tv(0.05) * 45), 5, 3) * 0.3), 0.3
-    if name == 'raster_roll':
-        dd = d or 3.3; x = clicks(dd, int(dd * 60), 2200, 7600, 0.5) * 0.4; t = tv(dd)
-        x[:len(t)] += sweep_lp(osc('saw', sweep(mf(57), mf(81), dd), dd) * 0.15, 400, 6000, 2, 32) * (t / dd) ** 1.5; return x, 0.3
-    if name == 'image_done':
+    if name == 'line': m = PENT[min(len(PENT) - 1, k // 9)] + 12; return S(tick(mf(m), 0.012) * 0.5, crush(osc('sq', mf(m), 0.03) * np.exp(-tv(0.03) * 80), 4, 3) * 0.3), 0.2
+    if name == 'resolve':
         x = np.zeros(int(1.6 * SR))
         for i, m in enumerate((69, 76, 81, 88)): ins(x, bell(m, 1.2, 2.0) * 0.35, i * 0.04 * SR)
         return x, 0.6
-    if name == 'ring_ticks': dd = d or 0.6; return clicks(dd, 18, 3800, 6400, 0.8) * 0.4, 0.2
-    if name == 'chain_step': m = [81, 84, 88, 91, 93, 96][k % 6]; return S(blipn(m, 0.14), glass(m + 12, 0.5) * 0.25), 0.4
-    if name == 'final_hit': return S(boom(48, 24, 2.0) * 1.0, crash(2.0) * 0.4, kick(1.4, 1.2) * 0.8), 0.5
-    if name == 'rewind':
-        dd = d or 1.25; t = tv(dd); x = revcym(dd) * 0.6 + whoosh(dd, True, 300, 10000) * 0.6
-        x += crush(np.sin(phase(sweep(2200, 300, dd), dd)) * (t / dd) * 0.25, 4, 4); return x, 0.3
+    if name == 'pop': m = [81, 84, 88, 91, 93, 96][k % 6]; return S(blipn(m, 0.12), glass(m + 12, 0.4) * 0.2), 0.4
+    if name == 'finish':
+        x = np.zeros(int(1.8 * SR)); ins(x, S(crash(1.6) * 0.3, kick(1.2, 1.0) * 0.6), 0)
+        for i, m in enumerate((81, 88, 93)): ins(x, bell(m, 1.4, 2.0) * 0.3, i * 0.05 * SR)
+        return x, 0.6
     raise KeyError(name)
 missing = set(); stamp = {}
-GAIN = {'ui_ticks': 0.5, 'room_tone': 0.6, 'machine_hum': 0.6, 'blip': 0.8, 'part': 0.9, 'title_hit': 0.95, 'scatter_tick': 0.7, 'det_tick': 0.6,
-        'gold_ping': 0.75, 'adc_tick': 0.8, 'pixel_click': 0.9, 'scan_tick': 0.85, 'emit': 0.85, 'kick': 1.0, 'gas_ticks': 0.8, 'pump_hum': 0.8,
-        'impact_digital': 1.0, 'final_hit': 1.0, 'bass_drop': 0.9, 'scatter_big': 0.95, 'path_trace': 0.7, 'pass_through': 0.7, 'field_hum': 0.45,
-        # long tonal effects sit under the music, not on top of it
-        'pump_spin': 0.3, 'pressure_fall': 0.35, 'light_wave': 0.35, 'e_wave': 0.3, 'wave_on': 0.5, 'p_sweep': 0.55, 'accel_sweep': 0.45,
-        'beam_focus': 0.55, 'beam_on': 0.5, 'tilt_tone': 0.6, 'leak': 0.6, 'current_up': 0.55, 'scan_sweep': 0.5, 'approach_tone': 0.75,
-        'cut_sweep': 0.6, 'lab_whoosh': 0.7, 'whoosh_back': 0.75, 'dive': 0.8, 'raster_roll': 0.8, 'chamber_close': 0.9}
-QUANT = {'title_hit', 'part', 'chain_step', 'blip', 'confirm', 'crystal', 'reveal', 'image_done', 'final_hit', 'focus_lock'}
+GAIN = {'hum': 0.6, 'buzz': 0.7, 'wave': 0.75, 'ret': 0.7, 'line': 0.75, 'scan': 0.55, 'sweep': 0.7, 'tone': 0.85, 'resolve': 0.9, 'impact': 1.0, 'finish': 1.0}
+QUANT = {'pop', 'resolve', 'finish', 'tone', 'switch'}
 for cu in cuesheet['cues']:
     t = cu['t']
     if cu['sfx'] in QUANT: q = round(t / S16) * S16; t = q if abs(q - t) < 0.07 else t      # nudge accents onto the 16th grid
-    key = (cu['sfx'], round(t / S16), cu.get('arg'))
+    key = (cu['sfx'], round(t / S16 * 2), cu.get('arg'))
     if key in stamp: continue
     stamp[key] = 1
-    try: sig, rv = make(cu['sfx'], cu.get('arg'))
+    try: sig, rv = make(cu['sfx'], cu.get('arg') if cu.get('arg') is not None else cu.get('g', 1), t)
     except KeyError: missing.add(cu['sfx']); continue
     sig = sig / (np.max(np.abs(sig)) + 1e-9)
     bed = 0.45 if cu['sfx'] in BEDS else 1.0
