@@ -70,8 +70,9 @@ PROBE.skinTop = skinTop;
 // waves: dir +1 travels down from y0 starting at t0; dir −1 travels up from y0. amp scales the pressure; col: 'tx' | 'echo'
 PROBE.thickness = (st, e, t) => {
   let d = 0;
-  for (const f of st.fires || []) if (e >= f.e0 && e <= f.e1) d += 9 * PROBE.wave(t - f.t0);
-  for (const r of st.recv || []) if (e >= (r.e0 ?? -99) && e <= (r.e1 ?? 99)) d -= 7 * r.amp * PROBE.wave(t - r.t0);
+  // drawn ~1,000,000× slower and hugely exaggerated: the real change in thickness is a few nanometres
+  for (const f of st.fires || []) if (e >= f.e0 && e <= f.e1) d += 20 * PROBE.wave(t - f.t0);
+  for (const r of st.recv || []) if (e >= (r.e0 ?? -99) && e <= (r.e1 ?? 99)) d -= 15 * r.amp * PROBE.wave(t - r.t0);
   return d;
 };
 // pressure at micro point y (beam centre) from all waves
@@ -94,7 +95,6 @@ PROBE.drawMicro = (c, cam, t, st = {}) => {
   // backing block
   c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P.g2; c.fillRect(0, 0, W, H); c.restore();
   PIX.cam(c, cam);
-  for (let k = 0; k < 220; k++) { const x = -300 + 870 * U.hash(k, 11), y = -500 + 720 * U.hash(k, 12); PIX.fill(c, PIX.rectPath(Math.round(x), Math.round(y), 2, 2), 'g3'); }
   const eIdx = []; for (let e = -12; e <= 12; e++) { const xs = S(M.ex(e), 0)[0]; if (xs > -M.PITCH * z && xs < W + M.PITCH * z) eIdx.push(e); }
   // wires (one per element) and their voltage packets
   for (const e of eIdx) {
@@ -109,11 +109,12 @@ PROBE.drawMicro = (c, cam, t, st = {}) => {
   const gel = st.gel ?? 1;
   PIX.fill(c, PIX.rectPath(-600, M.LENS, 1470, M.SKIN - M.LENS - 7), 'n0');             // the gap above the skin (air)
   if (gel > 0) {
-    const xg = lerp(-600, 870, gel), gp = [[-600, M.LENS]];
-    for (let x = -600; x <= xg; x += 2) gp.push([x, M.LENS]);
-    for (let x = xg; x >= -600; x -= 2) gp.push([x, skinTop(x) + 0.5]);
-    const fr = []; for (let y = M.LENS; y <= M.SKIN + 2; y += 2) fr.push([xg + 6 * Math.sin(y * 0.3 + t * 9) * (gel < 1 ? 1 : 0), y]);
-    ROOM.FL(c, z, U.poly([...gp, ...fr.reverse()]), 'l1', 'l0', 'l2', 1.5, 1);
+    // one continuous layer from the probe face down to the skin; while it flows in, its front pushes the air out
+    const xg = gel >= 1 ? 870 : lerp(-40, 310, gel), wob = gel < 1 ? 1 : 0, pts = [];
+    for (let x = -600; x <= xg; x += 2) pts.push([x, M.LENS]);                                   // along the probe face
+    for (let y = M.LENS; y <= M.SKIN + 2; y += 2) pts.push([xg + wob * (6 * Math.sin(y * 0.3 + t * 9) - 4 * (y - M.LENS) / 22), y]);   // the front
+    for (let x = xg; x >= -600; x -= 2) pts.push([x, skinTop(x) + 0.5]);                         // back along the skin
+    ROOM.FL(c, z, U.poly(pts), 'l1', 'l0', 'l2', 1.5, 1);
   }
   ROOM.FL(c, z, PIX.rectPath(-600, M.MAT, 1470, M.LENS - M.MAT), 'g3', 'g2', 'g4', 1.5, 1);   // lens
   PIX.fill(c, PIX.rectPath(-600, M.GND, 1470, M.MAT - M.GND), 'g6');                          // matching layer
@@ -169,6 +170,7 @@ PROBE.drawBands = (c, cam, t, st) => {
       if (w.yEnd != null && (w.dir > 0 ? y > w.yEnd : y < w.yEnd)) continue;
       const [s0, sy] = K.S(cam, w.x0, y), s1 = K.S(cam, w.x1, y)[0], Y = Math.round(sy - th / 2);
       if (Y < -th || Y > H) continue;
+      if (st.particles && y > M.DERM + 4) continue;                                // in tissue the particles themselves carry the wave
       const col = kind === 'tx' ? (a > 0.7 ? 'w' : a > 0.33 ? 'y4' : 'y3') : (a > 0.6 ? 'y4' : a > 0.28 ? 'y3' : 'y2');
       c.fillStyle = P[col];
       for (let sx = Math.max(0, Math.floor(s0)); sx < Math.min(W, Math.ceil(s1)); sx++) {
@@ -188,11 +190,11 @@ PROBE.drawParticles = (c, cam, t, st) => {
   for (let j = Math.max(0, Math.floor((wy0 - M.DERM) / sp) - 1); M.DERM + j * sp < wy1 + sp; j++) {
     const y0 = M.DERM + 8 + j * sp;
     // displacement ∝ the pressure gradient's integral: use the pressure a quarter wave ahead (a phase shift) for a smooth look
-    const p0 = PROBE.pressure(st, y0, t), u0 = 3.2 * PROBE.pressure(st, y0 + M.LAM / 4, t);
+    const p0 = PROBE.pressure(st, y0, t), u0 = 5.5 * PROBE.pressure(st, y0 + M.LAM / 4, t);
     for (let i = -40; i <= 70; i++) {
       const x0 = i * sp + (j % 2 ? sp / 2 : 0) + (U.hash(i, j) - 0.5) * 1.5;
       const wb = clamp(Math.min(x0 - bx0, bx1 - x0) / 14), p = p0 * wb, u = u0 * wb;   // only inside the beam
-      const col = p > 0.55 ? 'y4' : p > 0.25 ? 'y3' : p < -0.4 ? 's1' : 's2';
+      const col = p > 0.5 ? 'w' : p > 0.22 ? 'y4' : p < -0.35 ? 's1' : 's2';
       const [sx, sy] = K.S(cam, x0, y0 + u);
       if (sx < -2 || sx > W + 2 || sy < -2 || sy > H + 2) continue;
       c.fillStyle = P[col]; c.fillRect(Math.round(sx - z), Math.round(sy - z), Math.max(2, Math.round(2 * z)), Math.max(2, Math.round(2 * z)));

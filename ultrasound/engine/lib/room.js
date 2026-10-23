@@ -17,6 +17,7 @@ ROOM.HOOK = { x: 0, y: -166, z: 12 };                          // the opening sh
 ROOM.fanW = (bx, bz) => [FAN.ax + FAN.k * bx, FAN.ay + FAN.k * (bz + US.RP)];
 ROOM.MACHINE = { x: 0, y: -147, z: 3.3 };                      // monitor, deck and the probe on the belly
 ROOM.PROBEV = { x: 0, y: -106, z: 5.4 };                       // the probe, the hand, the cutaway fan
+ROOM.FINAL = { x: 0, y: -156.3, z: 6.5 };                      // the whole monitor, title above, the process chain below
 const TX = 12, TW = 432, TH = 324;                             // texture scale (px/cm) and size
 const FL = (c, z, path, base, sh, hi, s = 1.5, hs = 1) => PIX.flat(c, path, base, sh, hi, [s / z, s / z], [hs / z, hs / z]);
 const R = (x, y, w, h, r = 0) => PIX.rectPath(x, y, w, h, r);
@@ -38,7 +39,7 @@ function buildTexture() {
   for (let d = 0; d <= US.DEPTH; d++) {
     const y = Math.round(ay + (US.RP + d) * pc), big = d % 5 === 0;
     x.fillStyle = P[big ? 'g8' : 'g5']; x.fillRect(big ? 345 : 347, y, big ? 5 : 3, 1);
-    if (big) T(String(d), 343, y - 3, 'g8', { align: 'right' });
+    if (big && d < 10) T(String(d), 343, y - 3, 'g8', { align: 'right' });
   }
   T('cm', 337, 66, 'g6');
   const yf = Math.round(ay + (US.RP + 7) * pc); x.fillStyle = P.y3; for (let k = 0; k < 3; k++) x.fillRect(344 - k, yf - k, 1, 2 * k + 1);
@@ -64,7 +65,7 @@ ROOM.drawScreen = (c, cam, t, o = {}) => {
   if (o.ui !== 0) { c.imageSmoothingEnabled = s < 0.999; c.drawImage(MT, sx, sy, TW * s, TH * s); }
   c.restore();
   const fr = o.fr || US.sweepFrames(t, 0.5);
-  US.drawFan(c, cam, FAN.ax, FAN.ay, FAN.k, { fr, lines: o.lines, clip, gain: o.gain, blank: o.blank });
+  US.drawFan(c, cam, FAN.ax, FAN.ay, FAN.k, { fr, lines: o.lines, clip, gain: o.gain, blank: o.blank, nearest: cam.z > 26 });
   if (o.sweep !== false && fr.s != null) ROOM.sweepLine(c, cam, fr.s, clip);
 };
 // the refresh line of the live image (one sweep per beat)
@@ -258,6 +259,13 @@ ROOM.draw = (c, cam, t, o = {}) => {
   ROOM.drawCable(c, cam, o);
   ROOM.drawProbe(c, cam, t, o);
   if (o.hand !== false) ROOM.drawHand(c, cam);
+};
+// the scan line sweeping through the cutaway in step with the refresh line on the monitor (one sweep per beat)
+ROOM.cutSweep = (c, cam, t, a = 1) => {
+  if (a <= 0) return;
+  const s = (t % 0.5) / 0.5, p = -US.HALF + 2 * US.HALF * s;
+  const S = r => US.toScreen(cam, PRB.ax, PRB.ay, 1, r * Math.sin(p), r * Math.cos(p) - US.RP), A = S(US.RP), B = S(US.RP + US.DEPTH);
+  c.save(); c.globalAlpha *= a; PIX.bline(c, A[0], A[1], B[0], B[1], 'c3'); c.restore();
 };
 // the fan the probe images, cut away under the skin (flat illustration of the same slice), with a cyan outline
 ROOM.drawCutaway = (c, cam, t, a = 1) => {

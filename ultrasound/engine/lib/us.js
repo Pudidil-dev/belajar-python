@@ -87,9 +87,9 @@ function fetusParts(p) {
   const oy = p.bob, H = { x: -2.55, z: 7.15 + oy, r: 1.25 };                     // head
   const B = { x: 0.55, z: 7.95 + oy, a: 2.0, b: 1.22, ang: 0.10 };               // body
   const sh = [-1.05, 7.15 + oy];                                                // shoulder
-  const el = [sh[0] + 0.4, sh[1] - 0.7];                                        // elbow: upper arm points up and forward
-  // forearm: from resting on the chest (pointing right-down) up to the hand at the mouth (coming from the chest side)
-  const th = 0.5 - 3.25 * p.hand, wrist = [el[0] + 0.95 * Math.cos(th), el[1] + 0.95 * Math.sin(th)];
+  const el = [sh[0] + 0.5, sh[1] - 0.42];                                       // elbow: upper arm forward along the chest
+  // forearm: from resting on the chest (pointing right-down) up in front of the chin — it never covers the face profile
+  const th = 0.5 - 2.15 * p.hand, wrist = [el[0] + 0.95 * Math.cos(th), el[1] + 0.95 * Math.sin(th)];
   const hip = [2.3, 8.2 + oy], kn = [hip[0] + 0.1 - 0.35 * p.kick, hip[1] - 1.05 + 0.35 * p.kick];
   const ank = [kn[0] + 0.85 + 0.25 * p.kick, kn[1] + 0.25 + 0.45 * p.kick];
   const hip2 = [2.1, 8.45 + oy], kn2 = [hip2[0] + 0.55, hip2[1] - 0.85], ank2 = [kn2[0] + 0.9, kn2[1] + 0.35];
@@ -119,7 +119,7 @@ function fetusRaw(x, z, F) {
   const ang = Math.atan2(-(z - H.z), x - H.x);                                  // 0 = toward the body, π/2 = up
   let rim = H.r;
   const bump = (a0, w, h) => h * Math.exp(-(((ang - a0) / w) ** 2));
-  rim += bump(1.72, 0.42, 0.16) + bump(1.16, 0.11, 0.46) + bump(0.94, 0.06, 0.22) + bump(0.81, 0.06, 0.19) + bump(0.60, 0.11, 0.17) - bump(0.36, 0.12, 0.10);
+  rim += bump(1.72, 0.42, 0.18) + bump(1.16, 0.12, 0.56) + bump(0.94, 0.06, 0.24) + bump(0.81, 0.06, 0.21) + bump(0.60, 0.12, 0.2) - bump(0.36, 0.12, 0.10);
   if (dh < rim) {
     if (dh < H.r - 0.13) {
       if (ell(x, z, H.x + 0.15, H.z + 0.15, 0.42, 0.22, 0.4) < 1) return [TI.choroid, 1];
@@ -245,10 +245,16 @@ US.sweepFrames = (t, P = 0.5) => {
 };
 // the gray level at body point (x, z) (bilinear in line and depth); −1 outside the fan, −2 for a line not acquired yet.
 // fr is one frame, or an array of frames, one per line (live display)
-US.sampleAt = (fr, x, z, nLines = NL) => {
+US.sampleAt = (fr, x, z, nLines = NL, nearest = false) => {
   const r = len(x, z + RP), phi = Math.atan2(x, z + RP);
   if (r < RP || r > RP + DEPTH || Math.abs(phi) > HALF) return -1;
   const fi = (phi + HALF) / (2 * HALF) * (NL - 1), fj = (r - RP) / DR - 0.5;
+  if (nearest) {
+    const i = Math.round(fi), j = Math.max(0, Math.min(NS - 1, Math.round(fj)));
+    if (i >= nLines) return -2;
+    const f = Array.isArray(fr) ? fr[i] : fr; if (!f) return -2;
+    return f.B[i * NS + j];
+  }
   const i0 = Math.floor(fi), j0 = Math.max(0, Math.floor(fj)), di = fi - i0, dj = Math.max(0, fj - j0);
   if (i0 >= nLines) return -2;
   const i1 = Math.min(NL - 1, i0 + 1, nLines - 1), j1 = Math.min(NS - 1, j0 + 1);
@@ -287,7 +293,7 @@ US.drawFan = (c, cam, ax, ay, k, o = {}) => {
   for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
     if (a < 1 && K.BAY(px, py) >= a) continue;
     const dx = (px + 0.5 - sx) / z, dy = (py + 0.5 - sy) / z, bx = dx * cr + dy * sr, bz = -dx * sr + dy * cr - RP;
-    const v = US.sampleAt(fr, bx, bz, nL); if (v === -1) continue;
+    const v = US.sampleAt(fr, bx, bz, nL, o.nearest); if (v === -1) continue;
     const q = ((py - y0) * bw + (px - x0)) * 4;
     const g = v === -2 ? (blank || RAMP[0]) : US.grayRGB(v * gain, px, py);
     d[q] = g[0]; d[q + 1] = g[1]; d[q + 2] = g[2]; d[q + 3] = 255;

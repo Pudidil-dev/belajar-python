@@ -286,10 +286,16 @@ g = np.ones(N)
 for tk in KICKS:
     s = int(tk * SR); L = min(int(0.28 * SR), N - s)
     if L > 0: g[s:s + L] = np.minimum(g[s:s + L], 1 - 0.6 * np.exp(-np.arange(L) / SR / 0.075))
-MUS += PUMP * g
+# the bass bus is saturated a little: upper harmonics carry the bass line on phone speakers
+MUS += np.tanh(2.0 * PUMP) / 2.0 * 0.95 * g
+# a short click on every kick, so the beat reads where a speaker has no low end
+for tk in KICKS:
+    tt = tv(0.014); put(MUS, (np.sin(2 * np.pi * 3100 * tt) * 0.6 + bp(noise(0.014), 2500, 6000) * 0.5) * np.exp(-tt * 260), tk, 0.16)
+# less sub: about −6 dB below ~70 Hz (most of it is inaudible on a phone and eats the headroom)
+for i in range(2): MUS[i] = MUS[i] - 0.5 * lp(MUS[i], 70, 2) - 0.25 * bp(MUS[i], 70, 140, 2)
 # the gel demo is darker (14–19 s)
 for i in range(2):
-    a_, b_ = int(tb(28) * SR), int(tb(38) * SR); MUS[i, a_:b_] = sweep_lp(MUS[i, a_:b_], 4200, 1800, 2, 48)
+    a_, b_ = int(tb(28) * SR), int(tb(36) * SR); MUS[i, a_:b_] = sweep_lp(MUS[i, a_:b_], 4200, 1800, 2, 48)
 
 # ---------------------------------------------------------------- sound effects (from the cue sheet)
 def tick(f=3000, d=0.02): return np.sin(2 * np.pi * f * tv(d)) * np.exp(-tv(d) * 180)
@@ -390,7 +396,7 @@ for _ in range(3):
     L = lufs(mix); mix *= 10 ** ((-14.0 - L) / 20)
     mix = np.tanh(mix / 0.92) * 0.92
     pk = np.max(np.abs(ss.resample_poly(mix, 4, 1, axis=1)))
-    if pk > 10 ** (-1.0 / 20): mix *= 10 ** (-1.0 / 20) / pk
+    if pk > 10 ** (-1.6 / 20): mix *= 10 ** (-1.6 / 20) / pk
 if len(sys.argv) > 3:
     from PIL import Image, ImageDraw
     hop = int(0.25 * SR); W_, H_ = 1150, 260; im = Image.new('RGB', (W_, H_), (16, 16, 20)); dr = ImageDraw.Draw(im)
@@ -401,5 +407,6 @@ if len(sys.argv) > 3:
     curve(0.72 * MUS[:, :mix.shape[1]] * 10 ** ((-14.0 - L) / 20), (90, 160, 255)); curve(2.2 * SFX[:, :mix.shape[1]] * 10 ** ((-14.0 - L) / 20), (255, 150, 60)); curve(mix, (240, 240, 240))
     im.save(sys.argv[3]); print('curve ->', sys.argv[3])
 print(f'integrated loudness {lufs(mix):.1f} LUFS, peak {20 * np.log10(np.max(np.abs(mix))):.2f} dBFS, {mix.shape[1] / SR:.2f} s')
+print(f'through a 300 Hz high-pass (a rough phone speaker): {lufs(np.stack([hp(mix[i], 300, 4) for i in range(2)])):.1f} LUFS')
 sf.write(OUT, mix.T.astype(np.float32), SR, subtype='PCM_24')
 print('->', OUT)
