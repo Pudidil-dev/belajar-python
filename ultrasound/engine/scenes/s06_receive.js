@@ -37,43 +37,64 @@ S.cycle = (c, lt, a = 1) => {
   PIX.text(c, '1 µs', x0 + 3, y0 + 22, 'g7', { shadow: null }); PIX.text(c, '156 µs', x0 + w - 3, y0 + 22, 'g7', { shadow: null, align: 'right' });
   c.restore();
 };
-// the receiver: echo voltage against time, time running down the screen (0 → 156 µs for 12 cm)
-const PX = { x0: 20, x1: 232, y0: 96, y1: 376, ty0: 108, ty1: 362, cx: 104 };
+// the receiver: echo voltage against time, time running down the screen (0 → 156 µs for 12 cm). Drawn through its own
+// camera (panel coordinates; identity = {x: 135, y: 240, z: 1}) so the shot can push in and follow the cursor, with
+// geometry re-rasterized at every scale. Beside the time axis, a strip of the real slice along the same scan line at
+// the same scale: each burst sits next to the tissue boundary it came from.
+const PX = { x0: 20, x1: 232, y0: 96, y1: 376, ty0: 108, ty1: 362, cx: 120, amp: 46, sx: 24, sw: 12 };
 S.PX = PX;
 S.yOfUs = us => PX.ty0 + (PX.ty1 - PX.ty0) * us / 156;
 let LI = null;
 S.line = () => LI || (LI = US.lineInfo(LINE, 35));
 S.ampAtUs = us => { const A = S.line().A, j = Math.min(US.NS - 1, Math.floor(us / 13 / US.DR)); return Math.max(A[Math.max(0, j - 1)], A[j], A[Math.min(US.NS - 1, j + 1)]); };
-S.drawScope = (c, lt, cursorUs, dy = 0) => {
-  const A = S.line().A, amax = Math.max(...A);
-  c.save(); c.translate(0, dy);
-  PIX.rect(c, PX.x0, PX.y0 + dy, PX.x1 - PX.x0, PX.y1 - PX.y0, 'g3'); PIX.rect(c, PX.x0 + 1, PX.y0 + 1 + dy, PX.x1 - PX.x0 - 2, PX.y1 - PX.y0 - 2, 'k');
-  for (let us = 0; us <= 156; us += 13) PIX.rect(c, PX.x0 + 4, Math.round(S.yOfUs(us)) + dy, PX.x1 - PX.x0 - 8, 1, 'n1');
-  PIX.rect(c, PX.cx, PX.ty0 + dy, 1, PX.ty1 - PX.ty0, 'g2');
-  PIX.rect(c, PX.cx, 0, 1, Math.max(0, PX.ty0 + dy), 'c1');                                 // the wire from the probe
+S.ID = { x: 135, y: 240, z: 1 };
+S.toS = (pc, x, y) => [135 + (x - pc.x) * pc.z, 240 + (y - pc.y) * pc.z];
+const PH = US.phi(LINE), KP = (PX.ty1 - PX.ty0) / 12;
+const strip = hw => (bx, bz) => { const r = bz + US.RP, along = bx * Math.sin(PH) + r * Math.cos(PH), perp = bx * Math.cos(PH) - r * Math.sin(PH); return Math.abs(perp) <= hw && along >= US.RP && along <= US.RP + 12; };
+const STRIP = strip(PX.sw / 2 / KP);
+S.drawScope = (c, lt, cursorUs, pc = S.ID, dy = 0) => {
+  const A = S.line().A, amax = Math.max(...A), z = pc.z, T = (x, y) => { const p = S.toS(pc, x, y); return [p[0], p[1] + dy]; };
+  const R = (x, y, w, h, col) => { const [a, b] = T(x, y); PIX.rect(c, Math.round(a), Math.round(b), Math.max(1, Math.round(w * z)), Math.max(1, Math.round(h * z)), col); };
+  R(PX.x0, PX.y0, PX.x1 - PX.x0, PX.y1 - PX.y0, 'g4'); R(PX.x0 + 1, PX.y0 + 1, PX.x1 - PX.x0 - 2, PX.y1 - PX.y0 - 2, 'n1');
+  for (let us = 0; us <= 156; us += 13) R(PX.x0 + 4, S.yOfUs(us), PX.x1 - PX.x0 - 8, 1 / z, 'n2');
+  R(PX.cx, PX.ty0, 1 / z, PX.ty1 - PX.ty0, 'n3');
+  { const [a, b] = T(PX.cx, PX.ty0); PIX.rect(c, Math.round(a), 0, Math.max(1, Math.round(z)), Math.max(0, Math.round(b)), 'c1'); }   // the wire from the probe
+  // the tissue strip (same depth scale as the time axis)
+  { const [ax, ay] = T(PX.sx + PX.sw / 2, PX.ty0), zc = KP * z, cc = { x: (135 - ax) / zc, y: (240 - ay) / zc, z: zc };
+    const [c0x, c0y] = T(PX.sx, PX.ty0), [c1x, c1y] = T(PX.sx + PX.sw, PX.ty1);
+    US.drawAnatomy(c, cc, 0, -US.RP, 1, { t: 0, rot: PH, full: true, inside: STRIP, clip: [Math.max(0, Math.floor(c0x) - 1), Math.max(0, Math.floor(c0y)), Math.ceil(c1x) + 1, Math.ceil(c1y)] }); }
   // the trace down to the cursor: an RF-like wiggle under each echo's envelope (amplified, gamma 0.8)
-  const yC = S.yOfUs(cursorUs);
-  let prev = null;
-  for (let y = PX.ty0; y < Math.min(PX.ty1, yC); y++) {
-    const us = (y - PX.ty0) / (PX.ty1 - PX.ty0) * 156, e = Math.pow(S.ampAtUs(us) / amax, 0.8);
-    const x = Math.round(PX.cx + 56 * e * Math.sin(y * 1.9));
-    if (prev != null) PIX.rect(c, Math.min(prev, x), y + dy, Math.abs(prev - x) + 1, 1, e > 0.6 ? 'c4' : 'c3');
+  const yC = S.yOfUs(cursorUs), sy0 = Math.max(0, Math.ceil(T(0, PX.ty0)[1])), sy1 = Math.min(PIX.H, Math.floor(T(0, Math.min(PX.ty1, yC))[1]));
+  let prev = null; const lw = Math.max(1, Math.round(z));
+  for (let sy = sy0; sy < sy1; sy++) {
+    const y = pc.y + (sy - dy - 240) / z, us = (y - PX.ty0) / (PX.ty1 - PX.ty0) * 156, e = Math.pow(S.ampAtUs(us) / amax, 0.8);
+    const x = Math.round(T(PX.cx + PX.amp * e * Math.sin(y * 1.9), 0)[0]);
+    if (prev != null) PIX.rect(c, Math.min(prev, x), sy, Math.abs(prev - x) + lw, 1, e > 0.6 ? 'c5' : e > 0.2 ? 'c4' : 'c3');
     prev = x;
   }
   if (cursorUs > 0 && cursorUs < 156) {
-    PIX.rect(c, PX.x0 + 4, Math.round(yC) + dy, PX.x1 - PX.x0 - 8, 1, 'c1'); PIX.rect(c, PX.cx - 3, Math.round(yC) + dy, 7, 1, 'c4');
-    // the signal arriving down the wire: a packet for every strong burst just ahead of the cursor
+    R(PX.x0 + 4, yC, PX.x1 - PX.x0 - 8, 1 / z, 'c1'); R(PX.cx - 3, yC, 7, 1 / z, 'c4');
+    // the signal arriving down the wire: a packet for every burst just ahead of the cursor
     const e = Math.pow(S.ampAtUs(cursorUs) / amax, 0.8);
-    if (e > 0.12) PIX.rect(c, PX.cx - 1, Math.round(yC) - 14 + dy, 3, 12, e > 0.5 ? 'c5' : 'c3');
+    if (e > 0.12) R(PX.cx - 1, yC - 16, 3, 14, e > 0.5 ? 'c5' : 'c3');
   }
-  c.restore();
+};
+// the shot: slide up, push in and follow the cursor down, pull back out as the trace completes
+S.scopeCam = lt => {
+  const yC = S.yOfUs(S.CUR(lt)), follow = { x: 115, y: U.clamp(yC - 30, 170, 290), z: 1.4 };
+  if (lt < 4.85) return S.ID;
+  if (lt < 7.55) { const e = MO.sineInOut(U.clamp((lt - 4.85) / 0.6)); return K.camLerp(S.ID, follow, e); }
+  return K.camLerp(follow, S.ID, MO.sineInOut(U.clamp((lt - 7.55) / 0.45)));
 };
 S.CUR = lt => U.clamp((lt - 4.75) / 3.15) * 156;
-const yb = d => Math.round(S.yOfUs(13 * d)), tAt = d => 4.75 + 13 * d / 156 * 3.15;
-S.notes = (c, lt, t1) => {
-  CAP.note(c, lt, { ax: PX.cx + 14, ay: yb(1.0), x: 166, y: yb(1.0) - 3, text: 'WEAK', t0: tAt(1.0), t1, col: 'c3', lineCol: 'c1', box: true });
-  CAP.note(c, lt, { ax: PX.cx + 6, ay: yb(4.4), x: 166, y: yb(4.4) - 3, text: 'NONE: FLUID', t0: tAt(4.4), t1, col: 'g9', lineCol: 'g5', box: true });
-  CAP.note(c, lt, { ax: PX.cx + 40, ay: yb(5.45), x: 166, y: yb(5.45) - 3, text: 'STRONG: BONE', t0: tAt(5.45), t1, col: 'c4', lineCol: 'c2', box: true });
+const yb = d => S.yOfUs(13 * d), tAt = d => 4.75 + 13 * d / 156 * 3.15;
+S.notes = (c, lt, t1, pc = S.ID) => {
+  const P = (x, y) => S.toS(pc, x, y);
+  for (const [d, dx, text, col, lc] of [[1.0, 14, 'WEAK', 'c3', 'c1'], [4.4, 6, 'NONE: FLUID', 'g9', 'g5'], [5.45, 40, 'STRONG: BONE', 'c4', 'c2']]) {
+    const a = P(PX.cx + dx, yb(d)), tx = Math.min(P(170, 0)[0], 238 - PIX.textWidth(text));
+    if (a[1] < 98 || a[1] > 466) continue;                                        // out of the pushed-in frame
+    CAP.note(c, lt, { ax: a[0], ay: a[1], x: tx, y: a[1] - 3, text, t0: tAt(d), t1, col, lineCol: lc, box: true });
+  }
 };
 S.draw = (c, lt, info) => {
   const t = info ? info.t : 31 + lt;
@@ -81,22 +102,22 @@ S.draw = (c, lt, info) => {
   const slide = MO.cubicOut(U.clamp((lt - 4.45) / 0.4));
   if (lt < 4.85) PROBE.drawMicro(c, S.mcam(lt), t, S.state(t));
   if (slide > 0) {
-    if (lt >= 4.85) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = PIX.P.n0; c.fillRect(0, 0, PIX.W, PIX.H); c.restore(); }
-    else { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = PIX.P.n0; c.fillRect(0, Math.round(480 * (1 - slide)), PIX.W, PIX.H); c.restore(); }
-    S.drawScope(c, lt, S.CUR(lt), Math.round(480 * (1 - slide)));
+    const dy = Math.round(480 * (1 - slide));
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = PIX.P.n0; c.fillRect(0, lt >= 4.85 ? 0 : dy, PIX.W, PIX.H); c.restore();
+    S.drawScope(c, lt, S.CUR(lt), S.scopeCam(lt), dy);
   }
   if (lt < 4.5) {
     S.cycle(c, lt, 1 - U.clamp((lt - 4.1) / 0.25));
-    // point at the next echo on its way up (the nearest one inside the frame)
-    const cam = S.mcam(lt), fronts = ARR.filter(a => a.lt > lt && vis(a.A) > 0.25).map(a => K.S(cam, M.ex(-3) - 18, M.GND + M.V * (31 + a.lt - t))).filter(p => p[1] < 440);
-    const ep = fronts.length ? fronts[0] : K.S(cam, M.ex(-3) - 18, M.GND + 6);
-    CAP.note(c, lt, { ax: ep[0] + 2, ay: ep[1], x: 14, y: 140, text: 'RETURNING ECHO', t0: 0.35, t1: 3.9, col: 'y4', lineCol: 'y2', box: true });
-    CAP.note(c, lt, { x: CAP.X0 + 5, y: CAP.Y0, text: 'THE SAME CRYSTALS', t0: 0.6, t1: 3.9, col: 'w', box: true });
-    CAP.note(c, lt, { x: CAP.X0 + 5, y: CAP.Y0 + 11, text: 'NOW LISTEN', t0: 0.85, t1: 3.9, col: 'w', box: true });
+    const cam = S.mcam(lt), fronts = ARR.filter(a => a.lt > lt && vis(a.A) > 0.25).map(a => K.S(cam, M.ex(-3) - 18, M.GND + M.V * (31 + a.lt - t))).filter(p => p[1] < 440 && p[1] > 90);
+    const ep = fronts.length ? fronts[0] : null;
+    CAP.note(c, lt, { ax: ep ? ep[0] + 2 : null, ay: ep ? ep[1] : null, x: CAP.X0 + 5, y: CAP.Y0, text: 'RETURNING ECHO', t0: 0.35, t1: 3.9, col: 'y4', lineCol: 'y2', box: true });
+    CAP.note(c, lt, { x: CAP.X0 + 5, y: CAP.Y0 + 11, text: 'THE SAME CRYSTALS', t0: 0.6, t1: 3.9, col: 'w', box: true });
+    CAP.note(c, lt, { x: CAP.X0 + 5, y: CAP.Y0 + 22, text: 'NOW LISTEN', t0: 0.85, t1: 3.9, col: 'w', box: true });
   } else {
-    const yt = yb(2.0);
-    CAP.note(c, lt, { ax: PX.cx - 30, ay: yt, x: CAP.X0 + 5, y: CAP.Y0, text: 'ELECTRICAL SIGNAL', t0: 4.7, t1: 99, col: 'c4', lineCol: 'c2', box: true });
-    S.notes(c, lt, 99);
+    const pc = S.scopeCam(lt), a = S.toS(pc, PX.cx - 20, yb(2.0));
+    CAP.note(c, lt, { ax: a[0], ay: a[1], x: CAP.X0 + 5, y: CAP.Y0, text: 'ELECTRICAL SIGNAL', t0: 4.7, t1: 7.1, col: 'c4', lineCol: 'c2', box: true });
+    S.notes(c, lt, 99, pc);
+    SC.s07_build.tofCaption(c, t);
   }
 };
 S.cues = () => {

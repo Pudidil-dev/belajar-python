@@ -18,7 +18,8 @@ From there the film follows one pulse of sound:
 8. the receiver trace: time of flight gives depth, echo size gives brightness;
 9. the fan filled line by line until the fetus appears.
 
-It ends on the same monitor shot it opened with, so the video loops.
+It ends on the whole monitor with the live image, the title above it and the process chain below it, then pushes back
+into the opening shot, so the video loops.
 
 - 1080×1920 vertical, 60 fps, exactly 50 s, H.264 + AAC stereo.
 - Every frame is drawn at 270×480 and upscaled 4× with nearest-neighbour. One limited palette with 4×4 ordered
@@ -82,7 +83,8 @@ Numbers on screen and where they come from:
 | 70 µs → 5.4 cm | the skull's depth on line 28 × 13 µs/cm |
 | 99.9% bounces back | air (Z ≈ 0.0004) against the probe face (Z ≈ 1.5): R² ≈ 0.999 |
 | 0.4%, 1%, <0.1%, 0.2%, 0.2%, 32% | R² at skin, fat, muscle → uterus, uterus → fluid, fluid → fetal skin, fetal skin → skull |
-| 3.5 MHz, 30 frames/s | the probe's frequency; 96 lines × 156 µs ≈ 15 ms per frame |
+| 1 µs / 156 µs (SEND / LISTEN) | a 2–3 cycle pulse at 3.5 MHz; the round trip to 12 cm at 13 µs/cm |
+| 3.5 MHz, FR 30 | the probe's frequency; 96 lines × 156 µs ≈ 15 ms per frame, so 30 frames/s is within reach |
 
 Shown in slow motion and not to scale, with a note on screen:
 
@@ -104,7 +106,8 @@ Shown in slow motion and not to scale, with a note on screen:
   - `caption_audit.py` (reading time of every text);
   - `text_check.py` (text collisions);
   - `video_diffs.py` (frame-to-frame change).
-- `审片/` — the independent review and what was done about each finding.
+- `审片/` — the two independent reviews (`审片.md` on the first render, `复审.md` on the revision) and what was done about each
+  finding (`处理记录.md`).
 - `output/` — the delivered film and its delivery note.
 
 ```sh

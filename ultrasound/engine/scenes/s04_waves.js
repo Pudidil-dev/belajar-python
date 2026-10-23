@@ -9,9 +9,11 @@ const F1 = 14.5, F2 = 15.25, F3 = 17.0, BX0 = M.ex(-2) - 18, BX1 = M.ex(2) + 18;
 S.F3 = F3;
 // close on the face for the gel demo, then follow the pulse at the drawn speed of sound (easing in)
 S.cam = lt => {
+  // then a slow, even drift down (exactly 1 px per frame) so the pulse visibly travels down the screen through tissue
+  // that stays almost still — only bunching and spreading in place as the wave passes
   if (lt < 3) return { x: M.CX, y: 310, z: 1.5 };
-  const tau = lt - 3, g = tau < 1.2 ? tau * tau / 2.4 : tau - 0.6, e = MO.smooth(U.clamp(tau));
-  return { x: M.CX, y: 310 + M.V * g, z: K.zl(1.5, 1, e) };
+  if (lt < 4) { const e = MO.smooth(lt - 3); return { x: M.CX, y: U.lerp(310, 550, e), z: K.zl(1.5, 1, e) }; }
+  return { x: M.CX, y: 550 + 60 * (lt - 4), z: 1 };
 };
 const tFace = (M.LENS - M.GND) / M.V;
 S.state = (t, lt) => {
@@ -53,13 +55,13 @@ S.draw = (c, lt, info) => {
   CAP.note(c, lt, { ax: rf[0], ay: rf[1], x: 128, y: 70, text: '99.9% BOUNCES BACK', t0: 0.75, t1: 2.25, col: 'y4', lineCol: 'y2', box: true });
   // with gel
   const gl = K.S(cam, 60, M.LENS + 10);
-  CAP.note(c, lt, { ax: gl[0], ay: gl[1], x: CAP.X0 + 5, y: CAP.Y0, text: 'COUPLING GEL', t0: 2.45, t1: 4.35, col: 'l2', lineCol: 'l1', box: true });
-  CAP.note(c, lt, { x: CAP.X0 + 5, y: CAP.Y0 + 11, text: 'FILLS THE AIR GAPS', t0: 2.6, t1: 4.35, col: 'g9', box: true });
+  CAP.note(c, lt, { ax: gl[0], ay: gl[1], x: CAP.X0 + 5, y: 104, text: 'COUPLING GEL', t0: 2.45, t1: 4.35, col: 'l2', lineCol: 'l1', box: true });
+  CAP.note(c, lt, { x: CAP.X0 + 5, y: 115, text: 'FILLS THE GAPS', t0: 2.6, t1: 4.35, col: 'g9', box: true });
   // in the tissue
-  CAP.scene(c, lt, { title: 'ULTRASOUND WAVES', ctx: ['SOUND TRAVELS INTO THE BODY', 'AS PRESSURE WAVES.'], t0: 4.45, t1: 7.72 });
+  CAP.scene(c, lt, { title: 'ULTRASOUND WAVES', ctx: ['SOUND TRAVELS INTO THE BODY', 'AS PRESSURE WAVES.'], t0: 3.9, t1: 7.85 });
   const yc = M.GND + M.V * (t - F3 - 0.25 / M.F), cp = K.S(cam, 70, yc);
-  CAP.note(c, lt, { ax: cp[0], ay: cp[1], x: 14, y: 104, text: 'COMPRESSION', t0: 5.4, t1: 7.72, col: 'w', lineCol: 'y3', box: true });
-  CAP.note(c, lt, { x: 14, y: 362, text: '1540 m/s · NOT X-RAYS', t0: 5.9, t1: 7.72, col: 'g9', box: true });
+  CAP.note(c, lt, { ax: cp[0], ay: cp[1], x: 14, y: 128, text: 'COMPRESSION', t0: 4.9, t1: 7.4, col: 'w', lineCol: 'y3', box: true });
+  CAP.note(c, lt, { x: 14, y: 362, text: '1540 m/s · NOT X-RAYS', t0: 5.6, t1: 7.85, col: 'g9', box: true });
 };
 S.cues = [[0.5, 'crystal', 0.8], [0.85, 'bounce', 1], [1.25, 'crystal', 0.6], [1.6, 'bounce', 0.8], [2.25, 'gel', 1], [3.0, 'crystal', 0.9], [3.35, 'pass', 0.9],
   [4.0, 'wave', 0.8], [4.5, 'wave', 0.6], [5.0, 'wave', 0.6], [5.5, 'wave', 0.5], [6.0, 'wave', 0.5], [6.5, 'wave', 0.45], [7.0, 'wave', 0.4], [7.5, 'wave', 0.4]];

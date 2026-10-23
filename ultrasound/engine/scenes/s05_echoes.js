@@ -28,15 +28,16 @@ const tHit = d => T0 + d / V, tBack = d => T0 + 2 * d / V;
 const pulseD = lt => (lt - T0) * V;
 const ampAt = d => { let a = 1; for (const b of BOUNDS) if (b.d <= d) a = b.Tafter; return a; };
 S.cam = lt => {
-  const track = { x: 5 / 60, y: Math.max(1.2, pulseD(Math.min(lt, 4)) - 1.5), z: 60 }, wide = { x: 5 / 30, y: 4.53, z: 30 };
+  const track = { x: 5 / 60, y: Math.max(1.2, pulseD(Math.min(lt, 4)) - 1.5), z: 60 }, wide = { x: 30 / 30, y: 4.53, z: 30 };
   if (lt < 4) return track;
-  if (lt < 7.6) { const e = MO.k75(U.clamp((lt - 4) / 1.4)), zz = K.zl(60, 30, e); return { x: 5 / zz, y: U.lerp(track.y, wide.y, e), z: zz }; }
+  // in the wide shot the column sits left of centre, so the notes on its right stay clear of the frame's right edge
+  if (lt < 7.6) { const e = MO.k75(U.clamp((lt - 4) / 1.4)), zz = K.zl(60, 30, e); return { x: U.lerp(5, 30, e) / zz, y: U.lerp(track.y, wide.y, e), z: zz }; }
   return K.zoomPath(wide, { x: 0, y: -0.25, z: 150 }, MO.cubicIn(U.clamp((lt - 7.6) / 1.4)));
 };
 const PH = US.phi(28), VIEW_Y = 92;
 // the column is the real slice along scan line 28 (the same model as the image), turned so the line runs straight down
 const inStrip = (bx, bz) => { const r = bz + US.RP, along = bx * Math.sin(PH) + r * Math.cos(PH), perp = bx * Math.cos(PH) - r * Math.sin(PH); return Math.abs(perp) <= HW && along >= US.RP && along <= US.RP + 12.6; };
-const NAMES = [[0.08, 'SKIN'], [0.85, 'FAT'], [2.07, 'MUSCLE'], [3.1, 'UTERINE WALL'], [4.36, 'FLUID'], [5.05, 'FETAL SKIN'], [5.55, 'SKULL'], [7.1, 'BRAIN'], [8.68, 'SKULL'], [9.65, 'FLUID'], [10.93, 'PLACENTA']];
+const NAMES = [[0.08, 'SKIN'], [0.85, 'FAT'], [2.07, 'MUSCLE'], [3.1, 'UTERINE WALL'], [4.36, 'FLUID'], [5.05, 'FETAL SKIN'], [5.55, 'SKULL'], [7.1, 'BRAIN']];
 const PCT = b => b.RI >= 0.1 ? Math.round(b.RI * 100) + '%' : b.RI >= 0.0095 ? (b.RI * 100).toFixed(0) + '%' : b.RI >= 0.001 ? (b.RI * 100).toFixed(1) + '%' : '<0.1%';
 // a few crest lines of a pulse travelling in the column (depth d of the leading crest, amplitude a)
 const fronts = (c, cam, d, a, dir, kind, dmin, dmax) => {
@@ -75,12 +76,12 @@ S.draw = (c, lt, info) => {
   // names on the left, echo bars and shares on the right
   const xl = Math.round(K.S(cam, -HW, 0)[0]) - 5, xr = Math.round(K.S(cam, HW, 0)[0]) + 6;
   for (const [d, s] of NAMES) {
-    const y = Math.round(K.S(cam, 0, d)[1]) - 3; if (y < VIEW_Y + 2 || y > 470) continue;
+    const y = Math.round(K.S(cam, 0, d)[1]) - 3; if (y < VIEW_Y + 2 || y > 470 || xl - PIX.textWidth(s) < 2) continue;
     PIX.label(c, { tx: xl, ty: y, text: s, t0: tHit(Math.max(0, d - 0.2)) - 0.1, t1: 99, col: 'g9', align: 'right' }, lt);
   }
   let lastY = -99;
   BOUNDS.forEach((b, i) => {
-    if (i === 0 || i > 7 || lt < tHit(b.d)) return;
+    if (i === 0 || i > 6 || lt < tHit(b.d)) return;
     const y = Math.round(K.S(cam, 0, b.d)[1]), grow = MO.backOut(U.clamp((lt - tHit(b.d)) / 0.3), 2.2), L = Math.max(1, Math.round(b.A * 90 * grow));
     if (y < VIEW_Y + 4 || y > 472) return;
     PIX.rect(c, xr, y - 1, L, 3, b.A > 0.3 ? 'y4' : 'y3');

@@ -119,7 +119,9 @@ function fetusRaw(x, z, F) {
   const ang = Math.atan2(-(z - H.z), x - H.x);                                  // 0 = toward the body, π/2 = up
   let rim = H.r;
   const bump = (a0, w, h) => h * Math.exp(-(((ang - a0) / w) ** 2));
-  rim += bump(1.72, 0.42, 0.18) + bump(1.16, 0.12, 0.56) + bump(0.94, 0.06, 0.24) + bump(0.81, 0.06, 0.21) + bump(0.60, 0.12, 0.2) - bump(0.36, 0.12, 0.10);
+  // a soft-tissue face pad over the front of the head, then the profile on it: forehead, nose, lips, chin
+  const pad = 0.16 * U.ss(0.3, 0.55, ang) * (1 - U.ss(1.75, 2.1, ang));
+  rim += pad + bump(1.62, 0.3, 0.16) + bump(1.17, 0.13, 0.52) + bump(0.95, 0.07, 0.2) + bump(0.82, 0.07, 0.18) + bump(0.6, 0.14, 0.16) - bump(0.36, 0.1, 0.12);
   if (dh < rim) {
     if (dh < H.r - 0.13) {
       if (ell(x, z, H.x + 0.15, H.z + 0.15, 0.42, 0.22, 0.4) < 1) return [TI.choroid, 1];

@@ -21,17 +21,17 @@ S.state = t => ({
 // the inset scope: the drive voltage and the crystal's thickness against time (cause, then effect)
 S.scope = (c, t, st, a) => {
   if (a <= 0) return;
-  const x0 = 128, y0 = 84, w = 102, h = 58;
+  const x0 = 128, y0 = 84, w = 102, h = 64;
   c.save(); c.globalAlpha *= a;
   PIX.rect(c, x0 - 2, y0 - 2, w + 4, h + 4, 'g4'); PIX.rect(c, x0 - 1, y0 - 1, w + 2, h + 2, 'k');
   PIX.text(c, 'VOLTAGE', x0 + 2, y0 + 1, 'c3', { shadow: null });
-  PIX.text(c, 'THICKNESS', x0 + 2, y0 + 30, 'g9', { shadow: null });
-  PIX.rect(c, x0 + 2, y0 + 24, w - 4, 1, 'g2'); PIX.rect(c, x0 + 2, y0 + 47, w - 4, 1, 'g2');
+  PIX.text(c, 'THICKNESS', x0 + 2, y0 + 27, 'g9', { shadow: null });
+  PIX.rect(c, x0 + 2, y0 + 24, w - 4, 1, 'g2'); PIX.rect(c, x0 + 2, y0 + 51, w - 4, 1, 'g2');
   let prev = null;
   for (let k = 0; k < w - 4; k++) {
     const tt = t - 1.1 + 1.1 * k / (w - 5), v = Math.abs(tt - FIRE) < 0.035 ? 1 : 0, th = PROBE.thickness(st, 0, tt) / 9;
     if (v) PIX.rect(c, x0 + 2 + k, y0 + 12, 1, 12, 'c3');
-    const y = Math.round(y0 + 47 - 7 * th);
+    const y = Math.round(y0 + 51 - 4 * th / 2.2 * 2.2);
     if (prev != null) PIX.rect(c, x0 + 2 + k, Math.min(prev, y), 1, Math.abs(prev - y) + 1, 'w');
     prev = y;
   }
@@ -61,11 +61,12 @@ S.draw = (c, lt, info) => {
   CAP.note(c, lt, { ax: cr[0], ay: cr[1], x: 14, y: cr[1] - 26, text: 'PIEZOELECTRIC CRYSTALS', t0: 1.55, t1: 6.6, col: 'w', lineCol: 'g7', box: true });
   CAP.note(c, lt, { ax: wx, ay: 128, x: 14, y: 104, text: 'ELECTRICAL PULSE', t0: 2.15, t1: 4.9, col: 'c4', lineCol: 'c2', box: true });
   S.scope(c, t, st, U.clamp((lt - 2.0) / 0.2) * (1 - U.clamp((lt - 5.0) / 0.25)));
-  CAP.note(c, lt, { x: 230, y: 147, text: 'SLOW MOTION, NOT TO SCALE', t0: 2.3, t1: 4.9, col: 'g8', align: 'right', box: true });
+  CAP.note(c, lt, { x: 230, y: 153, text: 'SLOWED, NOT TO SCALE', t0: 2.3, t1: 4.9, col: 'g9', align: 'right', box: true });
+  const ln = K.S(cam, M.ex(3), (M.MAT + M.LENS) / 2);
+  CAP.note(c, lt, { ax: ln[0], ay: ln[1], x: 236, y: ln[1] + 18, text: 'LENS', t0: 2.0, t1: 4.9, col: 'g9', lineCol: 'g6', align: 'right', box: true });
   // the pulse leaving: short, 2–3 cycles (the label stays put; its leader follows the pulse)
   const yp = M.GND + M.V * (t - FIRE) + M.LAM * 0.6, sp = K.S(cam, M.ex(2) + 18, yp);
-  CAP.note(c, lt, { ax: sp[0], ay: sp[1], x: 150, y: 300, text: 'SHORT PULSE:', t0: 5.65, t1: 6.85, col: 'y4', lineCol: 'y2', box: true });
-  CAP.note(c, lt, { x: 150, y: 311, text: '2-3 CYCLES', t0: 5.72, t1: 6.85, col: 'y4', box: true });
+  CAP.note(c, lt, { ax: sp[0], ay: sp[1], x: 150, y: 300, text: 'SHORT PULSE', t0: 5.6, t1: 6.85, col: 'y4', lineCol: 'y2', box: true });
 };
 S.cues = [[0.3, 'whoosh', 0.8], [1.55, 'tone', 0.6], [2.25, 'trigger', 0.9], [2.5, 'crystal', 1], [2.75, 'crystal', 0.6], [3.0, 'crystal', 0.35], [2.5, 'buzz', 0.7], [5.0, 'sweep', 0.7]];
 })();

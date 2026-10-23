@@ -17,7 +17,7 @@ ROOM.HOOK = { x: 0, y: -166, z: 12 };                          // the opening sh
 ROOM.fanW = (bx, bz) => [FAN.ax + FAN.k * bx, FAN.ay + FAN.k * (bz + US.RP)];
 ROOM.MACHINE = { x: 0, y: -147, z: 3.3 };                      // monitor, deck and the probe on the belly
 ROOM.PROBEV = { x: 0, y: -106, z: 5.4 };                       // the probe, the hand, the cutaway fan
-ROOM.FINAL = { x: 0, y: -156.3, z: 6.5 };                      // the whole monitor, title above, the process chain below
+ROOM.FINAL = { x: 0, y: -157.63, z: 6 };                      // the whole monitor, title above, the process chain below
 const TX = 12, TW = 432, TH = 324;                             // texture scale (px/cm) and size
 const FL = (c, z, path, base, sh, hi, s = 1.5, hs = 1) => PIX.flat(c, path, base, sh, hi, [s / z, s / z], [hs / z, hs / z]);
 const R = (x, y, w, h, r = 0) => PIX.rectPath(x, y, w, h, r);

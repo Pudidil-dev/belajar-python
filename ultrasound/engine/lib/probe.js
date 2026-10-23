@@ -32,7 +32,7 @@ PROBE.drawCut = (c, cam, a = 1) => {
     for (let k = -3; k <= 3; k++) { cc.beginPath(); cc.moveTo(ax + k * 0.12, ay - 16); cc.lineTo(ax + k * 0.12, ay - 5); cc.quadraticCurveTo(ax + k * 0.2, ay - 1.5, ax + k * 0.62, ay + RP() - 0.3); cc.strokeStyle = P.c1; cc.lineWidth = Math.max(0.03, 1 / z); cc.stroke(); }
     PIX.fill(cc, ring(PROBE.CR[0], PROBE.CR[1]), 'g9');                                // crystal elements
     PIX.fill(cc, ring(PROBE.CR[1], RP() - 0.2), 'g6');                                 // matching layer
-    PIX.fill(cc, ring(RP() - 0.2, RP() + 0.05, 34 * Math.PI / 180), 'g3');             // lens
+    PIX.fill(cc, ring(RP() - 0.2, RP() + 0.02, 34 * Math.PI / 180), 'g6');             // lens
     // kerfs between the 128 elements, once they are wider than a few pixels
     const pitch = 0.0316 * z;
     if (pitch > 2.2) {
@@ -43,6 +43,8 @@ PROBE.drawCut = (c, cam, a = 1) => {
     cc.restore();
     // housing shell (cut edge)
     cc.save(); cc.clip(path); cc.strokeStyle = P.ga; cc.lineWidth = 0.26; cc.stroke(path); cc.restore();
+    // the gel film between the face and the skin
+    PIX.fill(cc, ring(RP() + 0.02, RP() + 0.07, 33 * Math.PI / 180), 'l1');
     cc.setTransform(1, 0, 0, 1, 0, 0);
   };
   if (a >= 1) draw(c); else window.shifted(c, cc => { draw(cc); const img = cc.getImageData(0, 0, W, H), d = img.data; for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i += 4) if (K.BAY(x, y) >= a) d[i + 3] = 0; cc.putImageData(img, 0, 0); }, 0, 0);
@@ -116,8 +118,8 @@ PROBE.drawMicro = (c, cam, t, st = {}) => {
     for (let x = xg; x >= -600; x -= 2) pts.push([x, skinTop(x) + 0.5]);                         // back along the skin
     ROOM.FL(c, z, U.poly(pts), 'l1', 'l0', 'l2', 1.5, 1);
   }
-  ROOM.FL(c, z, PIX.rectPath(-600, M.MAT, 1470, M.LENS - M.MAT), 'g3', 'g2', 'g4', 1.5, 1);   // lens
-  PIX.fill(c, PIX.rectPath(-600, M.GND, 1470, M.MAT - M.GND), 'g6');                          // matching layer
+  ROOM.FL(c, z, PIX.rectPath(-600, M.MAT, 1470, M.LENS - M.MAT), 'g6', 'g5', 'g7', 1.5, 1);   // lens (silicone rubber)
+  PIX.fill(c, PIX.rectPath(-600, M.GND, 1470, M.MAT - M.GND), 'g8');                          // matching layer
   PIX.fill(c, PIX.rectPath(-600, M.GND, 1470, 1), 'g7');
   // crystals: each element's thickness follows its drive (send) or the echo pressure (receive)
   for (const e of eIdx) {

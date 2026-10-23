@@ -4,7 +4,7 @@
 (() => {
 const S = SC.s08_final = {};
 const CHAIN = [['ELECTRIC PULSE', 'c3'], ['PIEZOELECTRIC CRYSTALS', 'g9'], ['SOUND WAVES', 'y4'], ['ECHOES', 'y3'], ['SIGNALS', 'c4'], ['IMAGE', 'w']];
-const T_OUT = 3.3;                                                     // chain time (s after 46.0) when it clears
+const T_OUT = 3.85;                                                    // chain time (s after 45.5) when it clears
 const icon = (c, i, x, y) => {
   const R = (a, b, w, h, col) => PIX.rect(c, x + a, y + b, w, h, col);
   if (i === 0) { R(0, 5, 9, 1, 'c1'); R(4, 0, 1, 6, 'c3'); R(3, 2, 3, 1, 'c4'); }
@@ -14,7 +14,7 @@ const icon = (c, i, x, y) => {
   else if (i === 4) { for (let k = 0; k < 9; k++) R(k, 4 + Math.round(3 * Math.sin(k * 1.4)) - 1, 1, 2, 'c3'); }
   else { for (let r = 0; r < 8; r++) R(4 - Math.floor(r / 2), 1 + r, 1 + 2 * Math.floor(r / 2), 1, r % 3 ? 'g7' : 'w'); }
 };
-// the chain panel; ct = seconds since 46.0
+// the chain panel; ct = seconds since 45.5
 S.chain = (c, ct) => {
   const fa = ct < T_OUT ? 1 : U.clamp(1 - (ct - T_OUT) / PIX.FADE);
   if (fa <= 0) return;
@@ -29,14 +29,15 @@ S.chain = (c, ct) => {
   });
   c.restore();
 };
-S.cam = lt => lt < 2.35 ? ROOM.FINAL : K.zoomPath(ROOM.FINAL, ROOM.HOOK, MO.cubicInOut(U.clamp((lt - 2.35) / 0.65)));
+S.cam = lt => { if (lt < 2.35) return ROOM.FINAL; const e = MO.cubicInOut(U.clamp((lt - 2.35) / 0.6)); return e > 0.985 ? ROOM.HOOK : K.zoomPath(ROOM.FINAL, ROOM.HOOK, e); };
 S.draw = (c, lt, info) => {
   const t = info ? info.t : 47 + lt, cam = S.cam(lt);
   ROOM.drawWall(c, cam);
   ROOM.drawMachine(c, cam, t, {});
-  S.chain(c, lt + 1.0);
-  PIX.label(c, { tx: 135, ty: 12, text: 'HOW ULTRASOUND', t0: 0.0, t1: 2.3, col: 'w', align: 'center', sc: 2, rate: 120 }, lt);
-  PIX.label(c, { tx: 135, ty: 32, text: 'MACHINES WORK', t0: 0.1, t1: 2.3, col: 'c4', align: 'center', sc: 2, rate: 120 }, lt);
+  S.chain(c, lt + 1.5);
+  // the title lands on the final hit (its first letters on the first frame of the scene)
+  PIX.label(c, { tx: 135, ty: 56, text: 'HOW ULTRASOUND', t0: -0.12, t1: 2.3, col: 'w', align: 'center', sc: 2, rate: 120 }, lt);
+  PIX.label(c, { tx: 135, ty: 76, text: 'MACHINES WORK', t0: -0.06, t1: 2.3, col: 'c4', align: 'center', sc: 2, rate: 120 }, lt);
 };
 S.cues = () => [[0, 'finish', 1.0], [2.35, 'whoosh', 0.8], [2.0, 'scan', 0.4]];
 })();
