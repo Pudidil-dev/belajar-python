@@ -10,6 +10,7 @@ import math
 import numpy as np
 
 import pixfont as F
+from px import glow as halo
 from pal import *  # noqa: F401,F403
 from px import (Cam, Path, disc_mask, dilate, line_mask, poly_mask, shaded_mask,
                 text, W, H, hash01, clamp)
@@ -112,6 +113,9 @@ def draw_machine(cv, cam, t, glow=0.0):
     # top handle + status LED
     fill(cv, cam, rr(252, -692, 488, -662, 12), M2, M3, M1, M1, k=5)
     blink = (math.sin(t * 6.0) > -0.2)
+    if blink:
+        gx, gy = cam.pt(466, -677)
+        halo(cv, gx, gy, 16 * cam.z, G1, 0.55)
     disc_w(cv, cam, 466, -677, 6, G1 if blink else M1)
     # screen
     fill(cv, cam, rr(240, -630, 500, -388, 14), M1, M2, M0, M0, k=6)
@@ -121,6 +125,9 @@ def draw_machine(cv, cam, t, glow=0.0):
     fill(cv, cam, rr(236, -334, 470, -66, 16), M2, M3, M1, M1, k=6)
     for i, yy in enumerate((-306, -270, -234)):
         on = (int(t * 2) + i) % 3 != 0
+        if on:
+            gx, gy = cam.pt(446, yy)
+            halo(cv, gx, gy, 18 * cam.z, CY2, 0.45)
         disc_w(cv, cam, 446, yy, 8, CY2 if on else CY0, outline=M1)
     # lower panel vents
     if z >= 0.25:
@@ -207,6 +214,10 @@ def draw_dialyzer(cv, cam, t, glow=0.0):
     z = cam.z
     if not cam.visible(110, -470, 230, -40, pad=10):
         return
+    if glow > 0:
+        for yy in np.linspace(-430, -70, 9):
+            gx, gy = cam.pt(DZ_CX, yy)
+            halo(cv, gx, gy, 70 * cam.z, CY1, 0.42 * glow)
     # holder arm + clamp ring
     fill(cv, cam, rr(184, -270, 226, -240, 6), M1, M2, M0, M0, k=3)
     # housing: clear shell with the red fiber bundle inside
@@ -283,6 +294,9 @@ def draw_chamber(cv, cam, t):
     ph = (t * 2.0) % 1.0
     disc_w(cv, cam, DZ_CX, 10 + ph * (level - 10), 2.5, R3)
     fill(cv, cam, rr(140, 100, 180, 132, 6), M1, M2, M0, M0, k=3)
+    if math.sin(t * 5) > 0:
+        gx, gy = cam.pt(172, 116)
+        halo(cv, gx, gy, 10 * cam.z, G1, 0.5)
     disc_w(cv, cam, 172, 116, 3, G1 if math.sin(t * 5) > 0 else M2)
 
 

@@ -90,6 +90,8 @@ def lens(a, b, cx, cy, r):
     ring = (d > r) & (d <= r + 2.0)
     out[ring] = CY2
     out[(d > r + 2.0) & (d <= r + 3.0)] = CY3
+    halo = (d > r + 3.0) & (d <= r + 9.0) & (BAYER_FULL < 0.45 * (1 - (d - r - 3.0) / 6.0))
+    out[halo] = CY1
     out[(d > r - 1.0) & (d <= r)] = BG0
     return out
 

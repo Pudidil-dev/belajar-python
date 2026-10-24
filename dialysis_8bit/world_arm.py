@@ -9,7 +9,7 @@ import math
 import numpy as np
 
 from pal import *  # noqa: F401,F403
-from px import (BAYER4, H, W, Canvas, Path, dilate, disc_mask, hash01,
+from px import (BAYER4, H, W, Canvas, Path, dilate, disc_mask, glow, hash01,
                 line_mask, poly_mask, shaded_mask, smooth, clamp)
 
 
@@ -501,6 +501,9 @@ def draw_bg(cv, cam, t, par=0.35, machine_ghost=None):
         y = (hash01(23, k) * 540 - cam.cy * d * zz * 0.25 - t * (4 + 6 * hash01(24, k))) % 540 - 30
         tw = 0.5 + 0.5 * math.sin(t * (1.0 + 2.5 * hash01(25, k)) + 6.28 * hash01(26, k))
         col = CY0 if tw < 0.6 else (BG5 if tw < 0.9 else CY1)
+        if d > 0.7 and k % 3 == 0:
+            # the nearer motes glow, like Kurzgesagt's drifting fireflies
+            glow(cv, x, y, 4.5, CY0, 0.35 + 0.4 * tw)
         cv.px(x, y, col)
         if d > 0.75 and tw > 0.85:
             cv.px(x + 1, y, col)

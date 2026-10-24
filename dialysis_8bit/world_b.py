@@ -8,7 +8,7 @@ import math
 import numpy as np
 
 from pal import *  # noqa: F401,F403
-from px import BAYER4, H, W, disc_mask, poly_mask, shaded_mask, hash01
+from px import BAYER4, H, W, back_out, disc_mask, glow, poly_mask, shaded_mask, hash01
 from world_a import rr, fill, disc_w
 from world_arm import Tube, draw_bg
 
@@ -102,6 +102,9 @@ def draw_interior(cv, cam, t, hl=0.0):
         cv.a[r0:r1, a0:a1] = col
     if hl > 0:
         fx = FRONT_X[HL_FIBER]
+        for yy in np.linspace(CUT0 + 20, CUT1 - 20, 7):
+            gx, gy = cam.pt(fx, yy)
+            glow(cv, gx, gy, 16 * cam.z, CY1, 0.45 * hl)
         for dx in (-FIB_W / 2 - 2.5, FIB_W / 2 + 1.5):
             a = cam.pt(fx + dx, CUT0 + 4)
             b = cam.pt(fx + dx, CUT1 - 4)
@@ -180,6 +183,6 @@ def draw_world(cv, cam, t, hl=0.0, arrows=0.0):
     draw_bg(cv, cam, t, par=0.25)
     draw_dialyzer_b(cv, cam, t, hl)
     if arrows > 0:
-        lv = min(1.0, arrows)
-        arrow(cv, cam, 40, 150, 330, 10, R3, R0, R4, t, up=False, level=lv)
-        arrow(cv, cam, 232, 150, 330, 10, B3, B0, B4, t, up=True, level=lv)
+        g = back_out(min(1.0, arrows), 1.4)
+        arrow(cv, cam, 40, 150, 150 + 180 * g, 10, R3, R0, R4, t, up=False)
+        arrow(cv, cam, 232, 330 - 180 * g, 330, 10, B3, B0, B4, t, up=True)

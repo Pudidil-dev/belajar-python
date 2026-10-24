@@ -60,6 +60,30 @@ def seg(t, a, b):
     return clamp((t - a) / (b - a), 0.0, 1.0)
 
 
+def bezier_ease(x1, y1, x2, y2):
+    """CSS/AE cubic-bezier easing, solved with Newton steps (like MO.bezier)."""
+    def f(x):
+        x = clamp(x, 0.0, 1.0)
+        t = x
+        for _ in range(10):
+            bx = 3 * (1 - t) ** 2 * t * x1 + 3 * (1 - t) * t * t * x2 + t ** 3 - x
+            dbx = 3 * (1 - t) ** 2 * x1 + 6 * (1 - t) * t * (x2 - x1) + 3 * t * t * (1 - x2)
+            if abs(dbx) < 1e-7:
+                break
+            t = clamp(t - bx / dbx, 0.0, 1.0)
+        return 3 * (1 - t) ** 2 * t * y1 + 3 * (1 - t) * t * t * y2 + t ** 3
+    return f
+
+
+# Kurzgesagt: "other actions use 75% influence" ~ cubic-bezier(.75,0,.25,1)
+K75 = bezier_ease(0.75, 0.0, 0.25, 1.0)
+
+
+def back_out(t, s=1.4):
+    t = clamp(t, 0.0, 1.0) - 1
+    return 1 + t * t * ((s + 1) * t + s)
+
+
 class Cam:
     """World -> screen transform: screen = (p - c) * zoom + screen centre."""
 
@@ -336,6 +360,17 @@ def shaded_mask(cv, m, x0, y0, base, hi=None, sh=None, outline=None, k=1,
             sm = np.zeros_like(m)
             sm[max(0, sy):max(0, sy) + sz, max(0, sx):max(0, sx) + sz] = True
             cv.stamp(sm & m, x0, y0, spec)
+
+
+def glow(cv, x, y, r, color, level=0.6):
+    """Radial glow (TOON.glow) in pixel form: three nested dithered discs,
+    pattern anchored to the light so it does not crawl."""
+    if level <= 0 or r < 1:
+        return
+    ox, oy = int(math.floor(x)), int(math.floor(y))
+    for k, lv in ((1.0, 0.28), (0.62, 0.52), (0.34, 0.85)):
+        m, x0, y0 = disc_mask(x, y, max(0.8, r * k))
+        cv.stamp_dither(m, x0, y0, color, level * lv, ox=ox, oy=oy)
 
 
 def shaded_disc(cv, cx, cy, r, base, hi=None, sh=None, outline=None, spec=None, k=None):

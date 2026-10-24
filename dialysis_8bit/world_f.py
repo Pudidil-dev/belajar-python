@@ -16,8 +16,8 @@ import math
 import numpy as np
 
 from pal import *  # noqa: F401,F403
-from px import (BAYER4, H, W, Cam, clamp, dilate, disc_mask, ellipse_mask, hash01,
-                lerp, poly_mask, seg, shift, smooth, ease_io)
+from px import (BAYER4, H, W, K75, Cam, back_out, clamp, dilate, disc_mask, ellipse_mask,
+                glow, hash01, lerp, poly_mask, seg, shift, smooth, ease_io)
 
 FX = 135.0
 LUM = 35.0
@@ -91,7 +91,7 @@ def _ease(name, x):
         return x ** 3
     if name == "tail":
         return 1 - (1 - x) ** 3.2
-    return ease_io(x)
+    return K75(x)
 
 
 def cam_f(t):
@@ -624,6 +624,8 @@ def draw_water(cv, cam, x, y, bright=True):
 
 def pore_flash(cv, cam, j, side, k, color):
     yp = pore_y(j)
+    gx, gy = cam.pt((WR[0] + WR[1]) / 2 if side > 0 else (WL[0] + WL[1]) / 2, yp)
+    glow(cv, gx, gy, 5.5 * cam.z, U2, 0.75 * k)
     xa, xb = (WR if side > 0 else WL)
     a = cam.pt(xa, yp - pore_gap(j) / 2 - SLANT / 2 - 0.6)
     b = cam.pt(xb, yp + pore_gap(j) / 2 + SLANT / 2 + 0.6)
@@ -631,6 +633,8 @@ def pore_flash(cv, cam, j, side, k, color):
 
 
 def bump_flash(cv, cam, y, k):
+    gx, gy = cam.pt(XL1, y)
+    glow(cv, gx, gy, 7.0 * cam.z, R5, 0.6 * k)
     a = cam.pt(XL1 - 0.6, y - 6)
     b = cam.pt(XL1 + 0.8, y + 6)
     cv.rect_dither(a[0] - 1, a[1], b[0], b[1], WHITE, k)
@@ -720,10 +724,10 @@ def draw_world(cv, cam, t, *, show_urea1=1.0, show_cc=0.0, water=0.0, uf=False,
         for i, yy in enumerate((180, 270)):
             chevron(cv, cam.sx(WR[1]) + 26 + push, yy, 5, CY2, BG0, level=pressure * 0.8)
     if cc_arrows > 0:
-        lv = min(1.0, cc_arrows)
-        big_arrow(cv, cam.sx(FX), 110, 300, 12, R3, R0, R4, t, level=lv * 0.9)
+        g = back_out(min(1.0, cc_arrows), 1.4)       # grow with a Kurzgesagt overshoot
+        big_arrow(cv, cam.sx(FX), 110, 110 + 190 * g, 12, R3, R0, R4, t, level=0.9)
         for xx in (FX - 82.0, FX + 82.0):
-            big_arrow(cv, cam.sx(xx), 330, 130, 10, B3, B0, B4, t, level=lv * 0.9)
+            big_arrow(cv, cam.sx(xx), 330, 330 - 200 * g, 10, B3, B0, B4, t, level=0.9)
 
 
 def rbc_bouncer_pos(i, t):
