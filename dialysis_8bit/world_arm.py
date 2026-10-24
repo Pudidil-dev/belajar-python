@@ -246,10 +246,12 @@ def draw_arm(cv, cam, G, shadow=True, hand=True):
     vein_edge = inside & (dv > 0.74 * hv)
 
     # skin texture: rare 1px pores, anchored to the arm
-    if 0.8 <= z < 1.6:
+    if z >= 0.8:
+        # 1px pores anchored to the arm at screen scale (no 'sand' at close range)
         q = vhash(np.floor(u * z / 1.5), np.floor(v * z / 1.5), 7)
-        band = np.where((q < 0.010) & (band == 2), 3, band)
-        band = np.where((q > 0.995) & (band == 2), 1, band)
+        dens = 0.010 if z < 1.6 else 0.006
+        band = np.where((q < dens) & (band == 2), 3, band)
+        band = np.where((q > 1 - dens * 0.5) & (band == 2), 1, band)
 
     img = np.array(SKIN_RAMP, dtype=np.uint8)[np.clip(band, 0, len(SKIN_RAMP) - 1)]
     img[vein_edge & (band <= 3)] = VEIN
@@ -304,6 +306,8 @@ def draw_needle(cv, cam, G, un, kind, t=0.0):
     tp = rect_local(un - 9, vn - 17, un - 1, vn + 17, 0.06)
     m, x0, y0 = poly_mask(P(tp))
     if m is not None:
+        shd = max(1, int(round(z)))
+        cv.stamp_dither(m, x0 + shd, y0 + shd, S1, 0.55)
         shaded_mask(cv, m, x0, y0, T2, hi=T2, sh=T1, outline=T0, k=max(1, int(round(z))))
         if z >= 0.9:
             _tape_dots(cv, cam, G, un - 9, vn - 17, un - 1, vn + 17)
@@ -313,6 +317,9 @@ def draw_tape(cv, cam, G, uc, vc, wu, wv, ang=0.0):
     z = cam.z * G.s
     m, x0, y0 = poly_mask(screen_poly(cam, G, rect_local(uc - wu / 2, vc - wv / 2, uc + wu / 2, vc + wv / 2, ang)))
     if m is not None:
+        # soft contact shadow on the skin, then the tape with a lifted top-left edge
+        sh = max(1, int(round(z)))
+        cv.stamp_dither(m, x0 + sh, y0 + sh, S1, 0.55)
         shaded_mask(cv, m, x0, y0, T2, hi=T2, sh=T1, outline=T0, k=max(1, int(round(z))))
         if z >= 0.9:
             _tape_dots(cv, cam, G, uc - wu / 2, vc - wv / 2, uc + wu / 2, vc + wv / 2)

@@ -405,7 +405,21 @@ def draw_backdrop(cv, cam, t):
     far = (rel < 0.34)
     th = BAYER4[(ys % 4)[:, None], (xs % 4)[None, :]]
     a[np.broadcast_to(far[None, :], (H, W)) & (th < 0.75)] = DL2
-    # dialysate flow streaks rising (two depths)
+    # dialysate streamlines beside the hero fiber: dashed lanes marching upward
+    if cam.z >= 1.2:
+        for side in (-1, 1):
+            for i, off_ in enumerate((14.0, 30.0, 50.0, 74.0)):
+                lx = FX + side * (LUM + WALL + off_)
+                sx = cam.sx(lx)
+                if not (0 <= sx < W):
+                    continue
+                ph = (np.arange(H) / cam.z + cam.cy - H / 2 / cam.z + V_D * t + 17.0 * i) / 34.0
+                fr = ph - np.floor(ph)
+                dash = fr < 0.30
+                head = fr < 0.035
+                col = int(sx)
+                a[dash, col] = DL3
+                a[head, col] = B2
     for k in range(110):
         depth = 0.6 if k % 2 else 1.0
         wx = hash01(905, k) * 900 - 300

@@ -53,8 +53,8 @@ def build_tubes():
     ven_top = Tube([(DZ_CX, -52 + MY), (DZ_CX, -26 + MY), (DZ_CX, 2 + MY)], 8.0, "blood", speed=62.0,
                    specks=0.0, seed=7)
     hub = list(reversed(_local_ext(UN_V)))
-    ven_pts = [(DZ_CX, 96 + MY), (DZ_CX, 134 + MY), (146, 46), (96, 66), (36, 104), (-10, 170),
-               (-14, 240), (2, 292)] + hub
+    ven_pts = [(DZ_CX, 96 + MY), (DZ_CX, 134 + MY), (150, 48), (112, 78), (86, 124), (76, 182),
+               (74, 240), (64, 292), (46, 324)] + hub
     ven = Tube(ven_pts, 8.0, "blood", speed=62.0, specks=0.0, seed=5)
     # dialysate hoses: in at the bottom port, out at the top port
     d_in = Tube([(224, 60 + MY), (236, -10 + MY), (232, -80 + MY), (214, -108 + MY)], 9.0, "dialysate",

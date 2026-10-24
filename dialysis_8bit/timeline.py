@@ -54,8 +54,8 @@ A2_KEYS = [
     (43.40, 160.0, -360.0, 5.0, None),
     (44.20, 160.0, -150.0, 2.0, "out"),     # out of the dialyzer at the outlet
     (45.00, 160.0, -40.0, 2.0, "io"),       # drip chamber
-    (45.80, 30.0, 110.0, 2.0, "io"),        # follow the return line
-    (46.50, 30.0, 300.0, 2.3, "io"),        # venous needle
+    (45.80, 92.0, 150.0, 2.0, "io"),        # follow the return line
+    (46.50, 40.0, 300.0, 2.3, "io"),        # venous needle
 ]
 TITLE_CAM = (70.0, 252.0, 1.15)
 
@@ -121,7 +121,7 @@ def near(ax, ay, dx, dy, label, font=F.BOLD):
     """Place a callout's text relative to its anchor, kept inside the safe area."""
     w = font.width(label)
     lx = clamp(ax + dx - (w if dx < 0 else 0), 10, W - 12 - w)
-    ly = clamp(ay + dy, 44, 392)
+    ly = clamp(ay + dy, 44, 380)
     return lx, ly
 
 
@@ -182,7 +182,7 @@ def frame(t):
 def _shot_a_open(cv, t):
     cam = cam_a1(t)
     dz = seg(t, 4.95, 5.25) if t < 5.55 else 1.0
-    world_a(cv, t, cam, dialyzer_glow=dz if t > 4.95 else 0.0)
+    world_a(cv, t, cam, dialyzer_glow=dz if t > 4.95 else 0.0, ven_dim=t < 2.6)
     T = A.TUBES
     if t < 2.9:
         tube_chevrons(cv, cam, T["art"], 30, 150, t, R5)
@@ -317,7 +317,7 @@ def _montage(cv, t):
     i = min(3, int((t - 49.5) / 0.5))
     lt = t - 49.5 - i * 0.5
     if i == 0:
-        world_a(cv, t - 49.5 + 1.0, Cam(*OPEN_CAM))
+        world_a(cv, t - 49.5 + 1.0, Cam(*OPEN_CAM), ven_dim=True)
     elif i == 1:
         world_a(cv, t, Cam(300.0, -306.0, 1.25))
     elif i == 2:
@@ -366,7 +366,7 @@ def _final(cv, t):
     # drawn exactly like frame 0 so the clip loops without a seam
     tau = t - DUR
     cam = _snap(Cam(*OPEN_CAM))
-    world_a(cv, tau, cam)
+    world_a(cv, tau, cam, ven_dim=True)
     tube_chevrons(cv, cam, A.TUBES["art"], 30, 150, tau, R5)
 
 
@@ -410,6 +410,10 @@ def events():
     ev.append((46.8, "complete", None))
     for i in range(4):
         ev.append((49.5 + 0.5 * i, "cut", i))
+    # the montage's diffusion cut replays scene time 16.75..17.25: echo its crossings
+    for k, c in enumerate(WF.CROSSERS):
+        if 16.75 <= c["tc"] < 17.25:
+            ev.append((51.0 + c["tc"] - 16.75, "urea_cross", k))
     ev.append((51.4, "riser_end", None))
     ev.append((51.5, "title", None))
     ev.append((51.92, "pop", "HEMODIALYSIS"))
