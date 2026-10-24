@@ -236,12 +236,12 @@ def draw_arm(cv, cam, G, shadow=True, hand=True):
 
     # fistula vein: raised bulge catches light on top, shadow + mauve underneath
     taper = np.clip(np.minimum(u - VEIN_U0, VEIN_U1 - u) / 60.0, 0.0, 1.0)
-    hv = 6.5 * taper
+    hv = 8.5 * taper
     dv = v - vein_v(u)
     inside = (np.abs(dv) < hv) & (taper > 0)
     up = inside & (dv < -0.2 * hv + checker * 0.6 / max(z, 0.2))
     low = inside & (dv > 0.30 * hv + checker * 0.6 / max(z, 0.2))
-    band = np.where(up & (band == 2), 1, band)
+    band = np.where(up & (band >= 1) & (band <= 2), band - 1, band)
     band = np.where(low & (band <= 2), 3, band)
     vein_edge = inside & (dv > 0.74 * hv)
 
@@ -268,7 +268,7 @@ def draw_needle(cv, cam, G, un, kind, t=0.0):
     The needle points toward the elbow (-u); its tube leaves toward +u."""
     vn = float(vein_v(un))
     z = cam.z * G.s
-    wing = (CR0, CR1, CR2) if kind == "A" else (CV0, CV1, CV2)
+    wing = (CR0, CR1, CR2) if kind == "A" else (VN0, VN1, VN2)
 
     def P(pts):
         return screen_poly(cam, G, pts)
@@ -288,7 +288,7 @@ def draw_needle(cv, cam, G, un, kind, t=0.0):
               (un + 9, vn + sgn * 18), (un + 1, vn + sgn * 17), (un - 1, vn + sgn * 12)]
         m, x0, y0 = poly_mask(P(wp))
         if m is not None:
-            shaded_mask(cv, m, x0, y0, wing[1], hi=wing[2], sh=wing[0], outline=R0 if kind == "A" else CV0,
+            shaded_mask(cv, m, x0, y0, wing[1], hi=wing[2], sh=wing[0], outline=R0,
                         k=max(1, int(round(z))))
             if z >= 0.9:
                 for k_ in (5.5, 9.5):
@@ -341,7 +341,7 @@ def draw_clamp(cv, cam, path, s, kind, wpx):
     tx, ty = path.tangent(s)
     nx, ny = -ty, tx
     z = cam.z
-    col = (CR0, CR1, CR2) if kind == "A" else (CV0, CV1, CV2)
+    col = (CR0, CR1, CR2) if kind == "A" else (M1, M3, M4)
     L = wpx * 1.6
     Wd = 3.2
     pts = []
@@ -349,7 +349,7 @@ def draw_clamp(cv, cam, path, s, kind, wpx):
         pts.append(cam.pt(x + tx * a + nx * b, y + ty * a + ny * b))
     m, x0, y0 = poly_mask(pts)
     if m is not None:
-        shaded_mask(cv, m, x0, y0, col[1], hi=col[2], sh=col[0], outline=R0 if kind == "A" else CV0,
+        shaded_mask(cv, m, x0, y0, col[1], hi=col[2], sh=col[0], outline=R0 if kind == "A" else M0,
                     k=max(1, int(round(z))))
 
 

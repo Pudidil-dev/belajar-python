@@ -108,3 +108,16 @@ CV2 = hx("#7ab0ff")
 # Status LED green
 G1 = hx("#2fd67a")
 G2 = hx("#b6ffd0")
+
+# Dialysate fill inside the dialyzer: a distinct cool blue so it reads as a
+# moving fluid, not as empty background (review v2 #5)
+DS0 = hx("#0b2c44")
+DS1 = hx("#0f3a55")
+DS2 = hx("#134a6a")
+DS3 = hx("#1b5d84")
+
+# Venous (return) side: maroon instead of blue, so blue means dialysate only
+# (review v2 #6)
+VN0 = hx("#3b0a18")
+VN1 = hx("#6e1a2c")
+VN2 = hx("#9a3346")

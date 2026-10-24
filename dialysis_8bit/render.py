@@ -15,26 +15,34 @@ import numpy as np
 from PIL import Image
 
 import timeline as TL
+from hud import composite, upscale
 from px import H, W
 
 SCALE = 4
 
 
+def full_frame(t):
+    """Art at 270x480 scaled x4, then the HUD text layer at full resolution."""
+    cv = TL.frame(t)
+    full = upscale(cv.a)
+    composite(full, cv.hud.ops)
+    return full
+
+
 def render_rgb(i):
-    t = i / TL.FPS
-    return TL.frame(t).a.tobytes()
+    return full_frame(i / TL.FPS).tobytes()
 
 
 def stills(times, out, scale=2):
     os.makedirs(out, exist_ok=True)
     for t in times:
-        a = TL.frame(t).a
+        a = full_frame(t)
         Image.fromarray(a, "RGB").resize((W * scale, H * scale), Image.NEAREST).save(
             os.path.join(out, f"t{t:05.2f}.png"))
 
 
 def sheet(out, times, cols=9, scale=1):
-    tiles = [TL.frame(t).a for t in times]
+    tiles = [np.asarray(Image.fromarray(full_frame(t), "RGB").resize((W, H), Image.BOX)) for t in times]
     rows = (len(tiles) + cols - 1) // cols
     pad = 4
     S = np.zeros((rows * (H + pad), cols * (W + pad), 3), np.uint8)
@@ -47,11 +55,10 @@ def sheet(out, times, cols=9, scale=1):
 def video(out, audio=None, t0=0.0, t1=TL.DUR, workers=4):
     n0, n1 = int(round(t0 * TL.FPS)), int(round(t1 * TL.FPS))
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-           "-s", f"{W}x{H}", "-r", str(TL.FPS), "-i", "-"]
+           "-s", f"{W * SCALE}x{H * SCALE}", "-r", str(TL.FPS), "-i", "-"]
     if audio:
         cmd += ["-ss", f"{t0:.4f}", "-t", f"{(t1 - t0):.4f}", "-i", audio]
-    cmd += ["-vf", f"scale={W * SCALE}:{H * SCALE}:flags=neighbor:out_color_matrix=bt709:out_range=tv,"
-                   "format=yuv420p",
+    cmd += ["-vf", "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
             "-c:v", "libx264", "-preset", "slow", "-crf", "15", "-tune", "animation",
             "-profile:v", "high", "-level", "4.2", "-g", "120",
             "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]

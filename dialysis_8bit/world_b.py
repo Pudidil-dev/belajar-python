@@ -16,8 +16,8 @@ HX0, HX1 = 70.0, 200.0        # housing outer x
 HY0, HY1 = 46.0, 434.0        # housing outer y (between caps)
 CUT0, CUT1 = 96.0, 384.0      # cutaway window (fibers visible)
 POT0, POT1 = (78.0, 96.0), (384.0, 402.0)  # potting bands
-FRONT_X = [84 + 10 * i for i in range(11)]  # front fiber centres
-FIB_W = 6.0
+FRONT_X = [80 + 6 * i for i in range(19)]   # front fiber centres (denser bundle)
+FIB_W = 4.2
 V_BLOOD = 60.0
 V_DIAL = 44.0
 
@@ -26,7 +26,7 @@ OUT_TUBE = Tube([(135, 456), (135, 500), (135, 560)], 8.0, "blood", speed=62.0, 
 D_OUT = Tube([(204, 104), (230, 96), (262, 70), (290, 40)], 9.0, "dialysate", speed=46.0, seed=23)
 D_IN = Tube([(300, 420), (262, 398), (230, 380), (204, 376)], 9.0, "dialysate", speed=46.0, seed=24)
 
-HL_FIBER = 5  # index of the fiber we dive into (x = 134)
+HL_FIBER = 9  # index of the fiber we dive into (x = 134)
 
 
 def fiber_x(i):
@@ -43,7 +43,7 @@ def _rows(cam, y0, y1):
     return max(0, a), min(H, b)
 
 
-def draw_interior(cv, cam, t, hl=0.0):
+def draw_interior(cv, cam, t, hl=0.0, streak=1.0):
     """Cutaway window: dialysate space, back fibers, front fibers."""
     c0, c1 = _cols(cam, HX0 + 6, HX1 - 6)
     r0, r1 = _rows(cam, CUT0, CUT1)
@@ -57,14 +57,14 @@ def draw_interior(cv, cam, t, hl=0.0):
     img = np.empty((r1 - r0, c1 - c0, 3), np.uint8)
     # dialysate space, darker toward the shell (depth)
     edge = np.abs((wx - 135.0) / 62.0)
-    img[:] = DL3
+    img[:] = DS2
     th = BAYER4[(np.arange(r0, r1) % 4)[:, None], (np.arange(c0, c1) % 4)[None, :]]
-    img[np.broadcast_to(edge > 0.70, img.shape[:2]) & (th < 0.5)] = DL2
-    img[np.broadcast_to(edge > 0.86, img.shape[:2])] = DL1
+    img[np.broadcast_to(edge > 0.70, img.shape[:2]) & (th < 0.5)] = DS1
+    img[np.broadcast_to(edge > 0.86, img.shape[:2])] = DS0
     # back layer: thin fibers behind (2 per front gap), dim
-    bx = (wx - 81.5) / 5.0
+    bx = (wx - 80.0) / 3.0
     bl = bx - np.floor(bx)
-    back = np.broadcast_to((bl < 0.30), img.shape[:2])
+    back = np.broadcast_to((bl < 0.30) & ((np.floor(bx) % 2) == 1), img.shape[:2])
     ph = (wy - V_BLOOD * 0.8 * t - 23.0 * (np.floor(bx) % 5)) / 30.0
     fr = ph - np.floor(ph)
     img[back] = PL2
@@ -74,9 +74,10 @@ def draw_interior(cv, cam, t, hl=0.0):
     q = (wy + V_DIAL * t + 97.0 * (sx % 13)) / 18.0
     sq = q - np.floor(q)
     lanes = np.broadcast_to((sx % 2) == 0, img.shape[:2])
-    streak = (sq < 0.16) & ~back & lanes
-    img[streak] = B3
-    img[(sq < 0.05) & ~back & lanes] = B4
+    lv = th < streak            # streaks fade in after the push-through (no strobing)
+    streak_m = (sq < 0.16) & ~back & lanes & lv
+    img[streak_m] = B3
+    img[(sq < 0.05) & ~back & lanes & lv] = B4
     cv.a[r0:r1, c0:c1] = img
     # front fibers: pale walls, red lumen with flowing packets
     for i, fx in enumerate(FRONT_X):
@@ -119,7 +120,7 @@ def draw_potting(cv, cam, y0, y1, t):
             disc_w(cv, cam, fx, yy, 1.6, R2)
 
 
-def draw_dialyzer_b(cv, cam, t, hl=0.0):
+def draw_dialyzer_b(cv, cam, t, hl=0.0, streak=1.0):
     # blood in (top) / out (bottom) and dialysate hoses
     IN_TUBE.draw(cv, cam, t)
     OUT_TUBE.draw(cv, cam, t)
@@ -127,7 +128,7 @@ def draw_dialyzer_b(cv, cam, t, hl=0.0):
     D_IN.draw(cv, cam, t)
     # back shell (seen through the cut)
     fill(cv, cam, rr(HX0, HY0, HX1, HY1, 22), M1, M2, M0, M0, k=3)
-    draw_interior(cv, cam, t, hl)
+    draw_interior(cv, cam, t, hl, streak)
     draw_potting(cv, cam, *POT0, t)
     draw_potting(cv, cam, *POT1, t)
     # remaining front shell above / below the window + cut rims
@@ -143,8 +144,8 @@ def draw_dialyzer_b(cv, cam, t, hl=0.0):
     # caps + ports
     fill(cv, cam, rr(HX0 - 6, 28, HX1 + 6, 72, 12), CR1, CR2, CR0, R0, k=5)
     fill(cv, cam, rr(124, 10, 146, 32, 5), CR1, CR2, CR0, R0, k=3)
-    fill(cv, cam, rr(HX0 - 6, 408, HX1 + 6, 452, 12), CV1, CV2, CV0, CV0, k=5)
-    fill(cv, cam, rr(124, 448, 146, 470, 5), CV1, CV2, CV0, CV0, k=3)
+    fill(cv, cam, rr(HX0 - 6, 408, HX1 + 6, 452, 12), VN1, VN2, VN0, R0, k=5)
+    fill(cv, cam, rr(124, 448, 146, 470, 5), VN1, VN2, VN0, R0, k=3)
     for py in (104, 376):
         fill(cv, cam, rr(196, py - 11, 214, py + 11, 4), M3, M4, M2, M1, k=2)
         fill(cv, cam, rr(208, py - 13, 216, py + 13, 2), B3, B4, B2, B0, k=2)
@@ -179,9 +180,38 @@ def arrow(cv, cam, x, y0, y1, w, color, dark, light, t, up=False, level=1.0):
     cv.stamp(chev, x0, y0, light)
 
 
-def draw_world(cv, cam, t, hl=0.0, arrows=0.0):
+def inset(cv, cam, k, t):
+    """End-on cross-section of the bundle: hundreds of fibers packed in the
+    potting (shows 'thousands' better than a side view can)."""
+    if k <= 0:
+        return
+    cx, cy = 214.0, 172.0
+    r = 31.0 * back_out(min(1.0, k), 1.3)
+    # leader to the top potting band
+    ax, ay = cam.pt(HX1 - 12, (POT0[0] + POT0[1]) / 2)
+    cv.line(ax, ay + 1, cx - r * 0.7, cy - r * 0.7 + 1, BG0)
+    cv.line(ax, ay, cx - r * 0.7, cy - r * 0.7, WHITE)
+    m, x0, y0 = disc_mask(cx, cy, r + 3)
+    cv.stamp(m, x0, y0, CY2)
+    m, x0, y0 = disc_mask(cx, cy, r + 1.5)
+    cv.stamp(m, x0, y0, M1)
+    m, x0, y0 = disc_mask(cx, cy, r)
+    cv.stamp(m, x0, y0, T2)
+    hh, ww = m.shape
+    ys, xs = np.mgrid[0:hh, 0:ww]
+    gx = xs + x0
+    gy = ys + y0
+    row = (gy // 3)
+    dots = ((gx + (row % 2) * 1.5) % 3 < 1) & (gy % 3 == 0) & m
+    cv.stamp(dots, x0, y0, R2)
+    sh = m & ~np.roll(np.roll(m, -2, 0), -2, 1)
+    cv.stamp_dither(sh, x0, y0, T1, 0.6)
+
+
+def draw_world(cv, cam, t, hl=0.0, arrows=0.0, streak=1.0, inset_k=0.0):
     draw_bg(cv, cam, t, par=0.25)
-    draw_dialyzer_b(cv, cam, t, hl)
+    draw_dialyzer_b(cv, cam, t, hl, streak)
+    inset(cv, cam, inset_k, t)
     if arrows > 0:
         g = back_out(min(1.0, arrows), 1.4)
         arrow(cv, cam, 40, 150, 150 + 180 * g, 10, R3, R0, R4, t, up=False)

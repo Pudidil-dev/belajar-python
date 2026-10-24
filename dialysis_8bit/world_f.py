@@ -65,21 +65,21 @@ def _k(t, a, b, ease):
 CAM_KEYS = [
     # (t, cx, cy, zoom, ease into this key)
     (9.90, 135.0, 240.0, 0.60, None),
-    (10.70, 135.0, 240.0, 1.45, "out"),
-    (13.60, 135.0, 240.0, 1.45, "io"),
-    (15.20, 173.5, 240.0, 2.60, "io"),
+    (10.70, 135.0, 240.0, 1.45, "out"),     # lens reveal settles on the fiber
+    (14.30, 135.0, 240.0, 1.45, "io"),      # hold: meet the cast, the membrane
+    (15.60, 173.5, 240.0, 2.60, "io"),      # slow push onto the wall
     (19.60, 173.5, 240.0, 2.60, "io"),
-    (23.80, 173.5, 172.0, 2.60, "io"),
+    (23.80, 173.5, 172.0, 2.60, "io"),      # glide up with the swept-away urea
     (24.10, 173.5, 172.0, 2.60, "io"),
-    (25.00, 168.0, 178.0, 3.20, "io"),
+    (25.00, 168.0, 178.0, 3.20, "io"),      # push to the red cell
     (27.00, 168.0, 178.0, 3.20, "io"),
-    (27.80, 173.5, 172.0, 2.60, "io"),
+    (27.80, 173.5, 172.0, 2.60, "io"),      # back out for the proteins
     (30.00, 173.5, 172.0, 2.60, "io"),
-    (31.00, 160.0, 172.0, 2.00, "io"),
-    (37.00, 160.0, 172.0, 2.00, "io"),
-    (38.60, 135.0, 210.0, 0.95, "tail"),
-    (42.50, 135.0, 210.0, 0.95, "io"),
-    (43.50, 135.0, 210.0, 0.18, "in"),
+    (31.00, 158.0, 172.0, 2.60, "io"),      # lateral glide toward the blood side (pressure)
+    (37.00, 158.0, 172.0, 2.60, "io"),
+    (38.60, 135.0, 150.0, 0.95, "tail"),    # pull out to the fiber segment
+    (42.40, 135.0, 290.0, 0.95, "io"),      # slow tilt down the fiber (gradient)
+    (43.50, 135.0, 290.0, 0.18, "in"),      # fast pull-out back to the dialyzer
 ]
 
 
@@ -112,8 +112,7 @@ def cam_f(t):
 # ---------------------------------------------------------- event schedule
 UREA_TIMES = ([16.25, 17.0, 17.5, 17.75, 18.0, 18.5, 18.75, 19.0, 19.25] +
               [19.5, 19.75, 20.0, 20.5, 20.75, 21.0, 21.25, 21.5, 22.0, 22.25, 22.5, 22.75, 23.0, 23.5, 23.75] +
-              [24.25, 25.5, 26.25, 27.25, 27.75, 28.5, 29.0, 29.5] +
-              [30.5, 31.5, 32.5, 33.5, 34.5, 35.5, 36.25])
+              [24.25, 25.5, 26.25, 27.25, 27.75, 28.5, 29.0, 29.5])
 RBC_BOUNCES = [(25.10, 180.0), (26.35, 150.0)]
 ALB_BOUNCES = [(27.55, 182.0), (28.30, 150.0), (29.10, 198.0)]
 
@@ -252,7 +251,7 @@ class Urea1:
 
 def crosser_pos(c, t):
     tc, yp = c["tc"], c["yp"]
-    ta = tc - 0.10
+    ta = tc - 0.15
     if t < tc - 6.0 or t > tc + 6.0:
         return None
     if t <= ta:
@@ -261,10 +260,10 @@ def crosser_pos(c, t):
         x = lerp(c["x0"], XL1 - R_UREA - 0.2, k) + wob
         y = yp + V_B * (t - ta) + (1 - k) * 1.2 * math.sin(1.7 * t + c["ph"])
         return (x, y)
-    if t <= tc + 0.10:
-        k = (t - ta) / 0.20
+    if t <= tc + 0.15:
+        k = (t - ta) / 0.30
         return (lerp(XL1 - R_UREA, WR[1] + R_UREA, k), yp + SLANT * (k - 0.5))
-    dt = t - (tc + 0.10)
+    dt = t - (tc + 0.15)
     x = WR[1] + R_UREA + 12.0 * (1 - math.exp(-dt / 0.5)) + min(1.0, dt) * 1.6 * math.sin(1.1 * t + c["ph"])
     return (x, yp + SLANT * 0.5 - V_D * dt)
 
@@ -315,6 +314,17 @@ class UreaCC:
         return pts
 
 
+def cc_hops(t, window=0.22):
+    """Counter-current view: urea crossing a wall right now (for glow hops)."""
+    out = []
+    for q in UREACC.p:
+        tc = q["te"] + (q["yc"] + 160.0) / V_B
+        if abs(t - tc) < window and q["yc"] < 640:
+            xw = (WR[0] + WR[1]) / 2 if q["side"] > 0 else (WL[0] + WL[1]) / 2
+            out.append((xw, q["yc"], 1.0 - abs(t - tc) / window))
+    return out
+
+
 class Water:
     """Background water (shown when the story turns to water) + UF streams."""
 
@@ -353,13 +363,13 @@ class Water:
             yp = pore_y(j)
             ph = STEP * hash01(811, j)
             ramp0 = t_start + 0.8 * hash01(812, j)
-            n0 = int(math.floor((t - 1.5 - ramp0 - ph) / STEP))
-            for n in range(max(0, n0), n0 + 26):
+            n0 = int(math.floor((t - 2.6 - ramp0 - ph) / STEP))
+            for n in range(max(0, n0), n0 + 36):
                 tc = ramp0 + ph + n * STEP
                 if tc > t_end:
                     break
                 d = t - tc
-                if d < -1.1 or d > 1.5:
+                if d < -1.1 or d > 2.6:
                     continue
                 if d <= -0.08:
                     x = XL1 - R_WATER + U_IN * (d + 0.08)
@@ -393,7 +403,7 @@ def _xrange(cam, x0, x1):
 def draw_backdrop(cv, cam, t):
     """Dialysate space, neighbour fibers (depth), lumen ground with plasma specks."""
     a = cv.a
-    a[:] = DL1
+    a[:] = DS1
     ys = np.arange(H)
     # far bundle layer (parallax): dim vertical fibers drifting slower
     par = 0.55
@@ -404,7 +414,7 @@ def draw_backdrop(cv, cam, t):
     rel = ((xs - off) % spacing) / spacing
     far = (rel < 0.34)
     th = BAYER4[(ys % 4)[:, None], (xs % 4)[None, :]]
-    a[np.broadcast_to(far[None, :], (H, W)) & (th < 0.75)] = DL2
+    a[np.broadcast_to(far[None, :], (H, W)) & (th < 0.75)] = DS0
     # dialysate streamlines beside the hero fiber: dashed lanes marching upward
     if cam.z >= 1.2:
         for side in (-1, 1):
@@ -418,8 +428,8 @@ def draw_backdrop(cv, cam, t):
                 dash = fr < 0.30
                 head = fr < 0.035
                 col = int(sx)
-                a[dash, col] = DL3
-                a[head, col] = B2
+                a[dash, col] = DS3
+                a[head, col] = B3
     for k in range(110):
         depth = 0.6 if k % 2 else 1.0
         wx = hash01(905, k) * 900 - 300
@@ -429,7 +439,7 @@ def draw_backdrop(cv, cam, t):
         sx, sy = cam.pt(wx, wy)
         ln = (5 + 9 * hash01(907, k)) * cam.z
         if -ln < sy < H and 0 <= sx < W:
-            cv.rect(sx, sy, sx + 1, sy + ln, DL3 if depth < 1 else B1)
+            cv.rect(sx, sy, sx + 1, sy + ln, DS2 if depth < 1 else DS3)
             if depth >= 1:
                 cv.px(sx, sy, B2)
     # dialysate texture rising
@@ -438,7 +448,7 @@ def draw_backdrop(cv, cam, t):
         wy = float(wrapy(hash01(902, k) * PY - V_D * t))
         sx, sy = cam.pt(wx, wy)
         if 0 <= sx < W and 0 <= sy < H and not (XL0 - 8 < wx < XL1 + 8):
-            cv.px(sx, sy, B1 if k % 3 else DL3)
+            cv.px(sx, sy, B2 if k % 3 else DS3)
     # neighbour fibers (same plane), dimmer than the hero fiber; when the
     # camera pulls far out they read as the whole bundle again
     span = 1 if cam.z > 0.6 else 6
@@ -509,7 +519,7 @@ def _wall(cv, cam, wa, wb, inner_left, dim):
         img[rim_lo & ~pm] = M1
         # inner half of each channel picks up the dialysate tint
         outer = (wx > (wa + wb) / 2) if inner_left else (wx < (wa + wb) / 2)
-        img[pm & np.broadcast_to(outer, img.shape[:2])] = DL3
+        img[pm & np.broadcast_to(outer, img.shape[:2])] = DS2
     # edges: the lumen-side face catches light, the outer face is shaded
     if c1 - c0 >= 3:
         if inner_left:
@@ -623,13 +633,14 @@ def draw_water(cv, cam, x, y, bright=True):
 
 
 def pore_flash(cv, cam, j, side, k, color):
+    """Compact glow on the pore channel while urea passes (no oversized block)."""
     yp = pore_y(j)
-    gx, gy = cam.pt((WR[0] + WR[1]) / 2 if side > 0 else (WL[0] + WL[1]) / 2, yp)
-    glow(cv, gx, gy, 5.5 * cam.z, U2, 0.75 * k)
     xa, xb = (WR if side > 0 else WL)
-    a = cam.pt(xa, yp - pore_gap(j) / 2 - SLANT / 2 - 0.6)
-    b = cam.pt(xb, yp + pore_gap(j) / 2 + SLANT / 2 + 0.6)
-    cv.rect_dither(a[0] - 1, a[1], b[0] + 1, b[1], color, k)
+    gx, gy = cam.pt((xa + xb) / 2, yp)
+    glow(cv, gx, gy, 3.2 * cam.z, U2, 0.8 * k)
+    a = cam.pt(xa, yp - pore_gap(j) / 2 - SLANT / 2)
+    b = cam.pt(xb, yp + pore_gap(j) / 2 + SLANT / 2)
+    cv.rect_dither(a[0], a[1], b[0], b[1], U1, 0.45 * k)
 
 
 def bump_flash(cv, cam, y, k):
@@ -675,12 +686,28 @@ def big_arrow(cv, x, y0, y1, w, color, dark, light, t, level=1.0):
 def draw_world(cv, cam, t, *, show_urea1=1.0, show_cc=0.0, water=0.0, uf=False,
                pressure=0.0, cc_arrows=0.0, hl_urea=None, hl_rbc=None, hl_alb=None):
     draw_backdrop(cv, cam, t)
-    # albumin + red cells (behind the small molecules)
-    for (x, y, ang, isb) in ALB_SET.state(t):
-        draw_albumin(cv, cam, x, y, ang, hl=(hl_alb is not None and isb and abs(y - hl_alb) < 1.0))
-    for (x, y, phi, th, sq, ident) in RBC_SET.state(t):
-        draw_rbc(cv, cam, x, y, phi, th, sq, hl=(hl_rbc is not None and ident == ("b", hl_rbc)))
-    # water background (revealed for the ultrafiltration story)
+    # membrane feedback first, so molecules stay visible inside the pore
+    for c in CROSSERS:
+        d = t - c["tc"]
+        if -0.16 < d < 0.30:
+            pore_flash(cv, cam, c["j"], 1, 1.0 - max(0.0, d) / 0.30, U3)
+    for tb, yb in RBC_BOUNCES + ALB_BOUNCES:
+        d = t - tb
+        if -0.02 < d < 0.28:
+            bump_flash(cv, cam, yb, 0.85 * (1.0 - max(0.0, d) / 0.28))
+    if show_cc > 0.5:
+        for (xw, yc, k) in cc_hops(t):
+            gx, gy = cam.pt(xw, yc)
+            glow(cv, gx, gy, 6.0, U2, 0.7 * k)
+    # when the camera is far out, the neighbour fibers carry the same traffic
+    offs = [0.0] if cam.z > 0.6 else [160.0 * k for k in range(-6, 7)]
+    for ox in offs:
+        hero = ox == 0.0
+        for (x, y, ang, isb) in ALB_SET.state(t):
+            draw_albumin(cv, cam, x + ox, y, ang, hl=(hero and hl_alb is not None and isb and abs(y - hl_alb) < 1.0))
+        for (x, y, phi, th, sq, ident) in RBC_SET.state(t):
+            draw_rbc(cv, cam, x + ox, y, phi, th, sq, hl=(hero and hl_rbc is not None and ident == ("b", hl_rbc)))
+    # water: background only when asked; the UF story uses the pushed chains
     if water > 0:
         wx, wy = WATER.background(t)
         n = len(wx)
@@ -693,25 +720,17 @@ def draw_world(cv, cam, t, *, show_urea1=1.0, show_cc=0.0, water=0.0, uf=False,
     # urea
     if show_urea1 > 0:
         pts = UREA1.state(t)
-        n = len(pts)
         for i, (x, y) in enumerate(pts):
             if show_urea1 < 1 and hash01(990, i) > show_urea1:
                 continue
             draw_urea(cv, cam, x, y)
     if show_cc > 0:
-        for i, (x, y) in enumerate(UREACC.state(t)):
-            if show_cc < 1 and hash01(991, i) > show_cc:
-                continue
-            draw_urea(cv, cam, x, y)
-    # membrane feedback: pore flashes on crossings, soft flashes on bounces
-    for c in CROSSERS:
-        d = t - c["tc"]
-        if -0.05 < d < 0.30:
-            pore_flash(cv, cam, c["j"], 1, 1.0 - max(0.0, d) / 0.30, U3)
-    for tb, yb in RBC_BOUNCES + ALB_BOUNCES:
-        d = t - tb
-        if -0.02 < d < 0.28:
-            bump_flash(cv, cam, yb, 0.85 * (1.0 - max(0.0, d) / 0.28))
+        pts = UREACC.state(t)
+        for ox in offs:
+            for i, (x, y) in enumerate(pts):
+                if show_cc < 1 and hash01(991, i) > show_cc:
+                    continue
+                draw_urea(cv, cam, x + ox, y)
     # pressure arrows (ultrafiltration)
     if pressure > 0:
         wx_ = cam.sx(XL1)

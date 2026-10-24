@@ -230,8 +230,8 @@ def draw_dialyzer(cv, cam, t, glow=0.0):
     # caps: arterial (red, top) and venous (blue, bottom)
     fill(cv, cam, rr(124, -444, 196, -404, 10), CR1, CR2, CR0, R0, k=4)
     fill(cv, cam, rr(151, -462, 169, -440, 4), CR1, CR2, CR0, R0, k=2)
-    fill(cv, cam, rr(124, -100, 196, -60, 10), CV1, CV2, CV0, CV0, k=4)
-    fill(cv, cam, rr(151, -64, 169, -44, 4), CV1, CV2, CV0, CV0, k=2)
+    fill(cv, cam, rr(124, -100, 196, -60, 10), VN1, VN2, VN0, R0, k=4)
+    fill(cv, cam, rr(151, -64, 169, -44, 4), VN1, VN2, VN0, R0, k=2)
     # dialysate side ports (Hansen connectors)
     for py in (-390, -110):
         fill(cv, cam, rr(186, py - 10, 216, py + 10, 4), M3, M4, M2, M1, k=3)
