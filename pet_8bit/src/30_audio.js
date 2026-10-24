@@ -33,7 +33,7 @@ function musicEvents() {
   for (let b = 1; b <= NBARS; b++) {
     const t0 = (b - 1) * BAR, ch = BARS[b - 1], s = sec(b), at = beat => t0 + beat * BEAT;
     const root = nm(CH[ch][0], 1), t5 = chordMidi(ch, 5), t4 = chordMidi(ch, 4);
-    const padV = { hook: 0.05, clinic: 0.06, mach: 0.045, build: 0.055 + 0.005 * (b - 12), peak: 0.07, climax: 0.07, detect: 0.062, coinc: 0.05, image: 0.06, reveal: 0.085, recap: 0.055, pickup: 0.06 }[s];
+    const padV = { hook: 0.05, clinic: 0.068, mach: 0.045, build: 0.055 + 0.005 * (b - 12), peak: 0.07, climax: 0.07, detect: 0.07, coinc: 0.05, image: 0.06, reveal: 0.085, recap: 0.055, pickup: 0.06 }[s];
     const cut = { hook: 1500, clinic: 1700, mach: 1300, build: 1100 + 500 * (b - 12), peak: 2000, climax: 3200, detect: 900, coinc: 1600, image: 1400 + 600 * (b - 26), reveal: 2600, recap: 2400, pickup: 1800 }[s];
     const cut1 = { build: 1500 + 500 * (b - 12), peak: 6000, image: 2400 + 900 * (b - 26), pickup: 4200 }[s] || cut;
     for (const m of chordMidi(ch, 3)) N(t0, BAR + 0.04, 'pad', m, padV, (m % 3 - 1) * 0.45, { cut, cut1 });
@@ -58,13 +58,13 @@ function musicEvents() {
       if (!(s === 'build' && b === 13)) { clap(1, s === 'climax' ? 0.36 : 0.32); clap(3, s === 'climax' ? 0.36 : 0.32); }
       for (let i = 0; i < 4; i++) hat(i + 0.5, s === 'hook' ? 0.07 : 0.09, s === 'climax' || s === 'coinc' || s === 'recap');
     }
-    if (s === 'clinic') { kick(0, 0.44); kick(2, 0.4); clap(3, 0.22); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.06 : 0.035, 0.25); }
+    if (s === 'clinic') { kick(0, 0.48); kick(2, 0.44); clap(1, 0.2); clap(3, 0.26); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.06); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.07 : 0.04, 0.25); }
     if (s === 'mach') { for (let i = 0; i < 16; i++) if (i % 2) hat(i / 4, i % 4 === 3 ? 0.06 : 0.04); for (let i = 0; i < 4; i++) D(at(i + 0.75), 'perc', 0.08, i % 2 ? 0.4 : -0.4); }
     if (s === 'climax' || s === 'coinc' || s === 'recap') for (let i = 0; i < 16; i++) if (i % 4 === 1 || i % 4 === 3) hat(i / 4, 0.035);
     if (s === 'hook' && b >= 2) for (let i = 0; i < 16; i++) if (i % 4) hat(i / 4, 0.03);
     if (s === 'build') for (let i = 0; i < (b === 12 ? 8 : 16); i++) D(at(i / (b === 12 ? 2 : 4)), 'snare', 0.05 + i * (b === 12 ? 0.012 : 0.008));
     if (s === 'peak') { for (let i = 0; i < 3; i++) kick(i, 0.55); for (let i = 0; i < 8; i++) D(at(i / 4), 'snare', 0.13 + i * 0.012); for (let i = 0; i < 6; i++) D(at(2 + i / 8), 'snare', 0.2 + i * 0.015); }
-    if (s === 'detect') { kick(0, 0.56); kick(2.5, 0.4); clap(2, 0.38); for (let i = 0; i < 16; i++) D(at(i / 4), 'tick', i % 4 === 2 ? 0.08 : 0.035, ((i * 5) % 7) / 7 - 0.5); hat(1.5, 0.06); hat(3.5, 0.06, true); }
+    if (s === 'detect') { kick(0, 0.58); kick(2.5, 0.42); clap(2, 0.42); for (let i = 0; i < 16; i++) D(at(i / 4), 'tick', i % 4 === 2 ? 0.08 : 0.035, ((i * 5) % 7) / 7 - 0.5); hat(1.5, 0.06); hat(3.5, 0.06, true); }
     if (s === 'image' && b === 27) for (let i = 0; i < 16; i++) D(at(i / 4), 'snare', 0.06 + i * 0.012);
     if (s === 'reveal') { kick(0, 0.44); kick(2, 0.38); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.06 : 0.035, 0.25); clap(3, 0.2); }
     if (s === 'pickup') { kick(0, 0.55); kick(1, 0.45); for (let i = 8; i < 16; i++) D(at(i / 4), 'snare', 0.08 + (i - 8) * 0.022); }
@@ -75,8 +75,8 @@ function musicEvents() {
       const pat = [0, 1, 2, 1, 0, 2, 1, 2];
       for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.6, 'arp', t5[pat[i % 8] % t5.length] + (i % 8 >= 6 || (s === 'build' && b === 13) ? 12 : 0), s === 'climax' ? 0.034 : 0.026, i % 2 ? 0.45 : -0.45);
     }
-    if (s === 'clinic') [[0.5, 0], [1.5, 1], [2.5, 2], [3.25, 1]].forEach(([p, i], j) => N(at(p), 0.18, 'pluck', t5[i] + 12, 0.04, j % 2 ? 0.3 : -0.3));
-    if (s === 'detect') [[0.75, 2], [1.5, 0], [2.25, 1], [3.0, 2], [3.5, 0]].forEach(([p, i], j) => N(at(p), 0.35, 'bell', t5[i] + 12, 0.07 + 0.012 * (j % 2), j % 2 ? 0.4 : -0.4));
+    if (s === 'clinic') [[0.5, 0], [1.5, 1], [2.5, 2], [3.25, 1]].forEach(([p, i], j) => N(at(p), 0.18, 'pluck', t5[i] + 12, 0.05, j % 2 ? 0.3 : -0.3));
+    if (s === 'detect') [[0.75, 2], [1.5, 0], [2.25, 1], [3.0, 2], [3.5, 0]].forEach(([p, i], j) => N(at(p), 0.35, 'bell', t5[i] + 12, 0.08 + 0.012 * (j % 2), j % 2 ? 0.4 : -0.4));
     if (s === 'reveal') { N(at(0.5), 0.6, 'bell', t5[0] + 12, 0.08, -0.3); N(at(2), 0.6, 'bell', t5[2], 0.07, 0.3); N(at(3.25), 0.5, 'bell', t5[1] + 12, 0.06, 0); }
   }
   // melodies
