@@ -1745,7 +1745,7 @@ function s07(t) {
   if (t > T_F18 && t < T_F18 + 0.5) { const f = fdgF(135, 230, 40); ring(f[0], f[1] + 4, 8 + 26 * (t - T_F18), 1, P.FO3, pulse(t, T_F18, 0.5)); }
   cap('F-18 FDG TRACER', 9.05, t, 'A glucose analog', 9.5);
 }
-const ARM_CAM = () => new Cam(146, 226, 1.55, 135, 250);
+const ARM_CAM = () => new Cam(150, 205, 1.45, 135, 250);
 const VEIN_PT = [96, 240];
 function s08(t) {
   const cam = ARM_CAM();
