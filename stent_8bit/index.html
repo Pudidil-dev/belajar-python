@@ -1,0 +1,2295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Coronary Stents Explained</title>
+<meta name="description" content="How coronary stents work: a 55-second 8-bit scientific animation (HTML5 Canvas + Web Audio).">
+<style>
+:root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #35d9ff; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 500 14px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { display: flex; flex-direction: column; min-height: 100%; }
+#stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px 16px 6px; position: relative; }
+#screen { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #0b1020; box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0,0,0,.55); cursor: pointer; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); letter-spacing: .08em; }
+#bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 16px 6px; max-width: 720px; width: 100%; margin: 0 auto; }
+.btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.btn:hover { border-color: #3a4b7c; }
+.btn:focus-visible, #scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+#scrub { flex: 1 1 auto; min-width: 60px; height: 40px; background: transparent; -webkit-appearance: none; appearance: none; margin: 0; --p: 0%; }
+#scrub::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+#scrub::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+#scrub::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+#scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--ink); border: 0; }
+#scrub::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 0; }
+#time { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--sub); min-width: 104px; text-align: right; }
+#scene { text-align: center; color: var(--sub); font-size: 12px; letter-spacing: .06em; padding: 0 16px 12px; min-height: 28px; }
+@media (max-width: 420px) { #time { min-width: 0; font-size: 12px; } .btn { width: 36px; height: 36px; } #bar { gap: 6px; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="270" height="480" role="img" aria-label="Animation: how a coronary stent opens a narrowed heart artery"></canvas>
+  <div id="loading">LOADING…</div>
+</div>
+<div id="bar">
+  <button id="play" class="btn" aria-label="Play"></button>
+  <button id="replay" class="btn" aria-label="Replay"></button>
+  <input id="scrub" type="range" min="0" max="3299" step="1" value="0" aria-label="Seek">
+  <span id="time">0:00.0 / 0:55.0</span>
+  <button id="mute" class="btn" aria-label="Mute"></button>
+</div>
+<div id="scene" aria-live="polite"></div>
+<script>
+(function(){
+// ---- 00_core.js
+// ============================================================================
+// CORONARY STENT 8-bit — core: pixel buffer, palette, rasterizers, masks, easing, text.
+// Everything draws into one 270x480 Uint32 buffer (crisp pixels, no AA).
+// The buffer is shown 4x nearest-neighbour (1080x1920) by the player/export.
+// ============================================================================
+const W = 270, H = 480, FPS = 60, DUR = 55, NF = 3300;
+const CX = 135, CY = 240;
+let buf = new Uint32Array(W * H);
+const SPARE = [new Uint32Array(W * H), new Uint32Array(W * H), new Uint32Array(W * H), new Uint32Array(W * H)];
+const CHAINBUF = SPARE[0], FEEDBUF = SPARE[1], TRANSBUF = SPARE[2], TMPBUF = SPARE[3];
+
+function hexc(h) {
+  const n = parseInt(h.slice(1), 16);
+  return (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255)) >>> 0;
+}
+const P = {};
+const PAL_HEX = {
+  // ground (dark navy, #0B1020 from the brief)
+  K0: '#04060D', BG: '#0B1020', N1: '#10172C', N2: '#161F3A', N3: '#1E2949', N4: '#29375E', N5: '#3A4B7C', N6: '#53679A',
+  // machine casing ramp around #CAD2DE
+  C0: '#252B37', C1: '#465064', C2: '#6E7A8E', C3: '#9AA5B7', C4: '#CAD2DE', C5: '#E5EAF1', C6: '#FFFFFF',
+  // tungsten ramp around #919AA8
+  T0: '#272C35', T1: '#454C59', T2: '#676F7E', T3: '#919AA8', T4: '#B6BEC9', T5: '#DCE1E8',
+  // primary electrons #35D9FF
+  E0: '#0A324C', E1: '#116C96', E2: '#35D9FF', E3: '#BDF5FF',
+  // secondary electrons #A7E7FF
+  S0: '#22445A', S1: '#5D9BBA', S2: '#A7E7FF', S3: '#E9FAFF',
+  // X-ray photons #FFD65A
+  Y0: '#4A380D', Y1: '#A47C1C', Y2: '#FFD65A', Y3: '#FFF3C2',
+  // RF fields #A579FF
+  V0: '#22154C', V1: '#4C339C', V2: '#A579FF', V3: '#DDCCFF',
+  // tumor coral #F26676
+  R0: '#3C101A', R1: '#7C2332', R2: '#BC4154', R3: '#F26676', R4: '#FFA8B0',
+  // water #75BFE8
+  W0: '#13324B', W1: '#326E9A', W2: '#75BFE8', W3: '#C5E8FA',
+  // hydroxyl radicals #FF9B4A
+  O0: '#4C230A', O1: '#A8531A', O2: '#FF9B4A', O3: '#FFD4A9',
+  // DNA ivory + lavender
+  I0: '#4E4A3F', I1: '#9B9580', I2: '#EDE6D0', I3: '#FFFCF1',
+  L0: '#33295A', L1: '#6C5EA4', L2: '#B9A8E8', L3: '#E5DBFF',
+  // dose map blue -> amber -> warm red
+  D0: '#1C2D74', D1: '#3365CE', D2: '#E8A83B', D3: '#EC7E3A', D4: '#E3453E',
+  // alignment lasers / status lights (green, used only for these)
+  G0: '#0B4325', G1: '#1D9A4F', G2: '#5CFF8A', G3: '#CCFFDB',
+  A0: '#5A3D0E', A1: '#B07A1E', A2: '#E8A83B',
+  // anatomy (muted so coral + dose read first)
+  SK0: '#2E1F28', SK1: '#7E5A55', SK2: '#B68A78', SK3: '#D9AF98',
+  MU0: '#3A2A3E', MU1: '#55405A', MU2: '#6C5372',
+  LU0: '#161D38', LU1: '#202A4D', LU2: '#2C3964', LU3: '#3C4C80',
+  HE0: '#3E1D33', HE1: '#5E2B48', HE2: '#7E3C5E',
+  BO0: '#6F6C64', BO1: '#B3B0A5', BO2: '#DCDACF',
+  CO1: '#C9AE86',
+  // healthy cells (cool neutral)
+  HC0: '#232C47', HC1: '#36446A', HC2: '#4B5C8A', HC3: '#6D80B0',
+  // hot filament (dull red, gun only)
+  HF1: '#7A2E22', HF2: '#C2553A', HF3: '#F29A6E',
+  // CT greys
+  CT0: '#06080E', CT1: '#141824', CT2: '#2A303D', CT3: '#4C5363', CT4: '#7E8595', CT5: '#A3AAB8', CT6: '#E2E6EE',
+  INK: '#F4F7FB', SUB: '#A9B3C5', SH: '#03050A',
+};
+for (const k in PAL_HEX) P[k] = hexc(PAL_HEX[k]);
+
+// ---------------------------------------------------------------- math/ease
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const smooth = t => t * t * (3 - 2 * t);
+const eio = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eout = t => 1 - Math.pow(1 - t, 3);
+const ein = t => t * t * t;
+function bezierEase(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  return function (x) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const fx = ((ax * t + bx) * t + cx) * t - x;
+      const d = (3 * ax * t + 2 * bx) * t + cx;
+      if (Math.abs(fx) < 1e-6) break;
+      t -= fx / (d || 1e-6);
+      t = clamp(t, 0, 1);
+    }
+    return ((ay * t + by) * t + cy) * t;
+  };
+}
+const K75 = bezierEase(0.75, 0, 0.25, 1);      // Kurzgesagt camera ease
+const K50 = bezierEase(0.5, 0, 0.2, 1);
+function backOut(t, s) { s = s === undefined ? 1.70158 : s; t = clamp(t, 0, 1) - 1; return t * t * ((s + 1) * t + s) + 1; }
+const TAU = Math.PI * 2;
+
+// stateless hash -> [0,1)
+function hash(n) {
+  n = (n | 0) ^ 0x9e3779b9;
+  n = Math.imul(n ^ (n >>> 16), 0x21f0aaad);
+  n = Math.imul(n ^ (n >>> 15), 0x735a2d97);
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663));
+const hash3 = (a, b, c) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663) ^ Math.imul(c | 0, 83492791));
+function vnoise(x, s) { // 1-D value noise, smooth
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(hash2(i, s), hash2(i + 1, s), u);
+}
+
+// ---------------------------------------------------------------- dithering
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bay = (x, y) => (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+
+// ---------------------------------------------------------------- primitives
+function clear(c) { buf.fill(c); }
+function pset(x, y, c) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c; }
+function psetD(x, y, c, lv) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H && bay(x, y) < lv) buf[y * W + x] = c; }
+function rect(x0, y0, x1, y1, c, lv) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1));
+  const p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  if (a >= b || p >= q) return;
+  if (lv === undefined || lv >= 1) { for (let y = p; y < q; y++) buf.fill(c, y * W + a, y * W + b); return; }
+  if (lv <= 0) return;
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+}
+function frame(x0, y0, x1, y1, c) { rect(x0, y0, x1, y0 + 1, c); rect(x0, y1 - 1, x1, y1, c); rect(x0, y0, x0 + 1, y1, c); rect(x1 - 1, y0, x1, y1, c); }
+function disc(cx, cy, r, c, lv) {
+  if (r <= 0) return;
+  if (lv !== undefined && lv <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy, h = r * r - dy * dy;
+    if (h < 0) continue;
+    const s = Math.sqrt(h);
+    const a = Math.max(0, Math.ceil(cx - s - 0.5)), b = Math.min(W - 1, Math.floor(cx + s - 0.5));
+    if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+    else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+  }
+}
+function ring(cx, cy, r, w, c, lv) {
+  const ro = r + w / 2, ri = Math.max(0, r - w / 2);
+  const y0 = Math.max(0, Math.floor(cy - ro)), y1 = Math.min(H - 1, Math.ceil(cy + ro));
+  const x0 = Math.max(0, Math.floor(cx - ro)), x1 = Math.min(W - 1, Math.ceil(cx + ro));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+      if (d2 <= ro * ro && d2 >= ri * ri && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function ellipse(cx, cy, rx, ry, c, lv, rot) {
+  const R = Math.max(rx, ry);
+  const cs = Math.cos(rot || 0), sn = Math.sin(rot || 0);
+  const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
+  const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx;
+      const u = (dx * cs + dy * sn) / rx, v = (-dx * sn + dy * cs) / ry;
+      if (u * u + v * v <= 1 && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+// scanline polygon fill (even-odd) on pixel centres; pts = [x0,y0,x1,y1,...]
+const _xs = [];
+function poly(pts, c, lv) {
+  const n = pts.length >> 1; if (n < 3) return;
+  let ymin = Infinity, ymax = -Infinity;
+  for (let i = 0; i < n; i++) { const y = pts[2 * i + 1]; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+  const y0 = Math.max(0, Math.floor(ymin)), y1 = Math.min(H - 1, Math.ceil(ymax));
+  for (let y = y0; y <= y1; y++) {
+    const sy = y + 0.5; _xs.length = 0;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const yi = pts[2 * i + 1], yj = pts[2 * j + 1];
+      if ((yi > sy) !== (yj > sy)) { const xi = pts[2 * i], xj = pts[2 * j]; _xs.push(xi + (sy - yi) * (xj - xi) / (yj - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < _xs.length; k += 2) {
+      const a = Math.max(0, Math.ceil(_xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(_xs[k + 1] - 0.5));
+      if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+      else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// clip a segment to the screen (Liang-Barsky); returns null if outside
+function clipSeg(x0, y0, x1, y1, m) {
+  m = m || 2;
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  const p = [-dx, dx, -dy, dy], q = [x0 + m, W + m - 1 - x0, y0 + m, H + m - 1 - y0];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; }
+    else { const r = q[i] / p[i]; if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; } }
+  }
+  return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
+}
+function line(x0, y0, x1, y1, c, lv) {
+  const s = clipSeg(x0, y0, x1, y1); if (!s) return;
+  x0 = Math.floor(s[0]); y0 = Math.floor(s[1]); x1 = Math.floor(s[2]); y1 = Math.floor(s[3]);
+  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1, err = dx + dy;
+  for (let guard = 0; guard < 4000; guard++) {
+    if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H && (lv === undefined || bay(x0, y0) < lv)) buf[y0 * W + x0] = c;
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function lineW(x0, y0, x1, y1, w, c, lv) {
+  if (w <= 1.2) { line(x0, y0, x1, y1, c, lv); return; }
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1e-6;
+  const nx = -dy / L * w / 2, ny = dx / L * w / 2;
+  poly([x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny], c, lv);
+}
+function polyline(pts, c, lv) { for (let i = 0; i + 3 < pts.length; i += 2) line(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], c, lv); }
+function dashLine(x0, y0, x1, y1, c, on, off, phase) {
+  const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) return;
+  const per = on + off; let s = -((phase || 0) % per);
+  for (; s < L; s += per) {
+    const a = Math.max(0, s), b = Math.min(L, s + on); if (b <= a) continue;
+    line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
+  }
+}
+// Kurzgesagt-style pixel glow: stacked dithered discs in darker tints
+function glow(cx, cy, r, c1, c2, lv) {
+  lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
+  disc(cx, cy, r, c1, 0.28 * lv);
+  disc(cx, cy, r * 0.62, c1, 0.55 * lv);
+  if (c2 !== undefined && c2 !== null) disc(cx, cy, r * 0.32, c2, 0.6 * lv);
+}
+function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
+  rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
+}
+
+// ---------------------------------------------------------------- masks
+// Bounding-box masks for 16-bit style shading (outline, rim light, shadow)
+class Mask {
+  constructor(x0, y0, x1, y1) {
+    this.x0 = Math.max(-2, Math.floor(x0) - 2); this.y0 = Math.max(-2, Math.floor(y0) - 2);
+    this.x1 = Math.min(W + 2, Math.ceil(x1) + 2); this.y1 = Math.min(H + 2, Math.ceil(y1) + 2);
+    this.w = Math.max(0, this.x1 - this.x0); this.h = Math.max(0, this.y1 - this.y0);
+    this.d = new Uint8Array(this.w * this.h);
+  }
+  get(x, y) { x -= this.x0; y -= this.y0; return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; }
+  empty() { return this.w === 0 || this.h === 0; }
+}
+function maskFn(x0, y0, x1, y1, fn) { // fn(px+0.5, py+0.5) -> bool
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) if (fn(m.x0 + i + 0.5, m.y0 + j + 0.5)) m.d[j * m.w + i] = 1;
+  return m;
+}
+function maskPoly(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+  const m = new Mask(x0, y0, x1, y1); if (m.empty()) return m;
+  const n = pts.length >> 1;
+  for (let j = 0; j < m.h; j++) {
+    const sy = m.y0 + j + 0.5; _xs.length = 0;
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const yi = pts[2 * i + 1], yk = pts[2 * k + 1];
+      if ((yi > sy) !== (yk > sy)) { const xi = pts[2 * i], xk = pts[2 * k]; _xs.push(xi + (sy - yi) * (xk - xi) / (yk - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < _xs.length; q += 2) {
+      const a = Math.max(0, Math.ceil(_xs[q] - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(_xs[q + 1] - 0.5 - m.x0));
+      for (let i = a; i <= b; i++) m.d[j * m.w + i] = 1;
+    }
+  }
+  return m;
+}
+function _span(m, j, xa, xb) { // fill pixels whose centres lie in [xa, xb] on mask row j
+  const a = Math.max(0, Math.ceil(xa - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(xb - 0.5 - m.x0));
+  if (a <= b) m.d.fill(1, j * m.w + a, j * m.w + b + 1);
+}
+function maskDisc(cx, cy, r) {
+  const m = new Mask(cx - r, cy - r, cx + r, cy + r);
+  for (let j = 0; j < m.h; j++) { const dy = m.y0 + j + 0.5 - cy, h = r * r - dy * dy; if (h < 0) continue; const s = Math.sqrt(h); _span(m, j, cx - s, cx + s); }
+  return m;
+}
+function maskEll(cx, cy, rx, ry, rot) {
+  const R = Math.max(rx, ry), c = Math.cos(rot || 0), s = Math.sin(rot || 0);
+  const m = new Mask(cx - R, cy - R, cx + R, cy + R);
+  const A = c * c / (rx * rx) + s * s / (ry * ry), Bk = 2 * (c * s / (rx * rx) - s * c / (ry * ry)), Ck = s * s / (rx * rx) + c * c / (ry * ry);
+  for (let j = 0; j < m.h; j++) {
+    const dy = m.y0 + j + 0.5 - cy, B = Bk * dy, C = Ck * dy * dy - 1, disc_ = B * B - 4 * A * C;
+    if (disc_ < 0) continue; const q = Math.sqrt(disc_);
+    _span(m, j, cx + (-B - q) / (2 * A), cx + (-B + q) / (2 * A));
+  }
+  return m;
+}
+function maskRR(x0, y0, x1, y1, r) { // rounded rect
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j + 0.5; if (y < y0 || y > y1) continue;
+    const qy = Math.max(y0 + r - y, 0, y - (y1 - r));
+    if (qy > r) continue;
+    const dx = r - Math.sqrt(Math.max(0, r * r - qy * qy));
+    _span(m, j, x0 + dx, x1 - dx);
+  }
+  return m;
+}
+function mFill(m, c, lv, clip) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      if (clip && !clip(x, y)) continue;
+      if (lv === undefined || lv >= 1 || bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// pixels of m whose neighbour at (x-dx, y-dy) is outside m (the edge facing -dx,-dy)
+function mRim(m, c, dx, dy, lv) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const ii = i - dx, jj = j - dy;
+      const inside = ii >= 0 && jj >= 0 && ii < m.w && jj < m.h && m.d[jj * m.w + ii];
+      if (!inside && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function mOutline(m, c) { // inner 4-neighbour outline
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i === 0 || !m.d[j * m.w + i - 1]) || (i === m.w - 1 || !m.d[j * m.w + i + 1]) || (j === 0 || !m.d[(j - 1) * m.w + i]) || (j === m.h - 1 || !m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+function mOuter(m, c) { // outer 4-neighbour outline (1 px outside the shape)
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i > 0 && m.d[j * m.w + i - 1]) || (i < m.w - 1 && m.d[j * m.w + i + 1]) || (j > 0 && m.d[(j - 1) * m.w + i]) || (j < m.h - 1 && m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+// standard 16-bit shading: base, light rim top-left, shadow rim bottom-right, outline
+function shade(m, base, hi, lo, ol, opt) {
+  opt = opt || {};
+  mFill(m, base, opt.lv, opt.clip);
+  const k = opt.k || 1;
+  if (lo !== null && lo !== undefined) for (let s = 1; s <= k; s++) mRim(m, lo, -s, -s);
+  if (hi !== null && hi !== undefined) for (let s = 1; s <= (opt.kh || k); s++) mRim(m, hi, s, s);
+  if (ol !== null && ol !== undefined) { if (opt.outer) mOuter(m, ol); else mOutline(m, ol); }
+}
+
+// ---------------------------------------------------------------- camera
+class Cam {
+  constructor(cx, cy, z, ax, ay) { this.cx = cx; this.cy = cy; this.z = z; this.ax = ax === undefined ? CX : ax; this.ay = ay === undefined ? CY : ay; }
+  x(wx) { return (wx - this.cx) * this.z + this.ax; }
+  y(wy) { return (wy - this.cy) * this.z + this.ay; }
+  s(v) { return v * this.z; }
+  wx(sx) { return (sx - this.ax) / this.z + this.cx; }
+  wy(sy) { return (sy - this.ay) / this.z + this.cy; }
+  pts(arr) { const o = new Array(arr.length); for (let i = 0; i < arr.length; i += 2) { o[i] = this.x(arr[i]); o[i + 1] = this.y(arr[i + 1]); } return o; }
+}
+// keyframe track: [[t, cx, cy, z, easeFn?], ...] with log-zoom interpolation
+function camTrack(keys, t, ax, ay) {
+  if (t <= keys[0][0]) { const k = keys[0]; return new Cam(k[1], k[2], k[3], ax, ay); }
+  for (let i = 0; i + 1 < keys.length; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t <= b[0]) {
+      const e = b[4] || K75; const f = e(seg(t, a[0], b[0]));
+      const z = Math.exp(lerp(Math.log(a[3]), Math.log(b[3]), f));
+      // zoom-aware centre blend: keep motion even across big zoom changes
+      let g = f;
+      if (Math.abs(Math.log(b[3] / a[3])) > 0.2) { const za = a[3], zb = b[3]; g = (1 / za - 1 / z) / (1 / za - 1 / zb); g = clamp(g, 0, 1); }
+      return new Cam(lerp(a[1], b[1], g), lerp(a[2], b[2], g), z, ax, ay);
+    }
+  }
+  const k = keys[keys.length - 1]; return new Cam(k[1], k[2], k[3], ax, ay);
+}
+
+// ---------------------------------------------------------------- buffers
+function withBuffer(target, fn) { const old = buf; buf = target; try { fn(); } finally { buf = old; } }
+function copyBuf(dst, src) { dst.set(src); }
+// dithered dissolve: show b where bayer < k
+function dissolve(a, b, k, out) {
+  out = out || buf;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; out[i] = bay(x, y) < k ? b[i] : a[i]; }
+}
+
+// ---------------------------------------------------------------- fonts
+function mkFont(h, defs, spaceW) {
+  const g = {};
+  for (const ch in defs) {
+    const rows = defs[ch].split('/');
+    const w = rows[0].length;
+    const bits = rows.map(r => { let v = 0; for (let i = 0; i < r.length; i++) if (r[i] === '#') v |= 1 << i; return v; });
+    g[ch] = { w, bits };
+  }
+  g[' '] = { w: spaceW, bits: new Array(h).fill(0) };
+  return { h, g };
+}
+// Label font: 7-row condensed caps (drawn at 2x -> 56 px cap height on export)
+const FL = mkFont(7, {
+  A: '.##./#..#/#..#/####/#..#/#..#/#..#', B: '###./#..#/#..#/###./#..#/#..#/###.', C: '.##./#..#/#.../#.../#.../#..#/.##.',
+  D: '###./#..#/#..#/#..#/#..#/#..#/###.', E: '####/#.../#.../###./#.../#.../####', F: '####/#.../#.../###./#.../#.../#...',
+  G: '.##./#..#/#.../#.##/#..#/#..#/.###', H: '#..#/#..#/#..#/####/#..#/#..#/#..#', I: '###/.#./.#./.#./.#./.#./###',
+  J: '...#/...#/...#/...#/#..#/#..#/.##.', K: '#..#/#..#/#.#./##../#.#./#..#/#..#', L: '#.../#.../#.../#.../#.../#.../####',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#', N: '#..#/##.#/##.#/#.##/#.##/#..#/#..#', O: '.##./#..#/#..#/#..#/#..#/#..#/.##.',
+  P: '###./#..#/#..#/###./#.../#.../#...', Q: '.##./#..#/#..#/#..#/#..#/#.#./.#.#', R: '###./#..#/#..#/###./#.#./#..#/#..#',
+  S: '.##./#..#/#.../.##./...#/#..#/.##.', T: '#####/..#../..#../..#../..#../..#../..#..', U: '#..#/#..#/#..#/#..#/#..#/#..#/.##.',
+  V: '#...#/#...#/#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#', X: '#...#/#...#/.#.#./..#../.#.#./#...#/#...#',
+  Y: '#...#/#...#/.#.#./..#../..#../..#../..#..', Z: '#####/....#/...#./..#../.#.../#..../#####',
+  0: '.##./#..#/#..#/#..#/#..#/#..#/.##.', 1: '.#./##./.#./.#./.#./.#./###', 2: '.##./#..#/...#/..#./.#../#.../####',
+  3: '###./...#/...#/.##./...#/...#/###.', 4: '..#./.##./#.#./#.#./####/..#./..#.', 5: '####/#.../###./...#/...#/#..#/.##.',
+  6: '.##./#.../#.../###./#..#/#..#/.##.', 7: '####/...#/..#./..#./.#../.#../.#..', 8: '.##./#..#/#..#/.##./#..#/#..#/.##.',
+  9: '.##./#..#/#..#/.###/...#/...#/.##.',
+  ',': '../../../../../.#/#.', '-': '.../.../.../###/.../.../...',
+  '?': '.##./#..#/...#/..#./.#../..../.#..', '!': '#/#/#/#/#/./#', '(': '.#/#./#./#./#./#./.#', ')': '#./.#/.#/.#/.#/.#/#.',
+  '/': '..#/..#/.#./.#./.#./#../#..', "'": '#/#/./././././.', '•': '../../##/##/../../..',
+  '^': '..#../.###./#.#.#/..#../..#../..#../..#..', '>': '...../..#../...#./#####/...#./..#../.....', '+': '.../.../.#./###/.#./.../...',
+  k: '#.../#.../#..#/#.#./##../#.#./#..#',
+}, 2);
+FL.g['.'] = { w: 1, bits: [0, 0, 0, 0, 0, 0, 1] };
+FL.g[':'] = { w: 1, bits: [0, 0, 1, 0, 0, 1, 0] };
+// Micro font: 5-row caps (2x -> 40 px)
+const FM = mkFont(5, {
+  A: '.##./#..#/####/#..#/#..#', B: '###./#..#/###./#..#/###.', C: '.###/#.../#.../#.../.###', D: '###./#..#/#..#/#..#/###.',
+  E: '####/#.../###./#.../####', F: '####/#.../###./#.../#...', G: '.###/#.../#.##/#..#/.###', H: '#..#/#..#/####/#..#/#..#',
+  I: '###/.#./.#./.#./###', J: '...#/...#/...#/#..#/.##.', K: '#..#/#.#./##../#.#./#..#', L: '#.../#.../#.../#.../####',
+  M: '#...#/##.##/#.#.#/#...#/#...#', N: '#..#/##.#/#.##/#..#/#..#', O: '.##./#..#/#..#/#..#/.##.', P: '###./#..#/###./#.../#...',
+  Q: '.##./#..#/#..#/#.#./.#.#', R: '###./#..#/###./#.#./#..#', S: '.###/#.../.##./...#/###.', T: '###/.#./.#./.#./.#.',
+  U: '#..#/#..#/#..#/#..#/.##.', V: '#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#.#.#/##.##/#...#', X: '#.#/#.#/.#./#.#/#.#',
+  Y: '#.#/#.#/.#./.#./.#.', Z: '####/...#/.##./#.../####',
+  0: '###/#.#/#.#/#.#/###', 1: '.#./##./.#./.#./###', 2: '##./..#/.#./#../###', 3: '##./..#/.#./..#/##.', 4: '#.#/#.#/###/..#/..#',
+  5: '###/#../##./..#/##.', 6: '.##/#../###/#.#/###', 7: '###/..#/.#./.#./.#.', 8: '###/#.#/###/#.#/###', 9: '###/#.#/###/..#/##.',
+  ',': '../../../.#/#.', '-': '.../.../###/.../...', '?': '##./..#/.#./.../.#.', '(': '.#/#./#./#./.#', ')': '#./.#/.#/.#/#.',
+  '/': '..#/.#./.#./.#./#..', "'": '#/#/./././', '!': '#/#/#/./#', '^': '.#./###/.#./.#./.#.', '>': '..#./...#/####/...#/..#.',
+  '+': '.../.#./###/.#./...', '•': '../##/##/../..', k: '#.../#.#./##../#.#./#..#',
+}, 2);
+FM.g['.'] = { w: 1, bits: [0, 0, 0, 0, 1] };
+FM.g[':'] = { w: 1, bits: [0, 1, 0, 1, 0] };
+FM.g["'"] = { w: 1, bits: [1, 1, 0, 0, 0] };
+// Title font: 9-row caps (2x + fake bold -> 72 px)
+const FT = mkFont(9, {
+  H: '#...#/#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  W: '#.....#/#.....#/#.....#/#.....#/#..#..#/#..#..#/#.#.#.#/##...##/#.....#', M: '#.....#/##...##/#.#.#.#/#..#..#/#.....#/#.....#/#.....#/#.....#/#.....#',
+  E: '####/#.../#.../#.../###./#.../#.../#.../####', D: '####./#...#/#...#/#...#/#...#/#...#/#...#/#...#/####.',
+  I: '###/.#./.#./.#./.#./.#./.#./.#./###', C: '.###./#...#/#..../#..../#..../#..../#..../#...#/.###.',
+  A: '.###./#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', L: '#.../#.../#.../#.../#.../#.../#.../#.../####',
+  N: '#...#/##..#/##..#/#.#.#/#.#.#/#.#.#/#..##/#..##/#...#', R: '####./#...#/#...#/#...#/####./#.#../#..#./#...#/#...#',
+  T: '#####/..#../..#../..#../..#../..#../..#../..#../..#..', S: '.###./#...#/#..../#..../.###./....#/....#/#...#/.###.',
+  K: '#...#/#..#./#.#../##.../##.../#.#../#..#./#...#/#...#',
+  Y: '#...#/#...#/.#.#./.#.#./..#../..#../..#../..#../..#..',
+}, 2);
+
+function glyphOf(f, ch) { return f.g[ch] || f.g[ch.toUpperCase()] || f.g['?'] || f.g[' ']; }
+function textW(f, s, sc, bold) {
+  sc = sc || 2; let w = 0;
+  for (let i = 0; i < s.length; i++) { w += glyphOf(f, s[i]).w; if (i < s.length - 1) w += 1; }
+  return w * sc + (bold ? 1 : 0);
+}
+// draw text; returns width. opt: {sc, c, ol, n (chars shown), bold, align, shadow}
+function text(f, s, x, y, opt) {
+  opt = opt || {};
+  const sc = opt.sc || 2, c = opt.c === undefined ? P.INK : opt.c, ol = opt.ol === undefined ? P.SH : opt.ol;
+  const bold = opt.bold ? 1 : 0, n = opt.n === undefined ? s.length : Math.floor(opt.n);
+  const tw = textW(f, s, sc, bold);
+  if (opt.align === 'center') x -= tw / 2; else if (opt.align === 'right') x -= tw;
+  x = Math.round(x); y = Math.round(y);
+  const passes = [];
+  if (opt.shadow !== undefined && opt.shadow !== null) passes.push([opt.shadow, 1, 1, opt.sd || 1]);
+  if (ol !== null) passes.push([ol, 1, 0, 0]);
+  passes.push([c, 0, 0, 0]);
+  for (const [col, grow, isSh, sd] of passes) {
+    let cx = x;
+    for (let i = 0; i < s.length && i < n; i++) {
+      const g = glyphOf(f, s[i]);
+      for (let r = 0; r < f.h; r++) {
+        const bits = g.bits[r]; if (!bits) continue;
+        for (let k = 0; k < g.w; k++) if (bits & (1 << k)) {
+          const px = cx + k * sc, py = y + r * sc;
+          if (isSh) rect(px + sd, py + sd, px + sc + bold + sd, py + sc + sd, col);
+          else if (grow) rect(px - 1, py - 1, px + sc + bold + 1, py + sc + 1, col);
+          else rect(px, py, px + sc + bold, py + sc, col);
+        }
+      }
+      cx += (g.w + 1) * sc;
+    }
+  }
+  return tw;
+}
+function wrap(f, s, maxW, sc) {
+  const words = s.split(' '); const lines = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (textW(f, t, sc) <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur); return lines;
+}
+
+// ---- 01_ui.js
+// ============================================================================
+// UI layer: callout labels (leader first, then typed text), micro-context
+// lines, the RADIATION VISUALIZED badge, scale tag, legends and meters.
+// Safe text area (logical px): x 18..252, y 30..420.
+// ============================================================================
+const SAFE = { l: 18, r: 252, t: 30, b: 420 };
+const TYPE_CPS = 40;     // label typing speed (chars / s)
+const MICRO_CPS = 58;
+
+// A callout: leader from the object anchor to an underline below the label.
+// spec: {text, x, y, ax, ay, t0, micro, mw, align('left'|'right'), c}
+function calloutLayout(spec) {
+  const sc = 2, tw = textW(FL, spec.text, sc);
+  let x = spec.align === 'right' ? spec.x - tw : spec.x;
+  const lines = spec.micro ? wrap(FM, spec.micro, spec.mw || (SAFE.r - Math.max(SAFE.l, Math.min(x, SAFE.r - tw))), 2) : [];
+  let bw = tw; for (const ln of lines) bw = Math.max(bw, textW(FM, ln, 2));
+  x = Math.round(clamp(x, SAFE.l, SAFE.r - bw));
+  const y = Math.round(spec.y);
+  const bh = 14 + (lines.length ? 6 + lines.length * 14 - 4 : 0);
+  return { x, y, tw, bw, lines, uy: y + bh + 3 };
+}
+// A callout: the text block (label + optional micro line) sits on an
+// underline; the leader rises/drops from the object anchor to that underline.
+function callout(spec, t) {
+  const age = t - spec.t0; if (age < 0) return;
+  const L = calloutLayout(spec), x = L.x, y = L.y, uy = L.uy;
+  const ul0 = x - 2, ul1 = x + L.bw + 1;
+  const lead = spec.ax !== undefined && spec.ax !== null;
+  const gk = K75(clamp(age / 0.2, 0, 1));
+  const lc = spec.lc === undefined ? P.SUB : spec.lc;
+  if (lead) {
+    const ax = Math.round(spec.ax), ay = Math.round(spec.ay);
+    const ex = ax < ul0 ? ul0 : ax > ul1 ? ul1 : ax;
+    if (ax !== ex) {
+      const hx = Math.round(lerp(ax, ex, gk));
+      rect(Math.min(ax, hx), ay, Math.max(ax, hx) + 1, ay + 1, lc);
+      if (gk >= 1) rect(ex, Math.min(ay, uy), ex + 1, Math.max(ay, uy) + 1, lc);
+    } else { const vy = Math.round(lerp(ay, uy, gk)); rect(ax, Math.min(ay, vy), ax + 1, Math.max(ay, vy) + 1, lc); }
+    rect(ax - 1, ay - 1, ax + 2, ay + 2, P.INK); frame(ax - 2, ay - 2, ax + 3, ay + 3, P.SH);
+    if (gk >= 1) rect(Math.min(ul0, ex), uy, Math.max(ul1, ex + 1), uy + 1, lc);
+  } else {
+    rect(ul0, uy, Math.round(lerp(ul0, ul1, gk)), uy + 1, lc);
+  }
+  const n = clamp((age - (lead ? 0.16 : 0.08)) * TYPE_CPS, 0, spec.text.length);
+  const mt0 = spec.mt0 !== undefined ? spec.mt0 - spec.t0 : 0.16 + spec.text.length / TYPE_CPS + 0.12;
+  if (spec.plate !== false && n > 0) { // dark plate behind the typed text (busy backgrounds)
+    let pw = textW(FL, spec.text.slice(0, Math.ceil(n)), 2), ph = y + 17;
+    let left = (age - mt0) * MICRO_CPS;
+    L.lines.forEach((ln, i) => { if (left <= 0) return; pw = Math.max(pw, textW(FM, ln.slice(0, Math.ceil(left)), 2)); ph = y + 20 + i * 14 + 12; left -= ln.length + 1; });
+    rect(x - 3, y - 3, x + pw + 3, Math.min(ph, uy), spec.plateC === undefined ? P.BG : spec.plateC);
+  }
+  if (n > 0) text(FL, spec.text, x, y, { sc: 2, c: spec.c === undefined ? P.INK : spec.c, n });
+  if (L.lines.length) {
+    let left = (age - mt0) * MICRO_CPS;
+    L.lines.forEach((ln, i) => {
+      if (left <= 0) return;
+      text(FM, ln, x, y + 20 + i * 14, { sc: 2, c: P.C4, n: left });
+      left -= ln.length + 1;
+    });
+  }
+}
+// plain micro-context line(s) (no label), typed
+function microText(s, x, y, t0, t, opt) {
+  opt = opt || {};
+  const age = t - t0; if (age < 0) return;
+  const lines = wrap(FM, s, opt.mw || (SAFE.r - x), 2);
+  let left = age * (opt.cps || MICRO_CPS);
+  lines.forEach((ln, i) => {
+    if (left <= 0) return;
+    const lw = textW(FM, ln, 2);
+    const lx = opt.align === 'center' ? x - lw / 2 : opt.align === 'right' ? x - lw : x;
+    text(FM, ln, lx, y + i * 14, { sc: 2, c: opt.c === undefined ? P.C4 : opt.c, n: left });
+    left -= ln.length + 1;
+  });
+}
+// small tag in the micro font next to an object, with a short tick
+function tag(s, x, y, t0, t, opt) {
+  opt = opt || {};
+  const age = t - t0; if (age < 0) return;
+  const n = clamp(age * 50, 0, s.length);
+  const tw = textW(FM, s, 2);
+  let lx = opt.align === 'center' ? x - tw / 2 : opt.align === 'right' ? x - tw : x;
+  lx = clamp(lx, SAFE.l, SAFE.r - tw);
+  if (n <= 0) return;
+  if (opt.plate) { const pw = textW(FM, s.slice(0, Math.ceil(n)), 2); rect(lx - 3, y - 3, lx + pw + 3, y + 13, P.K0); frame(lx - 3, y - 3, lx + pw + 3, y + 13, opt.plate); }
+  text(FM, s, lx, y, { sc: 2, c: opt.c === undefined ? P.INK : opt.c, n });
+}
+
+// Badges (bottom-left, stacked): RADIATION VISUALIZED / NOT TO SCALE
+const BADGE_Y = 404;
+function badgeRad(t0, t, t1) {
+  if (t < t0 || (t1 !== undefined && t > t1)) return;
+  const k = K75(clamp((t - t0) / 0.22, 0, 1));
+  const s = 'RADIATION VISUALIZED';
+  const tw = textW(FM, s, 2);
+  const x = Math.round(lerp(-tw - 30, SAFE.l, k)), y = BADGE_Y;
+  rect(x - 2, y - 3, x + tw + 17, y + 13, P.K0); frame(x - 2, y - 3, x + tw + 17, y + 13, P.Y1);
+  // tiny photon zigzag icon
+  const zx = x + 1, zy = y + 5;
+  const zz = [0, 2, 2, -2, 4, 2, 6, -2, 8, 2, 10, 0];
+  for (let i = 0; i + 3 < zz.length; i += 2) line(zx + zz[i], zy + zz[i + 1], zx + zz[i + 2], zy + zz[i + 3], P.Y2);
+  text(FM, s, x + 14, y, { sc: 2, c: P.Y3, ol: null });
+}
+function badgeScale(t0, t, t1, above) {
+  if (t < t0 || (t1 !== undefined && t > t1)) return;
+  const k = K75(clamp((t - t0) / 0.22, 0, 1));
+  const s = 'NOT TO SCALE';
+  const tw = textW(FM, s, 2);
+  const y = above ? BADGE_Y - 18 : BADGE_Y;
+  const x = Math.round(lerp(-tw - 10, SAFE.l, k));
+  rect(x - 2, y - 3, x + tw + 3, y + 13, P.K0); frame(x - 2, y - 3, x + tw + 3, y + 13, P.N5);
+  text(FM, s, x + 1, y, { sc: 2, c: P.SUB, ol: null });
+}
+
+// Relative dose legend: title, 5-band bar, LOW/HIGH
+function doseLegend(x, y, w, t0, t) {
+  const age = t - t0; if (age < 0) return;
+  w = Math.max(w, textW(FM, 'RELATIVE DOSE', 2));
+  const k = K75(clamp(age / 0.3, 0, 1));
+  const cols = [P.D0, P.D1, P.D2, P.D3, P.D4];
+  rect(x - 4, y - 4, x + w + 4, y + 44, P.K0); frame(x - 4, y - 4, x + w + 4, y + 44, P.N4);
+  text(FM, 'RELATIVE DOSE', x, y, { sc: 2, c: P.C4, ol: null, n: age * 50 });
+  const bw = Math.round(w * k), by = y + 15;
+  for (let i = 0; i < 5; i++) { const a = Math.round(x + i * w / 5), b = Math.round(x + (i + 1) * w / 5); rect(a, by, Math.min(b, x + bw), by + 7, cols[i]); }
+  frame(x - 1, by - 1, x + w + 1, by + 8, P.SH);
+  if (age > 0.3) { text(FM, 'LOW', x, by + 11, { sc: 2, c: P.SUB, ol: null }); text(FM, 'HIGH', x + w, by + 11, { sc: 2, c: P.SUB, ol: null, align: 'right' }); }
+}
+// vertical meter with a label above it
+function meter(x, y, h, lv, label, col, colD, t0, t) {
+  const age = t - t0; if (age < 0) return;
+  const k = K75(clamp(age / 0.25, 0, 1));
+  const hh = Math.round(h * k);
+  rect(x, y + h - hh, x + 12, y + h, P.K0); frame(x - 1, y + h - hh - 1, x + 13, y + h + 1, P.N5);
+  const fh = Math.round((h - 4) * clamp(lv, 0, 1) * k);
+  rect(x + 2, y + h - 2 - fh, x + 10, y + h - 2, colD);
+  rect(x + 2, y + h - 2 - fh, x + 5, y + h - 2, col);
+  if (fh > 1) rect(x + 2, y + h - 2 - fh, x + 10, y + h - 1 - fh, P.E3);
+  for (let i = 1; i < 5; i++) rect(x + 10, Math.round(y + h - 2 - (h - 4) * i / 5), x + 12, Math.round(y + h - 1 - (h - 4) * i / 5), P.N6);
+  if (label) text(FM, label, x + 6, y - 14, { sc: 2, c: P.INK, align: 'center', n: age * 50 });
+}
+// pixel arrow (cursor) for the planning UI
+function cursor(x, y) {
+  const rows = ['#', '##', '#.#', '#..#', '#...#', '#....#', '#..###', '#.#', '##', '#'];
+  x = Math.round(x); y = Math.round(y);
+  for (let r = 0; r < rows.length; r++) for (let i = 0; i < rows[r].length; i++) {
+    if (rows[r][i] === '#') pset(x + i, y + r, P.SH);
+    else pset(x + i, y + r, P.INK);
+  }
+  // white fill inside
+  for (let r = 2; r < 7; r++) for (let i = 1; i < r && i < 5; i++) if (rows[r][i] === '.') pset(x + i, y + r, P.INK);
+}
+// check mark icon
+function tick(x, y, c, s) {
+  s = s || 1; const pts = [[0, 3], [1, 4], [2, 5], [3, 4], [4, 3], [5, 2], [6, 1]];
+  for (const [a, b] of pts) rect(x + a * s - s, y + b * s - s, x + a * s + s, y + b * s + s, P.SH);
+  for (const [a, b] of pts) rect(x + a * s, y + b * s, x + a * s + s, y + b * s + s, c);
+}
+
+// ---- 05_fx.js
+// ============================================================================
+// Shared FX: paths, electrons (dots + short trails), photons (yellow line
+// packets / zigzags), RF sine patterns (purple), radical tags.
+// ============================================================================
+class Path {
+  constructor(pts) { // flat [x0,y0,x1,y1,...]
+    this.p = pts; this.n = pts.length >> 1; this.c = [0];
+    for (let i = 1; i < this.n; i++) this.c.push(this.c[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]));
+    this.L = this.c[this.n - 1];
+  }
+  _seg(s) { s = clamp(s, 0, this.L); let lo = 0, hi = this.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (this.c[m] <= s) lo = m; else hi = m; } return [lo, s]; }
+  at(s) { const [i, ss] = this._seg(s); const l = this.c[i + 1] - this.c[i] || 1e-9, f = (ss - this.c[i]) / l; return [lerp(this.p[2 * i], this.p[2 * i + 2], f), lerp(this.p[2 * i + 1], this.p[2 * i + 3], f)]; }
+  tan(s) { const [i] = this._seg(s); const dx = this.p[2 * i + 2] - this.p[2 * i], dy = this.p[2 * i + 3] - this.p[2 * i + 1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+  sub(s0, s1, step) { // flat points of the sub-path
+    step = step || 2; const out = []; s0 = clamp(s0, 0, this.L); s1 = clamp(s1, 0, this.L);
+    for (let s = s0; s < s1; s += step) { const q = this.at(s); out.push(q[0], q[1]); }
+    const q = this.at(s1); out.push(q[0], q[1]); return out;
+  }
+}
+function arcPts(cx, cy, r, a0, a1, n, fx) { // fx(a) -> [x,y] param; default circle
+  const out = [];
+  for (let i = 0; i <= n; i++) { const a = lerp(a0, a1, i / n); if (fx) { const q = fx(a); out.push(q[0], q[1]); } else out.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+  return out;
+}
+// electron: bright dot, short trail behind the motion, small glow (screen px)
+function electron(x, y, vx, vy, opt) {
+  opt = opt || {};
+  const L = opt.trail === undefined ? 7 : opt.trail;
+  const c1 = opt.c1 || P.E1, c2 = opt.c2 || P.E2, c3 = opt.c3 || P.E3, c0 = opt.c0 || P.E0;
+  const v = Math.hypot(vx, vy) || 1, ux = vx / v, uy = vy / v;
+  if (opt.glow !== false) disc(x, y, opt.gr || 4.5, c0, 0.45 * (opt.lv || 1));
+  if (L > 0) {
+    line(x - ux * L, y - uy * L, x - ux * L * 0.45, y - uy * L * 0.45, c1, 0.6);
+    line(x - ux * L * 0.5, y - uy * L * 0.5, x, y, c1);
+  }
+  const r = opt.r || 1;
+  if (r >= 1.5) { disc(x, y, r + 0.6, c2); pset(x - 0.5, y - 0.5, c3); pset(x + 0.5, y - 0.5, c3); }
+  else { pset(x, y, c3); pset(x - 1, y, c2); pset(x + 1, y, c2); pset(x, y - 1, c2); pset(x, y + 1, c2); }
+}
+// photon packet: zigzag along direction (dx,dy); len, amp, wl in screen px
+function photon(x, y, dx, dy, opt) {
+  opt = opt || {};
+  const len = opt.len || 10, amp = opt.amp === undefined ? 1.6 : opt.amp, wl = opt.wl || 4;
+  const c = opt.c || P.Y2, ch = opt.ch || P.Y3;
+  const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; const nx = -dy, ny = dx;
+  if (opt.glow) disc(x - dx * len * 0.4, y - dy * len * 0.4, len * 0.55, P.Y0, 0.4 * opt.glow);
+  if (amp <= 0.3) { line(x - dx * len, y - dy * len, x, y, c); pset(x, y, ch); return; }
+  let px = x - dx * len, py = y - dy * len; const steps = Math.max(2, Math.round(len / (wl / 2)));
+  for (let i = 1; i <= steps; i++) {
+    const s = i / steps, sgn = (i === steps) ? 0 : (i % 2 ? 1 : -1);
+    const qx = x - dx * len * (1 - s) + nx * amp * sgn, qy = y - dy * len * (1 - s) + ny * amp * sgn;
+    line(px, py, qx, qy, c); px = qx; py = qy;
+  }
+  pset(x, y, ch); pset(x - dx, y - dy, ch);
+}
+// RF wave: sine drawn along a path (world path, cam), purple
+function rfAlong(cam, path, s0, s1, amp, wl, phase, c, cdim, lv) {
+  if (amp <= 0.05) return;
+  const step = 1.2 / cam.z;
+  let prev = null;
+  for (let s = s0; s <= s1; s += step) {
+    const [x, y] = path.at(s), [tx, ty] = path.tan(s);
+    const off = amp * Math.sin((s / wl) * TAU - phase);
+    const sx = cam.x(x - ty * off), sy = cam.y(y + tx * off);
+    if (prev) { line(prev[0], prev[1], sx, sy, Math.abs(off) > amp * 0.55 ? c : (cdim || c), lv); }
+    prev = [sx, sy];
+  }
+}
+// •OH tag next to a radical
+function ohTag(x, y, t0, t) { tag('•OH', x, y, t0, t, { c: P.O3 }); }
+
+// ---- 10_vessel.js
+// ============================================================================
+// VESSEL world: longitudinal cutaway of a coronary artery, vertical in frame.
+// Proximal (ostium side) at the top, distal at the bottom; blood flows DOWN.
+// x = lateral (0 = vessel axis), y = along the vessel. Lesion centred at y=0.
+// Plaque grows inside the wall (intima), never floats in the lumen.
+// ============================================================================
+for (const [k, v] of Object.entries({
+  AW0: '#3A1220', AW1: '#7A2A3C', AW2: '#B04A5C', AW3: '#D9737F', AW4: '#F6B0B4', AW5: '#FFD8D6',
+  BL0: '#2C0712', BL1: '#4A0C1C', BL2: '#651428',
+  RB0: '#4A0A16', RB1: '#8E1428', RB2: '#C81E3A', RB3: '#F0505E', RB4: '#FF9696',
+  PQ0: '#5A3A08', PQ1: '#A8701A', PQ2: '#E0A832', PQ3: '#F6D468',
+  FC1: '#CDBB92', FC2: '#F2E6C6',
+  GW0: '#59626E', GW1: '#AEB8C4', GW2: '#F2F6FA',
+  CA0: '#1E2638', CA1: '#3E4C68', CA2: '#6A7C9C', CA3: '#9EB0CC',
+  BA0: '#0C4250', BA1: '#2290AE', BA2: '#5CD6EE', BA3: '#C2F6FF',
+  ST0: '#353D49', ST1: '#6F7A8A', ST2: '#B4BFCC', ST3: '#EEF3F8',
+  MC0: '#3E3A5A', MC1: '#8A86B0', MC2: '#C4C0E0',
+  DR0: '#1C5A46', DR1: '#3FB98A', DR2: '#7FF0C0', DR3: '#D4FFEE',
+  HM0: '#3A0C16', HM1: '#6A1A28', HM2: '#9A2E3C', HM3: '#C4505A', HM4: '#E07A7E',
+  PA1: '#4E5C9C', PA2: '#7484C4', FAT: '#C9A26A',
+  XR0: '#141416', XR1: '#2E2E33', XR2: '#4E4E55', XR3: '#76767E', XR4: '#A0A0A8', XR5: '#CACACF', XR6: '#E6E6EA',
+  TL0: '#173F3C', TL1: '#2F7F7A', TL2: '#4FB0A8', TL3: '#8FDCD2',
+})) P[k] = hexc(v);
+
+const VS = { R0: 70, MED: 18, ADV: 13, Lp: 52, PLmax: 74, PRk: 0.42, RS: 67, NR: 6, K: 8, PITCH: 28, SLEN: 27.1, RC: 9, YT: -720, YB: 720 };
+const lesionB = y => { const u = y / VS.Lp, u2 = u * u; return 1 / (1 + u2 * u2 * u2); };
+// stent zig-zag amplitude from radius: strut length is conserved (struts rotate, they do not stretch)
+function stentAmp(r) { const h = Math.PI * r / VS.K; return Math.sqrt(Math.max(4, VS.SLEN * VS.SLEN - h * h)) / 2; }
+
+// ---------------------------------------------------------------- profile
+// st: g plaque growth, rb balloon radius, by device centre y, rs stent radius,
+//     stent 0 none / 1 on balloon / 2 left in the wall, ax axis centering 0..1
+function devAt(y, st) {
+  let r = 0;
+  if (st.rb > 0 && Math.abs(y - st.by) < 98) { const f = clamp((98 - Math.abs(y - st.by)) / 16, 0, 1); r = Math.max(r, lerp(Math.min(st.rb, 4), st.rb, smooth(f))); }
+  if (st.stent && Math.abs(y - (st.stent === 2 ? 0 : st.by)) < VS.NR * VS.PITCH / 2 + 2) r = Math.max(r, st.rs);
+  return r;
+}
+const PRF = { xl: 0, xr: 0, ml: 0, mr: 0, PL: 0, PR: 0, ax: 0, dev: 0, nc: 0 };
+function profile(y, st, o) {
+  o = o || PRF;
+  const g = st.g || 0, b = lesionB(y);
+  const PL = VS.PLmax * g * b, PR = PL * VS.PRk;
+  const xlN = -VS.R0 + PL, xrN = VS.R0 - PR, nc = (xlN + xrN) / 2;
+  const dev = devAt(y, st);
+  const ax = lerp(nc, 0, st.ax || 0);
+  let xl = xlN, xr = xrN;
+  if (dev > 0) { xl = Math.min(xlN, ax - dev); xr = Math.max(xrN, ax + dev); }
+  const pl = xlN - xl, pr = xr - xrN;
+  const thL = Math.max(0.4 * PL, PL - pl), thR = Math.max(0.4 * PR, PR - pr);
+  o.ml = xl - thL; o.mr = xr + thR; o.xl = xl; o.xr = xr; o.PL = PL; o.PR = PR; o.ax = ax; o.dev = dev; o.nc = nc;
+  o.thL = thL; o.thR = thR;
+  return o;
+}
+// ---------------------------------------------------------------- flow
+// Q(t) is integrated once into FLOWPHI so particle positions are a pure function of t
+let FLOWPHI = null;
+function flowQ(t) {
+  if (t < 1.5) return 1;
+  if (t < 6.0) return 1 - 0.45 * smooth(seg(t, 1.5, 5.0));
+  if (t < 24.3) return 0.55;
+  if (t < 31.2) return lerp(0.55, 0.03, smooth(seg(t, 24.3, 25.4)));
+  if (t < 35.0) return lerp(0.03, 1, smooth(seg(t, 31.2, 32.6)));
+  return 1;
+}
+function flowInit() {
+  const n = Math.ceil(DUR * 120) + 2; FLOWPHI = new Float32Array(n); let a = 0;
+  for (let i = 0; i < n; i++) { FLOWPHI[i] = a; a += flowQ(i / 120) / 120; }
+}
+function flowPhi(t) { const f = clamp(t, 0, DUR) * 120, i = Math.floor(f); return lerp(FLOWPHI[i], FLOWPHI[Math.min(i + 1, FLOWPHI.length - 1)], f - i); }
+// RBC particles
+const RBCS = (function () { const a = []; for (let i = 0; i < 175; i++) a.push({ p: hash(i * 3 + 1), u: (hash(i * 7 + 2) * 2 - 1) * 0.86, ang: hash(i * 11) * TAU, tb: hash(i * 13) * TAU, sz: 0.85 + 0.3 * hash(i * 17) }); return a; })();
+const _F = new Float32Array(800);
+function rbcLayout(st, phi, cb) {
+  // cumulative effective lumen width from the top (flow coordinate)
+  const n = 720, dy = (VS.YB - VS.YT) / n; let F = 0; _F[0] = 0;
+  const pr = {};
+  for (let i = 1; i <= n; i++) {
+    const y = VS.YT + (i - 0.5) * dy; profile(y, st, pr);
+    let w = pr.xr - pr.xl;
+    if (st.rb > 14 && Math.abs(y - st.by) < 98) w *= 1 - clamp((st.rb - 14) / 44, 0, 1);    // inflated balloon blocks the lumen
+    F += Math.max(0.5, w) * dy; _F[i] = F;
+  }
+  const Ft = F, speed = 0.115 * (VS.YB - VS.YT) * VS.R0 * 2 / Ft;
+  for (const c of RBCS) {
+    const k = 1 - 0.35 * c.u * c.u;
+    const f = ((c.p + k * phi * speed * 0.9) % 1 + 1) % 1, target = f * Ft;
+    let lo = 0, hi = n; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (_F[m] < target) lo = m; else hi = m; }
+    const y = VS.YT + (lo + (target - _F[lo]) / Math.max(1e-6, _F[hi] - _F[lo])) * dy;
+    profile(y, st, pr);
+    const m = 7.5, w = pr.xr - pr.xl;
+    if (w < 2 * m + 2) continue;
+    const x = pr.xl + m + (c.u + 1) / 2 * (w - 2 * m);
+    cb(c, x, y);
+  }
+}
+function drawRBC(x, y, s, ang, tb, sz) {
+  const rx = 6.4 * s * sz, ry = Math.max(1.4, rx * (0.32 + 0.68 * Math.abs(Math.cos(tb))));
+  if (x < -rx || x > W + rx || y < -rx || y > H + rx) return;
+  const m = maskEll(x, y, rx, ry, ang);
+  shade(m, P.RB2, P.RB3, P.RB1, P.RB0, { k: s > 1.6 ? 2 : 1 });
+  if (ry > 3) ellipse(x + 0.6, y + 0.6, rx * 0.42, ry * 0.42, P.RB1, undefined, ang);
+}
+// ---------------------------------------------------------------- render
+// opt: clip [x0,x1] screen columns; plaqueFx (formation 0..1); flowOff
+function drawVessel(cam, t, st, opt) {
+  opt = opt || {};
+  const c0 = opt.clip ? opt.clip[0] : 0, c1 = opt.clip ? opt.clip[1] : W;
+  const z = cam.z, phi = st.phi === undefined ? flowPhi(t) : st.phi;
+  // background tissue with soft parallax
+  for (let y = 0; y < H; y++) { buf.fill(P.BG, y * W + c0, y * W + c1); }
+  for (let i = 0; i < 9; i++) {
+    const wx = (hash(i * 5) - 0.5) * 700, wy = (hash(i * 9) - 0.5) * 1600;
+    const sx = CX + (wx - cam.cx * 0.45) * z * 0.6, sy = CY + (wy - cam.cy * 0.45) * z * 0.6;
+    const r = (40 + 50 * hash(i * 3)) * z * 0.6;
+    if (sx + r < c0 || sx - r > c1) continue;
+    disc(sx, sy, r, i % 2 ? P.N1 : P.N2, 0.7);
+  }
+  const pr = {};
+  const yOff = phi * 160;   // lumen streak texture moves with the flow
+  for (let sy = 0; sy < H; sy++) {
+    const wy = cam.wy(sy + 0.5);
+    profile(wy, st, pr);
+    const X = v => cam.x(v);
+    const oL = pr.ml - VS.MED - VS.ADV, oR = pr.mr + VS.MED + VS.ADV;
+    const bounds = [X(oL), X(pr.ml - VS.MED), X(pr.ml - 2.5), X(pr.ml), X(pr.xl), X(pr.xr), X(pr.mr), X(pr.mr + 2.5), X(pr.mr + VS.MED), X(oR)];
+    const capW = 3.2 * z, wyq = Math.floor(wy);
+    for (let sx = c0; sx < c1; sx++) {
+      const x = sx + 0.5;
+      let col;
+      if (x < bounds[0] || x >= bounds[9]) continue;
+      const wx = cam.wx(x);
+      if (x < bounds[1] || x >= bounds[8]) {           // adventitia
+        col = ((Math.floor(wx / 7) * 7 + wyq * 3) % 11 === 0) ? P.AW0 : P.AW1;
+        if (x < bounds[0] + 1 || x >= bounds[9] - 1) col = P.AW0;
+      } else if (x < bounds[2] || x >= bounds[7]) {    // media: circumferential smooth muscle in section
+        const q = (wyq + 400) % 7, r = Math.floor((wx + 400) / 5) % 3;
+        col = (q === 0 || (q === 3 && r === 1)) ? P.AW1 : (q === 1 && r === 0 ? P.AW3 : P.AW2);
+      } else if (x < bounds[3] || x >= bounds[6]) {    // intima / internal elastic lamina
+        col = P.AW3;
+      } else if (x < bounds[4] || x >= bounds[5]) {    // plaque inside the wall (left or right)
+        const left = x < bounds[4];
+        const dLum = left ? bounds[4] - x : x - bounds[5];
+        if (dLum < 1) col = P.AW4;                     // endothelium
+        else if (dLum < capW) col = dLum < capW * 0.5 ? P.FC2 : P.FC1;   // fibrous cap
+        else {
+          const h = hash2(Math.floor(wx / 3), Math.floor(wy / 3));
+          col = h < 0.08 ? P.PQ3 : h < 0.2 ? P.PQ1 : P.PQ2;
+          const dIn = left ? x - bounds[3] : bounds[6] - x;
+          if (dIn < 1.5 * z) col = P.PQ1;
+          if (((Math.floor(wx) + Math.floor(wy) * 2) % 13 === 0) && h > 0.5) col = P.PQ3; // cholesterol crystal glints
+        }
+      } else {                                         // lumen with plasma streaks
+        const e = Math.min(x - bounds[4], bounds[5] - x);
+        col = P.BL1;
+        const sq = (wy - yOff + 997 * (Math.floor(wx / 9) % 7)) % 23;
+        if (sq > 0 && sq < 2.2 * Math.min(1, z)) col = P.BL2;
+        if (e < 1) col = P.AW4;
+        else if (e < 5 * z && bay(sx, sy) < 0.5) col = P.BL0;
+      }
+      buf[sy * W + sx] = col;
+    }
+  }
+  // foam cells / macrophages inside the plaque
+  if ((st.g || 0) > 0.15) for (let i = 0; i < 9; i++) {
+    const yr = (hash(i * 31) - 0.5) * 1.4 * VS.Lp, f = 0.3 + 0.45 * hash(i * 37), right = i >= 6;
+    profile(yr, st, pr);
+    const th = right ? pr.mr - pr.xr : pr.xl - pr.ml;
+    if (th < 14) continue;
+    const wx = right ? pr.xr + f * th : pr.ml + f * th;
+    const sx = cam.x(wx), sy2 = cam.y(yr);
+    if (sx < c0 - 10 || sx > c1 + 10) continue;
+    const r = Math.min(th * 0.28, 7) * z;
+    shade(maskEll(sx, sy2, r * 1.2, r, hash(i) * 3), P.MC1, P.MC2, P.MC0, P.MC0);
+    for (let k = 0; k < 4; k++) { const a = k * 1.7 + i; pset(sx + Math.cos(a) * r * 0.5, sy2 + Math.sin(a) * r * 0.45, P.PQ3); }
+  }
+  if (opt.formation > 0) drawFormation(cam, st, opt.formation, t);
+  // stent back struts, then blood cells, then devices, then front struts
+  if (st.stent) drawStent(cam, st, -1, t);
+  rbcLayout(st, phi, (c, x, y) => {
+    const sx = cam.x(x); if (sx < c0 - 8 || sx > c1 + 8) return;
+    drawRBC(sx, cam.y(y), z, c.ang + t * 0.8 * (c.u + 0.2), c.tb + t * 2.4, c.sz);
+  });
+  drawDevices(cam, st, t);
+  if (st.stent) drawStent(cam, st, 1, t);
+}
+// LDL + monocytes entering the wall during plaque formation (time-lapse)
+function drawFormation(cam, st, k, t) {
+  const pr = {};
+  for (let i = 0; i < 16; i++) {
+    const y = (hash(i * 17 + 5) - 0.5) * 1.6 * VS.Lp; profile(y, st, pr);
+    const ph = clamp(k * 1.6 - i * 0.04, 0, 1); if (ph <= 0 || ph >= 1) continue;
+    const xa = pr.xl + 16, xb = pr.ml + 0.5 * (pr.xl - pr.ml);
+    const x = lerp(xa, xb, smooth(ph)), sx = cam.x(x), sy = cam.y(y);
+    if (i % 4 === 0) { shade(maskDisc(sx, sy, 4.5 * cam.z), P.MC1, P.MC2, P.MC0, P.MC0); pset(sx, sy, P.MC0); }
+    else { rect(sx - 1, sy - 1, sx + 2, sy + 2, P.PQ1); pset(sx, sy, P.PQ3); }
+  }
+}
+// ---------------------------------------------------------------- devices
+function wirePath(st, y0, y1) { // guidewire follows the lumen centre line
+  const pts = [], pr = {};
+  for (let y = y0; y <= y1; y += 4) { profile(y, st, pr); pts.push((pr.xl + pr.xr) / 2 + Math.sin(y * 0.03) * 2.5, y); }
+  return pts;
+}
+function tube(cam, pts, r, c0, c1, c2, c3) {
+  const q = cam.pts(pts);
+  for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, 2 * r * cam.z + 2), c0);
+  for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, 2 * r * cam.z), c1);
+  for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i] - r * cam.z * 0.35, q[i + 1], q[i + 2] - r * cam.z * 0.35, q[i + 3], Math.max(1, r * cam.z * 0.6), c2);
+  if (c3 !== undefined) for (let i = 0; i + 3 < q.length; i += 2) line(q[i] - r * cam.z * 0.5, q[i + 1], q[i + 2] - r * cam.z * 0.5, q[i + 3], c3);
+}
+function drawDevices(cam, st, t) {
+  const z = cam.z;
+  // guiding catheter at the ostium (top)
+  if (st.gc) tube(cam, [st.gcX || 0, -1200, st.gcX || 0, st.gcTip], 10, P.CA0, P.CA1, P.CA2, P.CA3);
+  // guidewire
+  if (st.wire !== undefined && st.wire !== null) {
+    const y0 = st.wireFrom === undefined ? (st.gc ? st.gcTip : -1200) : st.wireFrom;
+    if (st.wire > y0) {
+      const pts = wirePath(st, y0, st.wire);
+      const q = cam.pts(pts);
+      for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, 1.6 * z), P.GW0);
+      for (let i = 0; i + 3 < q.length; i += 2) line(q[i], q[i + 1], q[i + 2], q[i + 3], P.GW1);
+      if (z > 1.4) for (let i = 0; i + 3 < q.length; i += 2) line(q[i] - 1, q[i + 1], q[i + 2] - 1, q[i + 3], P.GW2);
+      // soft J-tip
+      const n = q.length; const tx = q[n - 2], ty = q[n - 1];
+      for (let k = 0; k <= 8; k++) { const a = k / 8 * Math.PI * 0.8; pset(tx + Math.sin(a) * 6 * z, ty + (1 - Math.cos(a)) * 3 * z + k * 0.6 * z, P.GW2); }
+      if (st.wireGlow) glow(tx, ty, 10, P.GW0, P.GW1, st.wireGlow);
+    }
+  }
+  // balloon catheter shaft (from the top down to the balloon)
+  if (st.rb > 0) {
+    const top = st.by - 98;
+    const pts = wirePath(st, -1200, top).map((v, i) => i % 2 === 0 ? v : v);
+    tube(cam, pts, 3.4, P.CA0, P.CA1, P.CA2);
+    drawBalloon(cam, st, t);
+  }
+}
+function drawBalloon(cam, st, t) {
+  const z = cam.z, pr = {};
+  const y0 = st.by - 98, y1 = st.by + 98;
+  const sy0 = Math.max(0, Math.floor(cam.y(y0))), sy1 = Math.min(H, Math.ceil(cam.y(y1)));
+  const infl = clamp((st.rb - 10) / 50, 0, 1);
+  for (let sy = sy0; sy < sy1; sy++) {
+    const wy = cam.wy(sy + 0.5); profile(wy, st, pr);
+    const f = clamp((98 - Math.abs(wy - st.by)) / 16, 0, 1);
+    const hb = lerp(Math.min(st.rb, 4), st.rb, smooth(f));
+    const xa = cam.x(pr.ax), a = Math.round(xa - hb * z), b = Math.round(xa + hb * z);
+    for (let sx = Math.max(0, a); sx < Math.min(W, b); sx++) {
+      const u = (sx + 0.5 - xa) / (hb * z);              // -1..1 across the balloon
+      if (u < -0.62 && u > -0.8) buf[sy * W + sx] = P.BA2;
+      else if (u > 0.55) { if (bay(sx, sy) < 0.55) buf[sy * W + sx] = P.BA0; }
+      else if (bay(sx, sy) < 0.32 + 0.18 * infl) buf[sy * W + sx] = P.BA1;
+      if (infl < 0.25 && ((sy + Math.round(u * 6)) % 7 === 0)) buf[sy * W + sx] = P.BA0;     // wrapped folds
+    }
+    if (a >= 0 && a < W) buf[sy * W + a] = P.BA3; if (b - 1 >= 0 && b - 1 < W) buf[sy * W + b - 1] = P.BA3;
+  }
+  // inner shaft + radiopaque marker bands at the stent ends
+  const pts = [], pts2 = [];
+  for (let y = y0; y <= y1; y += 4) { profile(y, st, pr); pts.push(pr.ax, y); }
+  const q = cam.pts(pts); for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, 2.4 * z), P.CA2);
+  for (const e of [-1, 1]) { const y = st.by + e * VS.NR * VS.PITCH / 2; profile(y, st, pr); rect(cam.x(pr.ax) - 3 * z, cam.y(y) - 1.5 * z, cam.x(pr.ax) + 3 * z, cam.y(y) + 1.5 * z, P.ST3); }
+}
+// ---------------------------------------------------------------- stent (cylindrical lattice)
+// side: -1 back half, +1 front half
+function drawStent(cam, st, side, t) {
+  const z = cam.z, cyS = st.stent === 2 ? 0 : st.by, pr = {};
+  const K = VS.K, nseg = 5;
+  for (let k = 0; k < VS.NR; k++) {
+    const yk = cyS + (k - (VS.NR - 1) / 2) * VS.PITCH;
+    profile(yk, st, pr);
+    const r = st.stent === 2 ? Math.min(st.rs, Math.max(-pr.xl, pr.xr) - 0.5) : st.rs;
+    const a = stentAmp(r), xa = pr.ax;
+    for (let i = 0; i < 2 * K; i++) {
+      const th0 = i * Math.PI / K, th1 = (i + 1) * Math.PI / K;
+      const z0 = ((i + k) % 2 ? -a : a), z1 = -z0;     // neighbouring rings are out of phase (peak-to-valley links)
+      let px = null, py = null;
+      for (let s = 0; s <= nseg; s++) {
+        const th = lerp(th0, th1, s / nseg), zz = lerp(z0, z1, s / nseg);
+        const d = Math.cos(th);
+        const sx = cam.x(xa + r * Math.sin(th)), sy = cam.y(yk + zz);
+        if (px !== null && (d >= 0 ? 1 : -1) === side) {
+          const lit = d > 0.55;
+          if (side > 0) { lineW(px, py, sx, sy, Math.max(1, 1.7 * z), P.ST0); line(px, py, sx, sy, lit ? P.ST3 : P.ST2); }
+          else line(px, py, sx, sy, P.ST1);
+        }
+        px = sx; py = sy;
+      }
+      // links between rings at every second crown
+      if (k < VS.NR - 1 && (i + k) % 2 === 0 && i % 4 < 2) {
+        const d = Math.cos(th0); if ((d >= 0 ? 1 : -1) !== side) continue;
+        const sx = cam.x(xa + r * Math.sin(th0));
+        line(sx, cam.y(yk + a), sx, cam.y(yk + VS.PITCH - a), side > 0 ? P.ST2 : P.ST1);
+      }
+    }
+  }
+}
+
+// ---- 11_anatomy.js
+// ============================================================================
+// Anatomy & lab worlds: beating heart with coronary arteries, top-down cath
+// lab, radial-access wrist cutaway, catheter route map, X-ray angiography,
+// stent strut close-up, drug-eluting coating close-up.
+// ============================================================================
+function spline(ctrl, per) { // closed Catmull-Rom
+  const n = ctrl.length / 2, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = (i - 1 + n) % n, p1 = i, p2 = (i + 1) % n, p3 = (i + 2) % n;
+    for (let k = 0; k < per; k++) {
+      const t = k / per, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push(f(ctrl[2 * p0], ctrl[2 * p1], ctrl[2 * p2], ctrl[2 * p3]), f(ctrl[2 * p0 + 1], ctrl[2 * p1 + 1], ctrl[2 * p2 + 1], ctrl[2 * p3 + 1]));
+    }
+  }
+  return out;
+}
+const HEART_OUT = spline([-30, -62, 10, -66, 46, -56, 70, -30, 82, 8, 78, 46, 62, 78, 46, 96, 24, 92, -6, 74, -38, 50, -62, 18, -72, -16, -62, -46], 8);
+const CORO = { // heart-local polylines (proximal -> distal), width
+  LAD: [[16, -50, 18, -30, 18.7, -18, 19, -6, 24, 20, 34, 50, 44, 78, 46, 92], 3.2],
+  D1: [[19, -2, 40, 6, 58, 22, 66, 34], 2],
+  D2: [[27, 30, 50, 42, 64, 58], 1.8],
+  LCX: [[16, -50, 38, -50, 60, -38, 76, -12, 80, 12], 2.8],
+  OM: [[66, -30, 74, -4, 72, 24], 1.8],
+  RCA: [[-10, -58, -36, -50, -56, -30, -66, 0, -58, 34, -34, 62, -10, 78], 3],
+  AM: [[-62, 14, -40, 30, -22, 40], 1.8],
+  LM: [[4, -58, 16, -50], 3.4],
+};
+const L_H = [18.7, -18];       // lesion on the proximal-mid LAD (vertical there)
+const HEART_C = [6, 14];
+function beatAt(t) { // systolic squeeze at every half-bar (64 bpm, locked to the 128 BPM grid)
+  const b = 2 * BEAT, ph = ((t % b) + b) % b / b;
+  return ph < 0.12 ? smooth(ph / 0.12) : ph < 0.4 ? 1 - smooth((ph - 0.12) / 0.28) : 0;
+}
+function heartXf(view, beat) {
+  const kx = 1 - 0.035 * beat, ky = 1 - 0.028 * beat;
+  return (lx, ly) => [view.ox + (HEART_C[0] + (lx - HEART_C[0]) * kx) * view.s, view.oy + (HEART_C[1] + (ly - HEART_C[1]) * ky) * view.s];
+}
+// opt: beat, lesion 'narrow'|'open', perf 0..1, hl, flow 0..1 (dots), t
+function drawHeart(view, t, opt) {
+  opt = opt || {};
+  const beat = opt.beat === undefined ? beatAt(t) : opt.beat, X = heartXf(view, beat), s = view.s;
+  const tubeL = (pts, w, c0, c1, c2) => {
+    const q = []; for (let i = 0; i < pts.length; i += 2) { const p = X(pts[i], pts[i + 1]); q.push(p[0], p[1]); }
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, w * s + 2), c0);
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, w * s), c1);
+    if (c2 !== undefined && w * s > 2) for (let i = 0; i + 3 < q.length; i += 2) line(q[i] - w * s * 0.25, q[i + 1] - w * s * 0.2, q[i + 2] - w * s * 0.25, q[i + 3] - w * s * 0.2, c2);
+    return q;
+  };
+  // great vessels behind the heart
+  tubeL([30, -40, 26, -78, 16, -104, -2, -110, -22, -100, -30, -82], 16, P.PA1 === undefined ? P.N4 : P.HM0, P.PA1, P.PA2);
+  tubeL([-6, -50, -10, -96, 0, -122, 26, -128, 50, -118, 58, -96], 20, P.AW0, P.AW2, P.AW3);
+  // myocardium
+  const pts = []; for (let i = 0; i < HEART_OUT.length; i += 2) { const p = X(HEART_OUT[i], HEART_OUT[i + 1]); pts.push(p[0], p[1]); }
+  const m = maskPoly(pts);
+  shade(m, P.HM2, P.HM3, P.HM1, P.HM0, { k: Math.max(1, Math.round(s * 2)) });
+  // right ventricle facet (two-tone) + interventricular groove shading
+  const rv = []; for (const [x, y] of [[-70, -14], [-60, 20], [-36, 50], [-4, 74], [22, 90], [24, 20], [18, -40], [-20, -56]]) { const p = X(x, y); rv.push(p[0], p[1]); }
+  mFill(maskPoly(rv), P.HM1, 0.35);
+  // downstream LV wall: reduced or restored supply (illustrative)
+  if (opt.perf !== undefined) {
+    const zone = []; for (const [x, y] of [[20, -12], [62, 10], [74, 40], [60, 76], [44, 92], [26, 70], [21, 20]]) { const p = X(x, y); zone.push(p[0], p[1]); }
+    const zm = maskPoly(zone);
+    if (opt.perf < 1) mFill(zm, P.HM0, 0.45 * (1 - opt.perf));
+    if (opt.perf > 0.5) mFill(zm, P.HM4, 0.22 * (opt.perf - 0.5) * 2 * (0.6 + 0.4 * beat));
+  }
+  // coronary arteries on the surface
+  const qs = {};
+  for (const k of ['RCA', 'AM', 'LCX', 'OM', 'D2', 'D1', 'LAD', 'LM']) qs[k] = tubeL(CORO[k][0], CORO[k][1], P.AW0, P.AW2, P.AW3);
+  const [lx, ly] = X(L_H[0], L_H[1]);
+  if (opt.lesion === 'narrow') { rect(lx - 2 * s, ly - 4 * s, lx - 0.4 * s, ly + 4 * s, P.PQ2); rect(lx + 0.6 * s, ly - 3 * s, lx + 2 * s, ly + 3 * s, P.PQ2); }
+  if (opt.lesion === 'open') { rect(lx - 1.8 * s, ly - 4.5 * s, lx + 1.8 * s, ly + 4.5 * s, P.ST2, 0.6); }
+  if (opt.hl) { const r = (9 + 2 * Math.sin(t * 8)) * Math.max(1, s * 0.5); ring(lx, ly, r, 1, P.INK, opt.hl); ring(lx, ly, r + 3, 1, P.AW4, 0.5 * opt.hl); }
+  // blood flow dots along the arteries
+  if (opt.flow > 0) for (const k of ['LM', 'LAD', 'D1', 'D2', 'LCX', 'OM', 'RCA', 'AM']) {
+    const q = qs[k]; const path = new Path(q); const n = Math.max(2, Math.floor(path.L / 9));
+    for (let i = 0; i < n; i++) {
+      let u = ((i / n) + t * 0.55 * (k === 'LAD' || k === 'D1' || k === 'D2' ? opt.flow : 1)) % 1;
+      if (k === 'LAD' && opt.lesion === 'narrow' && u > 0.25 && hash(i * 7) > 0.45) continue;
+      const [x, y] = path.at(u * path.L); rect(x - 0.5, y - 0.5, x + 1.5, y + 1.5, P.AW5);
+    }
+  }
+}
+// ---------------------------------------------------------------- cath lab (top-down)
+const LAB = { heartC: [8, -40], HL: 0.2316, wrist: [-98, 126] };
+const labHeartView = (cam) => ({ ox: cam.x(LAB.heartC[0]), oy: cam.y(LAB.heartC[1]), s: cam.z * LAB.HL });
+function drawLab(cam, t, opt) {
+  opt = opt || {};
+  const z = cam.z, R = (x0, y0, x1, y1, r) => maskRR(cam.x(x0), cam.y(y0), cam.x(x1), cam.y(y1), r * z);
+  clear(P.N1);
+  const g = 40 * z; if (g > 6) { const ox = ((cam.x(0) % g) + g) % g, oy = ((cam.y(0) % g) + g) % g; for (let x = ox; x < W; x += g) rect(x, 0, x + 1, H, P.N2); for (let y = oy; y < H; y += g) rect(0, y, W, y + 1, P.N2); }
+  // instrument table
+  shade(R(-205, 100, -150, 200, 4), P.C3, P.C4, P.C2, P.C0);
+  for (let i = 0; i < 4; i++) rect(cam.x(-198 + i * 12), cam.y(112), cam.x(-192 + i * 12), cam.y(170), i % 2 ? P.CA2 : P.ST2);
+  // procedure table + arm board
+  shade(R(-62, -175, 62, 340, 8), P.C1, P.C2, P.C0, P.K0, { k: 2 });
+  shade(R(-122, 40, -60, 160, 6), P.C1, P.C2, P.C0, P.K0);
+  // patient: gown, head, arms
+  shade(R(-56, -98, 56, 210, 22), P.N5, P.N6, P.N4, P.N3, { k: 2 });
+  shade(R(-40, 200, 40, 330, 14), P.N5, P.N6, P.N4, P.N3);
+  shade(maskDisc(cam.x(0), cam.y(-128), 23 * z), P.SK2, P.SK3, P.SK1, P.SK0, { k: 2 });
+  shade(maskEll(cam.x(0), cam.y(-140), 21 * z, 12 * z), P.N2, P.N3, P.N1, P.K0);
+  const arm = (pts, w) => { const q = cam.pts(pts); for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], w * z + 2, P.SK0); for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], w * z, P.SK2); };
+  arm([-52, -82, -78, 0, -92, 70, -98, 126], 16); arm([52, -82, 62, 20, 66, 126], 16);
+  shade(maskDisc(cam.x(-100), cam.y(142), 10 * z), P.SK2, P.SK3, P.SK1, P.SK0); shade(maskDisc(cam.x(67), cam.y(140), 10 * z), P.SK2, P.SK3, P.SK1, P.SK0);
+  // sterile drape window at the wrist
+  shade(R(-112, 96, -84, 138, 3), P.TL1, P.TL2, P.TL0, P.TL0);
+  rect(cam.x(-102), cam.y(110), cam.x(-94), cam.y(126), P.SK2);
+  if (opt.sheath) { const q = cam.pts([-98, 118, -92, 104]); lineW(q[0], q[1], q[2], q[3], Math.max(1, 3 * z), P.CA2); }
+  // chest window with the beating heart
+  if (opt.heart !== false) {
+    const hc = cam.pts(LAB.heartC), r = 36 * z;
+    const HB = SPARE[1]; HB.fill(P.HM0);  // draw the heart, keep it only inside the chest window
+    withBuffer(HB, () => drawHeart(labHeartView(cam), t, { lesion: opt.lesion || 'narrow', perf: opt.perf, hl: opt.hl, flow: opt.flow }));
+    const m = maskDisc(hc[0], hc[1], r);
+    for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) { if (!m.d[j * m.w + i]) continue; const x = m.x0 + i, y = m.y0 + j; if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = HB[y * W + x]; }
+    ring(hc[0], hc[1], r, Math.max(1, 1.5 * z), P.C4, 0.8);
+  }
+  // C-arm: flat-panel detector over the chest + the arc
+  const ca = opt.carm === false ? 0 : 1;
+  if (ca) {
+    const arc = []; for (let i = 0; i <= 24; i++) { const a = -1.75 + i / 24 * 3.5; arc.push(70 + Math.cos(a) * 70, -40 + Math.sin(a) * 70); }
+    const q = cam.pts(arc);
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], 18 * z + 2, P.C0);
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], 18 * z, P.C3);
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i] - 3 * z, q[i + 1], q[i + 2] - 3 * z, q[i + 3], 4 * z, P.C4);
+    if (opt.detector !== false) { shade(R(-44, -84, 44, -64, 3), P.C2, P.C3, P.C1, P.C0); }
+    shade(maskDisc(cam.x(140), cam.y(-40), 22 * z), P.C2, P.C3, P.C1, P.C0);
+  }
+  // monitor boom (top right)
+  for (let i = 0; i < 4; i++) {
+    const x0 = 86 + (i % 2) * 52, y0 = -232 + Math.floor(i / 2) * 40;
+    shade(R(x0, y0, x0 + 48, y0 + 34, 2), P.C0, P.C1, P.K0, P.K0);
+    rect(cam.x(x0 + 4), cam.y(y0 + 4), cam.x(x0 + 44), cam.y(y0 + 30), i === 0 ? P.XR3 : P.N3);
+    if (i === 0) for (let k = 0; k < 5; k++) line(cam.x(x0 + 10 + k * 6), cam.y(y0 + 8), cam.x(x0 + 14 + k * 5), cam.y(y0 + 26), P.XR1);
+  }
+  // interventional cardiologist (top-down: cap, shoulders, arms to the wrist)
+  const dx = -142, dy = 92;
+  const armq = cam.pts([dx + 10, dy + 6, -112, 118, dx + 14, dy - 8, -110, 104]);
+  lineW(armq[0], armq[1], armq[2], armq[3], 7 * z, P.TL1); lineW(armq[4], armq[5], armq[6], armq[7], 7 * z, P.TL1);
+  shade(maskEll(cam.x(dx), cam.y(dy), 20 * z, 30 * z, 0.3), P.TL2, P.TL3, P.TL1, P.TL0, { k: 2 });
+  shade(maskDisc(cam.x(dx - 2), cam.y(dy), 11 * z), P.TL1, P.TL2, P.TL0, P.TL0);
+  shade(maskDisc(cam.x(-110), cam.y(116), 4 * z), P.C5, P.C6, P.C3, P.C1); shade(maskDisc(cam.x(-108), cam.y(102), 4 * z), P.C5, P.C6, P.C3, P.C1);
+}
+// ---------------------------------------------------------------- wrist cutaway (side view)
+function drawWrist(cam, t, st) {
+  const z = cam.z;
+  clear(P.N1);
+  const Y = v => cam.y(v);
+  rect(0, Y(-90), W, Y(-80), P.SK3); rect(0, Y(-80), W, Y(-72), P.SK2);
+  for (let y = Math.max(0, Math.floor(Y(-72))); y < Math.min(H, Y(-28)); y++) for (let x = 0; x < W; x++) buf[y * W + x] = bay(x, y) < 0.3 ? P.SK3 : P.SK2;
+  rect(0, Y(-28), W, Y(140), P.MU1);
+  for (let i = 0; i < 18; i++) { const yy = Y(30 + i * 7); line(0, yy, W, yy + 3, P.MU0, 0.5); }
+  rect(0, Y(-92), W, Y(-90), P.SK0);
+  // radial artery
+  rect(0, Y(-22), W, Y(22), P.AW1); rect(0, Y(-21), W, Y(-17), P.AW3); rect(0, Y(17), W, Y(21), P.AW2);
+  rect(0, Y(-16), W, Y(16), P.BL1);
+  for (let i = 0; i < 26; i++) {
+    const x = ((hash(i * 3) * 600 + t * 120) % 600) - 300, y = (hash(i * 7) - 0.5) * 22;
+    drawRBC(cam.x(x), Y(y), z * 0.9, 0.2, i + t * 3, 1);
+  }
+  // local anaesthetic needle
+  const an = st.anaes || 0;
+  if (an > 0 && an < 1) {
+    const k = Math.sin(an * Math.PI), tipx = 74 - 14 * k, tipy = -92 + 18 * k;
+    lineW(cam.x(tipx + 50), Y(tipy - 40), cam.x(tipx), Y(tipy), 1.2, P.GW1);
+    shade(maskRR(cam.x(tipx + 50), Y(tipy - 48), cam.x(tipx + 90), Y(tipy - 32), 2), P.C4, P.C5, P.C2, P.C0);
+    for (let i = 0; i < 5; i++) disc(cam.x(tipx + (hash(i) - 0.5) * 16), Y(tipy + 4 + hash(i * 3) * 10), 1.4 * z * k, P.MC2, 0.8);
+  }
+  // introducer sheath: outside -> through the skin -> into the lumen, pointing toward the heart (left)
+  const k = st.sheath || 0;
+  if (k > 0) {
+    const path = new Path([180, -150, 40, -84, -20, -8, -260, -4]);
+    const tip = 60 + k * (path.L - 60);
+    const q = cam.pts(path.sub(0, tip, 3));
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], 9 * z + 2, P.CA0);
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], 9 * z, P.CA1);
+    for (let i = 0; i + 3 < q.length; i += 2) line(q[i], q[i + 1] - 2 * z, q[i + 2], q[i + 3] - 2 * z, P.CA3);
+    const hb = cam.pts([180, -150]); shade(maskRR(hb[0] - 10 * z, hb[1] - 16 * z, hb[0] + 18 * z, hb[1] + 6 * z, 3 * z), P.CA2, P.CA3, P.CA1, P.CA0);
+    lineW(hb[0] + 12 * z, hb[1] - 10 * z, hb[0] + 40 * z, hb[1] - 30 * z, 3 * z, P.CA2);
+    if (st.click) { const [tx, ty] = path.at(tip); ring(cam.x(tx), cam.y(ty), 10 + 10 * st.click, 1, P.INK, 1 - st.click); }
+  }
+}
+// ---------------------------------------------------------------- catheter route map
+const ROUTE = new Path([-124, 150, -121, 60, -119, 20, -110, -60, -95, -110, -60, -132, -22, -122, -4, -130, 8, -122, 6, -100, 3, -84, 10, -80, 16, -72]);
+const MAP_HEART = { ox: 4, oy: -50, s: 0.42 };
+function drawMap(cam, t, prog) {
+  const z = cam.z;
+  clear(P.BG);
+  const body = cam.pts([-95, -150, -40, -168, 40, -168, 95, -150, 104, -100, 80, 130, -80, 130, -104, -100]);
+  poly(body, P.N2); polyline(body.concat(body.slice(0, 2)), P.N4);
+  disc(cam.x(0), cam.y(-212), 36 * z, P.N2); ring(cam.x(0), cam.y(-212), 36 * z, 1, P.N4);
+  for (const s of [-1, 1]) { const q = cam.pts([s * 98, -140, s * 122, 20, s * 128, 160]); for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], 30 * z, P.N2); }
+  // other arteries (anatomical context)
+  const art = (pts, w) => { const q = cam.pts(pts); for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, w * z), P.AW1); };
+  art([-4, -130, -10, -180], 3); art([8, -124, 12, -180], 3); art([30, -128, 60, -132, 95, -110, 112, 20, 124, 150], 3);
+  art([40, -118, 46, -60, 46, 120], 5);
+  drawHeart({ ox: cam.x(MAP_HEART.ox), oy: cam.y(MAP_HEART.oy), s: MAP_HEART.s * z }, t, { lesion: 'narrow' });
+  const qa = cam.pts(ROUTE.p); for (let i = 0; i + 3 < qa.length; i += 2) lineW(qa[i], qa[i + 1], qa[i + 2], qa[i + 3], Math.max(1.5, 5 * z), P.AW2);
+  for (let i = 0; i + 3 < qa.length; i += 2) line(qa[i] - 1, qa[i + 1], qa[i + 2] - 1, qa[i + 3], P.AW3);
+  // guiding catheter inside the route
+  const L = ROUTE.L * clamp(prog, 0, 1);
+  if (L > 1) {
+    const q = cam.pts(ROUTE.sub(0, L, 3));
+    for (let i = 0; i + 3 < q.length; i += 2) lineW(q[i], q[i + 1], q[i + 2], q[i + 3], Math.max(1, 2.4 * z), P.CA3);
+    const [tx, ty] = ROUTE.at(L); glow(cam.x(tx), cam.y(ty), 9, P.CA1, P.CA3, 1); disc(cam.x(tx), cam.y(ty), 2, P.INK);
+  }
+}
+// ---------------------------------------------------------------- X-ray angiography
+const ANG = { // display-local tree (origin at the catheter tip), dist = path distance from the ostium
+  segs: [
+    { p: [0, 0, 6, 24], w: 5, d0: 0 },                                         // left main
+    { p: [6, 24, 10, 60, 14, 96, 12, 120, 8, 170, 0, 230, -8, 290], w: 4, d0: 24, lad: true },
+    { p: [12, 70, 40, 92, 62, 120], w: 2.6, d0: 70 },
+    { p: [9, 150, 34, 176, 52, 210], w: 2.2, d0: 150 },
+    { p: [6, 24, 40, 34, 70, 60, 86, 100, 92, 150], w: 3.6, d0: 24 },
+    { p: [70, 60, 96, 84, 104, 118], w: 2.2, d0: 70 },
+  ],
+  sten: [12, 108], stenL: 16,
+};
+function drawAngio(t, opt) {
+  opt = opt || {};
+  const zc = opt.zoom || 1, fx = opt.fx === undefined ? 0 : opt.fx, fy = opt.fy === undefined ? 0 : opt.fy;
+  clear(P.N1);
+  shade(maskRR(10, 64, 260, 408, 8), P.C1, P.C2, P.C0, P.K0, { k: 2 });
+  const sx0 = 18, sy0 = 72, sx1 = 252, sy1 = 392;
+  const ox = 120 - fx * zc + (fx === 0 ? 0 : 0), oy = 130 - fy * zc;
+  const X = x => 120 + (x - fx) * zc, Y = y => 150 + (y - fy) * zc;
+  const nt = Math.floor(t * 15);
+  for (let y = sy0; y < sy1; y++) for (let x = sx0; x < sx1; x++) {
+    const lx = (x - 120) / zc + fx, ly = (y - 150) / zc + fy;
+    let v = 0.62;
+    const dh = Math.hypot((lx - 30) / 120, (ly - 140) / 130); if (dh < 1) v -= 0.1 * (1 - dh);
+    if (Math.abs(lx + 70) < 16) v -= 0.08;                                   // spine shadow
+    if (((Math.floor(ly / 34) * 34 + 12 - ly + Math.abs(lx) * 0.18) % 34 + 34) % 34 < 2) v -= 0.05;   // ribs
+    v += (hash2(Math.floor(x / 2) + nt * 131, Math.floor(y / 2)) - 0.5) * 0.09;
+    const c = v > 0.7 ? P.XR6 : v > 0.62 ? P.XR5 : v > 0.54 ? P.XR4 : v > 0.46 ? P.XR3 : P.XR2;
+    buf[y * W + x] = c;
+  }
+  // guiding catheter shadow
+  lineW(X(-30), Y(-120), X(0), Y(0), Math.max(1, 3 * zc), P.XR2);
+  // contrast-filled vessels (dark), filling from the ostium
+  const front = opt.fill === undefined ? 1e9 : opt.fill;
+  for (const s of ANG.segs) {
+    const path = new Path(s.p); let acc = s.d0;
+    const L = clamp(front - acc, 0, path.L); if (L <= 0) continue;
+    const step = 2 / zc;
+    for (let u = 0; u < L; u += step) {
+      const [x, y] = path.at(u);
+      let w = s.w;
+      if (s.lad && !opt.post) { const d = Math.hypot(x - ANG.sten[0], y - ANG.sten[1]); if (d < ANG.stenL) w *= lerp(0.28, 1, smooth(d / ANG.stenL)); }
+      disc(X(x), Y(y), Math.max(0.6, w * zc * 0.5), P.XR1);
+    }
+  }
+  if (opt.post) { // faint stent mesh
+    for (let k = -4; k <= 4; k++) { const y = ANG.sten[1] + k * 4; line(X(ANG.sten[0] - 3.4), Y(y), X(ANG.sten[0] + 3.4), Y(y + 3), P.XR2); }
+  }
+  if (opt.mark) { const sx = X(ANG.sten[0]), sy = Y(ANG.sten[1]), r = (12 + 4 * Math.sin(t * 9)) * Math.max(1, zc * 0.4); frame(sx - r, sy - r, sx + r, sy + r, P.INK); }
+  // bezel UI: live indicator + frame counter dots
+  rect(sx0, sy0, sx1, sy0 + 1, P.C0); disc(sx1 - 10, sy0 + 10, 3, Math.floor(t * 2) % 2 ? P.R3 : P.R1);
+  for (let i = 0; i < 6; i++) rect(sx0 + 8 + i * 6, sy1 - 8, sx0 + 11 + i * 6, sy1 - 5, i <= nt % 6 ? P.C4 : P.C1);
+}
+// ---------------------------------------------------------------- stent strut close-up (unrolled lattice)
+function drawStrutCloseup(t, r, opt) {
+  opt = opt || {};
+  clear(P.BA0);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = 0.5 + 0.5 * Math.sin((x + y * 0.3) * 0.05 + t * 0.6); if (bay(x, y) < 0.25 + 0.3 * v) buf[y * W + x] = P.BA1; }
+  const Zc = 3.6, h = Math.PI * r / VS.K, a = stentAmp(r), pitch = VS.PITCH;
+  const cx = 135, cy = 240;
+  for (let ring_ = -2; ring_ <= 2; ring_++) {
+    const yk = ring_ * pitch;
+    for (let i = -8; i <= 8; i++) {
+      const x0 = i * h, x1 = (i + 1) * h, z0 = ((i + ring_) % 2 + 2) % 2 ? -a : a, z1 = -z0;
+      const A = [cx + x0 * Zc, cy + (yk + z0) * Zc], B = [cx + x1 * Zc, cy + (yk + z1) * Zc];
+      if (Math.max(A[0], B[0]) < -20 || Math.min(A[0], B[0]) > W + 20) continue;
+      lineW(A[0], A[1], B[0], B[1], 8, P.ST0); lineW(A[0], A[1], B[0], B[1], 6, P.ST1); lineW(A[0], A[1] - 1.5, B[0], B[1] - 1.5, 2.4, P.ST2); line(A[0], A[1] - 2, B[0], B[1] - 2, P.ST3);
+      // crown hinge: plastic deformation highlight while it bends
+      shade(maskDisc(A[0], A[1], 4.4), P.ST2, P.ST3, P.ST1, P.ST0);
+      if (opt.bend > 0) glow(A[0], A[1], 9, P.ST1, P.ST3, opt.bend * (0.6 + 0.4 * Math.sin(t * 20 + i)));
+      if (((i + ring_) % 2 + 2) % 2 === 0 && ((i % 4) + 4) % 4 < 2 && ring_ < 2) {
+        lineW(A[0], A[1], A[0], cy + (yk + pitch - a) * Zc, 6, P.ST0); lineW(A[0], A[1], A[0], cy + (yk + pitch - a) * Zc, 4, P.ST2); line(A[0] - 1, A[1], A[0] - 1, cy + (yk + pitch - a) * Zc, P.ST3);
+      }
+    }
+  }
+}
+// ---------------------------------------------------------------- drug-eluting coating close-up
+function drawDES(t, k) {
+  clear(P.BL1);
+  const wallX = 128;
+  // vessel wall tissue (left) with smooth-muscle cells
+  for (let y = 0; y < H; y++) for (let x = 0; x < wallX; x++) buf[y * W + x] = ((x + y * 2) % 23 === 0) ? P.AW1 : P.AW2;
+  for (let i = 0; i < 22; i++) {
+    const cx = 14 + hash(i * 3) * 100, cy = 20 + hash(i * 5) * 440;
+    shade(maskEll(cx, cy, 13, 4.5, 0.15 + 0.2 * hash(i)), P.AW3, P.AW4, P.AW2, P.AW1); disc(cx, cy, 2, P.AW1);
+  }
+  // excess tissue regrowth toward the lumen is held back where drug arrives
+  const grow = k;   // time-lapse progress
+  for (let i = 0; i < 7; i++) {
+    const cy = 120 + i * 44, near = Math.abs(cy - 250) < 90;
+    const ext = near ? 6 + 6 * smooth(clamp(grow * 3, 0, 1)) * (1 - 0.7 * smooth(clamp(grow * 2 - 0.3, 0, 1))) : 6 + 26 * grow;
+    shade(maskEll(wallX + ext * 0.5, cy, ext * 0.6 + 4, 7, 0), near ? P.AW3 : P.AW4, P.AW5, P.AW2, P.AW1);
+  }
+  rect(wallX - 1, 0, wallX + 1, H, P.AW4);
+  // strut cross-section with its thin drug-containing coating
+  const sx = wallX + 4, sy = 250, sw = 30, sh = 26;
+  shade(maskRR(sx - 6, sy - sh / 2 - 6, sx + sw + 6, sy + sh / 2 + 6, 9), P.DR0, P.DR1, P.DR0, P.DR0);
+  mFill(maskRR(sx - 4, sy - sh / 2 - 4, sx + sw + 4, sy + sh / 2 + 4, 8), P.DR1, 0.5);
+  shade(maskRR(sx, sy - sh / 2, sx + sw, sy + sh / 2, 6), P.ST2, P.ST3, P.ST1, P.ST0, { k: 2 });
+  // healing endothelial layer gradually covers the strut
+  const cov = smooth(clamp(grow * 1.3, 0, 1));
+  if (cov > 0) { for (let y = sy - 22 - 40 * cov; y < sy + 22 + 40 * cov; y += 1) { const x = sx + sw + 8; if (Math.abs(y - sy) < 22 + 40 * cov) rect(x, y, x + 3, y + 1, P.AW4); } }
+  // drug molecules: released slowly from the coating, diffusing into the wall
+  for (let i = 0; i < 46; i++) {
+    const rel = clamp((grow - hash(i * 7) * 0.8) / 0.25, 0, 1);
+    const a = hash(i * 13) * TAU, r0 = 18 + 4 * hash(i * 3);
+    let x = sx + sw / 2 + Math.cos(a) * r0, y = sy + Math.sin(a) * (r0 - 2);
+    if (rel > 0) { const d = rel * (60 + 80 * hash(i * 19)); x -= d * 0.9 + Math.sin(t * 3 + i) * 3; y += (hash(i * 23) - 0.5) * d * 1.4; }
+    if (x > W || x < 0) continue;
+    const c = rel > 0 ? P.DR2 : P.DR3;
+    rect(x - 1, y - 1, x + 2, y + 2, P.DR0); rect(x - 0.5, y - 0.5, x + 1.5, y + 1.5, c);
+  }
+  // blood in the lumen (right)
+  for (let i = 0; i < 9; i++) drawRBC(170 + hash(i * 3) * 90, ((hash(i * 7) * 520 + t * 90) % 520) - 20, 2.2, 1.4, i + t * 2, 1);
+}
+
+// ---- 20_scenes.js
+// ============================================================================
+// MASTER TIMELINE — HOW CORONARY STENTS WORK (24 scenes, 55 s, 60 fps)
+// renderFrame(t) is a pure function of t (flow, devices, dose of drug, all).
+// ============================================================================
+const BEAT = 60 / 128;
+function engineInit() { flowInit(); }
+function track(keys, t) {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i + 1 < keys.length; i++) { const a = keys[i], b = keys[i + 1]; if (t <= b[0]) return lerp(a[1], b[1], (b[2] || K75)(seg(t, a[0], b[0]))); }
+  return keys[keys.length - 1][1];
+}
+const LBL_Y = 40;
+const VH = 3.2 / 208;            // heart units per vessel unit (LAD width = vessel outer width)
+function chip(s, t0, t, col, icon, row) {
+  if (t < t0) return;
+  const k = K75(clamp((t - t0) / 0.22, 0, 1)), tw = textW(FM, s, 2), y = 404 - (row || 0) * 18;
+  const x = Math.round(lerp(-tw - 30, SAFE.l, k));
+  rect(x - 2, y - 3, x + tw + (icon ? 17 : 3), y + 13, P.K0); frame(x - 2, y - 3, x + tw + (icon ? 17 : 3), y + 13, col);
+  if (icon === 'clock') { ring(x + 6, y + 5, 5, 1, P.INK); const a = t * 9; line(x + 6, y + 5, x + 6 + Math.cos(a) * 4, y + 5 + Math.sin(a) * 4, P.INK); }
+  text(FM, s, x + (icon ? 14 : 1), y, { sc: 2, c: P.INK, ol: null });
+}
+// ---------------------------------------------------------------- vessel state through the film
+function gAt(t) { return t < 1.5 ? 0 : t < 3 ? 0.42 * smooth(seg(t, 1.5, 3)) : t < 4.5 ? lerp(0.42, 0.9, smooth(seg(t, 3, 4.5))) : lerp(0.9, 1, smooth(seg(t, 4.5, 5.6))); }
+function vstate(t) {
+  const st = { g: gAt(t), rb: 0, by: 0, rs: VS.RC, stent: 0, ax: 0, gc: false, gcTip: -330, wire: null };
+  if (t >= 16 && t < 35) {
+    st.gc = true;
+    st.wire = t < 18 ? track([[16.15, -330], [17.95, -80, eio]], t) : track([[18.1, -80], [18.9, 40, K50], [19.4, 230, eout]], t);
+    if (t >= 34.25) st.wire = track([[34.25, 230], [34.95, -700, ein]], t);
+  }
+  if (t >= 20 && t < 34.4) {
+    st.stent = 1; st.rb = 7;
+    st.by = t < 22.85 ? track([[20.0, -470], [21.7, -150, eout], [22.0, -150], [22.85, 0, K75]], t) : 0;
+    if (t >= 24.3) {
+      // pressurised fluid: stepped rise with micro-holds, peak at 26.25 (music drop), held, then deflation
+      st.rb = t < 26.25 ? lerp(7, 60, smooth(seg(t, 24.3, 26.25)) * (0.92 + 0.08 * Math.cos(seg(t, 24.3, 26.25) * 18))) : t < 31.1 ? lerp(60, 67, smooth(seg(t, 26.25, 29.0))) : lerp(67, 6, smooth(seg(t, 31.1, 32.4)));
+      st.rs = Math.max(VS.RC, t < 31.1 ? st.rb - 0.5 : 66);
+      st.ax = clamp((Math.max(st.rb, st.rs) - 12) / 30, 0, 1);
+    }
+    if (t >= 31.1) { st.stent = 2; st.rs = 66; st.ax = 1; }
+    if (t >= 33.1) { st.by = track([[33.1, 0], [34.3, -760, ein]], t); }
+  }
+  if (t >= 34.4) { st.stent = 2; st.rs = 66; st.ax = 1; }
+  return st;
+}
+// ---------------------------------------------------------------- S01-S04 inside the artery
+function flowMeter(lv, t0, t) {
+  const k = K75(clamp((t - t0) / 0.25, 0, 1)); if (k <= 0) return;
+  const x = 230, y = 150, h = 120;
+  rect(x - 2, y - 22, x + 20, y + h + 2, P.K0); frame(x - 2, y - 22, x + 20, y + h + 2, P.N5);
+  // blood drop icon
+  disc(x + 9, y - 9, 5, P.RB2); poly([x + 9, y - 21, x + 4.5, y - 10, x + 13.5, y - 10], P.RB2); pset(x + 7, y - 11, P.RB4);
+  const fh = Math.round((h - 4) * clamp(lv, 0, 1) * k);
+  rect(x + 2, y + h - 2 - fh, x + 16, y + h - 2, P.RB1); rect(x + 2, y + h - 2 - fh, x + 7, y + h - 2, P.RB2);
+  if (fh > 0) rect(x + 2, y + h - 2 - fh, x + 16, y + h - 1 - fh, P.RB4);
+  for (let i = 1; i < 4; i++) rect(x + 16, Math.round(y + h - 2 - (h - 4) * i / 4), x + 18, Math.round(y + h - 1 - (h - 4) * i / 4), P.N6);
+}
+function s01(t) {
+  const cam = new Cam(0, track([[0, -270], [1.5, 0, eout]], t), 1.0);
+  drawVessel(cam, t, vstate(t));
+  callout({ text: 'HEALTHY ARTERY', x: 18, y: LBL_Y, ax: CX - 40, ay: CY + 10, t0: 0.12 }, t);
+}
+function s02(t) {
+  const cam = new Cam(track([[1.5, 0], [2.4, -22]], t), 0, track([[1.5, 1.0], [3.0, 1.18, eio]], t));
+  drawVessel(cam, t, vstate(t), { formation: seg(t, 1.5, 3.0) });
+  callout({ text: 'PLAQUE BUILDS UP', x: 18, y: LBL_Y, ax: cam.x(-VS.R0 + 10), ay: cam.y(-30), t0: 1.62, micro: 'YEARS LATER' }, t);
+}
+function widthBar(cam, st, t, t0) {
+  const k = clamp((t - t0) / 0.2, 0, 1); if (k <= 0) return;
+  const pr = profile(0, st, {}); const y = cam.y(0);
+  const a = cam.x(pr.xl) + 2, b = cam.x(pr.xr) - 2, a0 = cam.x(-VS.R0) + 2, b0 = cam.x(VS.R0) - 2;
+  dashLine(a0, y - 0, b0, y, P.N6, 2, 3, 0); rect(a0, y - 4, a0 + 1, y + 5, P.N6); rect(b0 - 1, y - 4, b0, y + 5, P.N6);
+  rect(a, y - 1, b, y + 1, P.INK); rect(a, y - 6, a + 2, y + 7, P.INK); rect(b - 2, y - 6, b, y + 7, P.INK);
+}
+function s03(t) {
+  const cam = new Cam(track([[3.0, -22], [3.6, 0]], t), 0, track([[3.0, 1.18], [3.7, 0.92, K75]], t));
+  const st = vstate(t);
+  drawVessel(cam, t, st);
+  widthBar(cam, st, t, 3.3);
+  callout({ text: 'ARTERY NARROWS', x: 18, y: LBL_Y, ax: CX + 8, ay: cam.y(-20), t0: 3.08 }, t);
+}
+function s04(t) {
+  const cam = new Cam(0, track([[4.5, 0], [6.0, 40, eio]], t), track([[4.5, 0.92], [6.0, 1.2, eio]], t));
+  drawVessel(cam, t, vstate(t));
+  flowMeter(lerp(1, 0.55, smooth(seg(t, 4.6, 5.6))), 4.55, t);
+  callout({ text: 'REDUCED BLOOD SUPPLY', x: 18, y: LBL_Y, ax: CX + 10, ay: cam.y(130), t0: 4.6 }, t);
+}
+// ---------------------------------------------------------------- scale chain: vessel <-> heart <-> lab
+function chainScene(sH, t, o) {
+  const M = sH * VH;
+  const zL = sH / LAB.HL;
+  const lesLab = [LAB.heartC[0] + L_H[0] * LAB.HL, LAB.heartC[1] + L_H[1] * LAB.HL];
+  const drawV = () => drawVessel(new Cam(0, 0, M), t, o.vstate);
+  const drawHt = () => { clear(P.BG); drawHeart({ ox: CX - L_H[0] * sH, oy: CY - L_H[1] * sH, s: sH }, t, o.heart); };
+  const lc = o.labCenter || lesLab;
+  const drawL = () => drawLab(new Cam(lc[0], lc[1], zL), t, o.lab || {});
+  const mix = (A, B, k) => { if (k <= 0) A(); else if (k >= 1) B(); else { withBuffer(TMPBUF, A); B(); dissolve(TMPBUF, buf, k, buf); } };
+  if (sH > 3.4) mix(drawV, drawHt, smooth(seg(-Math.log(sH), -Math.log(5.6), -Math.log(3.4))));
+  else if (sH > 0.9) drawHt();
+  else mix(drawHt, drawL, smooth(seg(-Math.log(sH), -Math.log(0.9), -Math.log(0.52))));
+}
+function s05(t) {
+  const sH = Math.exp(lerp(Math.log(1.2 / VH), Math.log(0.37), K75(seg(t, 6.0, 7.75))));
+  const lesLab = [LAB.heartC[0] + L_H[0] * LAB.HL, LAB.heartC[1] + L_H[1] * LAB.HL];
+  const f = smooth(seg(t, 7.2, 7.9));
+  chainScene(sH, t, { vstate: vstate(t), heart: { lesion: 'narrow', perf: 0.35, hl: seg(t, 6.6, 6.9) }, lab: { lesion: 'narrow', perf: 0.35, hl: 1 }, labCenter: [lerp(lesLab[0], 0, f), lerp(lesLab[1], -30, f)] });
+  let ax = CX, ay = CY;
+  if (sH < 0.9) { const cam = new Cam(lerp(lesLab[0], 0, f), lerp(lesLab[1], -30, f), sH / LAB.HL); ax = cam.x(lesLab[0]); ay = cam.y(lesLab[1]); }
+  callout({ text: 'CORONARY ARTERY', x: 18, y: LBL_Y, ax, ay: ay - 8, t0: 6.7 }, t);
+}
+// ---------------------------------------------------------------- S06 cath lab, S07 wrist, S08 route
+function labCam(t) {
+  const zL = track([[8.0, 1.6], [8.7, 0.72, K75], [9.25, 0.74], [10.0, 3.4, ein]], t);
+  const cx = track([[8.0, 0], [8.7, -40, K75], [9.25, -40], [10.0, LAB.wrist[0], ein]], t), cy = track([[8.0, -30], [8.7, 20, K75], [9.25, 20], [10.0, LAB.wrist[1] - 8, ein]], t);
+  return new Cam(cx, cy, zL);
+}
+function s06(t) {
+  const cam = labCam(t);
+  drawLab(cam, t, { lesion: 'narrow', perf: 0.35 });
+  if (t > 8.1) { const k = seg(t, 8.1, 8.3); rect(cam.x(86) - 1, cam.y(-232) - 1, cam.x(186) + 1, cam.y(-152) + 1, P.TL3, 0.25 * k * (1 - seg(t, 9.2, 9.4))); }
+  callout({ text: 'CARDIAC CATHETERIZATION', x: 18, y: LBL_Y, ax: cam.x(60), ay: cam.y(-80), t0: 8.25 }, t);
+}
+function s07(t) {
+  const cam = new Cam(0, -20, track([[10.0, 1.15], [12.0, 1.25, eio]], t));
+  drawWrist(cam, t, { anaes: seg(t, 10.12, 10.55), sheath: K75(seg(t, 10.65, 11.55)), click: t > 11.55 ? seg(t, 11.55, 11.85) : 0 });
+  const [ex, ey] = [cam.x(40), cam.y(-84)];
+  callout({ text: 'RADIAL ACCESS', x: 18, y: LBL_Y, ax: ex, ay: ey, t0: 10.2 }, t);
+}
+function s08(t) {
+  const prog = smooth(seg(t, 12.15, 13.85));
+  const [tx, ty] = ROUTE.at(ROUTE.L * prog);
+  const z = track([[12.0, 1.0], [12.4, 1.55, K75], [13.6, 1.55], [14.0, 2.4, ein]], t);
+  const cam = new Cam(lerp(-70, tx, 0.8), lerp(-20, ty, 0.85), z);
+  drawMap(cam, t, prog);
+  callout({ text: 'GUIDING CATHETER', x: 18, y: LBL_Y, ax: cam.x(tx), ay: cam.y(ty) - 4, t0: 12.2 }, t);
+}
+// ---------------------------------------------------------------- S09 angiography
+function s09(t) {
+  const zm = track([[14.0, 1.0], [15.15, 1.0], [16.0, 3.4, ein]], t);
+  const fx = ANG.sten[0] * smooth(seg(t, 15.15, 16)), fy = ANG.sten[1] * smooth(seg(t, 15.15, 16));
+  drawAngio(t, { fill: lerp(0, 330, smooth(seg(t, 14.25, 15.05))), zoom: zm, fx, fy, mark: t > 14.95 && t < 15.6 });
+  callout({ text: 'X-RAY GUIDANCE', x: 18, y: LBL_Y - 10, ax: 120 + (ANG.sten[0] - fx) * zm + 14, ay: 150 + (ANG.sten[1] - fy) * zm, t0: 14.3 }, t);
+}
+// ---------------------------------------------------------------- S10-S19 the procedure in the vessel
+function s10(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, track([[16.0, 0], [16.6, -110, K75], [17.95, -40, eio]], t), track([[16.0, 0.92], [16.6, 1.1, K75]], t));
+  drawVessel(cam, t, st);
+  callout({ text: 'GUIDEWIRE', x: 18, y: LBL_Y, ax: cam.x(profile(st.wire, st, {}).nc) + 2, ay: cam.y(st.wire) + 4, t0: 16.3 }, t);
+}
+function s11(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, track([[18.0, -40], [19.3, 120, K75], [19.9, 40, K75]], t), track([[18.0, 1.1], [19.3, 1.1], [19.9, 0.9, K75]], t));
+  st.wireGlow = seg(t, 18.4, 19.2) * (1 - seg(t, 19.4, 19.6));
+  drawVessel(cam, t, st);
+  if (t > 19.4) {
+    const k = seg(t, 19.4, 19.75), pr = profile(st.wire, st, {}), x = cam.x((pr.xl + pr.xr) / 2), y = cam.y(st.wire);
+    ring(x, y, 6 + 16 * backOut(k), 1, P.G2, 1 - 0.7 * k); if (k > 0.3) tick(x + 10, y - 16, P.G2, 2);
+  }
+  callout({ text: 'LESION CROSSED', x: 18, y: LBL_Y, ax: cam.x(profile(0, st, {}).nc), ay: cam.y(0), t0: 18.25 }, t);
+}
+function s12(t) {
+  const st = vstate(t);
+  const close = 1 - smooth(seg(t, 21.55, 22.0));
+  const cam = new Cam(lerp(0, profile(st.by, st, {}).ax, close), lerp(0, st.by, close), lerp(0.95, 1.75, close));
+  drawVessel(cam, t, st);
+  callout({ text: 'STENT DELIVERY', x: 18, y: LBL_Y, ax: cam.x(profile(st.by, st, {}).ax + 10), ay: cam.y(st.by - 20), t0: 20.15 }, t);
+}
+function lockBrackets(cam, t, t0) {
+  const k = backOut(clamp((t - t0) / 0.3, 0, 1), 2); if (k <= 0) return;
+  const hy = VS.NR * VS.PITCH / 2 + 4, w = 46;
+  const y0 = cam.y(-hy), y1 = cam.y(hy), x0 = cam.x(-w), x1 = cam.x(w), L = 14 * k;
+  const c = P.INK;
+  for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { rect(x, y, x + sx * L, y + sy * 2, c); rect(x, y, x + sx * 2, y + sy * L, c); }
+  for (const y of [y0, y1]) dashLine(x0 - 30, y, x0 - 6, y, P.ST3, 2, 2, t * 20);
+}
+function s13(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, 0, track([[22.0, 0.95], [24.0, 1.0, eio]], t));
+  drawVessel(cam, t, st);
+  lockBrackets(cam, t, 22.85);
+  callout({ text: 'STENT POSITIONED', x: 18, y: LBL_Y, ax: cam.x(-48), ay: cam.y(-VS.NR * VS.PITCH / 2 - 4), t0: 22.4 }, t);
+}
+function gauge(p, t0, t) {
+  const k = K75(clamp((t - t0) / 0.25, 0, 1)); if (k <= 0) return;
+  const cx = 232, cy = 368, r = 20 * k;
+  disc(cx, cy, r + 3, P.K0); ring(cx, cy, r + 2, 1, P.N5); disc(cx, cy, r, P.N2);
+  for (let i = 0; i <= 8; i++) { const a = Math.PI * 0.75 + i / 8 * Math.PI * 1.5; line(cx + Math.cos(a) * r * 0.75, cy + Math.sin(a) * r * 0.75, cx + Math.cos(a) * r * 0.95, cy + Math.sin(a) * r * 0.95, i > 6 ? P.RB3 : P.C4); }
+  const a = Math.PI * 0.75 + clamp(p, 0, 1) * Math.PI * 1.5;
+  lineW(cx, cy, cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8, 2, P.BA2); disc(cx, cy, 2.5, P.C5);
+  // syringe-style inflation device body
+  rect(cx - 6, cy + r + 4, cx + 6, cy + r + 9, P.BA1);
+}
+function s14(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, 0, 1.0);
+  drawVessel(cam, t, st);
+  gauge(smooth(seg(t, 24.3, 26.25)) * 0.9, 24.25, t);
+  if (t > 26.25 && t < 26.7) { const k = seg(t, 26.25, 26.7); ring(cam.x(0), cam.y(0), 70 + 40 * k, 2, P.BA3, 1 - k); }
+  callout({ text: 'BALLOON INFLATION', x: 18, y: LBL_Y, ax: cam.x(-st.rb * 0.5), ay: cam.y(-40), t0: 24.2 }, t);
+}
+function s15(t) {
+  const r = lerp(24, 67, smooth(seg(t, 27.05, 28.55)));
+  drawStrutCloseup(t, r, { bend: seg(t, 27.1, 27.5) * (1 - seg(t, 28.4, 28.8)) });
+  callout({ text: 'STENT EXPANSION', x: 18, y: LBL_Y, ax: 135 + 0, ay: 240 - stentAmp(r) * 3.6, t0: 27.15 }, t);
+}
+function s16(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, 0, track([[29.0, 1.25], [31.0, 1.05, eio]], t));
+  drawVessel(cam, t, st);
+  // outward contact force: stent pressing plaque into the wall (plaque stays, compressed)
+  const k = seg(t, 29.2, 29.5) * (1 - seg(t, 30.6, 30.9));
+  if (k > 0) for (const sgn of [-1, 1]) for (const y of [-40, 0, 40]) {
+    const pr = profile(y, st, {}), x = cam.x(sgn < 0 ? pr.xl : pr.xr) - sgn * 8, yy = cam.y(y);
+    const ph = (t * 3) % 1, d = 6 * ph;
+    poly([x + sgn * d, yy - 4, x + sgn * (d + 6), yy, x + sgn * d, yy + 4], P.INK, k);
+  }
+  callout({ text: 'ARTERY WIDENS', x: 18, y: LBL_Y, ax: cam.x(profile(-30, st, {}).xl - 10), ay: cam.y(-30), t0: 29.15 }, t);
+}
+function s17(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, 0, 1.05);
+  drawVessel(cam, t, st);
+  callout({ text: 'BALLOON DEFLATES', x: 18, y: LBL_Y, ax: cam.x(st.rb * 0.4), ay: cam.y(-20), t0: 31.15 }, t);
+}
+function s18(t) {
+  const st = vstate(t);
+  const cam = new Cam(0, 0, track([[33.0, 1.05], [35.0, 0.95, eio]], t));
+  drawVessel(cam, t, st);
+  if (t > 34.5) { const k = seg(t, 34.5, 34.8); ring(cam.x(0), cam.y(0), 40 + 50 * k, 1, P.G2, 1 - k); }
+  callout({ text: 'STENT STAYS IN PLACE', x: 18, y: LBL_Y, ax: cam.x(-62), ay: cam.y(-60), t0: 33.2 }, t);
+}
+function s19(t) {
+  const st = vstate(t); st.gc = false; st.wire = null;
+  const cam = new Cam(0, track([[35.0, -300], [38.0, 260, eio]], t), 1.0);
+  drawVessel(cam, t, st);
+  flowMeter(lerp(0.55, 1, smooth(seg(t, 35.3, 36.4))), 35.2, t);
+  callout({ text: 'IMPROVED BLOOD FLOW', x: 18, y: LBL_Y, ax: CX - 30, ay: CY + 30, t0: 35.2 }, t);
+}
+// ---------------------------------------------------------------- S20 before / after
+function s20(t) {
+  const before = { g: 1, rb: 0, by: 0, rs: 0, stent: 0, ax: 0, phi: flowPhi(5) + (t - 38) * 0.55 };
+  const after = { g: 1, rb: 0, by: 0, rs: 66, stent: 2, ax: 1, phi: flowPhi(36) + (t - 38) };
+  withBuffer(TMPBUF, () => drawVessel(new Cam(113, 0, 0.6), t, before));
+  drawVessel(new Cam(-113, 0, 0.6), t, after);
+  for (let y = 0; y < H; y++) for (let x = 0; x < 135; x++) buf[y * W + x] = TMPBUF[y * W + x];
+  rect(134, 0, 136, H, P.K0); rect(134.5, 0, 135.5, H, P.INK);
+  const k = seg(t, 38.05, 38.3);
+  rect(0, 0, W, H, P.C6, k > 0 && k < 1 ? 0.15 * (1 - k) : 0);
+  const s = 'BEFORE / AFTER', tw = textW(FL, s, 2);
+  callout({ text: s, x: CX - tw / 2 + 1, y: LBL_Y, ax: null, t0: 38.1 }, t);
+}
+// ---------------------------------------------------------------- S21 post-stent angiography
+function s21(t) {
+  drawAngio(t, { post: true, fill: lerp(0, 330, smooth(seg(t, 40.1, 40.9))), zoom: track([[40.0, 2.4], [42.0, 2.0, eio]], t), fx: ANG.sten[0], fy: ANG.sten[1] - 10 });
+  if (t > 40.8) { const k = seg(t, 40.8, 41.1); tick(205, 300, P.G2, 2); ring(213, 305, 8 + 8 * k, 1, P.G2, 1 - k); }
+  callout({ text: 'FLOW ASSESSMENT', x: 18, y: LBL_Y - 10, ax: 120 + 14, ay: 150 + 10 * 2.2, t0: 40.15 }, t);
+}
+// ---------------------------------------------------------------- S22 drug-eluting stent
+function s22(t) {
+  const zin = seg(t, 42.0, 42.7);
+  if (zin < 1) {
+    const st = { g: 1, rb: 0, by: 0, rs: 66, stent: 2, ax: 1 };
+    const z = Math.exp(lerp(Math.log(1.2), Math.log(5), K75(zin)));
+    const draw1 = () => drawVessel(new Cam(lerp(0, -60, K75(zin)), 0, z), t, st);
+    if (zin < 0.6) draw1(); else { withBuffer(TMPBUF, draw1); drawDES(t, 0); dissolve(TMPBUF, buf, smooth(seg(zin, 0.6, 1)), buf); }
+  } else drawDES(t, smooth(seg(t, 42.8, 45.6)));
+  callout({ text: 'DRUG-ELUTING STENT', x: 18, y: LBL_Y, ax: 150, ay: 222, t0: 42.35, micro: 'Helps limit tissue regrowth' }, t);
+}
+// ---------------------------------------------------------------- S23 coronary circulation
+function s23(t) {
+  const sH = Math.exp(lerp(Math.log(2.2 / VH), Math.log(1.45), K75(seg(t, 46.0, 47.6))));
+  const perf = lerp(0.35, 1, smooth(seg(t, 47.4, 49.2)));
+  const st = { g: 1, rb: 0, by: 0, rs: 66, stent: 2, ax: 1 };
+  if (sH > 3.4) chainScene(sH, t, { vstate: st, heart: { lesion: 'open', perf, flow: 1 } });
+  else { clear(P.BG); const cy = lerp(CY - L_H[1] * sH, 250 - HEART_C[1] * sH, smooth(seg(t, 47.0, 48.0))), cx = lerp(CX - L_H[0] * sH, 135 - HEART_C[0] * sH, smooth(seg(t, 47.0, 48.0))); drawHeart({ ox: cx, oy: cy, s: sH }, t, { lesion: 'open', perf, flow: 1, hl: seg(t, 47.8, 48.1) * (1 - seg(t, 49.5, 49.8)) }); }
+  const ax = 135 + (L_H[0] - HEART_C[0]) * 1.45, ay = 250 + (L_H[1] - HEART_C[1]) * 1.45;
+  callout({ text: 'BLOOD FLOW IMPROVED', x: 18, y: LBL_Y, ax, ay: ay - 10, t0: 47.75 }, t);
+}
+// ---------------------------------------------------------------- S24 recap + title + loop
+const RECAP = [['PLAQUE', 51.0], ['NARROWED ARTERY', 51.45], ['GUIDEWIRE', 51.9], ['BALLOON', 52.35], ['EXPANDED STENT', 52.8], ['IMPROVED FLOW', 53.25]];
+function recapState(i, t) {
+  const st = { g: 1, rb: 0, by: 0, rs: VS.RC, stent: 0, ax: 0, gc: false, wire: null };
+  const u = clamp((t - RECAP[i][1]) / 0.45, 0, 1);
+  if (i === 0) st.g = lerp(0.2, 0.55, u);
+  if (i === 2) { st.gc = true; st.wire = lerp(-120, 200, eout(u)); }
+  if (i === 3) { st.gc = true; st.wire = 220; st.stent = 1; st.rb = lerp(20, 60, u); st.rs = st.rb - 0.5; st.ax = clamp((st.rb - 12) / 30, 0, 1); }
+  if (i >= 4) { st.stent = 2; st.rs = 66; st.ax = 1; }
+  st.phi = flowPhi(i < 4 ? 10 : 40) + (t - 51) * (i === 5 ? 1.4 : i < 3 ? 0.55 : 0.2);
+  return st;
+}
+function s24(t) {
+  if (t < 53.7) {
+    let i = 0; while (i + 1 < RECAP.length && t >= RECAP[i + 1][1]) i++;
+    const cam = new Cam(0, 0, 0.92 + 0.06 * seg(t, RECAP[i][1], RECAP[i][1] + 0.45));
+    drawVessel(cam, t, recapState(i, t));
+    const k = seg(t, RECAP[i][1], RECAP[i][1] + 0.1); if (k < 1 && i > 0) rect(0, 0, W, H, P.C6, 0.25 * (1 - k));
+    tag(RECAP[i][0], CX, LBL_Y, RECAP[i][1] + 0.02, t, { align: 'center', c: P.INK, plate: P.N5 });
+    for (let j = 0; j < 6; j++) { const x = 105 + j * 12; rect(x, 396, x + 7, 400, j <= i ? P.BA2 : P.N4); }
+    return;
+  }
+  const st = { g: 1, rb: 0, by: 0, rs: 66, stent: 2, ax: 1 };
+  const end = seg(t, 54.62, 54.98);
+  const draw1 = () => {
+    drawVessel(new Cam(0, track([[53.7, -60], [55.0, 200, eio]], t), 1.0), t, st);
+    if (t > 53.75) {
+      darken(0.35 * seg(t, 53.7, 53.9), 0, 70, W, 170);
+      text(FT, 'HOW CORONARY', CX, 92, { sc: 2, bold: true, align: 'center', shadow: P.AW0, sd: 2, n: (t - 53.78) * 45 });
+      text(FT, 'STENTS WORK', CX, 120, { sc: 2, bold: true, align: 'center', shadow: P.AW0, sd: 2, n: (t - 54.02) * 45 });
+    }
+  };
+  if (end <= 0) draw1();
+  else { withBuffer(TMPBUF, draw1); s01(0); dissolve(TMPBUF, buf, smooth(end), buf); }
+}
+// ---------------------------------------------------------------- scene table
+const SCENES = [
+  [0, 1.5, s01], [1.5, 3, s02], [3, 4.5, s03], [4.5, 6, s04], [6, 8, s05], [8, 10, s06], [10, 12, s07, 0.22], [12, 14, s08, 0.22],
+  [14, 16, s09, 0.2], [16, 18, s10, 0.25], [18, 20, s11], [20, 22, s12], [22, 24, s13], [24, 27, s14], [27, 29, s15, 0.2],
+  [29, 31, s16, 0.2], [31, 33, s17], [33, 35, s18], [35, 38, s19, 0.2], [38, 40, s20, 0.15], [40, 42, s21, 0.2], [42, 46, s22],
+  [46, 51, s23, 0.25], [51, 55, s24, 0.15],
+];
+function sceneIndex(t) { for (let i = 0; i < SCENES.length; i++) if (t < SCENES[i][1]) return i; return SCENES.length - 1; }
+function renderFrame(t) {
+  t = clamp(t, 0, DUR - 1e-6);
+  const i = sceneIndex(t), S = SCENES[i];
+  S[2](t);
+  const d = S[3];
+  if (d && i > 0 && t < S[0] + d) { withBuffer(TRANSBUF, () => SCENES[i - 1][2](t)); dissolve(TRANSBUF, buf, smooth((t - S[0]) / d), buf); }
+  if ((t >= 1.55 && t < 4.6) || (t >= 42.75 && t < 45.9)) chip('TIME-LAPSE', t < 10 ? 1.55 : 42.75, t, P.PQ2, 'clock');
+}
+
+// ---- 30_audio.js
+// ============================================================================
+// AUDIO — original 128 BPM electronic score in A minor + game-like SFX.
+// 4-bar hook (Am-F-C-G) heard from frame one, sidechain-pumped bass/pads,
+// dotted-8th delay on leads, a DROP exactly when the balloon reaches full
+// inflation (26.25 s = bar 15), and a 1.33-beat pickup that loops into 0:00.
+// One deterministic event list -> live lookahead scheduler + offline export.
+// ============================================================================
+const SR = 48000, BAR = 4 * BEAT;
+const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const nm = (n, o) => 12 * (o + 1) + NOTE[n];
+const CH = { Am: ['A', 'C', 'E'], Am9: ['A', 'C', 'E', 'B'], F: ['F', 'A', 'C'], Fmaj7: ['F', 'A', 'C', 'E'], C: ['C', 'E', 'G'], G: ['G', 'B', 'D'], Em: ['E', 'G', 'B'], E: ['E', 'G#', 'B'] };
+const BARS = ['Am', 'F', 'C', 'G', 'Am', 'F', 'C', 'G', 'F', 'G', 'Am', 'Em', 'F', 'E', 'Am', 'F', 'C', 'G', 'Am', 'F', 'C', 'G', 'Am9', 'Fmaj7', 'Am', 'F', 'C', 'G', 'Am', 'E'];
+function chordMidi(name, oct) { let prev = -1; return CH[name].map(n => { let m = nm(n, oct); while (m <= prev) m += 12; prev = m; return m; }); }
+function sec(b) { return b <= 4 ? 'hook' : b <= 8 ? 'disc' : b <= 12 ? 'prec' : b === 13 ? 'calm' : b === 14 ? 'build' : b <= 19 ? 'climax' : b <= 22 ? 'relief' : b <= 24 ? 'micro' : b <= 29 ? 'res' : 'pickup'; }
+// the hook (beats, length) over Am | F | C | G
+const HOOK = [
+  [['E', 5, 0, .5], ['A', 5, .5, .5], ['E', 5, 1, .5], ['D', 5, 1.5, .5], ['C', 5, 2, .75], ['D', 5, 2.75, .25], ['E', 5, 3, 1]],
+  [['C', 5, 0, .5], ['D', 5, .5, .5], ['C', 5, 1, .5], ['A', 4, 1.5, 1], ['G', 4, 2.5, .5], ['A', 4, 3, 1]],
+  [['E', 5, 0, .5], ['G', 5, .5, .5], ['E', 5, 1, .5], ['D', 5, 1.5, .5], ['C', 5, 2, .5], ['E', 5, 2.5, .5], ['G', 5, 3, 1]],
+  [['D', 5, 0, .5], ['E', 5, .5, .5], ['D', 5, 1, .5], ['B', 4, 1.5, 1], ['G', 4, 2.5, .5], ['B', 4, 3, .5], ['D', 5, 3.5, .5]],
+];
+function musicEvents() {
+  const ev = [];
+  const N = (t, d, k, m, v, p, x) => ev.push(Object.assign({ t, d, k, f: mtof(m), v, p: p || 0 }, x || {}));
+  const D = (t, k, v, p, x) => ev.push(Object.assign({ t, d: 0.5, k, v, p: p || 0 }, x || {}));
+  const hook = (bar, idx, inst, v, oct, harm) => HOOK[idx].forEach(([n, o, b, l]) => {
+    const t = (bar - 1) * BAR + b * BEAT; if (t >= DUR) return;
+    N(t, l * BEAT, inst, nm(n, o + (oct || 0)), v, 0);
+    if (harm) N(t, l * BEAT, inst, nm(n, o + (oct || 0)) - (['E', 'B'].includes(n) ? 3 : 4), v * 0.55, 0.3);
+  });
+  for (let b = 1; b <= 30; b++) {
+    const t0 = (b - 1) * BAR, ch = BARS[b - 1], s = sec(b);
+    const root = nm(CH[ch][0], 1), t5 = chordMidi(ch, 5), t4 = chordMidi(ch, 4);
+    const barLen = Math.min(BAR, DUR - t0);
+    // pads (sidechained)
+    const padV = { hook: 0.05, disc: 0.06, prec: 0.05, calm: 0.07, build: 0.08, climax: 0.065, relief: 0.08, micro: 0.07, res: 0.065, pickup: 0.06 }[s];
+    const cut = { hook: 1400, disc: 1800, prec: 1600, calm: 900, build: 700, climax: 2600, relief: 2000, micro: 1500, res: 2600, pickup: 2000 }[s];
+    for (const m of chordMidi(ch, 3)) N(t0, barLen + (b === 30 ? 0 : 0.04), 'pad', m, padV, (m % 3 - 1) * 0.45, { cut, cut1: s === 'build' ? 4200 : cut });
+    // bass
+    const n8 = Math.round(barLen / (BEAT / 2)), n16 = Math.round(barLen / (BEAT / 4));
+    if (s === 'hook' || s === 'disc' || s === 'res') for (let i = 0; i < n8; i++) N(t0 + i * BEAT / 2, BEAT / 2 * 0.7, 'bass', root + (i % 2 ? 12 : 0), i % 2 ? 0.17 : 0.22);
+    if (s === 'prec' || s === 'calm' || s === 'climax') for (let i = 0; i < n16; i++) N(t0 + i * BEAT / 4, BEAT / 4 * 0.62, 'bass', root + ((i % 4 === 2) ? 12 : 0) + (s === 'climax' && i % 8 === 7 ? 7 : 0), i % 4 === 0 ? 0.23 : 0.15);
+    if (s === 'relief') { N(t0, BEAT * 1.9, 'bass', root, 0.2); N(t0 + 2 * BEAT, BEAT * 1.9, 'bass', root + 7, 0.16); }
+    if (s === 'micro') N(t0, BAR * 0.95, 'sub', root + 12, 0.16);
+    if (s === 'build') N(t0, BAR, 'sub', nm('E', 1), 0.22, 0, { rise: true });
+    if (s === 'pickup') N(t0, barLen, 'bass', nm('E', 2), 0.2);
+    // drums
+    const kick = (beat, v) => { const t = t0 + beat * BEAT; if (t < DUR) D(t, 'kick', v); };
+    const clap = (beat, v) => { const t = t0 + beat * BEAT; if (t < DUR) D(t, 'clap', v); };
+    const hat = (pos, v, open) => { const t = t0 + pos * BEAT; if (t < DUR) D(t, open ? 'ohat' : 'hat', v, ((pos * 0.37) % 0.6) - 0.3); };
+    if (['hook', 'disc', 'prec', 'climax', 'res'].includes(s)) {
+      for (let i = 0; i < 4; i++) kick(i, s === 'climax' ? 0.58 : 0.52);
+      if (!(s === 'hook' && b === 1)) { clap(1, 0.32); clap(3, 0.32); }
+      for (let i = 0; i < 8; i++) if (i % 2) hat(i / 2, s === 'hook' ? 0.07 : 0.1, s === 'disc' || s === 'climax' || s === 'res');
+      if (s !== 'hook' || b >= 3) for (let i = 0; i < 16; i++) if (i % 4) hat(i / 4, (i % 2 ? 0.045 : 0.03) * (s === 'prec' ? 1.5 : 1));
+      if (s === 'climax') { clap(3.75, 0.12); D(t0 + 1.5 * BEAT, 'perc', 0.18, -0.4); }
+      if (b === 12) for (let i = 12; i < 16; i++) D(t0 + i * BEAT / 4, 'tom', 0.2 + (i - 12) * 0.04, 0, { f: 180 - (i - 12) * 22 });
+      if (b === 4) for (let i = 8; i < 16; i++) D(t0 + i * BEAT / 4, 'snare', 0.08 + (i - 8) * 0.025);
+    }
+    if (s === 'calm') { for (let i = 0; i < 4; i++) kick(i, 0.42); }
+    if (s === 'build') {
+      kick(0, 0.5); kick(2, 0.42);
+      for (let i = 0; i < 8; i++) D(t0 + i * BEAT / 2, 'snare', 0.07 + i * 0.012);
+      for (let i = 0; i < 8; i++) D(t0 + 2 * BEAT + i * BEAT / 4, 'snare', 0.13 + i * 0.016);
+    }
+    if (b === 15 || b === 25) D(t0, 'crash', 0.34);
+    if (s === 'relief') { kick(0, 0.4); kick(2, 0.36); D(t0 + BEAT, 'perc', 0.16, 0.3); D(t0 + 3 * BEAT, 'perc', 0.16, -0.3); for (let i = 0; i < 8; i++) D(t0 + i * BEAT / 2, 'shaker', i % 2 ? 0.06 : 0.035, 0.25); }
+    if (s === 'micro') for (let i = 0; i < 16; i++) D(t0 + i * BEAT / 4, 'tick', i % 4 === 2 ? 0.09 : 0.04, ((i * 5) % 7) / 7 - 0.5);
+    if (s === 'pickup') { for (let i = 0; i < 5; i++) D(t0 + i * BEAT / 4, 'snare', 0.12 + i * 0.04); D(t0, 'kick', 0.5); }
+    // arps (sidechained)
+    if (s === 'disc' || s === 'climax' || s === 'res') {
+      const pat = [0, 1, 2, 1, 0, 2, 1, 2];
+      for (let i = 0; i < 16; i++) N(t0 + i * BEAT / 4, BEAT / 4 * 0.6, 'arp', t5[pat[i % 8] % t5.length] + (i % 8 >= 6 ? 12 : 0), s === 'climax' ? 0.034 : 0.03, i % 2 ? 0.45 : -0.45);
+    }
+    if (s === 'prec' || s === 'calm') { // shorter rhythmic notes: staccato plucks on the 16th grid
+      const pat = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1];
+      for (let i = 0; i < 16; i++) if (pat[i]) N(t0 + i * BEAT / 4, 0.09, 'pluck', t4[(i + b) % t4.length] + 12, s === 'calm' ? 0.035 : 0.05 + 0.004 * (b - 9), i % 2 ? 0.3 : -0.3);
+    }
+    if (s === 'micro') { N(t0 + 0.5 * BEAT, 0.6, 'bell', t5[0], 0.07, -0.3); N(t0 + 2 * BEAT, 0.6, 'bell', t5[2], 0.06, 0.3); N(t0 + 3.25 * BEAT, 0.5, 'bell', t5[1] + 12, 0.05, 0); }
+  }
+  // melodies
+  for (let b = 1; b <= 4; b++) hook(b, b - 1, 'lead', 0.085, 0);            // immediate hook
+  hook(5, 0, 'pluck', 0.06, 0); hook(6, 1, 'pluck', 0.06, 0); hook(7, 2, 'pluck', 0.065, 0); hook(8, 3, 'pluck', 0.065, 0);
+  for (let b = 15; b <= 18; b++) hook(b, b - 15, 'saw', 0.07, 0, true);   // climax: supersaw + harmony
+  [['A', 4, 0, .5], ['C', 5, .5, .5], ['E', 5, 1, .5], ['A', 5, 1.5, 2.5]].forEach(([n, o, b, l]) => N(18 * BAR + b * BEAT, l * BEAT, 'saw', nm(n, o), 0.07));
+  [[20, [['C', 5, 0, 2], ['A', 4, 2, 2]]], [21, [['E', 5, 0, 2], ['G', 5, 2, 2]]], [22, [['D', 5, 0, 2], ['B', 4, 2, 1], ['D', 5, 3, 1]]]].forEach(([bar, ns]) => ns.forEach(([n, o, b, l]) => N((bar - 1) * BAR + b * BEAT, l * BEAT, 'bell', nm(n, o), 0.11, 0.1)));
+  for (let b = 25; b <= 28; b++) hook(b, b - 25, 'saw', 0.065, 0, true);
+  [['A', 4, 0, .5], ['C', 5, .5, .5], ['E', 5, 1, .5], ['A', 5, 1.5, 2.5]].forEach(([n, o, b, l]) => N(28 * BAR + b * BEAT, l * BEAT, 'saw', nm(n, o), 0.07));
+  [['E', 5, 0], ['G#', 5, 0.33], ['B', 5, 0.66], ['E', 6, 1.0]].forEach(([n, o, b]) => { const t = 29 * BAR + b * BEAT; if (t < DUR) N(t, 0.15, 'pluck', nm(n, o), 0.07, 0); });
+  return ev;
+}
+// ---------------------------------------------------------------- SFX (every one tied to a visible event)
+function sfxEvents() {
+  const ev = [];
+  const S = (t, k, v, x) => ev.push(Object.assign({ t, d: 0.5, k, v: v === undefined ? 1 : v, p: 0 }, x || {}));
+  // S01-S04: inside the artery
+  S(0.0, 'heart', 0.9); S(0.2, 'flowpulse', 0.5, { d: 1.2 }); S(0.8, 'accent', 0.6);
+  S(1.5, 'bioticks', 0.5, { d: 1.5 }); S(1.55, 'tension', 0.3, { d: 1.45 });
+  S(3.0, 'tension', 0.45, { d: 1.5, f0: 110, f1: 165 }); S(3.75, 'lowpulse', 0.6);
+  S(4.5, 'heart', 0.9); S(4.6, 'lowpulse', 0.45); S(5.25, 'warn', 0.45);
+  // S05-S09: zoom out, lab, access, route, imaging
+  S(6.0, 'revwhoosh', 0.5, { d: 1.75 }); S(6.56, 'heart', 0.45); S(7.5, 'heart', 0.5); S(7.85, 'accent', 0.5);
+  S(8.1, 'uion', 0.55); S(8.6, 'click', 0.6); S(9.0, 'confirm', 0.5); S(9.25, 'whoosh', 0.45, { d: 0.75 });
+  S(10.15, 'click', 0.3); S(10.65, 'slide', 0.3, { d: 0.9 }); S(11.55, 'click', 0.75); S(11.6, 'confirm', 0.45);
+  S(12.15, 'track', 0.5, { d: 1.7 }); S(12.2, 'ticks', 0.3, { d: 1.6 }); S(13.85, 'ping', 0.4, { f: 1318 });
+  S(14.05, 'scanpulse', 0.6); S(14.25, 'chirp', 0.5); S(14.3, 'contrast', 0.35, { d: 0.8 }); S(14.95, 'ping', 0.35, { f: 1760 }); S(15.2, 'dive', 0.45, { d: 0.8 });
+  // S10-S13: wire, crossing, delivery, lock
+  S(16.0, 'swish', 0.35, { d: 0.25 }); S(16.15, 'track', 0.35, { d: 1.8 }); S(16.2, 'ticks', 0.35, { d: 1.75 });
+  S(18.2, 'rising', 0.5, { d: 1.2 }); S(19.4, 'success', 0.7);
+  S(20.0, 'slide', 0.5, { d: 1.75 }); S(20.05, 'mticks', 0.35, { d: 1.7 });
+  S(22.0, 'slide', 0.35, { d: 0.85 }); S(22.85, 'lock', 0.8); S(22.95, 'drone', 0.35, { d: 1.35 });
+  // S14: the climax — pressure rises, struts click (accelerating), DROP at full inflation
+  S(24.3, 'pressure', 0.6, { d: 1.95 }); S(24.3, 'duck', 1, { d: 1.95, amt: 0.62 });
+  for (let i = 0; i < 12; i++) { const u = i / 12; S(24.9 + (1 - Math.pow(1 - u, 2)) * 1.3, 'strut', 0.3 + 0.03 * i, { f: 1800 + i * 90, p: (i % 2 ? 0.35 : -0.35) }); }
+  S(26.25, 'drop', 1.0); S(26.3, 'deploy', 0.6);
+  // S15-S18: strut close-up, widening, deflation, removal
+  S(27.0, 'swish', 0.3, { d: 0.25 }); S(27.0, 'duck', 1, { d: 1.6, amt: 0.75 });
+  for (let i = 0; i < 10; i++) S(27.1 + i * 0.14, 'strut', 0.32, { f: 1500 + (i % 5) * 220, p: (i % 3 - 1) * 0.5 });
+  S(28.0, 'deploy', 0.55);
+  S(29.1, 'deep', 0.6, { d: 1.0 }); S(30.2, 'release', 0.3, { d: 0.5 });
+  S(31.15, 'release', 0.6, { d: 1.25 });
+  S(33.1, 'retreat', 0.5, { d: 1.2 }); S(34.25, 'retreat', 0.3, { d: 0.6 }); S(34.5, 'success', 0.5);
+  // S19-S21: improved flow, before/after, assessment
+  S(35.0, 'fluidsweep', 0.65, { d: 2.6 }); S(35.6, 'warm', 0.45, { d: 1.6 }); S(35.625, 'heart', 0.7); S(36.56, 'heart', 0.6); S(37.5, 'heart', 0.6);
+  S(38.0, 'compare', 0.6); S(38.3, 'click', 0.5);
+  S(40.0, 'scanpulse', 0.5); S(40.15, 'contrast', 0.35, { d: 0.75 }); S(40.8, 'confirm', 0.45);
+  // S22: drug release (molecular ticks on the 16th grid, pentatonic)
+  S(42.0, 'dive', 0.45, { d: 0.7 }); S(42.8, 'process', 0.3, { d: 2.8 });
+  const pent = [0, 3, 5, 7, 10];
+  for (let i = 0; i < 22; i++) { const t = 42.9 + i * BEAT / 4 * 1.0 + (i > 11 ? BEAT / 4 * (i - 11) * 0.5 : 0); if (t < 45.8) S(t, 'molecule', 0.22 + 0.01 * (i % 4), { f: mtof(nm('A', 6) + pent[(i * 3) % 5]), p: (hash(i * 7) - 0.5) * 0.9 }); }
+  // S23: circulation
+  S(46.0, 'pull', 0.35, { d: 1.6 }); S(46.875, 'heart', 0.6); S(47.8, 'heart', 0.75); S(48.75, 'heart', 0.75); S(49.7, 'heart', 0.7); S(50.6, 'heart', 0.65);
+  S(47.4, 'fluidsweep', 0.5, { d: 2.0 }); S(47.8, 'success', 0.4);
+  // S24: recap cuts, title, loop pickup
+  RECAP.forEach(([name, t], i) => S(t, 'cut', 0.45, { f: mtof(nm('A', 5) + [0, 3, 5, 7, 10, 12][i]) }));
+  S(53.7, 'impact', 0.85); S(54.35, 'swish', 0.35, { d: 0.5 }); S(54.62, 'accent', 0.5);
+  return ev;
+}
+function allEvents() {
+  const ev = musicEvents().map(e => Object.assign(e, { bus: 'm' })).concat(sfxEvents().map(e => Object.assign(e, { bus: 's' })));
+  ev.sort((a, b) => a.t - b.t);
+  return ev;
+}
+// ---------------------------------------------------------------- synthesis core
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const MUSIC_GAIN = 0.6;
+function makeAudioGraph(ctx) {
+  const G = { ctx };
+  const rnd = mulberry(2468);
+  const nb = ctx.createBuffer(1, SR * 2, SR); const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = rnd() * 2 - 1;
+  G.noise = nb;
+  const ir = ctx.createBuffer(2, Math.floor(SR * 2.0), SR);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) { const t = i / SR; d[i] = (rnd() * 2 - 1) * Math.pow(1 - t / 2.0, 2) * Math.exp(-t * 2.2) * (t < 0.01 ? t / 0.01 : 1); } }
+  G.rev = ctx.createConvolver(); G.rev.buffer = ir;
+  G.revIn = ctx.createGain(); G.revIn.connect(G.rev);
+  G.mix = ctx.createGain();
+  G.revOut = ctx.createGain(); G.revOut.gain.value = 0.28; G.rev.connect(G.revOut); G.revOut.connect(G.mix);
+  // dotted-8th ping-pong delay (leads, plucks, rewards)
+  G.dIn = ctx.createGain();
+  const dl = ctx.createDelay(1.0), dr = ctx.createDelay(1.0); dl.delayTime.value = BEAT * 0.75; dr.delayTime.value = BEAT * 0.75;
+  const fb = ctx.createGain(); fb.gain.value = 0.34; const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 3200;
+  const pl = ctx.createStereoPanner(); pl.pan.value = -0.6; const prr = ctx.createStereoPanner(); prr.pan.value = 0.6;
+  G.dIn.connect(dl); dl.connect(dlp); dlp.connect(dr); dr.connect(fb); fb.connect(dl); dl.connect(pl); dr.connect(prr);
+  G.dOut = ctx.createGain(); G.dOut.gain.value = 0.5; pl.connect(G.dOut); prr.connect(G.dOut); G.dOut.connect(G.mix);
+  // music bus with a sidechain "pump" sub-bus (pads, bass, arps duck on every kick)
+  G.music = ctx.createGain(); G.music.gain.value = MUSIC_GAIN; G.music.connect(G.mix);
+  G.pump = ctx.createGain(); G.pump.gain.value = 1; G.pump.connect(G.music);
+  G.sfx = ctx.createGain(); G.sfx.gain.value = 0.92; G.sfx.connect(G.mix);
+  G.comp = ctx.createDynamicsCompressor(); G.comp.threshold.value = -12; G.comp.knee.value = 6; G.comp.ratio.value = 3; G.comp.attack.value = 0.004; G.comp.release.value = 0.15;
+  G.master = ctx.createGain(); G.master.gain.value = 0.9;
+  G.mix.connect(G.comp); G.comp.connect(G.master); G.master.connect(ctx.destination);
+  G.pw = {};
+  for (const duty of [0.125, 0.25, 0.5]) {
+    const n = 48, re = new Float32Array(n), im = new Float32Array(n);
+    for (let k = 1; k < n; k++) { re[k] = Math.sin(2 * Math.PI * k * duty) / (k * Math.PI); im[k] = 2 * Math.pow(Math.sin(Math.PI * k * duty), 2) / (k * Math.PI); }
+    G.pw[duty] = ctx.createPeriodicWave(re, im);
+  }
+  return G;
+}
+const PUMPED = { pad: 1, bass: 1, arp: 1, sub: 1 };
+function voice(G, ev, when, send, delay) {
+  const ctx = G.ctx, vg = ctx.createGain(); vg.gain.value = 0;
+  const pan = ctx.createStereoPanner(); pan.pan.value = clamp(ev.p || 0, -1, 1);
+  vg.connect(pan); pan.connect(ev.bus === 'm' ? (PUMPED[ev.k] ? G.pump : G.music) : G.sfx);
+  if (send) { const s = ctx.createGain(); s.gain.value = send; pan.connect(s); s.connect(G.revIn); }
+  if (delay) { const s = ctx.createGain(); s.gain.value = delay; pan.connect(s); s.connect(G.dIn); }
+  return { vg, srcs: [], end: when + (ev.d || 0.5) + 0.8 };
+}
+function osc(G, V, type, f, t0, t1) {
+  const o = G.ctx.createOscillator();
+  if (typeof type === 'number') o.setPeriodicWave(G.pw[type]); else o.type = type;
+  o.frequency.setValueAtTime(f, t0); o.start(t0); o.stop(t1); V.srcs.push(o); return o;
+}
+function noiseSrc(G, V, t0, t1, rate) {
+  const s = G.ctx.createBufferSource(); s.buffer = G.noise; s.loop = true; s.playbackRate.value = rate || 1;
+  s.start(t0, hash(Math.floor(t0 * 1000)) * 1.5); s.stop(t1); V.srcs.push(s); return s;
+}
+function filt(G, type, f, q) { const b = G.ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q || 0.7; return b; }
+function adsr(g, t, a, d, s, r, dur, peak) {
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.setTargetAtTime(peak * s, t + a, d / 3 + 1e-4);
+  g.gain.setTargetAtTime(0, t + Math.max(a, dur), r / 3 + 1e-4);
+}
+function perc(g, t, a, dec, peak) { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.setTargetAtTime(0, t + a, dec / 3 + 1e-4); }
+function playEvent(G, ev, when) {
+  const ctx = G.ctx, k = ev.k, v = ev.v, d = ev.d || 0.5, f = ev.f;
+  let V;
+  switch (k) {
+    case 'pad': {
+      V = voice(G, ev, when, 0.45); const lp = filt(G, 'lowpass', ev.cut || 1500, 0.9); lp.connect(V.vg);
+      if (ev.cut1 && ev.cut1 !== ev.cut) { lp.frequency.setValueAtTime(ev.cut, when); lp.frequency.exponentialRampToValueAtTime(ev.cut1, when + d); }
+      for (const det of [-11, -4, 4, 11]) { const o = osc(G, V, 'sawtooth', f, when, when + d + 1.0); o.detune.value = det; o.connect(lp); }
+      adsr(V.vg, when, 0.06, 0.5, 0.85, 0.35, d, v * 0.26); V.end = when + d + 1.2; break;
+    }
+    case 'bass': {
+      V = voice(G, ev, when, 0); const lp = filt(G, 'lowpass', 1100, 2); lp.frequency.setValueAtTime(2400, when); lp.frequency.setTargetAtTime(420, when, 0.06); lp.connect(V.vg);
+      osc(G, V, 'sawtooth', f, when, when + d + 0.15).connect(lp);
+      const s = osc(G, V, 'sine', f / 2, when, when + d + 0.15); const sg = ctx.createGain(); sg.gain.value = 0.9; s.connect(sg); sg.connect(V.vg);
+      adsr(V.vg, when, 0.004, 0.09, 0.7, 0.04, d, v); break;
+    }
+    case 'sub': {
+      V = voice(G, ev, when, 0); const o = osc(G, V, 'sine', f, when, when + d + 0.4); o.connect(V.vg);
+      if (ev.rise) o.frequency.exponentialRampToValueAtTime(f * 2, when + d);
+      adsr(V.vg, when, ev.rise ? d * 0.8 : 0.02, 0.3, 0.8, 0.2, d, v); break;
+    }
+    case 'arp': { V = voice(G, ev, when, 0.25, 0.25); osc(G, V, 0.125, f, when, when + d + 0.2).connect(V.vg); perc(V.vg, when, 0.002, Math.max(0.07, d), v); break; }
+    case 'pluck': {
+      V = voice(G, ev, when, 0.3, 0.42); const lp = filt(G, 'lowpass', 4000, 3); lp.frequency.setValueAtTime(6000, when); lp.frequency.setTargetAtTime(900, when, 0.07); lp.connect(V.vg);
+      osc(G, V, 0.25, f, when, when + Math.max(d, 0.1) + 0.35).connect(lp); osc(G, V, 'triangle', f * 2, when, when + 0.2).connect(lp);
+      perc(V.vg, when, 0.002, Math.max(0.16, d * 0.9), v); break;
+    }
+    case 'lead': {
+      V = voice(G, ev, when, 0.35, 0.45); const lp = filt(G, 'lowpass', 5200, 1.5); lp.frequency.setValueAtTime(7000, when); lp.frequency.setTargetAtTime(2400, when, 0.12); lp.connect(V.vg);
+      const o1 = osc(G, V, 0.25, f, when, when + d + 0.3), o2 = osc(G, V, 0.5, f * 1.003, when, when + d + 0.3); o1.connect(lp); o2.connect(lp);
+      adsr(V.vg, when, 0.005, 0.12, 0.55, 0.12, d, v); break;
+    }
+    case 'saw': { // climax supersaw
+      V = voice(G, ev, when, 0.35, 0.38); const lp = filt(G, 'lowpass', 4800, 1); lp.connect(V.vg);
+      for (const det of [-16, -7, 0, 7, 16]) { const o = osc(G, V, 'sawtooth', f, when, when + d + 0.3); o.detune.value = det; o.connect(lp); }
+      const o2 = osc(G, V, 0.25, f * 2, when, when + d + 0.3); const og = ctx.createGain(); og.gain.value = 0.35; o2.connect(og); og.connect(lp);
+      adsr(V.vg, when, 0.006, 0.15, 0.65, 0.14, d, v * 0.5); break;
+    }
+    case 'bell': {
+      V = voice(G, ev, when, 0.55, 0.3); const c = osc(G, V, 'sine', f, when, when + d + 0.8); const m = osc(G, V, 'sine', f * 3.5, when, when + d + 0.8);
+      const mg = ctx.createGain(); mg.gain.setValueAtTime(f * 2.2, when); mg.gain.setTargetAtTime(f * 0.15, when, 0.2); m.connect(mg); mg.connect(c.frequency);
+      c.connect(V.vg); perc(V.vg, when, 0.004, Math.max(0.5, d), v); break;
+    }
+    case 'kick': {
+      V = voice(G, ev, when, 0); const o = osc(G, V, 'sine', 170, when, when + 0.45); o.frequency.exponentialRampToValueAtTime(48, when + 0.1);
+      o.connect(V.vg); perc(V.vg, when, 0.0015, 0.3, v);
+      const n = noiseSrc(G, V, when, when + 0.015, 1); const hp = filt(G, 'highpass', 3000); const ng = ctx.createGain(); ng.gain.value = 0.18; n.connect(hp); hp.connect(ng); ng.connect(V.vg);
+      G.pump.gain.setValueAtTime(0.38, when); G.pump.gain.setTargetAtTime(1.0, when + 0.02, 0.075);   // sidechain pump
+      break;
+    }
+    case 'clap': case 'snare': {
+      V = voice(G, ev, when, 0.35); const n = noiseSrc(G, V, when, when + 0.3, 1); const bp = filt(G, 'bandpass', k === 'clap' ? 1300 : 2100, 0.8); n.connect(bp); bp.connect(V.vg);
+      const o = osc(G, V, 'triangle', 200, when, when + 0.1); const og = ctx.createGain(); og.gain.value = 0.3; o.connect(og); og.connect(V.vg);
+      if (k === 'clap') { V.vg.gain.setValueAtTime(0, when); for (const dt of [0, 0.011, 0.022]) { V.vg.gain.setValueAtTime(v, when + dt); V.vg.gain.setTargetAtTime(v * 0.25, when + dt + 0.001, 0.004); } V.vg.gain.setTargetAtTime(0, when + 0.03, 0.05); }
+      else perc(V.vg, when, 0.002, 0.09, v);
+      break;
+    }
+    case 'hat': case 'ohat': case 'tick': case 'shaker': {
+      V = voice(G, ev, when, 0.08); const n = noiseSrc(G, V, when, when + 0.3, 1); const hp = filt(G, k === 'shaker' ? 'bandpass' : 'highpass', k === 'shaker' ? 6500 : k === 'tick' ? 9000 : 7500, 0.8); n.connect(hp); hp.connect(V.vg);
+      perc(V.vg, when, k === 'shaker' ? 0.012 : 0.001, k === 'ohat' ? 0.14 : k === 'tick' ? 0.016 : k === 'shaker' ? 0.05 : 0.03, v); break;
+    }
+    case 'perc': { V = voice(G, ev, when, 0.2); const o = osc(G, V, 'triangle', 820, when, when + 0.1); o.frequency.exponentialRampToValueAtTime(460, when + 0.05); o.connect(V.vg); perc(V.vg, when, 0.001, 0.05, v); break; }
+    case 'tom': { V = voice(G, ev, when, 0.25); const o = osc(G, V, 'sine', ev.f || 150, when, when + 0.35); o.frequency.exponentialRampToValueAtTime((ev.f || 150) * 0.55, when + 0.25); o.connect(V.vg); perc(V.vg, when, 0.002, 0.22, v); break; }
+    case 'crash': { V = voice(G, ev, when, 0.45); const n = noiseSrc(G, V, when, when + 2.2, 1); const hp = filt(G, 'highpass', 5200); n.connect(hp); hp.connect(V.vg); perc(V.vg, when, 0.002, 1.5, v); V.end = when + 2.4; break; }
+    case 'duck': {
+      V = { vg: ctx.createGain(), srcs: [], end: when + d + 0.5 };
+      G.music.gain.setTargetAtTime(MUSIC_GAIN * (ev.amt || 0.6), when, 0.03); G.music.gain.setTargetAtTime(MUSIC_GAIN, when + d, 0.12); break;
+    }
+    default: V = sfx(G, ev, when);
+  }
+  return V;
+}
+function sweepNoise(G, V, when, d, f0, f1, q, peak, att) {
+  const n = noiseSrc(G, V, when, when + d + 0.3, 1); const bp = filt(G, 'bandpass', f0, q || 1.2);
+  bp.frequency.setValueAtTime(f0, when); bp.frequency.exponentialRampToValueAtTime(Math.max(30, f1), when + d);
+  n.connect(bp); bp.connect(V.vg); adsr(V.vg, when, (att || 0.5) * d, d * 0.3, 0.9, 0.12, d * 0.85, peak);
+}
+function sfx(G, ev, when) {
+  const ctx = G.ctx, k = ev.k, v = ev.v, d = ev.d || 0.5, f = ev.f;
+  const rewards = { accent: 1, confirm: 1, success: 1, uion: 1, cut: 1, deploy: 1, molecule: 1, ping: 1 };
+  const V = voice(G, ev, when, 0.3, rewards[k] ? 0.35 : 0);
+  const tone = (type, fr, t0, t1, dest) => { const o = osc(G, V, type, fr, t0, t1); o.connect(dest || V.vg); return o; };
+  const blip = (type, fr, t, dec, peak, dest) => { const g = ctx.createGain(); g.gain.value = 0; tone(type, fr, t, t + dec * 4 + 0.05, g); g.connect(dest || V.vg); perc(g, t, 0.002, dec, peak); return g; };
+  switch (k) {
+    case 'heart': { // lub-dub
+      for (const [dt, a] of [[0, 1], [0.21, 0.6]]) { const g = ctx.createGain(); g.gain.value = 0; const o = tone('sine', 68, when + dt, when + dt + 0.5, g); o.frequency.exponentialRampToValueAtTime(38, when + dt + 0.18); g.connect(V.vg); perc(g, when + dt, 0.004, 0.2, a);
+        const n = noiseSrc(G, V, when + dt, when + dt + 0.06, 0.6); const lp = filt(G, 'lowpass', 300); const ng = ctx.createGain(); ng.gain.value = 0.25 * a; n.connect(lp); lp.connect(ng); ng.connect(V.vg); }
+      V.vg.gain.setValueAtTime(v * 0.75, when); V.end = when + 1; break;
+    }
+    case 'flowpulse': case 'fluidsweep': {
+      const n = noiseSrc(G, V, when, when + d + 0.4, 0.8); const bp = filt(G, 'bandpass', 500, 1.6);
+      bp.frequency.setValueAtTime(380, when); bp.frequency.exponentialRampToValueAtTime(k === 'fluidsweep' ? 2400 : 900, when + d * 0.6); bp.frequency.exponentialRampToValueAtTime(600, when + d);
+      const lfo = tone('sine', k === 'fluidsweep' ? 3.4 : 2.1, when, when + d); lfo.disconnect(); const lg = ctx.createGain(); lg.gain.value = 180; lfo.connect(lg); lg.connect(bp.frequency);
+      n.connect(bp); bp.connect(V.vg); adsr(V.vg, when, d * 0.3, d * 0.3, 0.8, 0.3, d * 0.8, v * 0.3); V.end = when + d + 0.8; break;
+    }
+    case 'accent': { for (const [m, dt] of [[nm('A', 5), 0], [nm('E', 6), 0.04]]) blip(0.25, mtof(m), when + dt, 0.09, 1); V.vg.gain.setValueAtTime(v * 0.18, when); V.end = when + 0.8; break; }
+    case 'bioticks': {
+      const n = Math.round(d / (BEAT / 4)); for (let i = 0; i < n; i++) blip('triangle', 520 + i * 45, when + i * BEAT / 4, 0.02, 0.5 + i * 0.04);
+      V.vg.gain.setValueAtTime(v * 0.22, when); V.end = when + d + 0.4; break;
+    }
+    case 'tension': {
+      const lp = filt(G, 'lowpass', 400, 6); lp.frequency.setValueAtTime(300, when); lp.frequency.exponentialRampToValueAtTime(2400, when + d); lp.connect(V.vg);
+      const o = tone('sawtooth', ev.f0 || 82, when, when + d + 0.2, lp); o.frequency.exponentialRampToValueAtTime(ev.f1 || 110, when + d);
+      const o2 = tone('sawtooth', (ev.f0 || 82) * 1.5, when, when + d + 0.2, lp); o2.detune.value = 9;
+      adsr(V.vg, when, d * 0.6, 0.1, 0.9, 0.1, d, v * 0.12); break;
+    }
+    case 'lowpulse': { const o = tone('sine', 55, when, when + 0.6); o.frequency.exponentialRampToValueAtTime(41, when + 0.4); perc(V.vg, when, 0.01, 0.4, v * 0.55); break; }
+    case 'warn': { const lp = filt(G, 'lowpass', 2000); lp.connect(V.vg); for (const [fr, dt] of [[880, 0], [660, 0.16]]) blip(0.5, fr, when + dt, 0.08, 1, lp); V.vg.gain.setValueAtTime(v * 0.12, when); V.end = when + 0.8; break; }
+    case 'revwhoosh': {
+      sweepNoise(G, V, when, d, 3200, 260, 1.3, v * 0.38, 0.15);
+      const o = tone('sine', 900, when, when + d + 0.2); o.frequency.exponentialRampToValueAtTime(90, when + d);
+      const s2 = noiseSrc(G, V, when, when + d * 0.4, 1); const hp = filt(G, 'highpass', 4000); const g2 = ctx.createGain(); g2.gain.value = 0; s2.connect(hp); hp.connect(g2); g2.connect(V.vg); adsr(g2, when, d * 0.35, 0.02, 0.5, 0.05, d * 0.36, 0.5);
+      break;
+    }
+    case 'whoosh': sweepNoise(G, V, when, d, 300, 2600, 0.9, v * 0.32, 0.4); break;
+    case 'swish': sweepNoise(G, V, when, d, 700, 4200, 0.8, v * 0.22, 0.5); break;
+    case 'dive': sweepNoise(G, V, when, d, 220, 5200, 1.4, v * 0.36, 0.75); { const o = tone('sine', 200, when, when + d + 0.2); o.frequency.exponentialRampToValueAtTime(1300, when + d); } break;
+    case 'pull': sweepNoise(G, V, when, d, 4800, 220, 1.2, v * 0.36, 0.3); { const o = tone('sine', 1000, when, when + d + 0.2); o.frequency.exponentialRampToValueAtTime(130, when + d); } break;
+    case 'uion': { [nm('A', 5), nm('C', 6), nm('E', 6), nm('A', 6)].forEach((m, i) => blip('sine', mtof(m), when + i * 0.045, 0.06, 1)); V.vg.gain.setValueAtTime(v * 0.2, when); V.end = when + 0.9; break; }
+    case 'click': { const s = noiseSrc(G, V, when, when + 0.03, 2); const hp = filt(G, 'highpass', 3500); s.connect(hp); hp.connect(V.vg); blip('square', 2200, when, 0.008, 0.3); perc(V.vg, when, 0.001, 0.014, v * 0.4); break; }
+    case 'confirm': { [nm('C', 6), nm('E', 6)].forEach((m, i) => blip(0.25, mtof(m), when + i * 0.07, 0.08, 1)); V.vg.gain.setValueAtTime(v * 0.16, when); V.end = when + 0.9; break; }
+    case 'success': { [nm('A', 5), nm('C', 6), nm('E', 6), nm('A', 6)].forEach((m, i) => blip(0.25, mtof(m), when + i * 0.06, 0.12, 1)); blip('sine', mtof(nm('E', 7)), when + 0.24, 0.3, 0.5); V.vg.gain.setValueAtTime(v * 0.2, when); V.end = when + 1.2; break; }
+    case 'track': {
+      const lp = filt(G, 'lowpass', 1800, 2); lp.connect(V.vg); const o = tone('square', 220, when, when + d + 0.1, lp); o.frequency.exponentialRampToValueAtTime(440, when + d);
+      sweepNoise(G, V, when, d, 600, 1800, 1.5, v * 0.12, 0.5); adsr(V.vg, when, 0.1, 0.2, 0.7, 0.1, d, v * 0.1); break;
+    }
+    case 'ticks': case 'mticks': {
+      const n = Math.max(2, Math.round(d / (BEAT / (k === 'mticks' ? 2 : 4))));
+      for (let i = 0; i < n; i++) blip(k === 'mticks' ? 'sine' : 'square', k === 'mticks' ? 3200 + (i % 2) * 400 : 1600 + (i % 4) * 120, when + i * d / n, k === 'mticks' ? 0.03 : 0.008, 1);
+      V.vg.gain.setValueAtTime(v * (k === 'mticks' ? 0.1 : 0.08), when); V.end = when + d + 0.3; break;
+    }
+    case 'ping': { blip('sine', f, when, 0.25, 1); V.vg.gain.setValueAtTime(v * 0.2, when); V.end = when + 1; break; }
+    case 'scanpulse': {
+      const s = noiseSrc(G, V, when, when + 0.15, 1); const hp = filt(G, 'highpass', 2500); const g = ctx.createGain(); g.gain.value = 0; s.connect(hp); hp.connect(g); g.connect(V.vg); perc(g, when, 0.002, 0.08, 0.6);
+      blip('sine', 1975, when, 0.12, 0.6); blip('sine', 988, when + 0.05, 0.15, 0.5); V.vg.gain.setValueAtTime(v * 0.3, when); V.end = when + 0.8; break;
+    }
+    case 'chirp': { const o = tone('sine', 900, when, when + 0.2); o.frequency.exponentialRampToValueAtTime(3200, when + 0.15); perc(V.vg, when, 0.003, 0.12, v * 0.15); break; }
+    case 'contrast': { const s = noiseSrc(G, V, when, when + d + 0.2, 1); const bp = filt(G, 'bandpass', 900, 2); bp.frequency.setValueAtTime(700, when); bp.frequency.exponentialRampToValueAtTime(2000, when + d); s.connect(bp); bp.connect(V.vg); adsr(V.vg, when, d * 0.3, 0.2, 0.7, 0.15, d, v * 0.2); break; }
+    case 'slide': {
+      const s = noiseSrc(G, V, when, when + d + 0.2, 0.7); const bp = filt(G, 'bandpass', 1400, 3); s.connect(bp); bp.connect(V.vg);
+      const lp = filt(G, 'lowpass', 600); lp.connect(V.vg); const o = tone('sawtooth', 92, when, when + d + 0.1, lp); o.frequency.linearRampToValueAtTime(118, when + d);
+      adsr(V.vg, when, 0.06, 0.1, 0.8, 0.08, d, v * 0.12); break;
+    }
+    case 'rising': { const o = tone(0.25, mtof(nm('A', 4)), when, when + d + 0.1); o.frequency.exponentialRampToValueAtTime(mtof(nm('E', 6)), when + d); const lp = filt(G, 'lowpass', 3000); o.disconnect(); o.connect(lp); lp.connect(V.vg); adsr(V.vg, when, d * 0.5, 0.1, 0.8, 0.05, d, v * 0.07); break; }
+    case 'lock': {
+      for (const dt of [0, 0.06]) { const s = noiseSrc(G, V, when + dt, when + dt + 0.03, 2); const g = ctx.createGain(); g.gain.value = 0; s.connect(g); g.connect(V.vg); perc(g, when + dt, 0.001, 0.02, 0.6); }
+      const o = tone('sine', 110, when + 0.06, when + 0.5); o.frequency.exponentialRampToValueAtTime(70, when + 0.3);
+      blip(0.25, mtof(nm('E', 6)), when + 0.1, 0.1, 0.35); blip(0.25, mtof(nm('A', 6)), when + 0.17, 0.14, 0.35);
+      perc(V.vg, when, 0.001, 0.5, v * 0.45); V.vg.gain.setValueAtTime(v * 0.45, when + 0.05); V.end = when + 1; break;
+    }
+    case 'drone': { const lp = filt(G, 'lowpass', 500, 3); lp.connect(V.vg); tone('sawtooth', mtof(nm('E', 2)), when, when + d + 0.3, lp); tone('sawtooth', mtof(nm('E', 2)) * 1.005, when, when + d + 0.3, lp); adsr(V.vg, when, 0.2, 0.2, 0.8, 0.2, d, v * 0.12); break; }
+    case 'pressure': {
+      const lp = filt(G, 'lowpass', 500, 5); lp.frequency.setValueAtTime(400, when); lp.frequency.exponentialRampToValueAtTime(4000, when + d); lp.connect(V.vg);
+      const o = tone('sawtooth', 110, when, when + d + 0.1, lp); o.frequency.exponentialRampToValueAtTime(330, when + d);
+      const o2 = tone('square', 165, when, when + d + 0.1, lp); o2.frequency.exponentialRampToValueAtTime(495, when + d);
+      const s = noiseSrc(G, V, when, when + d, 1); const hp = filt(G, 'highpass', 3000); const g = ctx.createGain(); g.gain.value = 0; s.connect(hp); hp.connect(g); g.connect(V.vg); adsr(g, when, d * 0.9, 0.05, 1, 0.03, d, 0.35);
+      adsr(V.vg, when, d * 0.85, 0.05, 1, 0.03, d, v * 0.13); break;
+    }
+    case 'strut': { // metallic deformation click
+      const c = tone('sine', f || 2000, when, when + 0.25); const m = tone('sine', (f || 2000) * 2.76, when, when + 0.25); m.disconnect(); const mg = ctx.createGain(); mg.gain.setValueAtTime((f || 2000) * 1.2, when); mg.gain.setTargetAtTime(0, when, 0.03); m.connect(mg); mg.connect(c.frequency);
+      const s = noiseSrc(G, V, when, when + 0.02, 2); const g = ctx.createGain(); g.gain.value = 0.4; s.connect(g); g.connect(V.vg);
+      perc(V.vg, when, 0.001, 0.07, v * 0.22); break;
+    }
+    case 'drop': { // strongest mechanical payoff
+      const o = tone('sine', 120, when, when + 1.2); o.frequency.exponentialRampToValueAtTime(38, when + 0.35);
+      const s = noiseSrc(G, V, when, when + 1.0, 1); const hp = filt(G, 'highpass', 1800); const g = ctx.createGain(); g.gain.value = 0.35; s.connect(hp); hp.connect(g); g.connect(V.vg);
+      for (const m of [nm('A', 4), nm('E', 5), nm('A', 5), nm('C', 6)]) { const gg = ctx.createGain(); gg.gain.value = 0; tone('sawtooth', mtof(m), when, when + 1.2, gg); const lp = filt(G, 'lowpass', 3000); gg.connect(lp); lp.connect(V.vg); perc(gg, when, 0.003, 0.5, 0.1); }
+      perc(V.vg, when, 0.002, 0.9, v * 0.6); V.end = when + 1.6; break;
+    }
+    case 'deploy': { [nm('E', 6), nm('A', 6), nm('C', 7)].forEach((m, i) => blip('triangle', mtof(m), when + i * 0.035, 0.18, 1)); const s = noiseSrc(G, V, when, when + 0.6, 1); const hp = filt(G, 'highpass', 7000); const g = ctx.createGain(); g.gain.value = 0; s.connect(hp); hp.connect(g); g.connect(V.vg); perc(g, when, 0.01, 0.35, 0.4); V.vg.gain.setValueAtTime(v * 0.22, when); V.end = when + 1.2; break; }
+    case 'deep': { const lp = filt(G, 'lowpass', 300, 4); lp.frequency.setValueAtTime(200, when); lp.frequency.exponentialRampToValueAtTime(900, when + d * 0.5); lp.connect(V.vg); tone('sawtooth', 55, when, when + d + 0.2, lp); const o = tone('sine', 82, when, when + 0.5); o.frequency.exponentialRampToValueAtTime(41, when + 0.3); adsr(V.vg, when, 0.02, 0.3, 0.6, 0.3, d, v * 0.35); break; }
+    case 'release': sweepNoise(G, V, when, d, 5200, 500, 0.8, v * 0.3, 0.05); break;
+    case 'retreat': { const o = tone('sine', 660, when, when + d + 0.1); o.frequency.exponentialRampToValueAtTime(220, when + d); sweepNoise(G, V, when, d, 2500, 700, 1, v * 0.12, 0.3); adsr(V.vg, when, 0.05, 0.2, 0.7, 0.1, d, v * 0.18); break; }
+    case 'warm': { const lp = filt(G, 'lowpass', 600); lp.frequency.setValueAtTime(600, when); lp.frequency.exponentialRampToValueAtTime(2600, when + d * 0.6); lp.connect(V.vg); for (const m of [nm('F', 3), nm('C', 4), nm('A', 4), nm('E', 5)]) tone('sawtooth', mtof(m), when, when + d + 0.5, lp); adsr(V.vg, when, d * 0.4, 0.3, 0.7, 0.4, d, v * 0.045); V.end = when + d + 1; break; }
+    case 'compare': { const s = noiseSrc(G, V, when, when + 0.15, 1.5); const hp = filt(G, 'highpass', 2500); s.connect(hp); hp.connect(V.vg); const o = tone('square', 1400, when, when + 0.15); o.frequency.exponentialRampToValueAtTime(350, when + 0.12); perc(V.vg, when, 0.001, 0.1, v * 0.25); break; }
+    case 'molecule': { blip('sine', f, when, 0.06, 1); blip('triangle', f * 2, when, 0.03, 0.4); V.vg.gain.setValueAtTime(v * 0.25, when); V.end = when + 0.6; break; }
+    case 'process': { const n = Math.round(d / 0.09); for (let i = 0; i < n; i++) blip('sine', 2400 + 900 * hash(i * 7 + 3), when + i * 0.09 + hash(i) * 0.04, 0.015, 0.6); V.vg.gain.setValueAtTime(v * 0.08, when); V.end = when + d + 0.3; break; }
+    case 'cut': { blip(0.25, f, when, 0.07, 1); const s = noiseSrc(G, V, when, when + 0.05, 1.5); const hp = filt(G, 'highpass', 5000); const g = ctx.createGain(); g.gain.value = 0; s.connect(hp); hp.connect(g); g.connect(V.vg); perc(g, when, 0.001, 0.03, 0.5); V.vg.gain.setValueAtTime(v * 0.25, when); V.end = when + 0.6; break; }
+    case 'impact': {
+      const o = tone('sine', 90, when, when + 1.6); o.frequency.exponentialRampToValueAtTime(35, when + 0.5);
+      const s = noiseSrc(G, V, when, when + 1.2, 1); const lp = filt(G, 'lowpass', 2500); const g = ctx.createGain(); g.gain.value = 0.3; s.connect(lp); lp.connect(g); g.connect(V.vg);
+      for (const m of [nm('A', 3), nm('E', 4), nm('A', 4), nm('C', 5), nm('E', 5)]) { const gg = ctx.createGain(); gg.gain.value = 0; tone('sawtooth', mtof(m), when, when + 1.6, gg); const f2 = filt(G, 'lowpass', 2200); gg.connect(f2); f2.connect(V.vg); perc(gg, when, 0.01, 0.9, 0.06); }
+      perc(V.vg, when, 0.002, 1.1, v * 0.55); V.end = when + 1.8; break;
+    }
+    default: { tone('sine', 880, when, when + 0.1); perc(V.vg, when, 0.001, 0.05, 0.05); }
+  }
+  return V;
+}
+// ---------------------------------------------------------------- offline render (export)
+async function renderAudioOffline() {
+  const ctx = new OfflineAudioContext(2, Math.round(SR * DUR), SR);
+  const G = makeAudioGraph(ctx);
+  for (const ev of allEvents()) playEvent(G, ev, ev.t);
+  return await ctx.startRendering();
+}
+// ---------------------------------------------------------------- live scheduler (preview)
+const LIVE = { ctx: null, G: null, ev: null, playing: false, t0ctx: 0, pos0: 0, idx: 0, voices: [], timer: null, muted: false };
+function liveInit() {
+  if (LIVE.ctx) return LIVE.ctx;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  LIVE.ctx = new AC({ sampleRate: SR, latencyHint: 'interactive' });
+  LIVE.G = makeAudioGraph(LIVE.ctx);
+  LIVE.ev = allEvents();
+  return LIVE.ctx;
+}
+function liveNow() { return LIVE.playing ? LIVE.pos0 + (LIVE.ctx.currentTime - LIVE.t0ctx) : LIVE.pos0; }
+function liveStopVoices() {
+  const now = LIVE.ctx.currentTime;
+  for (const V of LIVE.voices) {
+    try { V.vg.gain.cancelScheduledValues(now); V.vg.gain.setValueAtTime(V.vg.gain.value, now); V.vg.gain.linearRampToValueAtTime(0, now + 0.02); } catch (e) { }
+    for (const s of V.srcs) { try { s.stop(now + 0.03); } catch (e) { } }
+  }
+  LIVE.voices = [];
+  for (const [p, v] of [[LIVE.G.music.gain, MUSIC_GAIN], [LIVE.G.pump.gain, 1]]) { try { p.cancelScheduledValues(now); p.setValueAtTime(v, now); } catch (e) { } }
+}
+function liveTick() {
+  if (!LIVE.playing) return;
+  const ctx = LIVE.ctx, ahead = 0.18, now = ctx.currentTime, pos = liveNow();
+  while (LIVE.idx < LIVE.ev.length && LIVE.ev[LIVE.idx].t < pos + ahead) {
+    const ev = LIVE.ev[LIVE.idx++];
+    if (ev.t >= DUR) continue;
+    const when = LIVE.t0ctx + (ev.t - LIVE.pos0);
+    if (when < now - 0.02) continue;
+    LIVE.voices.push(playEvent(LIVE.G, ev, Math.max(when, now + 0.005)));
+  }
+  LIVE.voices = LIVE.voices.filter(V => V.end > now);
+}
+function livePlay(pos) {
+  const ctx = liveInit();
+  if (ctx.state === 'suspended') ctx.resume();
+  liveStopVoices();
+  LIVE.pos0 = pos; LIVE.t0ctx = ctx.currentTime + 0.05; LIVE.playing = true;
+  LIVE.idx = 0; while (LIVE.idx < LIVE.ev.length && LIVE.ev[LIVE.idx].t < pos) {
+    const ev = LIVE.ev[LIVE.idx++];
+    const rem = ev.t + (ev.d || 0) - pos;
+    if ((ev.k === 'pad' || ev.k === 'drone' || ev.k === 'flowpulse' || ev.k === 'fluidsweep' || ev.k === 'process') && rem > 0.3) {
+      LIVE.voices.push(playEvent(LIVE.G, Object.assign({}, ev, { t: pos, d: rem }), LIVE.t0ctx));
+    }
+  }
+  clearInterval(LIVE.timer); LIVE.timer = setInterval(liveTick, 25); liveTick();
+}
+function livePause() {
+  if (!LIVE.ctx) return;
+  LIVE.pos0 = liveNow(); LIVE.playing = false; clearInterval(LIVE.timer); liveStopVoices();
+}
+function liveMute(m) { LIVE.muted = m; if (LIVE.G) LIVE.G.master.gain.setTargetAtTime(m ? 0 : 0.9, LIVE.ctx.currentTime, 0.02); }
+
+// ---- 40_player.js
+// ============================================================================
+// PLAYER: 270x480 canvas shown with nearest-neighbour scaling, controls
+// outside the composition. Audio starts on the first user gesture; the audio
+// clock drives the picture, so pause / resume / seek never duplicate sounds.
+// ============================================================================
+const SCENE_NAMES = ['HEALTHY ARTERY', 'PLAQUE BUILDS UP', 'ARTERY NARROWS', 'REDUCED BLOOD SUPPLY', 'CORONARY ARTERY', 'CARDIAC CATHETERIZATION',
+  'RADIAL ACCESS', 'GUIDING CATHETER', 'X-RAY GUIDANCE', 'GUIDEWIRE', 'LESION CROSSED', 'STENT DELIVERY', 'STENT POSITIONED', 'BALLOON INFLATION',
+  'STENT EXPANSION', 'ARTERY WIDENS', 'BALLOON DEFLATES', 'STENT STAYS IN PLACE', 'IMPROVED BLOOD FLOW', 'BEFORE / AFTER', 'FLOW ASSESSMENT',
+  'DRUG-ELUTING STENT', 'BLOOD FLOW IMPROVED', 'HOW CORONARY STENTS WORK'];
+const PL = { t: 0, playing: false, wallT0: 0, pos0: 0, audioOK: true, scrubbing: false, img: null, cx: null };
+function plClock() {
+  if (!PL.playing) return PL.t;
+  if (PL.audioOK && LIVE.ctx) return liveNow();
+  return PL.pos0 + (performance.now() - PL.wallT0) / 1000;
+}
+function plDraw(t) {
+  renderFrame(t);
+  const d = PL.img.data, u = new Uint32Array(d.buffer); u.set(buf);
+  PL.cx.putImageData(PL.img, 0, 0);
+}
+function plFmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+function plUI() {
+  const el = PL.el;
+  el.play.innerHTML = PL.playing ? ICON.pause : ICON.play;
+  el.play.setAttribute('aria-label', PL.playing ? 'Pause' : 'Play');
+  el.mute.innerHTML = LIVE.muted ? ICON.muted : ICON.sound;
+  el.mute.setAttribute('aria-label', LIVE.muted ? 'Unmute' : 'Mute');
+  if (!PL.scrubbing) el.scrub.value = String(Math.round(PL.t * FPS));
+  el.time.textContent = plFmt(PL.t) + ' / ' + plFmt(DUR);
+  const i = sceneIndex(PL.t);
+  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / 24  ' + SCENE_NAMES[i];
+  el.scrub.style.setProperty('--p', (PL.t / DUR * 100).toFixed(2) + '%');
+}
+function plPlay() {
+  if (PL.t >= DUR - 1 / FPS) PL.t = 0;
+  PL.playing = true; PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  try { livePlay(PL.t); if (LIVE.muted) liveMute(true); } catch (e) { PL.audioOK = false; }
+  plUI();
+}
+function plPause() {
+  PL.t = plClock(); PL.playing = false;
+  try { livePause(); } catch (e) { }
+  plUI();
+}
+function plSeek(t, keepPlaying) {
+  t = clamp(t, 0, DUR - 1 / FPS);
+  const was = PL.playing;
+  if (was) { try { livePause(); } catch (e) { } PL.playing = false; }
+  PL.t = t; plDraw(t);
+  if (was && keepPlaying !== false) plPlay(); else plUI();
+}
+function plLoop() {
+  if (PL.playing) {
+    let t = plClock();
+    if (t >= DUR - 1 / FPS) { t = DUR - 1 / FPS; PL.t = t; plDraw(t); plPause(); }
+    else { PL.t = t; plDraw(t); plUI(); }
+  }
+  requestAnimationFrame(plLoop);
+}
+const ICON = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/></svg>',
+  replay: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1.5L7 6l5 4.5V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15 8.6a4.6 4.6 0 0 1 0 6.8l-1.3-1.3a2.8 2.8 0 0 0 0-4.2zM17.6 6a8.3 8.3 0 0 1 0 12l-1.3-1.3a6.5 6.5 0 0 0 0-9.4z"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15.2 9.3l1.3-1.3 2.2 2.2 2.2-2.2 1.3 1.3-2.2 2.2 2.2 2.2-1.3 1.3-2.2-2.2-2.2 2.2-1.3-1.3 2.2-2.2z"/></svg>',
+};
+function plStart() {
+  const cv = document.getElementById('screen');
+  PL.cx = cv.getContext('2d', { alpha: false });
+  PL.img = PL.cx.createImageData(W, H);
+  PL.el = { play: document.getElementById('play'), replay: document.getElementById('replay'), mute: document.getElementById('mute'), scrub: document.getElementById('scrub'), time: document.getElementById('time'), scene: document.getElementById('scene') };
+  PL.el.replay.innerHTML = ICON.replay;
+  PL.el.scrub.max = String(NF - 1);
+  const fit = () => {
+    const stage = document.getElementById('stage');
+    const aw = stage.clientWidth, ah = stage.clientHeight;
+    let s = Math.min(aw / W, ah / H);
+    if (s >= 2) s = Math.floor(s);                       // integer scale when there is room
+    cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
+  };
+  addEventListener('resize', fit); fit();
+  PL.el.play.onclick = () => (PL.playing ? plPause() : plPlay());
+  PL.el.replay.onclick = () => { plSeek(0, false); plPlay(); };
+  PL.el.mute.onclick = () => { try { liveInit(); liveMute(!LIVE.muted); } catch (e) { LIVE.muted = !LIVE.muted; } plUI(); };
+  const sc = PL.el.scrub;
+  sc.addEventListener('input', () => { PL.scrubbing = true; const t = (+sc.value) / FPS; if (PL.playing) { try { livePause(); } catch (e) { } PL.playing = false; PL.resumeAfter = true; } PL.t = t; plDraw(t); plUI(); });
+  sc.addEventListener('change', () => { PL.scrubbing = false; if (PL.resumeAfter) { PL.resumeAfter = false; plPlay(); } else plUI(); });
+  cv.addEventListener('click', () => (PL.playing ? plPause() : plPlay()));
+  addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); PL.playing ? plPause() : plPlay(); }
+    else if (e.key === 'ArrowRight') plSeek(PL.t + (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'ArrowLeft') plSeek(PL.t - (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'm') PL.el.mute.click();
+    else if (e.key === 'r') PL.el.replay.click();
+  });
+  document.getElementById('loading').remove();
+  plDraw(0); plUI(); requestAnimationFrame(plLoop);
+}
+// public API (used by the MP4 export through Playwright)
+if (typeof window !== 'undefined') {
+  window.LINAC = { W, H, FPS, DUR, NF, renderFrame, getBuf: () => buf, renderAudioOffline, sceneIndex, seek: t => plSeek(t, false) };
+  const boot = () => setTimeout(() => { engineInit(); if (!/[?&]headless/.test(location.search)) plStart(); else window.LINAC.ready = true; window.LINAC.ready = true; }, 30);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+}
+
+})();
+</script>
+</body>
+</html>
