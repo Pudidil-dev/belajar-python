@@ -33,14 +33,14 @@ function musicEvents() {
   for (let b = 1; b <= NBARS; b++) {
     const t0 = (b - 1) * BAR, ch = BARS[b - 1], s = sec(b), at = beat => t0 + beat * BEAT;
     const root = nm(CH[ch][0], 1), t5 = chordMidi(ch, 5), t4 = chordMidi(ch, 4);
-    const padV = { hook: 0.05, clinic: 0.068, mach: 0.045, build: 0.055 + 0.005 * (b - 12), peak: 0.07, climax: 0.07, detect: 0.07, coinc: 0.05, image: 0.06, reveal: 0.085, recap: 0.055, pickup: 0.06 }[s];
-    const cut = { hook: 1500, clinic: 1700, mach: 1300, build: 1100 + 500 * (b - 12), peak: 2000, climax: 3200, detect: 900, coinc: 1600, image: 1400 + 600 * (b - 26), reveal: 2600, recap: 2400, pickup: 1800 }[s];
+    const padV = { hook: 0.05, clinic: 0.068, mach: 0.045, build: 0.055 + 0.005 * (b - 12), peak: 0.07, climax: 0.07, detect: 0.085, coinc: 0.05, image: 0.06, reveal: 0.085, recap: 0.055, pickup: 0.06 }[s];
+    const cut = { hook: 1500, clinic: 1700, mach: 1300, build: 1100 + 500 * (b - 12), peak: 2000, climax: 3200, detect: 1400, coinc: 1600, image: 1400 + 600 * (b - 26), reveal: 2600, recap: 2400, pickup: 1800 }[s];
     const cut1 = { build: 1500 + 500 * (b - 12), peak: 6000, image: 2400 + 900 * (b - 26), pickup: 4200 }[s] || cut;
     for (const m of chordMidi(ch, 3)) N(t0, BAR + 0.04, 'pad', m, padV, (m % 3 - 1) * 0.45, { cut, cut1 });
     if (s === 'climax' || s === 'reveal') for (const m of chordMidi(ch, 4)) N(t0, BAR, 'vox', m, s === 'climax' ? 0.05 : 0.035, (m % 2 ? 0.35 : -0.35));
     // bass
     if (s === 'hook' || s === 'recap') for (let i = 0; i < 8; i++) N(at(i / 2), BEAT / 2 * 0.7, 'bass', root + (i % 2 ? 12 : 0), i % 2 ? 0.16 : 0.22);
-    if (s === 'clinic') for (let i = 0; i < 8; i++) N(at(i / 2), BEAT / 2 * 0.8, 'bass', root + (i % 4 === 3 ? 7 : 0), i % 2 ? 0.12 : 0.18, 0, { cut: 700 });
+    if (s === 'clinic') for (let i = 0; i < 8; i++) N(at(i / 2), BEAT / 2 * 0.8, 'bass', root + (i % 4 === 3 ? 7 : 0), i % 2 ? 0.14 : 0.2, 0, { cut: 950 });
     if (s === 'mach') { const pat = [0, 0, 12, 0, 0, 12, 0, 7, 0, 0, 12, 0, 0, 12, 7, 12]; for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.6, 'ebass', root + 12 + pat[i], i % 4 === 0 ? 0.2 : 0.12); }
     if (s === 'build') for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.62, 'bass', root + (i % 4 === 2 ? 12 : 0), i % 4 === 0 ? 0.22 : 0.14, 0, { cut: 600 + 400 * (b - 12) });
     if (s === 'peak') for (let i = 0; i < 14; i++) N(at(i / 4), BEAT / 4 * 0.6, 'bass', root + (i % 2 ? 12 : 0), 0.14 + 0.007 * i, 0, { cut: 2400 });
@@ -58,15 +58,15 @@ function musicEvents() {
       if (!(s === 'build' && b === 13)) { clap(1, s === 'climax' ? 0.36 : 0.32); clap(3, s === 'climax' ? 0.36 : 0.32); }
       for (let i = 0; i < 4; i++) hat(i + 0.5, s === 'hook' ? 0.07 : 0.09, s === 'climax' || s === 'coinc' || s === 'recap');
     }
-    if (s === 'clinic') { kick(0, 0.48); kick(2, 0.44); clap(1, 0.2); clap(3, 0.26); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.06); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.07 : 0.04, 0.25); }
+    if (s === 'clinic') { kick(0, 0.5); kick(1, 0.38); kick(2, 0.46); kick(3, 0.38); clap(1, 0.24); clap(3, 0.3); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.075); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.08 : 0.05, 0.25); }
     if (s === 'mach') { for (let i = 0; i < 16; i++) if (i % 2) hat(i / 4, i % 4 === 3 ? 0.06 : 0.04); for (let i = 0; i < 4; i++) D(at(i + 0.75), 'perc', 0.08, i % 2 ? 0.4 : -0.4); }
     if (s === 'climax' || s === 'coinc' || s === 'recap') for (let i = 0; i < 16; i++) if (i % 4 === 1 || i % 4 === 3) hat(i / 4, 0.035);
     if (s === 'hook' && b >= 2) for (let i = 0; i < 16; i++) if (i % 4) hat(i / 4, 0.03);
     if (s === 'build') for (let i = 0; i < (b === 12 ? 8 : 16); i++) D(at(i / (b === 12 ? 2 : 4)), 'snare', 0.05 + i * (b === 12 ? 0.012 : 0.008));
     if (s === 'peak') { for (let i = 0; i < 3; i++) kick(i, 0.55); for (let i = 0; i < 8; i++) D(at(i / 4), 'snare', 0.13 + i * 0.012); for (let i = 0; i < 6; i++) D(at(2 + i / 8), 'snare', 0.2 + i * 0.015); }
-    if (s === 'detect') { kick(0, 0.58); kick(2.5, 0.42); clap(2, 0.42); for (let i = 0; i < 16; i++) D(at(i / 4), 'tick', i % 4 === 2 ? 0.08 : 0.035, ((i * 5) % 7) / 7 - 0.5); hat(1.5, 0.06); hat(3.5, 0.06, true); }
+    if (s === 'detect') { kick(0, 0.6); kick(1.75, 0.3); kick(2.5, 0.46); clap(2, 0.44); for (let i = 0; i < 16; i++) D(at(i / 4), 'tick', i % 4 === 2 ? 0.09 : 0.04, ((i * 5) % 7) / 7 - 0.5); hat(0.5, 0.05); hat(1.5, 0.07); hat(2.5, 0.05); hat(3.5, 0.07, true); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.06 : 0.035, -0.25); }
     if (s === 'image' && b === 27) for (let i = 0; i < 16; i++) D(at(i / 4), 'snare', 0.06 + i * 0.012);
-    if (s === 'reveal') { kick(0, 0.44); kick(2, 0.38); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.06 : 0.035, 0.25); clap(3, 0.2); }
+    if (s === 'reveal') { kick(0, 0.46); kick(1, 0.3); kick(2, 0.4); kick(3, 0.3); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.07 : 0.04, 0.25); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.05); clap(1, 0.16); clap(3, 0.22); }
     if (s === 'pickup') { kick(0, 0.55); kick(1, 0.45); for (let i = 8; i < 16; i++) D(at(i / 4), 'snare', 0.08 + (i - 8) * 0.022); }
     if (b === 11) for (let i = 12; i < 16; i++) D(at(i / 4), 'tom', 0.2 + (i - 12) * 0.04, 0, { f: 190 - (i - 12) * 26 });
     if ([1, 4, 15, 17, 21, 28, 30].includes(b)) D(t0, 'crash', b === 15 || b === 28 ? 0.4 : 0.3);
@@ -81,7 +81,7 @@ function musicEvents() {
   }
   // melodies
   for (let b = 1; b <= 4; b++) riff(b, b - 1, 'lead', 0.08, 0, false);
-  for (let b = 5; b <= 8; b++) riff(b, b - 5, 'pluck', 0.045, 1, false, 0.2);
+  for (let b = 5; b <= 8; b++) riff(b, b - 5, 'pluck', 0.06, 1, false, 0.2);
   [['B', 4, 0], ['D#', 5, 0.75], ['F#', 5, 1.5], ['B', 5, 2.25]].forEach(([n, o, p]) => N(13 * BAR + p * BEAT, BEAT * 0.7, 'saw', nm(n, o), 0.06));
   for (let b = 15; b <= 16; b++) riff(b, b - 15, 'saw', 0.075, 0, true);                   // THE DROP: supersaw hook
   for (let b = 21; b <= 24; b++) riff(b, b - 21, 'pluck', 0.04, 1, false, -0.2);
@@ -110,7 +110,7 @@ function sfxEvents() {
   for (const p of [-0.75, 0.75]) { S(T_ANN1, 'annihilate', 0.75, { p }); S(T_ANN1 + 0.04, 'gammaout', 0.45, { p }); }
   S(T_ANN1, 'boom', 0.6); S(T_ANN1, 'duck', 1, { d: 0.35, amt: 0.55 });
   // S06 pull-out, two synchronized detector clicks
-  S(7.0, 'revwhoosh', 0.6, { d: 0.95 }); for (const p of [-0.7, 0.7]) S(T_DET1, 'detect', 0.7, { p });
+  S(6.25, 'whoosh', 0.22, { d: 0.75 }); S(7.0, 'revwhoosh', 0.6, { d: 0.95 }); for (const p of [-0.7, 0.7]) S(T_DET1, 'detect', 0.7, { p });
   // S07-S10 the tracer
   S(9.05, 'ui', 0.35, { f: E6 }); S(9.55, 'lensw', 0.3, { d: 0.35 }); S(10.0, 'molzoom', 0.4, { d: 0.26 }); S(T_F18, 'glint', 0.55, { f: B6 });
   S(11.05, 'glove', 0.4); S(11.25, 'syringe', 0.45, { d: 0.94 }); S(12.2, 'lensw', 0.35, { d: 0.4 });
@@ -131,7 +131,7 @@ function sfxEvents() {
   { const hA = hitRing(EV_A.p[0], EV_A.p[1], Math.cos(EV_A.th), Math.sin(EV_A.th)), hB = hitRing(EV_A.p[0], EV_A.p[1], -Math.cos(EV_A.th), -Math.sin(EV_A.th)), v = Math.max(hA[2], hB[2]) / (T_REACH - EV_A.t0);
     for (const E of [EV_B, EV_C, EV_A]) { S(E.t0, 'emitsoft', 0.35); S(E.t0 + 0.02, 'sweep', 0.35, { p: Math.cos(E.th) * 0.7, d: 0.5 }); }
     S(EV_B.t0 + EV_B.sc / v, 'scatter', 0.5, { p: -0.4 }); S(EV_C.t0 + EV_C.ab / v, 'absorb', 0.5);
-    for (const p of [-0.7, 0.7]) S(T_REACH, 'detect', 0.75, { p }); }
+    S(EV_A.t0 + hA[2] / v, 'detect', 0.75, { p: 0.7 }); S(EV_A.t0 + hB[2] / v, 'detect', 0.75, { p: -0.7 }); }
   // S18-S20 crystal -> light -> electric signal (each on a bar downbeat)
   S(31.0, 'dive', 0.4, { d: 0.4 }); S(31.3, 'gammain', 0.5, { d: T_XTAL - 31.3 }); S(T_XTAL, 'crystal', 0.8); S(T_XTAL + 0.02, 'etrack', 0.45, { d: 0.32 });
   S(T_SCINT, 'scint', 0.75); for (let k = 0; k < 9; k++) S(T_SCINT + 0.22 + k * 0.055, 'sparkle', 0.22, { f: 4000 + hash(k + 40) * 3000, p: (hash(k) - 0.5) * 0.6 });
@@ -141,16 +141,17 @@ function sfxEvents() {
   S(T_C1, 'ping', 0.55, { f: E6, p: -0.7 }); S(T_C2, 'ping', 0.55, { f: E6, p: 0.7 }); S(T_CC, 'coin', 0.7);
   S(T_LOR, 'track', 0.55, { d: 0.4 });
   for (let k = 0; k < EVN; k++) S(T_EV0 + k * BEAT / 4, 'evtick', 0.26 + 0.004 * k, { f: mtof(nm('E', 6) + pent[(k * 3) % 10]), p: (k % 2 ? 0.5 : -0.5) });
-  S(42.0, 'data', 0.3, { d: 1.9 });
+  S(42.0, 'data', 0.3, { d: 1.9 }); S(42.75, 'shimmer', 0.3, { d: 1.2 });
   { const c = Math.cos(TOF.th), s = Math.sin(TOF.th), h1 = hitRing(TOF.p[0], TOF.p[1], c, s), h2 = hitRing(TOF.p[0], TOF.p[1], -c, -s), v = (h1[2] - h2[2]) / 0.36;
-    S(TOF.t0, 'emitsoft', 0.35); S(TOF.t0 + h2[2] / v, 'tofclick', 0.6, { p: -0.6 }); S(TOF.t0 + h1[2] / v, 'tofclick', 0.6, { p: 0.6 }); }
-  S(45.0, 'compare', 0.55); S(45.3, 'shimmer', 0.35, { d: 0.8 });
+    S(TOF.t0, 'emitsoft', 0.35); S(TOF.t0 + h2[2] / v, 'tofclick', 0.6, { p: -0.6 }); S(TOF.t0 + h1[2] / v, 'tofclick', 0.6, { p: 0.6 });
+    S(45.0, 'compare', 0.55); S(45.3, 'shimmer', 0.35, { d: 0.8 });
+    for (const r0 of TOF_REPLAY) { S(r0 + h2[2] / (2 * v), 'tofclick', 0.3, { p: -0.6 }); S(r0 + h1[2] / (2 * v), 'tofclick', 0.3, { p: 0.6 }); } }
   // S25 reconstruction -> warm reveal on bar 28
   S(47.05, 'ui', 0.3, { f: E6 }); S(47.55, 'dive', 0.4, { d: 0.45 }); S(48.0, 'data', 0.45, { d: 1.3 }); S(48.6, 'swish', 0.3, { d: 0.8 });
   for (let i = 0; i < 4; i++) S(49.4 + i * 0.25, 'iter', 0.45, { f: mtof(nm('B', 5) + [0, 3, 5, 7][i]) });
   S(T_REVEAL, 'complete', 0.85);
   // S26 PET + CT
-  S(51.0, 'pop', 0.35); S(51.65, 'slide', 0.45, { d: 0.85 }); S(T_FUSE, 'align', 0.75); S(53.4, 'ui', 0.3, { f: B6 }); S(53.9, 'ui', 0.3, { f: E6 });
+  S(51.0, 'pop', 0.35); S(51.65, 'slide', 0.45, { d: 0.85 }); S(T_FUSE, 'align', 0.75); S(53.34, 'select', 0.4); S(53.9, 'ui', 0.3, { f: E6 }); S(54.42, 'select', 0.4);
   // S27 recap on the beat, title, smooth reverse zoom into the loop
   S(55.0, 'swish', 0.35, { d: 0.3 });
   RECAP.forEach(([name, t], i) => S(t, 'cut', 0.45, { f: mtof(nm('E', 5) + pent[i]) }));

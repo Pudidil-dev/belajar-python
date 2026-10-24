@@ -66,6 +66,7 @@ function drawPETBody(cam, opt) {
 }
 // ---------------------------------------------------------------- axial chest slice (mm)
 const AX = {};
+let HEART_S = 1;
 const AX_BODY_R = [0, -104, 40, -108, 80, -104, 118, -92, 148, -68, 164, -36, 170, 0, 166, 40, 154, 72, 132, 94, 96, 108, 50, 114, 0, 116];
 const AX_LUNG_R = [-18, -72, -56, -82, -96, -72, -122, -44, -129, -6, -125, 34, -108, 64, -80, 78, -48, 76, -27, 60, -22, 30, -28, 0, -24, -36];
 const AX_LUNG_L = [40, -76, 80, -82, 112, -64, 126, -34, 130, 0, 124, 36, 106, 66, 78, 78, 50, 74, 38, 54, 46, 30, 64, 8, 60, -22, 44, -50];
@@ -96,7 +97,7 @@ function axTissue(x, y, inBody, deep, inLung) {
   if (Math.hypot(x - 26, y - 46) < 12.5) return Math.hypot(x - 26, y - 46) > 10.5 ? 2 : 5;   // descending aorta
   if (Math.hypot(x - 6, y - 36) < 6.5) return 7;                                  // oesophagus
   { // heart: long axis from posterior-right to anterior-left (apex towards the viewer's upper right)
-    const c = Math.cos(-0.45), s = Math.sin(-0.45), u = (x - 16) * c + (y + 22) * s, v = -(x - 16) * s + (y + 22) * c, e = (u / 54) ** 2 + (v / 40) ** 2;
+    const c = Math.cos(-0.45), s = Math.sin(-0.45), u = (x - 16) * c + (y + 22) * s, v = -(x - 16) * s + (y + 22) * c, e = (u / (54 * HEART_S)) ** 2 + (v / (40 * HEART_S)) ** 2;
     if (e < 1) {
       const lv = ((x - 34) / 17) ** 2 + ((y + 24) / 13) ** 2, rv = ((x + 6) / 20) ** 2 + ((y + 44) / 9) ** 2, la = ((x - 8) / 16) ** 2 + ((y - 4) / 10) ** 2;
       if (lv < 1 || rv < 1 || la < 1) return 5;

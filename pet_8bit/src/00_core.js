@@ -16,8 +16,8 @@ function hexc(h) {
 }
 const P = {};
 const PAL_HEX = {
-  // ground (dark navy, #0B1020 from the brief)
-  K0: '#04060D', BG: '#0B1020', N1: '#10172C', N2: '#161F3A', N3: '#1E2949', N4: '#29375E', N5: '#3A4B7C', N6: '#53679A',
+  // ground: deep navy (hue ~212°, kept out of the blue-violet band)
+  K0: '#04080D', BG: '#0A1520', N1: '#0F1B2C', N2: '#14233A', N3: '#1C2E49', N4: '#263D5E', N5: '#36557C', N6: '#4F739A',
   // machine casing ramp around #CAD2DE
   C0: '#252B37', C1: '#465064', C2: '#6E7A8E', C3: '#9AA5B7', C4: '#CAD2DE', C5: '#E5EAF1', C6: '#FFFFFF',
   // tungsten ramp around #919AA8

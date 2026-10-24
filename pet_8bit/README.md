@@ -58,32 +58,32 @@ node tools/smoke.js shot.png          # headless player check: play, pause, seek
 | 01 | 0–1.2 | PET IMAGING | The finished whole-body image is on frame 1. The nodule lights up, then a log zoom dives into it. |
 | 02 | 1.2–2.4 | FLUORINE-18 | Push through the hot 4 mm voxels; their colour bridges the scale jump into tissue. A cell lights up, then a lens reveal enters it and lands on an FDG molecule with its F-18 marked. |
 | 03 | 2.4–4.0 | POSITRON EMISSION | Lens reveal into the F atom's electron cloud, then into the nucleus. On the beat a proton becomes a neutron: β+ decay emits a positron (e+) and a neutrino. The neutrino is drawn faint and leaves without interacting. |
-| 04 | 4.0–5.5 | POSITRON SLOWS DOWN + Range: typically under 1 mm | A short, winding path through water molecules. Each kink is an electromagnetic interaction that knocks out an electron, and the energy bar falls. |
-| 05 | 5.5–7.0 | ANNIHILATION + 511 keV EACH | A brief positronium-like dance with an electron, then a controlled flash on bar 4 and two gold photons back to back. |
-| 06 | 7.0–9.0 | PET DETECTOR RING | Fast pull-out from the event to the ring. Both photons travel at the same slowed speed from a near-central event, so the two detector clicks are synchronized. |
-| 07 | 9.0–11.0 | F-18 FDG TRACER + A glucose analog | The shielded vial; a magnifier shows the molecules, then a lens reveal reaches the Haworth FDG. |
-| 08 | 11.0–13.0 | RADIOTRACER INJECTION | Clean, non-graphic IV. A cutaway lens over the vein shows the tracer entering the blood. |
+| 04 | 4.0–5.5 | POSITRON SLOWS DOWN + Mean range under 1 mm | A short, winding path through water molecules. Each kink is an electromagnetic interaction that knocks out an electron, and the energy bar falls. |
+| 05 | 5.5–7.0 | ANNIHILATION + 511 keV EACH | A brief positronium-like dance with an electron, then a controlled gold light bloom on bar 4 and two gold photons back to back, each carrying its 511 keV tag. The camera then starts pulling back (accelerating), so the photons stay in shot and hand over to S06. |
+| 06 | 7.0–9.0 | PET DETECTOR RING | The pull-out continues to the ring with a long settling tail; the photons keep the same screen positions across the cut and leave short wakes. The event sits perpendicular to its photon line, so both reach the ring together: two synchronized clicks. A small marker shows where the annihilation happened (no second flash). |
+| 07 | 9.0–11.0 | F-18 FDG TRACER + A glucose analog | The shielded vial; a magnifier shows the molecules, then a lens reveal reaches the Haworth FDG, which jiggles with thermal motion while the F-18 marker pulses on the beat. |
+| 08 | 11.0–13.0 | RADIOTRACER INJECTION | Clean, non-graphic IV. The tracer bolus runs from the shielded syringe down the line, through the cannula and into the vein towards the heart; the camera follows it, then a cutaway lens over the vein shows it in the blood. |
 | 09 | 13.0–15.0 | THROUGH THE BLOODSTREAM | Laminar flow (faster at the centre) with red cells tumbling face-on and edge-on. |
-| 10 | 15.0–17.0 | TRACER UPTAKE + Active cells trap more FDG | TIME-LAPSE. FDG moves capillary → GLUT → hexokinase, gets phosphorylated, and is trapped. Normal, inflamed and tumour cells all take it up, at different rates. |
-| 11 | 17.0–19.0 | PET SCANNING + PET and CT share one gantry | The pallet carries the patient into the bore. |
-| 12 | 19.0–21.0 | DETECTOR ARRAY + A stationary ring of crystals | An activation sweep around the 38 modules, then a zoom onto the crystal blocks. The ring never rotates. |
-| 13 | 21.0–23.0 | BETA-PLUS DECAY + F-18 > O-18 + e+ + ν | The same conversion, now labelled: the nucleus becomes O-18. |
-| 14 | 23.0–25.0 | POSITRON INTERACTIONS + Each interaction costs energy | The whole winding track, with ionizations along it. |
-| 15 | 25.0–27.0 | MATTER + ANTIMATTER + Mass becomes energy | Fuzzy probability clouds, never hard balls. The dance speeds up, half a beat of silence, then the annihilation is the drop (26.25 s): a light fill, not a blast. |
-| 16 | 27.0–29.0 | TWO 511 keV PHOTONS + Nearly opposite directions | Two equal energy tags and a ~180° marker. |
-| 17 | 29.0–31.0 | GAMMA RAYS TRAVEL + Some scatter or are absorbed | One unscattered pair reaches opposite detectors on the beat. One photon Compton-scatters (dashed, dimmer, SCATTERED). One is absorbed in bone (ABSORBED). |
-| 18 | 31.0–33.0 | SCINTILLATION CRYSTAL + Dense LYSO crystal | Push into the module. The gamma enters a crystal and is absorbed (photoelectric). A short photoelectron track excites luminescent centres. |
-| 19 | 33.0–35.0 | ENERGY > LIGHT + Excited crystal emits light | Blue-white optical photons bounce off the reflector walls down to the SiPM. The light comes from deposited energy, not from the gamma ray itself. |
-| 20 | 35.0–37.0 | LIGHT > ELECTRIC SIGNAL + Each cell fires an avalanche | Microcells fire; their summed current pulse feeds an amplifier, then TIME (TDC) and ENERGY (ADC). |
-| 21 | 37.0–39.0 | COINCIDENCE DETECTION + Paired within nanoseconds | Two opposite modules on one clock, inside the timing window: COINCIDENCE. |
-| 22 | 39.0–41.0 | LINE OF RESPONSE + The event lies somewhere on it | The LOR is drawn with equally possible origins along it. It is not a point. |
-| 23 | 41.0–44.0 | MANY DETECTED EVENTS + Lines pile up where tracer is | TIME-COMPRESSED. Events on 16ths, then many more; an event counter runs. |
-| 24 | 44.0–47.0 | TIME-OF-FLIGHT PET + On TOF-capable scanners | The nearer detector fires FIRST; the arrival-time difference gives a probability region (LIKELY ORIGIN), not an exact point. |
-| 25 | 47.0–51.0 | PET IMAGE RECONSTRUCTION + Built from many detected events | Workstation → sinogram → simple backprojection streaks → iterations 1–4 → the warm reveal of the activity map on bar 28. |
-| 26 | 51.0–55.0 | PET + CT + Anatomy + tracer activity | CT (anatomy) and PET (tracer) slide together and fuse on the beat. "NORMAL HEART UPTAKE" and "Bright does not always mean cancer". |
-| 27 | 55.0–60.0 | HOW PET SCANNERS WORK (+ HOW ANTIMATTER CREATES MEDICAL IMAGES) | Recap cuts on consecutive beats: RADIOTRACER → POSITRON → ANNIHILATION → TWO GAMMA PHOTONS → SCINTILLATION CRYSTALS → ELECTRICAL SIGNALS → COINCIDENCE DETECTION → PET IMAGE. The title then dissolves into frame 0 for a seamless loop. |
+| 10 | 15.0–17.0 | TRACER UPTAKE + More active = more FDG | TIME-LAPSE. FDG moves capillary → GLUT → hexokinase, gets phosphorylated, and is trapped. Normal, inflamed and tumour cells all take it up, at different rates. |
+| 11 | 17.0–19.0 | PET SCANNING + PET + CT in one gantry | The whole gantry is in shot; small CT and PET tags mark the two sections of the cutaway while the pallet carries the patient into the bore. |
+| 12 | 19.0–21.0 | DETECTOR ARRAY + Stationary crystal ring | An activation sweep around the 38 modules, then a zoom onto the crystal blocks. The ring never rotates. |
+| 13 | 21.0–23.0 | BETA-PLUS DECAY + F-18 > O-18 + e+ + ν | The same conversion, now labelled: the nucleus becomes O-18. The view then eases back out to the whole atom. |
+| 14 | 23.0–25.0 | POSITRON INTERACTIONS + Each interaction slows it | The whole winding track, with ionizations along it. |
+| 15 | 25.0–27.0 | MATTER + ANTIMATTER + Mass becomes energy | Fuzzy probability clouds, never hard balls. The dance speeds up, half a beat of silence, then the annihilation is the drop (26.25 s): a short gold-white radial light bloom, not a blast. |
+| 16 | 27.0–29.0 | TWO 511 keV PHOTONS + Nearly opposite paths | Two equal energy tags and a ~180° marker. |
+| 17 | 29.0–31.0 | GAMMA RAYS TRAVEL + Not every photon escapes | One unscattered pair from the lung nodule runs diagonally to opposite detectors; the nearer photon is detected a 16th note before the farther one (same speed, different path lengths). One photon Compton-scatters (dashed, dimmer, SCATTERED). One is absorbed in bone (ABSORBED). The camera then creeps towards the struck module before diving in. |
+| 18 | 31.0–33.0 | SCINTILLATION CRYSTAL + Dense LYSO crystal | Dive into the module. The gamma enters a crystal and is absorbed (photoelectric). A short photoelectron track excites luminescent centres, which keep glowing softly. |
+| 19 | 33.0–35.0 | ENERGY > LIGHT + Excited atoms emit light | Each blue-white optical photon is born with a tiny flash at an excited centre, then bounces off the reflector walls down to the SiPM. The light comes from deposited energy, not from the gamma ray itself. |
+| 20 | 35.0–37.0 | LIGHT > ELECTRIC SIGNAL + Cells fire avalanches | Microcells fire; their summed current pulse feeds an amplifier, then TIME (TDC) and ENERGY (ADC). |
+| 21 | 37.0–39.0 | COINCIDENCE DETECTION + Paired within nanoseconds | The nearer module fires first, the other a moment later, both on one running clock and inside the timing window: COINCIDENCE. Lone detections (singles) get time-stamped too, find no partner and fade out. |
+| 22 | 39.0–41.0 | LINE OF RESPONSE + Somewhere along this line | The LOR is drawn with a highlight running along its equally possible origins. It is not a point. |
+| 23 | 41.0–44.0 | MANY DETECTED EVENTS + Lines pile up at hot spots | TIME-COMPRESSED. Events on 16ths, then many more; an event counter runs. The drawn lines are counted per cell, and where many cross (the heart wall and the nodule) a hot spot glows up: the idea behind backprojection. |
+| 24 | 44.0–47.0 | TIME-OF-FLIGHT PET + On TOF-capable scanners | The nearer detector fires FIRST. Without timing the origin could be anywhere on the line; the arrival-time difference shrinks it to a probability region (LIKELY ORIGIN, FWHM about 5 cm, i.e. about 350 ps timing), not an exact point. Ghost replays of the photon race repeat the point. |
+| 25 | 47.0–51.0 | PET IMAGE RECONSTRUCTION + Built from many events | Workstation → sinogram (newest events land bright) → simple backprojection streaks → iterations 1–4 → on bar 28 the whole-body activity map is written out top to bottom by a scan bar. |
+| 26 | 51.0–55.0 | PET + CT + Anatomy + tracer activity | CT (anatomy) and PET (tracer) slide together and fuse on the beat. A reading cursor visits the normal heart uptake ("NORMAL HEART UPTAKE"), then the lung focus ("?"), under "Bright does not always mean cancer". The PET layer gently fades up and down over the CT while the view pushes in slowly. |
+| 27 | 55.0–60.0 | HOW PET SCANNERS WORK (+ HOW ANTIMATTER CREATES MEDICAL IMAGES) | Recap cuts on consecutive beats: RADIOTRACER → POSITRON → ANNIHILATION → TWO GAMMA PHOTONS → SCINTILLATION CRYSTALS → ELECTRICAL SIGNALS → COINCIDENCE DETECTION → PET IMAGE (the final image, with the title above it). The title fades, and a smooth zoom lands exactly on frame 0 (pixel-identical from 59.92 s), so the loop is seamless. |
 
-The bottom-left chips mark representations:
+Small chips under the caption mark representations:
 
 | Chip | When |
 |---|---|
@@ -91,6 +91,14 @@ The bottom-left chips mark representations:
 | NOT TO SCALE | Nucleus scenes |
 | TIME-LAPSE | Uptake |
 | TIME-COMPRESSED | Many events |
+
+## Short-video polish (review pass)
+
+- **Safe zones.** Captions, chips, the energy HUD, recap dots and the end title stay inside logical x 18–240, y 37–362, clear of the app's top tabs, side buttons and bottom caption area. The two struck modules in S06, S17–S24 sit on diagonal lines for the same reason.
+- **One-line labels.** Every micro-context line fits on one line; anything longer wraps into balanced lines (no one-word orphans).
+- **Never fully still.** Hold shots keep a meaningful environment layer moving: detector singles flickering around the ring, the patient's heartbeat and breathing (live patient only; the reconstructed images are time-averaged and do not move), the system clock, singles being discarded, ghost TOF replays, and the PET layer fading over the CT. At 60 fps, no hold has more than a couple of frozen frames.
+- **Continuity.** S05 → S06 is one continuous pull-out with the photons in shot; S17 → S18 creeps and then dives into the same module.
+- **Palette.** The navy ground sits at a hue of about 212°, outside the blue-violet band.
 
 ## Science notes and simplifications
 
@@ -118,7 +126,7 @@ The bottom-left chips mark representations:
 | Bars | Time (s) | Section |
 |---|---|---|
 | 1–4 | 0–7.5 | Hook riff; the first annihilation lands on bar 4 |
-| 5–8 | 7.5–15 | Clinical groove |
+| 5–8 | 7.5–15 | Clinical groove (four-on-the-floor, so the energy holds through the retention-critical seconds) |
 | 9–11 | 15–20.6 | Mechanical 16ths |
 | 12–14 | 20.6–26.25 | Build: snare rolls, rising tension, half a beat of silence |
 | 15–16 | 26.25–30 | DROP on the matter-antimatter annihilation |

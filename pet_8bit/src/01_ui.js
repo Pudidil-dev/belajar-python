@@ -8,12 +8,18 @@ const SAFE = { l: 18, r: 252, t: 30, b: 420 };
 const TYPE_CPS = 40;     // label typing speed (chars / s)
 const MICRO_CPS = 58;
 
+// balanced wrap: as many lines as a greedy wrap at maxW, but evened out (no one-word orphan lines)
+function wrapBal(f, s, maxW, sc) {
+  let best = wrap(f, s, maxW, sc); const n = best.length; if (n < 2) return best;
+  for (let w = maxW - 2; w > 24; w -= 2) { const L = wrap(f, s, w, sc); if (L.length > n) break; best = L; }
+  return best;
+}
 // A callout: leader from the object anchor to an underline below the label.
 // spec: {text, x, y, ax, ay, t0, micro, mw, align('left'|'right'), c}
 function calloutLayout(spec) {
   const sc = 2, tw = textW(FL, spec.text, sc);
   let x = spec.align === 'right' ? spec.x - tw : spec.x;
-  const lines = spec.micro ? wrap(FM, spec.micro, spec.mw || (SAFE.r - Math.max(SAFE.l, Math.min(x, SAFE.r - tw))), 2) : [];
+  const lines = spec.micro ? wrapBal(FM, spec.micro, spec.mw || (SAFE.r - Math.max(SAFE.l, Math.min(x, SAFE.r - tw))), 2) : [];
   let bw = tw; for (const ln of lines) bw = Math.max(bw, textW(FM, ln, 2));
   x = Math.round(clamp(x, SAFE.l, SAFE.r - bw));
   const y = Math.round(spec.y);
@@ -64,7 +70,7 @@ function callout(spec, t) {
 function microText(s, x, y, t0, t, opt) {
   opt = opt || {};
   const age = t - t0; if (age < 0) return;
-  const lines = wrap(FM, s, opt.mw || (SAFE.r - x), 2);
+  const lines = wrapBal(FM, s, opt.mw || (SAFE.r - x), 2);
   let left = age * (opt.cps || MICRO_CPS);
   lines.forEach((ln, i) => {
     if (left <= 0) return;

@@ -28,6 +28,8 @@ function drawRing(cam, t, opt) {
   if (opt.covers !== false) {
     const mc = maskDisc(cx, cy, RING.cov1 * z); shade(mc, P.SC2, P.SC3, P.SC1, P.SC0, { k: Math.max(1, Math.round(z * 10)) });
     disc(cx, cy, RING.cov0 * z + 2, P.SC1); ring(cx, cy, RING.cov0 * z + 4, 1.4, P.CR2);            // illuminated bore ring
+    const r0 = RING.cov0 * z + 4, a0 = t * 0.6;
+    for (let k = 0; k < 14; k++) { const a = a0 + k * 0.025; pset(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, P.CR3); pset(cx + Math.cos(a + Math.PI) * r0, cy + Math.sin(a + Math.PI) * r0, P.CR3); }
   }
   disc(cx, cy, RING.cov0 * z, P.N2);
   const hl = opt.hl || {};
@@ -44,12 +46,22 @@ function drawRing(cam, t, opt) {
     }
     if (h > 0) { const m = maskPoly(modQuad(cam, i, RING.rc - 3, RING.rh + 3, RING.mw + 4)); mOuter(m, h > 0.5 ? P.SG2 : P.SG1); }
   }
+  if (opt.singles !== false) for (let sl = Math.floor(t * 18) - 3; sl <= Math.floor(t * 18); sl++) { // singles: most detections are lone photons (no partner)
+    const age = t - sl / 18; if (age < 0 || age > 0.14) continue;
+    const m = Math.floor(hash3(sl, 7, 91) * RING.n), k = 1 - age / 0.14; if (hl[m]) continue;
+    if (z < 0.6) poly(modQuad(cam, m, RING.rc + 2, RING.rd - 2, RING.mw - 14), P.CR2, 0.25 + 0.5 * k);
+    else { const q = (hash3(sl, 8, 92) - 0.5) * 44, a = modAngle(m), c = Math.cos(a), s2 = Math.sin(a), r = RING.rc + 6; disc(cam.x(r * c - q * s2), cam.y(r * s2 + q * c), 1 + 2 * k, P.SL2, k); }
+  }
   disc(cx, cy, (RING.bore + 5) * z, P.SC1); disc(cx, cy, RING.bore * z, P.BG);                    // bore cover
   // patient cradle and pallet support inside the bore
   const tb = []; for (let k = 0; k <= 20; k++) { const x = lerp(-150, 150, k / 20); tb.push(cam.x(x), cam.y(134 + 0.0005 * x * x)); }
   tb.push(cam.x(118), cam.y(Math.sqrt(RING.bore * RING.bore - 118 * 118) - 4), cam.x(-118), cam.y(Math.sqrt(RING.bore * RING.bore - 118 * 118) - 4));
   poly(tb, P.PA1);
-  if (opt.body) drawSlice(cam, opt.body, { transparent: true, clip: [Math.floor(cx - RING.bore * z), Math.floor(cy - RING.bore * z), Math.ceil(cx + RING.bore * z), Math.ceil(cy + RING.bore * z)] });
+  // the live patient: heartbeat (~66 bpm) and quiet breathing (the reconstructed images later are time-averaged, so they do not move)
+  HEART_S = 1 + 0.035 * Math.max(0, Math.sin(t * TAU * 1.1)) ** 3;
+  const br = 1 + 0.012 * Math.sin(t * TAU / 4);
+  if (opt.body) drawSlice(new Cam(cam.cx, cam.cy, cam.z * br, cam.ax, cam.ay), opt.body, { transparent: true, clip: [Math.floor(cx - RING.bore * z), Math.floor(cy - RING.bore * z), Math.ceil(cx + RING.bore * z), Math.ceil(cy + RING.bore * z)] });
+  HEART_S = 1;
 }
 // a detected gamma lights its crystal: returns screen point on the crystal face
 function ringPoint(cam, a, r) { return [cam.x(Math.cos(a) * (r || RING.rc)), cam.y(Math.sin(a) * (r || RING.rc))]; }
@@ -70,7 +82,7 @@ function drawModuleCut(t, opt) {
       const b = bay(x, y), sx = (x - x0) / (x1 - x0);
       let c = b < 0.55 ? P.CR1 : P.CR0;
       if (sx < 0.16 && b < 0.7) c = P.CR2;                                                         // translucent edge highlight
-      if (Math.abs(sx - 0.62 - 0.05 * Math.sin(y * 0.05)) < 0.03 && b < 0.4) c = P.CR2;          // internal reflections
+      if (Math.abs(sx - 0.62 - 0.05 * Math.sin(y * 0.05 + t * 2.2 + i)) < 0.03 && b < 0.4) c = P.CR2;   // internal reflections (shimmer)
       if (lit > 0 && b < lit * 0.5) c = P.CR3;
       buf[y * W + x] = c;
     }
@@ -90,19 +102,20 @@ function drawModuleCut(t, opt) {
   // cooling plate with channel
   rect(MC.x0 - 6, MC.pcb1, MC.x0 + MC.n * MC.w + 6, MC.cool1, P.T2); rect(MC.x0 - 6, MC.pcb1, MC.x0 + MC.n * MC.w + 6, MC.pcb1 + 2, P.T4);
   for (let x = MC.x0; x < MC.x0 + MC.n * MC.w; x += 10) rect(x, MC.pcb1 + 8, x + 4, MC.cool1 - 6, P.T1);
-  ellipse(CX, (MC.pcb1 + MC.cool1) / 2, 8, 6, P.WC1 || P.T0);
+  for (let x = MC.x0 - 4 + ((t * 40) % 14); x < MC.x0 + MC.n * MC.w; x += 14) rect(x, (MC.pcb1 + MC.cool1) / 2 - 1, x + 5, (MC.pcb1 + MC.cool1) / 2 + 1, P.CR1);   // coolant flow
+  const led = Math.sin(t * 9) > 0.2; rect(226, MC.pcb1 - 10, 230, MC.pcb1 - 6, led ? P.SG2 : P.SG0); rect(234, MC.pcb1 - 10, 238, MC.pcb1 - 6, Math.sin(t * 5 + 1) > 0.6 ? P.Y2 : P.Y0);
 }
 // ---------------------------------------------------------------- SiPM close-up: microcells (Geiger-mode APDs) -> summed current pulse
-const SP = { cols: 8, rows: 8, x0: 31, y0: 118, c: 26 };
+const SP = { cols: 8, rows: 8, x0: 41, y0: 112, c: 24 };
 function spCell(i, j) { return [SP.x0 + i * SP.c, SP.y0 + j * SP.c]; }
 function drawSiPM(t, opt) {
   opt = opt || {};
   clear(P.BG);
   rect(SP.x0 - 8, SP.y0 - 8, SP.x0 + SP.cols * SP.c + 6, SP.y0 + SP.rows * SP.c + 6, P.PA0);
   for (let j = 0; j < SP.rows; j++) for (let i = 0; i < SP.cols; i++) {
-    const [x, y] = spCell(i, j), f = opt.fire ? opt.fire(i, j) : 0;
+    const [x, y] = spCell(i, j), f = opt.fire ? opt.fire(i, j) : 0, dk = hash3(i, j, Math.floor(t * 7)) > 0.985 ? 0.4 : 0;   // dark counts
     rect(x, y, x + SP.c - 4, y + SP.c - 4, P.PA2);
-    rect(x + 2, y + 2, x + SP.c - 6, y + SP.c - 6, f > 0 ? (f > 0.6 ? P.SG3 : P.SG2) : P.SL0);
+    rect(x + 2, y + 2, x + SP.c - 6, y + SP.c - 6, f > 0 ? (f > 0.6 ? P.SG3 : P.SG2) : dk > 0 ? P.SG1 : P.SL0);
     if (f > 0) { rect(x + 2, y + 2, x + SP.c - 6, y + SP.c - 6, P.SG1, 1 - f); if (f > 0.7) glow(x + SP.c / 2 - 2, y + SP.c / 2 - 2, 14, P.SG0, P.SG2, f - 0.7); }
     rect(x + SP.c - 6, y + 1, x + SP.c - 5, y + SP.c - 6, P.T3);                                  // quench resistor
     rect(x, y + SP.c - 4, x + SP.c - 4, y + SP.c - 3, P.T2);                                      // metal bus
@@ -155,6 +168,7 @@ function drawScannerSide(cam, t, opt) {
     rect(px0, y0, px1, y1, P.PCB1); rect(px0, Math.min(y0, y1), px1, Math.min(y0, y1) + 3, hp > 0 ? P.CR3 : P.CR2);
     if (y0 > Y(SIDE.bc)) rect(px0, y1 - 3, px1, y1, hp > 0 ? P.CR3 : P.CR2);
   }
+  if (UI_ON && opt.tags !== undefined) { tag('CT', (ctx0 + ctx1) / 2, b0 - 16, opt.tags, t, { align: 'center', c: P.INK, plate: P.C1 }); tag('PET', (px0 + px1) / 2, b0 - 16, opt.tags + 0.2, t, { align: 'center', c: P.CR3, plate: P.CR1 }); }
   // pallet + patient slide into the bore (patient lies at the bore centre)
   const ox = sl;
   const pal = maskRR(X(-6 + ox), Y(SIDE.pal), X(196 + ox), Y(SIDE.pal + 4), S(2)); shade(pal, P.PA1, P.PA2, P.PA0, P.SH);
@@ -213,12 +227,13 @@ function eventAt(k) { // deterministic event: source position + angle
   else { x = (hash(k * 13 + 5) - 0.5) * 300; y = (hash(k * 13 + 6) - 0.5) * 190; }
   return [x, y, a];
 }
-function drawSinogram(R, n, c) {
+function drawSinogram(R, n, hot) {
   rect(R[0], R[1], R[2], R[3], P.K0); frame(R[0] - 1, R[1] - 1, R[2] + 1, R[3] + 1, P.N5);
   const w = R[2] - R[0], h = R[3] - R[1];
   for (let k = 0; k < n; k++) {
     const [x, y, a] = eventAt(k), s = x * Math.cos(a) + y * Math.sin(a);
     const px = R[0] + a / Math.PI * w, py = R[1] + h / 2 + s / 260 * h;
-    pset(px, py, k % 7 === 0 ? P.HM7 : k % 3 ? P.HM5 : P.HM3);
+    if (hot && k >= n - hot) rect(px - 1, py - 1, px + 1, py + 1, P.HM9);                     // events arriving right now
+    else pset(px, py, k % 7 === 0 ? P.HM7 : k % 3 ? P.HM5 : P.HM3);
   }
 }

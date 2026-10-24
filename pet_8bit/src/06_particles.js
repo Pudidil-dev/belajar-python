@@ -39,7 +39,8 @@ function gamma(x, y, dx, dy, opt) {
 function gammaDim(x0, y0, x1, y1, ph) { dashLine(x0, y0, x1, y1, P.GA1, 3, 3, ph || 0); }
 function optPhoton(x, y, dx, dy, lv) {
   const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
-  line(x - dx * 4, y - dy * 4, x, y, P.SL0, lv === undefined ? 0.8 : lv); pset(x, y, P.SL2); pset(x - dx, y - dy, P.SL1);
+  line(x - dx * 7, y - dy * 7, x - dx * 3, y - dy * 3, P.SL0, lv === undefined ? 0.8 : lv); line(x - dx * 3, y - dy * 3, x, y, P.SL1);
+  rect(x - 1, y - 1, x + 1, y + 1, P.SL2);
 }
 function neutrino(x, y, dx, dy) {
   const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;

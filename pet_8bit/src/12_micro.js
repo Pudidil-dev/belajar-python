@@ -102,7 +102,7 @@ function waterField(cam, t, lv) {
   lv = lv === undefined ? 1 : lv;
   const g = 36, x0 = Math.floor(cam.wx(0) / g) - 1, x1 = Math.ceil(cam.wx(W) / g) + 1, y0 = Math.floor(cam.wy(0) / g) - 1, y1 = Math.ceil(cam.wy(H) / g) + 1;
   for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
-    const ox = (i + hash3(i, j, 61)) * g + Math.sin(t * 2 + i) * 0.8, oy = (j + hash3(i, j, 62)) * g + Math.cos(t * 1.7 + j) * 0.8, a = hash3(i, j, 63) * TAU;
+    const ox = (i + hash3(i, j, 61)) * g + Math.sin(t * 2.3 + i * 1.7) * 2.6, oy = (j + hash3(i, j, 62)) * g + Math.cos(t * 1.9 + j * 1.3) * 2.6, a = hash3(i, j, 63) * TAU + Math.sin(t * 1.4 + i + j) * 0.9;
     const X = cam.x(ox), Y = cam.y(oy), r = cam.s(4.2);
     if (X < -20 || X > W + 20 || Y < -20 || Y > H + 20) continue;
     for (const s of [-1, 1]) { const ha = a + s * 0.91, hx = X + Math.cos(ha) * r * 1.5, hy = Y + Math.sin(ha) * r * 1.5; line(X, Y, hx, hy, P.EL1, 0.6 * lv); disc(hx, hy, r * 0.62, P.EL0, 0.5 * lv); disc(hx, hy, Math.max(1, r * 0.22), P.SL0, lv); } // 2 H at 104.5 deg
@@ -140,7 +140,7 @@ function drawBlood(t, opt) {
   }
 }
 // ---------------------------------------------------------------- FDG uptake: capillary -> GLUT transporter -> hexokinase -> trapped FDG-6-phosphate
-const UP_CELLS = [{ y: 92, kind: 'NORMAL', rate: 0.25 }, { y: 214, kind: 'INFLAMED', rate: 0.6 }, { y: 336, kind: 'TUMOR', rate: 1.0 }];
+const UP_CELLS = [{ y: 154, kind: 'NORMAL', rate: 0.25 }, { y: 248, kind: 'INFLAMED', rate: 0.6 }, { y: 342, kind: 'TUMOR', rate: 1.0 }];
 function drawUptake(t, opt) {
   opt = opt || {};
   clear(P.TI1);
@@ -150,7 +150,7 @@ function drawUptake(t, opt) {
   for (let k = 0; k < 9; k++) { const y = ((hash(k + 3) * (H + 60) + t * 60) % (H + 60)) - 30; rbc(39, y, 11, Math.PI / 2 * 0.15 + 0.2 * hash(k)); }
   const u = opt.u || 0;                                                                              // time-lapse progress 0..1
   UP_CELLS.forEach((C, ci) => {
-    const cx = 178, cy = C.y, rx = 74, ry = 52, m = maskEll(cx, cy, rx, ry);
+    const cx = 172, cy = C.y, rx = 72, ry = 40, m = maskEll(cx, cy, rx, ry);
     shade(m, P.TI2, P.TI3, P.TI1, P.TI4);
     ring(cx, cy, Math.min(rx, ry) - 0.5, 0.01, P.TI4);
     ellipse(cx + 18, cy + 4, 20, 16, P.TI0); ellipse(cx + 18, cy + 4, 18, 14, P.TI1); disc(cx + 22, cy + 2, 4, P.TI3);    // nucleus
@@ -162,16 +162,16 @@ function drawUptake(t, opt) {
     // trapped FDG-6-phosphate accumulates (time-lapse); each gets a small yellow phosphate tag
     const n = Math.round(u * 14 * C.rate);
     for (let k = 0; k < n; k++) {
-      const a = hash3(ci, k, 72) * TAU, r = 0.25 + 0.55 * hash3(ci, k, 73), x = cx - 12 + Math.cos(a) * r * (rx - 30) + Math.sin(t * 3 + k) * 1.2, y = cy + Math.sin(a) * r * (ry - 16) + Math.cos(t * 2.6 + k) * 1.2;
+      const a = hash3(ci, k, 72) * TAU, r = 0.25 + 0.6 * hash3(ci, k, 73), x = cx - 12 + Math.cos(a) * r * (rx - 30) + Math.sin(t * 3 + k) * 1.2, y = cy + Math.sin(a) * r * (ry - 12) + Math.cos(t * 2.6 + k) * 1.2;
       tracerIcon(x, y, 2.4, a); pset(x + 3, y - 3, P.Y2); pset(x + 4, y - 3, P.Y2);
     }
     // molecules in transit: capillary -> GLUT -> inside
     for (let k = 0; k < 3; k++) {
-      const ph = ((t * (0.8 + C.rate) + k / 3 + ci * 0.21) % 1), gy = cy + (k - 1) * 14;
-      const x = ph < 0.5 ? lerp(60, cx - rx, ph / 0.5) : lerp(cx - rx, cx - 40, (ph - 0.5) / 0.5), y = ph < 0.5 ? lerp(cy - 30 + k * 30, gy, ph / 0.5) : gy;
+      const ph = ((t * (0.8 + C.rate) + k / 3 + ci * 0.21) % 1), gy = cy + (k - 1) * 12;
+      const x = ph < 0.5 ? lerp(60, cx - rx, ph / 0.5) : lerp(cx - rx, cx - 40, (ph - 0.5) / 0.5), y = ph < 0.5 ? lerp(cy - 26 + k * 26, gy, ph / 0.5) : gy;
       tracerIcon(x, y, 2.4, k + t);
     }
-    if (UI_ON && opt.tags) tag(C.kind, cx + 2, cy - ry - 13, opt.tags + ci * 0.15, t, { align: 'center', c: P.TI4 });
+    if (UI_ON && opt.tags) tag(C.kind, cx + 2, cy - ry - 12, opt.tags + ci * 0.15, t, { align: 'center', c: P.INK, plate: P.TI3 });
   });
 }
 // ---------------------------------------------------------------- the dose: F-18 FDG vial in a tungsten shield (stage px)
@@ -211,6 +211,7 @@ function drawVial(t, opt) {
 }
 // ---------------------------------------------------------------- forearm IV injection (seen from above, arm on an arm board)
 // world = stage px at zoom 1 (forearm ~26 cm -> 130 px); pass a Cam to frame it
+const ARM_FLOW = new Path([192, 176, 186, 196, 176, 220, 160, 236, 144, 241, 132, 241, 108, 240, 90, 240, 50, 237, 0, 236, -40, 236]), ARM_FLOW_VEIN = ARM_FLOW.c[6];
 const ARM_UP = [-10, 222, 40, 220, 78, 224, 94, 230, 120, 227, 170, 232, 214, 238, 226, 236, 246, 230, 262, 236, 268, 248, 262, 262, 246, 268, 226, 263, 214, 261, 170, 266, 120, 270, 94, 270, 78, 276, 40, 282, -10, 284];
 function drawArm(cam, t, opt) {
   opt = opt || {};
@@ -225,6 +226,12 @@ function drawArm(cam, t, opt) {
   rect(X(118), Y(232), X(150), Y(252), P.SL2, 0.25);                                                     // clear dressing
   lineW(X(108), Y(240), X(132), Y(241), S(2), P.SC3); shade(maskRR(X(132), Y(236), X(144), Y(246), S(2)), P.TI4, P.SL2, P.TI3, P.TI2);   // catheter + hub
   polyline(PT([144, 241, 160, 236, 176, 220, 186, 196, 192, 176]), P.SC3);                               // extension line
+  if (opt.flow > 0) { // the tracer bolus: syringe -> line -> cannula -> vein (venous flow runs towards the heart = the elbow, left)
+    const L = ARM_FLOW.L, front = L * opt.flow;
+    for (let s = Math.max(0, front - 150); s < front; s += 1.5) { const q = ARM_FLOW.at(s), inVein = s > ARM_FLOW_VEIN; if (inVein) disc(X(q[0]), Y(q[1]), S(2.6), P.TR1, 0.45 * (1 - (front - s) / 150)); }
+    for (let s = (t * 70) % 9; s < front; s += 9) { const q = ARM_FLOW.at(s), q2 = ARM_FLOW.at(Math.min(front, s + 4)), fade = s > ARM_FLOW_VEIN ? clamp(1 - (front - s) / 150, 0.2, 1) : 1; line(X(q[0]), Y(q[1]), X(q2[0]), Y(q2[1]), P.TR2, fade); }
+    const h = ARM_FLOW.at(front); disc(X(h[0]), Y(h[1]), S(1.6), P.TR3);
+  }
   const k = opt.push || 0, sx = 192, sy = 176, ang = -1.08, c = Math.cos(ang), s = Math.sin(ang);
   const Q = (u, v) => [X(sx + u * c - v * s), Y(sy + u * s + v * c)];
   shade(maskPoly([...Q(0, -9), ...Q(70, -9), ...Q(70, 9), ...Q(0, 9)]), P.T2, P.T4, P.T1, P.T0);        // tungsten syringe shield
