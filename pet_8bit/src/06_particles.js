@@ -13,8 +13,10 @@ function cloud(x, y, r, c0, c1, c2, c3, ph, lv) {
   disc(x, y, r * 0.7 * (1 + 0.08 * Math.sin(ph * 7)), c2, 0.75 * lv);
   disc(x, y, Math.max(0.8, r * 0.32), c3, lv);
 }
-const positronAt = (x, y, r, ph, lv) => cloud(x, y, r, P.PO0, P.PO1, P.PO2, P.PO3, ph, lv);
-const electronAt = (x, y, r, ph, lv) => cloud(x, y, r, P.EL0, P.EL1, P.EL2, P.EL3, ph, lv);
+// charge marks on close-ups: + for the positron (antimatter), - for the electron
+function chargeMark(x, y, r, plus, c) { const a = Math.max(1, Math.round(r * 0.26)); x = Math.round(x); y = Math.round(y); rect(x - a, y, x + a + 1, y + 1, c); if (plus) rect(x, y - a, x + 1, y + a + 1, c); }
+const positronAt = (x, y, r, ph, lv) => { cloud(x, y, r, P.PO0, P.PO1, P.PO2, P.PO3, ph, lv); if (r >= 5 && (lv === undefined || lv > 0.6)) chargeMark(x, y, r, true, P.PO0); };
+const electronAt = (x, y, r, ph, lv) => { cloud(x, y, r, P.EL0, P.EL1, P.EL2, P.EL3, ph, lv); if (r >= 5 && (lv === undefined || lv > 0.6)) chargeMark(x, y, r, false, P.EL0); };
 // trail behind a moving particle along recent path points [[x,y],...] (newest last)
 function trail(pts, c, cDim) {
   for (let i = 1; i < pts.length; i++) line(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], i > pts.length * 0.5 ? c : cDim, i > pts.length * 0.5 ? 1 : 0.55);

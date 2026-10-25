@@ -129,7 +129,7 @@ function drawSlice(cam, mode, opt) {
   for (let y = Math.max(0, cl[1]); y < Math.min(H, cl[3]); y++) for (let x = Math.max(0, cl[0]); x < Math.min(W, cl[2]); x++) {
     const wx = cam.wx(x + 0.5), wy = cam.wy(y + 0.5);
     const inB = mb.get(x, y), code = axTissue(wx, wy, inB, mw.get(x, y), ml.get(x, y) || ml2.get(x, y));
-    if (opt.transparent && code === 0) continue;
+    if (opt.transparent && (code === 0 || (code === 10 && mode !== 'tissue'))) continue;
     let c;
     if (mode === 'tissue') { c = pal.tissue[code]; if (code === 3 && hash2(Math.floor(wx / 6), Math.floor(wy / 6)) > 0.86) c = P.TI1; if (code === 1 && bay(x, y) < 0.3) c = P.TI2; }
     else if (mode === 'ct') { c = pal.ct[code]; if (code === 3 && hash2(Math.floor(wx / 5), Math.floor(wy / 5)) > 0.88) c = P.CT3; if (code === 0) c = P.K0; }

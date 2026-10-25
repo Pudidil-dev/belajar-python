@@ -4,10 +4,9 @@
 // outside the composition. Audio starts on the first user gesture; the audio
 // clock drives the picture, so pause / resume / seek never duplicate sounds.
 // ============================================================================
-const SCENE_NAMES = ['PET IMAGING', 'FLUORINE-18', 'POSITRON EMISSION', 'POSITRON SLOWS DOWN', 'ANNIHILATION', 'PET DETECTOR RING', 'F-18 FDG TRACER',
-  'RADIOTRACER INJECTION', 'THROUGH THE BLOODSTREAM', 'TRACER UPTAKE', 'PET SCANNING', 'DETECTOR ARRAY', 'BETA-PLUS DECAY', 'POSITRON INTERACTIONS',
-  'MATTER + ANTIMATTER', 'TWO 511 keV PHOTONS', 'GAMMA RAYS TRAVEL', 'SCINTILLATION CRYSTAL', 'ENERGY > LIGHT', 'LIGHT > ELECTRIC SIGNAL',
-  'COINCIDENCE DETECTION', 'LINE OF RESPONSE', 'MANY DETECTED EVENTS', 'TIME-OF-FLIGHT PET', 'PET IMAGE RECONSTRUCTION', 'PET + CT', 'HOW PET SCANNERS WORK'];
+const SCENE_NAMES = ['ANTIMATTER > MEDICAL IMAGE', 'PET DETECTOR RING', 'F-18 FDG TRACER', 'TRACER CIRCULATION', 'TRACER UPTAKE', 'FLUORINE-18', 'POSITRON EMISSION',
+  'POSITRON SLOWS DOWN', 'ANNIHILATION', 'GAMMA DETECTION', 'GAMMA > LIGHT', 'LIGHT > ELECTRIC SIGNAL', 'EVENT MEASUREMENT', 'COINCIDENCE DETECTION',
+  'LINE OF RESPONSE', 'MILLIONS OF EVENTS', 'PET IMAGE RECONSTRUCTION', 'PET + CT', 'HOW PET SCANNERS WORK'];
 const PL = { t: 0, playing: false, wallT0: 0, pos0: 0, audioOK: true, scrubbing: false, img: null, cx: null };
 function plClock() {
   if (!PL.playing) return PL.t;
@@ -29,7 +28,7 @@ function plUI() {
   if (!PL.scrubbing) el.scrub.value = String(Math.round(PL.t * FPS));
   el.time.textContent = plFmt(PL.t) + ' / ' + plFmt(DUR);
   const i = sceneIndex(PL.t);
-  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / 27  ' + SCENE_NAMES[i];
+  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / ' + SCENE_NAMES.length + '  ' + SCENE_NAMES[i];
   el.scrub.style.setProperty('--p', (PL.t / DUR * 100).toFixed(2) + '%');
 }
 function plPlay() {

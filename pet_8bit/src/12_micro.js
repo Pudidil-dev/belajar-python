@@ -77,6 +77,10 @@ function drawFDG(cx, cy, s, opt) {
       disc(ex, ey + 4, Math.max(2, s * 0.26), P.FO2); disc(ex - 1, ey + 3, Math.max(1, s * 0.1), P.FO3);
       if (opt.labels !== false) text(FM, '18F', ex + s * 0.3, ey + 1, { c: P.FO3, ol: P.SH });
     } else if (lab === '') disc(ex, ey, Math.max(1.5, s * 0.08), P.TR3);   // C3-OH (unlabelled, keeps the ring readable)
+    else if (opt.phos && lab === 'CH2OH') { // FDG-6-phosphate: the phosphate group added by hexokinase traps the molecule
+      const l2 = 'CH2O', tw = textW(FM, l2, 2), lx = ex - tw / 2 - 6; if (opt.labels !== false && s > 16) text(FM, l2, lx, ey - 13, { c: P.TR3, ol: P.SH });
+      const px = lx + tw + 9, py = ey - 8; disc(px, py, Math.max(3, s * 0.15), P.Y1); disc(px, py, Math.max(2, s * 0.12), P.Y2); if (s > 16) text(FM, 'P', px - 2, py - 4, { c: P.K0, ol: null });
+    }
     else if (opt.labels !== false && s > 16) text(FM, lab, ex - textW(FM, lab, 2) / 2, dy < 0 ? ey - 13 : ey + 2, { c: P.TR3, ol: P.SH });
   }
   for (const k of ['C1', 'C2', 'C3', 'C4', 'C5']) { const a = at(k); disc(a[0], a[1], Math.max(1.5, s * 0.1), P.TR2); }
@@ -119,23 +123,25 @@ function rbc(x, y, r, phi) { // face-on (phi=0) -> edge-on (phi=pi/2)
 function drawBlood(t, opt) {
   opt = opt || {};
   const top = opt.top === undefined ? 110 : opt.top, bot = opt.bot === undefined ? 390 : opt.bot, mid = (top + bot) / 2, half = (bot - top) / 2;
+  const dir = opt.dir || 1, ox = opt.ox || 0, md = (a, m) => ((a % m) + m) % m;   // ox: how far the camera has ridden along with the flow
+  const rs = opt.rs || 1;                                                          // cell scale (narrow capillaries -> single file)
   clear(P.TI1);
   rect(0, top, W, bot, P.RB0); rect(0, top, W, bot, P.TI0, 0.35);
-  for (const [y0, d] of [[top, -1], [bot, 1]]) { // vessel wall: endothelium, then smooth muscle
+  for (const [y0, d] of [[top, -1], [bot, 1]]) { // vessel wall: endothelium, then smooth muscle (still; only the camera moves)
     rect(0, y0 - (d < 0 ? 6 : 0), W, y0 + (d < 0 ? 0 : 6), P.TI4); rect(0, y0 - (d < 0 ? 14 : -6), W, y0 - (d < 0 ? 6 : -14), P.TI3);
-    for (let x = -((t * 20) % 18); x < W; x += 18) rect(x, y0 - (d < 0 ? 12 : -8), x + 9, y0 - (d < 0 ? 11 : -9), P.TI2);
+    for (let x = -md(-ox * dir, 18); x < W; x += 18) rect(x, y0 - (d < 0 ? 12 : -8), x + 9, y0 - (d < 0 ? 11 : -9), P.TI2);
   }
   // laminar flow: faster at the centre; cells + tracer move with the plasma
-  const N = 40;
+  const N = opt.cells === undefined ? 40 : opt.cells;
   for (let k = 0; k < N; k++) {
-    const yy = mid + (hash(k * 5 + 1) * 2 - 1) * (half - 16), v = 120 * (1 - ((yy - mid) / half) ** 2) + 25;
-    const x = ((hash(k * 5 + 2) * (W + 80) + t * v) % (W + 80)) - 40, r = 11 + 2 * hash(k * 5 + 3), phi = (hash(k * 5 + 4) * 3 + t * 1.3 * (hash(k) - 0.5)) % Math.PI;
+    const yy = mid + (hash(k * 5 + 1) * 2 - 1) * Math.max(0, half - 16 * rs), v = 120 * (1 - ((yy - mid) / Math.max(1, half)) ** 2) + 25;
+    const x = md(hash(k * 5 + 2) * (W + 80) + (t * v - ox) * dir, W + 80) - 40, r = (11 + 2 * hash(k * 5 + 3)) * rs, phi = (hash(k * 5 + 4) * 3 + t * 1.3 * (hash(k) - 0.5)) % Math.PI;
     rbc(x, yy, r, phi);
   }
   const M = opt.tracer === undefined ? 18 : opt.tracer;
   for (let k = 0; k < M; k++) {
-    const yy = mid + (hash(k * 7 + 31) * 2 - 1) * (half - 10), v = 120 * (1 - ((yy - mid) / half) ** 2) + 25;
-    const x = ((hash(k * 7 + 32) * (W + 40) + t * v) % (W + 40)) - 20;
+    const yy = mid + (hash(k * 7 + 31) * 2 - 1) * Math.max(0, half - 10), v = 120 * (1 - ((yy - mid) / Math.max(1, half)) ** 2) + 25;
+    const x = md(hash(k * 7 + 32) * (W + 40) + (t * v - ox) * dir, W + 40) - 20;
     tracerIcon(x, yy, 2.6, t * 2 + k);
   }
 }
@@ -243,4 +249,53 @@ function drawArm(cam, t, opt) {
   for (const v of [-1, 1]) shade(maskPoly([...Q(66, v * 10), ...Q(78, v * 10), ...Q(80, v * 22), ...Q(68, v * 24)]), P.GL1, P.GL2, P.GL0, P.GL0);
   shade(maskPoly([...Q(78, -24), ...Q(98, -30), ...Q(112, -18), ...Q(104, 16), ...Q(82, 26)]), P.GL1, P.GL2, P.GL0, P.GL0);          // palm
   shade(maskPoly([...Q(pr + 1, -5), ...Q(pr + 9, -6), ...Q(110, -14), ...Q(104, -2), ...Q(pr + 9, 5), ...Q(pr + 1, 4)]), P.GL1, P.GL2, P.GL0, P.GL0);   // thumb
+}
+// ---------------------------------------------------------------- uptake, director's cut: capillary across the top, our cell below
+// The followed molecule leaves the capillary, crosses into a normal cell through a GLUT transporter and is phosphorylated by
+// hexokinase (FDG-6-phosphate cannot leave: trapped). A time-lapse then shows normal, inflamed and tumour cells all taking
+// FDG up, at different rates. (FDG does not seek out disease: any cell that uses glucose takes it up.)
+const UP2 = { cap: [104, 148], gap: 160 };
+const UP2_CELLS = [
+  { kind: 'NORMAL', cx: 135, cy: 222, rx: 92, ry: 50, rate: 0.55, gl: [-1.92, -1.40, -1.05] },
+  { kind: 'INFLAMED', cx: 74, cy: 316, rx: 52, ry: 32, rate: 0.85, gl: [-1.9, -1.2] },
+  { kind: 'TUMOR', cx: 190, cy: 316, rx: 46, ry: 32, rate: 1.0, gl: [-1.95, -1.15] }];
+function glutAt(C, a) { return [C.cx + Math.cos(a) * C.rx, C.cy + Math.sin(a) * C.ry]; }
+function drawGLUT(x, y, a, open) { // a transporter spanning the membrane: two halves that open to pass glucose (and FDG)
+  const tx = -Math.sin(a), ty = Math.cos(a), g = 2.5 + 2 * (open || 0);
+  for (const s of [-1, 1]) shade(maskEll(x + tx * s * g, y + ty * s * g, 6, 2.6, a), P.CR1, P.CR2, P.CR0, P.TR0);
+}
+// path of the followed molecule (screen px) from the capillary to its trapping site
+const UP2_PATH = [[12.0, 175, 126], [12.35, 160, 143], [12.7, 151, 163], [12.95, 150, 182], [13.12, 127, 199], [13.35, 124, 207]];
+function up2Mol(t) {
+  const Q = UP2_PATH; if (t <= Q[0][0]) return [Q[0][1], Q[0][2]];
+  for (let i = 0; i + 1 < Q.length; i++) { const a = Q[i], b = Q[i + 1]; if (t <= b[0]) { const k = eio(seg(t, a[0], b[0])); return [lerp(a[1], b[1], k) + Math.sin(t * 13) * 0.7, lerp(a[2], b[2], k) + Math.cos(t * 11) * 0.7]; } }
+  const L = Q[Q.length - 1]; return [L[1] + Math.sin(t * 5) * 0.8, L[2] + Math.cos(t * 4.3) * 0.8];
+}
+function drawUptake2(t, opt) {
+  opt = opt || {};
+  clear(P.TI1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (bay(x, y) < 0.15 + 0.15 * vn2(x * 0.05, y * 0.05, 71)) buf[y * W + x] = P.TI2;   // interstitium
+  const [c0, c1] = UP2.cap, md = (a, m) => ((a % m) + m) % m;
+  rect(0, c0 + 6, W, c1 - 6, P.RB0); rect(0, c0 + 6, W, c1 - 6, P.TI0, 0.35);
+  rect(0, c0, W, c0 + 6, P.TI4); rect(0, c1 - 6, W, c1, P.TI4);
+  for (let x = 0; x < W; x += 18) { rect(x, c0 + 2, x + 9, c0 + 3, P.TI3); rect(x + 9, c1 - 3, x + 18, c1 - 2, P.TI3); }   // endothelial cells
+  rect(UP2.gap - 4, c1 - 6, UP2.gap + 4, c1, P.TI2);                                                                  // cleft between endothelial cells
+  for (let k = 0; k < 7; k++) rbc(md(hash(k + 61) * (W + 60) - t * 70, W + 60) - 30, (c0 + c1) / 2 + (hash(k + 62) - 0.5) * 4, 9, 0.25 + 0.3 * hash(k));   // single file
+  for (let k = 0; k < 6; k++) tracerIcon(md(hash(k + 71) * (W + 40) - t * 85, W + 40) - 20, (c0 + c1) / 2 + (hash(k + 72) - 0.5) * 18, 2.4, t * 2 + k);
+  const u = opt.u || 0;
+  UP2_CELLS.forEach((C, ci) => {
+    shade(maskEll(C.cx, C.cy, C.rx, C.ry), P.TI2, P.TI3, P.TI1, P.TI4);
+    const nx = C.cx + C.rx * 0.34, ny = C.cy + C.ry * 0.12;
+    ellipse(nx, ny, C.rx * 0.24, C.ry * 0.34, P.TI0); ellipse(nx, ny, C.rx * 0.22, C.ry * 0.3, P.TI1); disc(nx + 3, ny - 2, Math.max(2, C.ry * 0.08), P.TI3);   // nucleus
+    for (const a of C.gl) { const [gx, gy] = glutAt(C, a); drawGLUT(gx, gy, a, ci === 0 && a === C.gl[1] ? opt.glutOpen || 0 : 0); }
+    const hx = C.cx - C.rx * 0.3, hy = C.cy - C.ry * 0.05; shade(maskEll(hx, hy, C.rx * 0.08 + 3, C.ry * 0.12 + 3), P.C2, P.C3, P.C1, P.C0);   // hexokinase
+    const n = Math.round(u * 13 * C.rate);                                                                                // trapped FDG-6-P (time-lapse)
+    for (let k = 0; k < n; k++) { const a = hash3(ci, k, 72) * TAU, r = 0.2 + 0.6 * hash3(ci, k, 73), x = C.cx - C.rx * 0.14 + Math.cos(a) * r * C.rx * 0.55, y = C.cy + Math.sin(a) * r * C.ry * 0.55 + Math.sin(t * 3 + k) * 0.6; tracerIcon(x, y, 2.2, a); pset(x + 3, y - 3, P.Y2); pset(x + 4, y - 3, P.Y2); }
+    if (u > 0 && ci === 0) for (let k = 0; k < 3; k++) { // more molecules arriving at our cell
+      const ph = (t * 1.1 + k / 3) % 1, [gx, gy] = glutAt(C, C.gl[k]);
+      const x = ph < 0.5 ? lerp(gx + 6, gx, ph / 0.5) : lerp(gx, C.cx - 20, (ph - 0.5) / 0.5), y = ph < 0.5 ? lerp(c1 + 2, gy, ph / 0.5) : lerp(gy, C.cy - 6, (ph - 0.5) / 0.5);
+      tracerIcon(x, y, 2.2, k + t);
+    }
+    if (UI_ON && opt.tags !== undefined) tag(C.kind, C.cx + (ci ? 0 : 36), C.cy + (ci ? -C.ry + 6 : C.ry - 19), opt.tags + ci * 0.15, t, { align: 'center', c: P.INK, plate: P.TI3 });
+  });
 }

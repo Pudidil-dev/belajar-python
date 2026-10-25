@@ -26,40 +26,42 @@ function drawRing(cam, t, opt) {
   clear(P.BG);
   const cx = cam.x(0), cy = cam.y(0), z = cam.z;
   if (opt.covers !== false) {
-    const mc = maskDisc(cx, cy, RING.cov1 * z); shade(mc, P.SC2, P.SC3, P.SC1, P.SC0, { k: Math.max(1, Math.round(z * 10)) });
-    disc(cx, cy, RING.cov0 * z + 2, P.SC1); ring(cx, cy, RING.cov0 * z + 4, 1.4, P.CR2);            // illuminated bore ring
+    const mc = maskDisc(cx, cy, RING.cov1 * z); shade(mc, P.T2, P.T3, P.T1, P.T0, { k: Math.max(1, Math.round(z * 10)) });   // dark metallic gantry covers
+    disc(cx, cy, RING.cov0 * z + 2, P.T1); ring(cx, cy, RING.cov0 * z + 4, 1.4, P.CR2);            // illuminated bore ring
     const r0 = RING.cov0 * z + 4, a0 = t * 0.6;
     for (let k = 0; k < 14; k++) { const a = a0 + k * 0.025; pset(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, P.CR3); pset(cx + Math.cos(a + Math.PI) * r0, cy + Math.sin(a + Math.PI) * r0, P.CR3); }
   }
   disc(cx, cy, RING.cov0 * z, P.N2);
-  const hl = opt.hl || {};
+  const hl = opt.hl || {}, rej = opt.rej || {};
   for (let i = 0; i < RING.n; i++) {
-    const h = hl[i] || 0;
+    const h = hl[i] || 0, rj = rej[i] || 0;
     poly(modQuad(cam, i, RING.re, RING.rh, RING.mw - 6), P.T2);                                     // cooling plate
     poly(modQuad(cam, i, RING.rs, RING.re, RING.mw - 10), P.PCB1);                                  // readout electronics
     if (z > 0.35) { const q = modQuad(cam, i, RING.rs + 12, RING.rs + 24, 18); poly(q, P.PA0); }   // ASIC
-    poly(modQuad(cam, i, RING.rd, RING.rs, RING.mw - 2), P.PA1);                                    // SiPM array
-    poly(modQuad(cam, i, RING.rc, RING.rd, RING.mw - 2), h > 0 ? (h > 0.5 ? P.CR3 : P.CR2) : P.CR1); // LYSO crystal block
+    poly(modQuad(cam, i, RING.rd, RING.rs, RING.mw - 2), P.V1);                                     // SiPM array (purple)
+    poly(modQuad(cam, i, RING.rc, RING.rd, RING.mw - 2), h > 0 ? (h > 0.5 ? P.CR3 : P.CR2) : rj > 0 ? P.C3 : P.CR1); // LYSO crystal block
     if (z > 0.3) { // crystal pixelation (reflector lines)
       const a = modAngle(i), c = Math.cos(a), s = Math.sin(a);
       for (let q = -24; q <= 24; q += 8) line(cam.x(RING.rc * c - q * s), cam.y(RING.rc * s + q * c), cam.x(RING.rd * c - q * s), cam.y(RING.rd * s + q * c), P.CR0);
     }
     if (h > 0) { const m = maskPoly(modQuad(cam, i, RING.rc - 3, RING.rh + 3, RING.mw + 4)); mOuter(m, h > 0.5 ? P.SG2 : P.SG1); }
+    else if (rj > 0) { const m = maskPoly(modQuad(cam, i, RING.rc - 3, RING.rh + 3, RING.mw + 4)); mOuter(m, P.C2); }   // rejected detection: dim grey
   }
   if (opt.singles !== false) for (let sl = Math.floor(t * 18) - 3; sl <= Math.floor(t * 18); sl++) { // singles: most detections are lone photons (no partner)
     const age = t - sl / 18; if (age < 0 || age > 0.14) continue;
-    const m = Math.floor(hash3(sl, 7, 91) * RING.n), k = 1 - age / 0.14; if (hl[m]) continue;
+    const m = Math.floor(hash3(sl, 7, 91) * RING.n), k = 1 - age / 0.14; if (hl[m] || rej[m]) continue;
     if (z < 0.6) poly(modQuad(cam, m, RING.rc + 2, RING.rd - 2, RING.mw - 14), P.CR2, 0.25 + 0.5 * k);
     else { const q = (hash3(sl, 8, 92) - 0.5) * 44, a = modAngle(m), c = Math.cos(a), s2 = Math.sin(a), r = RING.rc + 6; disc(cam.x(r * c - q * s2), cam.y(r * s2 + q * c), 1 + 2 * k, P.SL2, k); }
   }
-  disc(cx, cy, (RING.bore + 5) * z, P.SC1); disc(cx, cy, RING.bore * z, P.BG);                    // bore cover
+  disc(cx, cy, (RING.bore + 5) * z, P.T3); disc(cx, cy, RING.bore * z, P.BG);                     // bore cover
   // patient cradle and pallet support inside the bore
   const tb = []; for (let k = 0; k <= 20; k++) { const x = lerp(-150, 150, k / 20); tb.push(cam.x(x), cam.y(134 + 0.0005 * x * x)); }
   tb.push(cam.x(118), cam.y(Math.sqrt(RING.bore * RING.bore - 118 * 118) - 4), cam.x(-118), cam.y(Math.sqrt(RING.bore * RING.bore - 118 * 118) - 4));
-  poly(tb, P.PA1);
+  poly(tb, P.T1);
   // the live patient: heartbeat (~66 bpm) and quiet breathing (the reconstructed images later are time-averaged, so they do not move)
-  HEART_S = 1 + 0.035 * Math.max(0, Math.sin(t * TAU * 1.1)) ** 3;
-  const br = 1 + 0.012 * Math.sin(t * TAU / 4);
+  const live = opt.body === 'tissue';                                                               // reconstructed images (pet) are time-averaged: no motion
+  HEART_S = live ? 1 + 0.035 * Math.max(0, Math.sin(t * TAU * 1.1)) ** 3 : 1;
+  const br = live ? 1 + 0.012 * Math.sin(t * TAU / 4) : 1;
   if (opt.body) drawSlice(new Cam(cam.cx, cam.cy, cam.z * br, cam.ax, cam.ay), opt.body, { transparent: true, clip: [Math.floor(cx - RING.bore * z), Math.floor(cy - RING.bore * z), Math.ceil(cx + RING.bore * z), Math.ceil(cy + RING.bore * z)] });
   HEART_S = 1;
 }
@@ -88,8 +90,8 @@ function drawModuleCut(t, opt) {
     }
     rect(x0, MC.y1, x1, MC.y1 + 2, P.CR3);                                                        // optical coupling
     // SiPM 1:1 under each crystal: package, active area, microcell texture
-    rect(x0, MC.sipm0, x1, MC.sipm1, P.PA0); rect(x0 + 3, MC.sipm0 + 2, x1 - 3, MC.sipm1 - 4, P.PA2);
-    for (let y = MC.sipm0 + 3; y < MC.sipm1 - 4; y += 2) for (let x = x0 + 4; x < x1 - 3; x += 2) pset(x, y, P.SL0);
+    rect(x0, MC.sipm0, x1, MC.sipm1, P.V0); rect(x0 + 3, MC.sipm0 + 2, x1 - 3, MC.sipm1 - 4, P.V1);   // silicon photomultiplier (purple)
+    for (let y = MC.sipm0 + 3; y < MC.sipm1 - 4; y += 2) for (let x = x0 + 4; x < x1 - 3; x += 2) pset(x, y, P.V2);
     if (opt.sipm && opt.sipm[i] > 0) rect(x0 + 3, MC.sipm0 + 2, x1 - 3, MC.sipm1 - 4, P.SG2, opt.sipm[i] * 0.7);
   }
   // readout board: traces, ASIC, connector
@@ -111,11 +113,11 @@ function spCell(i, j) { return [SP.x0 + i * SP.c, SP.y0 + j * SP.c]; }
 function drawSiPM(t, opt) {
   opt = opt || {};
   clear(P.BG);
-  rect(SP.x0 - 8, SP.y0 - 8, SP.x0 + SP.cols * SP.c + 6, SP.y0 + SP.rows * SP.c + 6, P.PA0);
+  rect(SP.x0 - 8, SP.y0 - 8, SP.x0 + SP.cols * SP.c + 6, SP.y0 + SP.rows * SP.c + 6, P.V0);
   for (let j = 0; j < SP.rows; j++) for (let i = 0; i < SP.cols; i++) {
     const [x, y] = spCell(i, j), f = opt.fire ? opt.fire(i, j) : 0, dk = hash3(i, j, Math.floor(t * 7)) > 0.985 ? 0.4 : 0;   // dark counts
-    rect(x, y, x + SP.c - 4, y + SP.c - 4, P.PA2);
-    rect(x + 2, y + 2, x + SP.c - 6, y + SP.c - 6, f > 0 ? (f > 0.6 ? P.SG3 : P.SG2) : dk > 0 ? P.SG1 : P.SL0);
+    rect(x, y, x + SP.c - 4, y + SP.c - 4, P.V2);
+    rect(x + 2, y + 2, x + SP.c - 6, y + SP.c - 6, f > 0 ? (f > 0.6 ? P.SG3 : P.SG2) : dk > 0 ? P.SG1 : P.V1);
     if (f > 0) { rect(x + 2, y + 2, x + SP.c - 6, y + SP.c - 6, P.SG1, 1 - f); if (f > 0.7) glow(x + SP.c / 2 - 2, y + SP.c / 2 - 2, 14, P.SG0, P.SG2, f - 0.7); }
     rect(x + SP.c - 6, y + 1, x + SP.c - 5, y + SP.c - 6, P.T3);                                  // quench resistor
     rect(x, y + SP.c - 4, x + SP.c - 4, y + SP.c - 3, P.T2);                                      // metal bus
@@ -144,19 +146,19 @@ function drawScannerSide(cam, t, opt) {
   for (let i = 0; i < 5; i++) rect(0, Y(0) + 4 + i * 6 + i * i, W, Y(0) + 5 + i * 6 + i * i, P.N3);
   const sl = opt.slide || 0;                                                                         // pallet travel into the bore (cm)
   // table base + lift column (fixed)
-  shade(maskRR(X(20), Y(-10), X(120), Y(0), S(3)), P.SC1, P.SC2, P.SC0, P.SH);
-  shade(maskRR(X(40), Y(-74), X(100), Y(-10), S(4)), P.SC2, P.SC3, P.SC1, P.SC0);
-  shade(maskRR(X(4), Y(-82), X(150), Y(-74), S(2)), P.SC2, P.SC3, P.SC1, P.SC0);                    // table top (cradle)
+  shade(maskRR(X(20), Y(-10), X(120), Y(0), S(3)), P.T1, P.T2, P.T0, P.SH);
+  shade(maskRR(X(40), Y(-74), X(100), Y(-10), S(4)), P.T2, P.T3, P.T1, P.T0);
+  shade(maskRR(X(4), Y(-82), X(150), Y(-74), S(2)), P.T3, P.T4, P.T2, P.T0);                       // table top (cradle)
   // gantry body: CT section (front) + PET section (rear), cut away around the bore
   const g = maskRR(X(SIDE.gx0), Y(SIDE.top), X(SIDE.gx1 + 40), Y(0), S(22));
-  shade(g, P.SC2, P.SC3, P.SC1, P.SC0, { k: 2 });
-  rect(X(SIDE.gx0 + 58), Y(SIDE.top + 6), X(SIDE.gx0 + 59), Y(-6), P.SC1);                           // CT | PET cover seam
-  shade(maskRR(X(SIDE.gx0 - 4), Y(-148), X(SIDE.gx0 + 6), Y(-54), S(4)), P.SC3, P.C6, P.SC1, P.SC0); // front bore lip
+  shade(g, P.T2, P.T3, P.T1, P.T0, { k: 2 });
+  rect(X(SIDE.gx0 + 58), Y(SIDE.top + 6), X(SIDE.gx0 + 59), Y(-6), P.T1);                            // CT | PET cover seam
+  shade(maskRR(X(SIDE.gx0 - 4), Y(-148), X(SIDE.gx0 + 6), Y(-54), S(4)), P.T3, P.T4, P.T1, P.T0);  // front bore lip
   rect(X(SIDE.gx0 - 2), Y(-147), X(SIDE.gx0), Y(-55), P.CR2);                                         // illuminated ring (edge-on)
   shade(maskRR(X(SIDE.gx0 + 14), Y(-176), X(SIDE.gx0 + 36), Y(-160), S(2)), P.PA1, P.PA2, P.PA0, P.SH); // control panel
   rect(X(SIDE.gx0 + 16), Y(-174), X(SIDE.gx0 + 34), Y(-168), P.CR1); rect(X(SIDE.gx0 + 17), Y(-166), X(SIDE.gx0 + 20), Y(-163), P.SG2);
   // cutaway window: the bore tunnel with the CT ring (tube + detector arc) and the PET ring (stationary blocks)
-  const c0 = X(SIDE.gx0 + 8), c1 = X(SIDE.gx1 - 6), b0 = Y(SIDE.bc - SIDE.br - 22), b1 = Y(SIDE.bc + SIDE.br + 22);
+  const c0 = X(SIDE.gx0 + 8), c1 = X(SIDE.gx1 + 32), b0 = Y(SIDE.bc - SIDE.br - 22), b1 = Y(SIDE.bc + SIDE.br + 22);   // cutaway to the back of the gantry
   rect(c0, b0, c1, b1, P.N1); frame(c0 - 1, b0 - 1, c1 + 1, b1 + 1, P.SC0);
   rect(c0, Y(SIDE.bc - SIDE.br), c1, Y(SIDE.bc + SIDE.br), P.BG);
   rect(c0, Y(SIDE.bc - SIDE.br) - 1, c1, Y(SIDE.bc - SIDE.br), P.SC1); rect(c0, Y(SIDE.bc + SIDE.br), c1, Y(SIDE.bc + SIDE.br) + 1, P.SC1);
@@ -164,26 +166,30 @@ function drawScannerSide(cam, t, opt) {
   rect(ctx0, b0 + 2, ctx1, Y(SIDE.bc - SIDE.br) - 3, P.T3); rect(ctx0 + 2, b0 + 4, ctx1 - 2, b0 + 7, P.Y1);                    // CT X-ray tube (top)
   rect(ctx0 - 2, Y(SIDE.bc + SIDE.br) + 3, ctx1 + 2, b1 - 2, P.T2);                                                          // CT detector arc (bottom)
   const px0 = X(SIDE.gx0 + 70), px1 = X(SIDE.gx0 + 96), hp = opt.pet || 0;
-  for (const [y0, y1] of [[b0 + 2, Y(SIDE.bc - SIDE.br) - 3], [Y(SIDE.bc + SIDE.br) + 3, b1 - 2]]) {
-    rect(px0, y0, px1, y1, P.PCB1); rect(px0, Math.min(y0, y1), px1, Math.min(y0, y1) + 3, hp > 0 ? P.CR3 : P.CR2);
-    if (y0 > Y(SIDE.bc)) rect(px0, y1 - 3, px1, y1, hp > 0 ? P.CR3 : P.CR2);
+  for (let r = 0; r < 5; r++) { // five stationary detector rings side by side: together a cylinder around the patient
+    const ra = X(SIDE.gx0 + 70 + r * 5.3), rb = X(SIDE.gx0 + 70 + r * 5.3 + 4.5), lit = opt.ringHL ? opt.ringHL(r) : hp;
+    for (const [y0, y1, up] of [[b0 + 2, Y(SIDE.bc - SIDE.br) - 3, 1], [Y(SIDE.bc + SIDE.br) + 3, b1 - 2, 0]]) {
+      rect(ra, y0, rb, y1, P.PCB1);                                                                     // readout electronics
+      rect(ra, up ? y1 - 6 : y0 + 3, rb, up ? y1 - 3 : y0 + 6, P.V1);                                   // SiPMs
+      rect(ra, up ? y1 - 3 : y0, rb, up ? y1 : y0 + 3, lit > 0 ? P.CR3 : P.CR2);                         // crystals face the patient
+    }
   }
   if (UI_ON && opt.tags !== undefined) { tag('CT', (ctx0 + ctx1) / 2, b0 - 16, opt.tags, t, { align: 'center', c: P.INK, plate: P.C1 }); tag('PET', (px0 + px1) / 2, b0 - 16, opt.tags + 0.2, t, { align: 'center', c: P.CR3, plate: P.CR1 }); }
   // pallet + patient slide into the bore (patient lies at the bore centre)
   const ox = sl;
   const pal = maskRR(X(-6 + ox), Y(SIDE.pal), X(196 + ox), Y(SIDE.pal + 4), S(2)); shade(pal, P.PA1, P.PA2, P.PA0, P.SH);
-  drawPatientSide(cam, ox, t);
+  drawPatientSide(cam, ox, t, opt);
   // cover the patient where it is inside the gantry walls but outside the cutaway
   const inside = X(SIDE.gx0 + 8);
   if (X(196 + ox) > X(SIDE.gx0)) {
-    rect(X(SIDE.gx0), Y(SIDE.bc - SIDE.br - 22), c0, Y(SIDE.bc + SIDE.br + 22), P.SC2);
+    rect(X(SIDE.gx0), Y(SIDE.bc - SIDE.br - 22), c0, Y(SIDE.bc + SIDE.br + 22), P.T2);
     shade(maskRR(X(SIDE.gx0 - 4), Y(-148), X(SIDE.gx0 + 6), Y(-54), S(4)), P.SC3, P.C6, P.SC1, P.SC0);
     rect(X(SIDE.gx0 - 2), Y(-147), X(SIDE.gx0), Y(-55), P.CR2);
     rect(inside, b0, inside + 1, b1, P.SC0);
   }
 }
 // supine patient, head towards the gantry (+x), arms raised above the head
-function drawPatientSide(cam, ox, t) {
+function drawPatientSide(cam, ox, t, opt) {
   const X = v => cam.x(v + ox), Y = v => cam.y(v), S = v => cam.s(v), base = SIDE.pal;
   // legs + feet (blanket), pelvis, torso (gown), head on a head-holder
   const legs = maskPoly([X(4), Y(base), X(4), Y(base - 12), X(30), Y(base - 15), X(62), Y(base - 18), X(84), Y(base - 20), X(84), Y(base)]);
@@ -200,6 +206,11 @@ function drawPatientSide(cam, ox, t) {
   lineW(X(150), Y(base - 20), X(176), Y(base - 22), Math.max(1, S(6)), P.SK1); lineW(X(150), Y(base - 21), X(176), Y(base - 23), Math.max(1, S(4)), P.SK2);
   lineW(X(176), Y(base - 22), X(198), Y(base - 17), Math.max(1, S(5)), P.SK1); lineW(X(176), Y(base - 23), X(198), Y(base - 18), Math.max(1, S(3.5)), P.SK2);
   disc(X(200), Y(base - 17), S(3.4), P.SK2);
+  // IV cannula left in the forearm since the injection (taped), with its short line
+  const ivx = X(190), ivy = Y(base - 19.4);
+  line(ivx, ivy, X(184), Y(base - 23), P.SC3); line(X(184), Y(base - 23), X(178), Y(base - 25), P.SC3);
+  rect(ivx - S(1.4), ivy - S(1.1), ivx + S(1.4), ivy + S(1.1), P.TI4); rect(ivx - S(2.4), ivy - S(1.8), ivx + S(2.4), ivy + S(1.8), P.SL2, 0.35);
+  if (opt && opt.iv > 0) { ring(ivx, ivy, S(4) + 3, 1, P.TR3, opt.iv); glow(ivx, ivy, S(5) + 4, P.TR0, P.TR2, 0.5 * opt.iv); }
 }
 // ---------------------------------------------------------------- reconstruction workstation
 function drawWorkstation(cam, t, opt) {

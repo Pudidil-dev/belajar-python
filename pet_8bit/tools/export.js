@@ -1,6 +1,6 @@
 'use strict';
 // Full export: index.html -> offline Web Audio render (Chromium) -> mastering
-// -> 3600 frames from the same engine code -> H.264/yuv420p 1080x1920@60 + AAC.
+// -> 4200 frames from the same engine code -> H.264/yuv420p 1080x1920@60 + AAC.
 //   node tools/export.js [--video-only] [--audio-only] [--out output/pet_8bit.mp4]
 const fs = require('fs');
 const path = require('path');

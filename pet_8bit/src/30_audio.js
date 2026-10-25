@@ -1,24 +1,27 @@
 'use strict';
 // ============================================================================
 // AUDIO — original 128 BPM electronic score in E minor + event-synced SFX.
-// 60 s = exactly 32 bars, so the beat grid is continuous across the loop.
-// Hook riff from frame one; the first annihilation lands on bar 4; clinical
-// groove; mechanical 16ths for the scanner; a build with half a beat of
-// silence, then THE DROP exactly on the matter-antimatter annihilation
-// (26.25 s, bar 15); precise half-time detector physics (crystal, light and
-// SiPM each on a bar downbeat); a rhythmic coincidence section; a warm
-// reveal on the reconstructed image (bar 28); recap, title, pickup -> 0:00.
-// Atomic-scale sounds are artistic representations (annihilation is silent).
+// 70 s = 37 bars + a 1.33-beat riser that hands over to bar 1, so the loop
+// lands on a downbeat. Music from frame one (hook riff over the first
+// detection); a machine groove for the scanner; a clinical groove for the
+// tracer's journey; a scale dive; the decay build-up (bar 12); a build with
+// half a beat of silence, then THE DROP exactly on the annihilation (26.25 s,
+// bar 15); half-time detector physics (detection, crystal, light and SiPM
+// each on a bar downbeat); a rhythmic measurement / coincidence section;
+// driving lines of response; the reconstruction rising into a warm reveal
+// on the final image (bar 32); fusion; the recap with the hook riff.
+// Sub-bass kept moderate; blips kept quiet (no constant loud beeping).
+// Atomic-scale sounds are artistic sonifications (annihilation is silent).
 // ============================================================================
 const SR = 48000, BAR = 4 * BEAT, TAIL = 3.0;
 const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, Bb: 10, B: 11 };
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 const nm = (n, o) => 12 * (o + 1) + NOTE[n];
 const CH = { Em: ['E', 'G', 'B'], C: ['C', 'E', 'G'], G: ['G', 'B', 'D'], D: ['D', 'F#', 'A'], Am: ['A', 'C', 'E'], B: ['B', 'D#', 'F#'], Em9: ['E', 'G', 'B', 'F#'], Cmaj7: ['C', 'E', 'G', 'B'] };
-const BARS = ['Em', 'C', 'G', 'D', 'Em', 'C', 'G', 'D', 'Am', 'C', 'D', 'Em', 'C', 'B', 'Em', 'C', 'Am', 'Em', 'C', 'B', 'Em', 'C', 'G', 'D', 'B', 'C', 'D', 'Em9', 'Cmaj7', 'Em', 'C', 'D'];
-const NBARS = BARS.length;
+const BARS = ['Em', 'C', 'G', 'D', 'Em', 'C', 'G', 'D', 'Am', 'C', 'D', 'Em', 'C', 'B', 'Em', 'C', 'Am', 'Em', 'C', 'B', 'Em', 'C', 'G', 'D', 'Em', 'C', 'Am', 'B', 'C', 'D', 'B', 'Em9', 'Cmaj7', 'G', 'D', 'Em', 'C', 'D'];
+const NBARS = BARS.length;   // 38: the last "bar" is the 1.33-beat riser into the loop
 function chordMidi(name, oct) { let prev = -1; return CH[name].map(n => { let m = nm(n, oct); while (m <= prev) m += 12; prev = m; return m; }); }
-function sec(b) { return b <= 4 ? 'hook' : b <= 8 ? 'clinic' : b <= 11 ? 'mach' : b <= 13 ? 'build' : b === 14 ? 'peak' : b <= 16 ? 'climax' : b <= 20 ? 'detect' : b <= 25 ? 'coinc' : b <= 27 ? 'image' : b <= 29 ? 'reveal' : b <= 31 ? 'recap' : 'pickup'; }
+function sec(b) { return b <= 2 ? 'hook' : b <= 4 ? 'scanner' : b <= 8 ? 'clinic' : b <= 10 ? 'mach' : b === 11 ? 'build' : b === 12 ? 'decay' : b === 13 ? 'build' : b === 14 ? 'peak' : b <= 16 ? 'climax' : b <= 20 ? 'detect' : b <= 26 ? 'coinc' : b <= 31 ? 'image' : b <= 35 ? 'reveal' : b <= 37 ? 'recap' : 'pickup'; }
 const RIFF = [
   [['B', 4, 0, .5], ['B', 4, .75, .25], ['G', 4, 1, .5], ['B', 4, 1.5, .5], ['E', 5, 2, .75], ['D', 5, 2.75, .25], ['B', 4, 3, 1]],
   [['C', 5, 0, .5], ['C', 5, .75, .25], ['G', 4, 1, .5], ['C', 5, 1.5, .5], ['E', 5, 2, .75], ['D', 5, 2.75, .25], ['C', 5, 3, 1]],
@@ -32,130 +35,143 @@ function musicEvents() {
   const riff = (bar, idx, inst, v, oct, dbl, p) => RIFF[idx].forEach(([n, o, b, l]) => { const t = (bar - 1) * BAR + b * BEAT, m = nm(n, o + (oct || 0)); N(t, l * BEAT, inst, m, v, p || 0); if (dbl) N(t, l * BEAT, inst, m - 12, v * 0.55, -0.25); });
   for (let b = 1; b <= NBARS; b++) {
     const t0 = (b - 1) * BAR, ch = BARS[b - 1], s = sec(b), at = beat => t0 + beat * BEAT;
-    const root = nm(CH[ch][0], 1), t5 = chordMidi(ch, 5), t4 = chordMidi(ch, 4);
-    const padV = { hook: 0.05, clinic: 0.068, mach: 0.045, build: 0.055 + 0.005 * (b - 12), peak: 0.07, climax: 0.07, detect: 0.085, coinc: 0.05, image: 0.06, reveal: 0.085, recap: 0.055, pickup: 0.06 }[s];
-    const cut = { hook: 1500, clinic: 1700, mach: 1300, build: 1100 + 500 * (b - 12), peak: 2000, climax: 3200, detect: 1400, coinc: 1600, image: 1400 + 600 * (b - 26), reveal: 2600, recap: 2400, pickup: 1800 }[s];
-    const cut1 = { build: 1500 + 500 * (b - 12), peak: 6000, image: 2400 + 900 * (b - 26), pickup: 4200 }[s] || cut;
+    const root = nm(CH[ch][0], 1), t5 = chordMidi(ch, 5);
+    if (s === 'pickup') { // 1.33 beats: a rising handover into bar 1 (frame one)
+      const len = DUR - t0;
+      for (const m of chordMidi(ch, 3)) N(t0, len + 0.04, 'pad', m, 0.06, (m % 3 - 1) * 0.45, { cut: 1800, cut1: 4200 });
+      N(t0, len, 'bass', nm('D', 2), 0.16); N(t0, len, 'sub', nm('D', 2), 0.15, 0, { rise: true });
+      [nm('D', 5), nm('F#', 5), nm('A', 5), nm('D', 6)].forEach((m, i) => N(t0 + i * BEAT / 3, 0.12, 'pluck', m, 0.05, i % 2 ? 0.3 : -0.3));
+      for (let i = 0; i < 4; i++) D(t0 + i * BEAT / 3, 'snare', 0.1 + i * 0.04);
+      continue;
+    }
+    const padV = { hook: 0.05, scanner: 0.05, clinic: 0.068, mach: 0.045, build: 0.058, decay: 0.066, peak: 0.07, climax: 0.07, detect: 0.085, coinc: 0.05, image: 0.06, reveal: 0.085, recap: 0.055 }[s];
+    const cut = { hook: 1500, scanner: 1600, clinic: 1700, mach: 1300, build: b === 11 ? 1100 : 1600, decay: 1400, peak: 2000, climax: 3200, detect: 1400, coinc: 1600, image: 1400 + 300 * (b - 27), reveal: 2600, recap: 2400 }[s];
+    const cut1 = { build: b === 11 ? 1900 : 2600, peak: 6000, image: 2000 + 400 * (b - 27) }[s] || cut;
     for (const m of chordMidi(ch, 3)) N(t0, BAR + 0.04, 'pad', m, padV, (m % 3 - 1) * 0.45, { cut, cut1 });
     if (s === 'climax' || s === 'reveal') for (const m of chordMidi(ch, 4)) N(t0, BAR, 'vox', m, s === 'climax' ? 0.05 : 0.035, (m % 2 ? 0.35 : -0.35));
     // bass
-    if (s === 'hook' || s === 'recap') for (let i = 0; i < 8; i++) N(at(i / 2), BEAT / 2 * 0.7, 'bass', root + (i % 2 ? 12 : 0), i % 2 ? 0.16 : 0.22);
+    if (s === 'hook' || s === 'scanner' || s === 'recap') for (let i = 0; i < 8; i++) N(at(i / 2), BEAT / 2 * 0.7, 'bass', root + (i % 2 ? 12 : 0), i % 2 ? 0.16 : 0.22);
+    if (s === 'scanner') { const pat = [0, 0, 12, 0, 0, 12, 0, 7, 0, 0, 12, 0, 0, 12, 7, 12]; for (let i = 0; i < 16; i++) if (i % 2) N(at(i / 4), BEAT / 4 * 0.5, 'ebass', root + 12 + pat[i], 0.07); }
     if (s === 'clinic') for (let i = 0; i < 8; i++) N(at(i / 2), BEAT / 2 * 0.8, 'bass', root + (i % 4 === 3 ? 7 : 0), i % 2 ? 0.14 : 0.2, 0, { cut: 950 });
     if (s === 'mach') { const pat = [0, 0, 12, 0, 0, 12, 0, 7, 0, 0, 12, 0, 0, 12, 7, 12]; for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.6, 'ebass', root + 12 + pat[i], i % 4 === 0 ? 0.2 : 0.12); }
-    if (s === 'build') for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.62, 'bass', root + (i % 4 === 2 ? 12 : 0), i % 4 === 0 ? 0.22 : 0.14, 0, { cut: 600 + 400 * (b - 12) });
+    if (s === 'build') for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.62, 'bass', root + (i % 4 === 2 ? 12 : 0), i % 4 === 0 ? 0.22 : 0.14, 0, { cut: b === 11 ? 700 : 1100 });
+    if (s === 'decay') { N(at(0), BEAT * 1.5, 'bass', root, 0.24); N(at(0), BAR * 0.9, 'sub', root + 12, 0.16); N(at(2.5), BEAT * 0.45, 'bass', root + 7, 0.16); N(at(3.25), BEAT * 0.5, 'bass', root + 12, 0.14); }
     if (s === 'peak') for (let i = 0; i < 14; i++) N(at(i / 4), BEAT / 4 * 0.6, 'bass', root + (i % 2 ? 12 : 0), 0.14 + 0.007 * i, 0, { cut: 2400 });
-    if (s === 'climax') { for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.62, 'bass', root + (i % 4 === 2 ? 12 : 0) + (i % 8 === 7 ? 7 : 0), i % 4 === 0 ? 0.24 : 0.15); N(t0, BAR * 0.95, 'sub', root + 12, 0.2); }
+    if (s === 'climax') { for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.62, 'bass', root + (i % 4 === 2 ? 12 : 0) + (i % 8 === 7 ? 7 : 0), i % 4 === 0 ? 0.24 : 0.15); N(t0, BAR * 0.95, 'sub', root + 12, 0.18); }
     if (s === 'detect') { N(at(0), BEAT * 1.4, 'bass', root, 0.24); N(at(1.5), BEAT * 0.4, 'bass', root + 12, 0.15); N(at(2.5), BEAT * 0.45, 'bass', root + 7, 0.17); N(at(3.25), BEAT * 0.5, 'bass', root + 12, 0.14); }
     if (s === 'coinc') for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.6, 'bass', root + ([0, 0, 12, 0][i % 4]), i % 4 === 0 ? 0.21 : 0.13, 0, { cut: 900 });
-    if (s === 'image') for (let i = 0; i < (b === 26 ? 8 : 16); i++) N(at(i / (b === 26 ? 2 : 4)), BEAT / (b === 26 ? 2 : 4) * 0.65, 'bass', root + (i % 2 ? 12 : 0), 0.15 + 0.004 * i);
+    if (s === 'image') for (let i = 0; i < (b === 27 ? 8 : 16); i++) N(at(i / (b === 27 ? 2 : 4)), BEAT / (b === 27 ? 2 : 4) * 0.65, 'bass', root + (i % 2 ? 12 : 0), 0.15 + 0.004 * i);
     if (s === 'reveal') { N(t0, BEAT * 1.9, 'bass', root, 0.19); N(at(2), BEAT * 1.9, 'bass', root + 7, 0.15); }
-    if (s === 'pickup') { N(t0, BAR, 'bass', nm('D', 2), 0.18); N(t0, BAR, 'sub', nm('D', 2), 0.18, 0, { rise: true }); }
     // drums
     const kick = (beat, v) => D(at(beat), 'kick', v), clap = (beat, v) => D(at(beat), 'clap', v);
     const hat = (beat, v, open) => D(at(beat), open ? 'ohat' : 'hat', v, ((beat * 0.37) % 0.6) - 0.3);
-    if (['hook', 'mach', 'build', 'climax', 'coinc', 'image', 'recap'].includes(s)) {
+    if (['hook', 'scanner', 'mach', 'build', 'climax', 'coinc', 'image', 'recap'].includes(s)) {
       for (let i = 0; i < 4; i++) kick(i, s === 'climax' ? 0.6 : 0.52);
       if (!(s === 'build' && b === 13)) { clap(1, s === 'climax' ? 0.36 : 0.32); clap(3, s === 'climax' ? 0.36 : 0.32); }
       for (let i = 0; i < 4; i++) hat(i + 0.5, s === 'hook' ? 0.07 : 0.09, s === 'climax' || s === 'coinc' || s === 'recap');
     }
     if (s === 'clinic') { kick(0, 0.5); kick(1, 0.38); kick(2, 0.46); kick(3, 0.38); clap(1, 0.24); clap(3, 0.3); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.075); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.08 : 0.05, 0.25); }
-    if (s === 'mach') { for (let i = 0; i < 16; i++) if (i % 2) hat(i / 4, i % 4 === 3 ? 0.06 : 0.04); for (let i = 0; i < 4; i++) D(at(i + 0.75), 'perc', 0.08, i % 2 ? 0.4 : -0.4); }
-    if (s === 'climax' || s === 'coinc' || s === 'recap') for (let i = 0; i < 16; i++) if (i % 4 === 1 || i % 4 === 3) hat(i / 4, 0.035);
+    if (s === 'mach' || s === 'scanner') { for (let i = 0; i < 16; i++) if (i % 2) hat(i / 4, i % 4 === 3 ? 0.06 : 0.04); for (let i = 0; i < 4; i++) D(at(i + 0.75), 'perc', s === 'mach' ? 0.08 : 0.06, i % 2 ? 0.4 : -0.4); }
+    if (s === 'climax' || s === 'coinc' || s === 'recap' || (s === 'image' && b >= 29)) for (let i = 0; i < 16; i++) if (i % 4 === 1 || i % 4 === 3) hat(i / 4, 0.035);
     if (s === 'hook' && b >= 2) for (let i = 0; i < 16; i++) if (i % 4) hat(i / 4, 0.03);
-    if (s === 'build') for (let i = 0; i < (b === 12 ? 8 : 16); i++) D(at(i / (b === 12 ? 2 : 4)), 'snare', 0.05 + i * (b === 12 ? 0.012 : 0.008));
+    if (s === 'build') for (let i = 0; i < (b === 11 ? 8 : 16); i++) D(at(i / (b === 11 ? 2 : 4)), 'snare', 0.05 + i * (b === 11 ? 0.012 : 0.008));
+    if (s === 'decay') { kick(0, 0.62); kick(2.5, 0.44); clap(2, 0.42); for (let i = 0; i < 16; i++) D(at(i / 4), 'tick', i % 4 === 2 ? 0.08 : 0.035, ((i * 5) % 7) / 7 - 0.5); hat(1.5, 0.06); hat(3.5, 0.06, true); }
     if (s === 'peak') { for (let i = 0; i < 3; i++) kick(i, 0.55); for (let i = 0; i < 8; i++) D(at(i / 4), 'snare', 0.13 + i * 0.012); for (let i = 0; i < 6; i++) D(at(2 + i / 8), 'snare', 0.2 + i * 0.015); }
     if (s === 'detect') { kick(0, 0.6); kick(1.75, 0.3); kick(2.5, 0.46); clap(2, 0.44); for (let i = 0; i < 16; i++) D(at(i / 4), 'tick', i % 4 === 2 ? 0.09 : 0.04, ((i * 5) % 7) / 7 - 0.5); hat(0.5, 0.05); hat(1.5, 0.07); hat(2.5, 0.05); hat(3.5, 0.07, true); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.06 : 0.035, -0.25); }
-    if (s === 'image' && b === 27) for (let i = 0; i < 16; i++) D(at(i / 4), 'snare', 0.06 + i * 0.012);
-    if (s === 'reveal') { kick(0, 0.46); kick(1, 0.3); kick(2, 0.4); kick(3, 0.3); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.07 : 0.04, 0.25); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.05); clap(1, 0.16); clap(3, 0.22); }
-    if (s === 'pickup') { kick(0, 0.55); kick(1, 0.45); for (let i = 8; i < 16; i++) D(at(i / 4), 'snare', 0.08 + (i - 8) * 0.022); }
-    if (b === 11) for (let i = 12; i < 16; i++) D(at(i / 4), 'tom', 0.2 + (i - 12) * 0.04, 0, { f: 190 - (i - 12) * 26 });
-    if ([1, 4, 15, 17, 21, 28, 30].includes(b)) D(t0, 'crash', b === 15 || b === 28 ? 0.4 : 0.3);
+    if (s === 'image' && b === 31) for (let i = 0; i < 16; i++) D(at(i / 4), 'snare', 0.06 + i * 0.012);
+    if (s === 'reveal') { const up = b >= 33 ? 1 : 0; kick(0, 0.46); kick(1, 0.3 + 0.06 * up); kick(2, 0.4); kick(3, 0.3 + 0.06 * up); for (let i = 0; i < 8; i++) D(at(i / 2), 'shaker', i % 2 ? 0.07 : 0.04, 0.25); for (let i = 0; i < 4; i++) hat(i + 0.5, 0.05 + 0.02 * up); clap(1, 0.16 + 0.06 * up); clap(3, 0.22 + 0.06 * up); if (up) for (let i = 0; i < 16; i++) if (i % 4 === 1 || i % 4 === 3) hat(i / 4, 0.03); }
+    if (b === 10) for (let i = 12; i < 16; i++) D(at(i / 4), 'tom', 0.2 + (i - 12) * 0.04, 0, { f: 190 - (i - 12) * 26 });
+    if ([1, 12, 15, 17, 21, 25, 32, 36].includes(b)) D(t0, 'crash', b === 15 || b === 32 ? 0.4 : 0.3);
     // arps / bells
-    if (s === 'mach' || s === 'build' || s === 'climax' || s === 'coinc' || s === 'recap') {
+    if (['scanner', 'mach', 'build', 'climax', 'coinc', 'recap'].includes(s) || (s === 'image' && b >= 29)) {
       const pat = [0, 1, 2, 1, 0, 2, 1, 2];
-      for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.6, 'arp', t5[pat[i % 8] % t5.length] + (i % 8 >= 6 || (s === 'build' && b === 13) ? 12 : 0), s === 'climax' ? 0.034 : 0.026, i % 2 ? 0.45 : -0.45);
+      for (let i = 0; i < 16; i++) N(at(i / 4), BEAT / 4 * 0.6, 'arp', t5[pat[i % 8] % t5.length] + (i % 8 >= 6 || (s === 'build' && b === 13) ? 12 : 0), s === 'climax' ? 0.034 : s === 'scanner' ? 0.02 : 0.026, i % 2 ? 0.45 : -0.45);
     }
     if (s === 'clinic') [[0.5, 0], [1.5, 1], [2.5, 2], [3.25, 1]].forEach(([p, i], j) => N(at(p), 0.18, 'pluck', t5[i] + 12, 0.05, j % 2 ? 0.3 : -0.3));
-    if (s === 'detect') [[0.75, 2], [1.5, 0], [2.25, 1], [3.0, 2], [3.5, 0]].forEach(([p, i], j) => N(at(p), 0.35, 'bell', t5[i] + 12, 0.08 + 0.012 * (j % 2), j % 2 ? 0.4 : -0.4));
+    if (s === 'detect' || s === 'decay') [[0.75, 2], [1.5, 0], [2.25, 1], [3.0, 2], [3.5, 0]].forEach(([p, i], j) => N(at(p), 0.35, 'bell', t5[i] + 12, 0.08 + 0.012 * (j % 2), j % 2 ? 0.4 : -0.4));
     if (s === 'reveal') { N(at(0.5), 0.6, 'bell', t5[0] + 12, 0.08, -0.3); N(at(2), 0.6, 'bell', t5[2], 0.07, 0.3); N(at(3.25), 0.5, 'bell', t5[1] + 12, 0.06, 0); }
   }
   // melodies
-  for (let b = 1; b <= 4; b++) riff(b, b - 1, 'lead', 0.08, 0, false);
+  for (let b = 1; b <= 4; b++) riff(b, b - 1, 'lead', b <= 2 ? 0.08 : 0.065, 0, false);
   for (let b = 5; b <= 8; b++) riff(b, b - 5, 'pluck', 0.06, 1, false, 0.2);
   [['B', 4, 0], ['D#', 5, 0.75], ['F#', 5, 1.5], ['B', 5, 2.25]].forEach(([n, o, p]) => N(13 * BAR + p * BEAT, BEAT * 0.7, 'saw', nm(n, o), 0.06));
   for (let b = 15; b <= 16; b++) riff(b, b - 15, 'saw', 0.075, 0, true);                   // THE DROP: supersaw hook
   for (let b = 21; b <= 24; b++) riff(b, b - 21, 'pluck', 0.04, 1, false, -0.2);
-  for (let b = 30; b <= 31; b++) riff(b, b - 30, 'lead', 0.075, 0, false);
-  riff(32, 3, 'pluck', 0.05, 1, false);
+  for (let b = 36; b <= 37; b++) riff(b, b - 36, 'lead', 0.075, 0, false);
   return ev;
 }
-// ---------------------------------------------------------------- SFX: every one tied to a visible event
+// ---------------------------------------------------------------- SFX: every one tied to a visible mechanism
 function sfxEvents() {
   const ev = [];
   const S = (t, k, v, x) => { if (t >= 0 && t < DUR) ev.push(Object.assign({ t, d: 0.5, k, v: v === undefined ? 1 : v, p: 0 }, x || {})); };
-  const E6 = mtof(nm('E', 6)), B6 = mtof(nm('B', 6)), pent = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22];
-  // S01-S02 PET image -> tissue -> cell -> FDG
-  S(0, 'scanimpact', 0.9); S(0.12, 'ping', 0.4, { f: E6 }); S(0.32, 'dive', 0.45, { d: 0.88 });
-  S(1.2, 'molzoom', 0.45, { d: 0.4 }); S(1.44, 'select', 0.4); S(1.66, 'lensw', 0.45, { d: 0.26 }); S(1.9, 'glint', 0.5, { f: B6 });
-  // S03 / S13 beta-plus decay
-  for (const [tD, l0] of [[T_EMIT1, 2.42], [T_DECAY2, 21.2]]) {
-    S(l0, 'lensw', 0.4, { d: 0.3 }); S(tD - 0.5, 'dive', 0.3, { d: 0.35 }); S(tD - 0.22, 'charge', 0.3, { d: 0.2 });
-    S(tD, 'nuclear', 0.8); S(tD + 0.01, 'emit', 0.6); S(tD + 0.04, 'neutrino', 0.3);
-  }
-  S(21.95, 'ui', 0.35, { f: mtof(nm('B', 5)) });
-  // S04 / S14 the positron loses energy: decelerating, descending ticks
-  for (const [t0, t1] of [[4.02, 5.45], [23.05, 24.9]]) PT_VERT.forEach((uv, i) => S(t0 + uv * (t1 - t0), 'ptick', 0.32, { f: 3200 - i * 150, p: (i % 2 ? 0.35 : -0.35) }));
-  // S05 first annihilation (bar 4): precise dual-channel impact
-  S(T_ANN1 - 0.33, 'orbit', 0.4, { d: 0.32 });
-  for (const p of [-0.75, 0.75]) { S(T_ANN1, 'annihilate', 0.75, { p }); S(T_ANN1 + 0.04, 'gammaout', 0.45, { p }); }
-  S(T_ANN1, 'boom', 0.6); S(T_ANN1, 'duck', 1, { d: 0.35, amt: 0.55 });
-  // S06 pull-out, two synchronized detector clicks
-  S(6.25, 'whoosh', 0.22, { d: 0.75 }); S(7.0, 'revwhoosh', 0.6, { d: 0.95 }); for (const p of [-0.7, 0.7]) S(T_DET1, 'detect', 0.7, { p });
-  // S07-S10 the tracer
-  S(9.05, 'ui', 0.35, { f: E6 }); S(9.55, 'lensw', 0.3, { d: 0.35 }); S(10.0, 'molzoom', 0.4, { d: 0.26 }); S(T_F18, 'glint', 0.55, { f: B6 });
-  S(11.05, 'glove', 0.4); S(11.25, 'syringe', 0.45, { d: 0.94 }); S(12.2, 'lensw', 0.35, { d: 0.4 });
-  S(13.0, 'enter', 0.5, { d: 0.3 }); S(28 * BEAT, 'bloodpulse', 0.45); S(30 * BEAT, 'bloodpulse', 0.4); S(13.1, 'flow', 0.3, { d: 1.8 });
-  S(15.05, 'tl', 0.4, { d: 0.4 }); for (let k = 0; k < 11; k++) S(15.3 + k * 0.15, 'trap', 0.28, { f: mtof(nm('E', 6) + pent[k % 10]), p: (hash(k + 3) - 0.5) * 0.8 });
-  // S11-S12 the scanner
-  S(17.05, 'swish', 0.3, { d: 0.3 }); S(17.25, 'table', 0.5, { d: 1.4 }); S(18.35, 'beep', 0.4);
-  for (let i = 0; i < RING.n; i += 4) S(19.15 + i * 0.022, 'activate', 0.25, { f: 900 + i * 40, p: Math.cos(modAngle(i)) * 0.7 });
-  S(20.15, 'dive', 0.3, { d: 0.75 });
-  // S15 matter + antimatter: rising tension, the dance, half a beat of silence, THE DROP on the annihilation
-  S(25.05, 'tense', 0.5, { d: T_ANN2 - 0.234 - 25.05 }); S(T_ANN2 - 0.65, 'orbit', 0.5, { d: 0.42, accel: true });
-  S(T_ANN2 - 0.234, 'duck', 1, { d: 0.234, amt: 0.03, rel: 0.004 });
-  for (const p of [-0.8, 0.8]) { S(T_ANN2, 'annihilate', 1.0, { p }); S(T_ANN2 + 0.05, 'gammaout', 0.6, { p }); }
-  S(T_ANN2, 'boom', 0.9); S(T_ANN2 + 0.02, 'shimmer', 0.5, { d: 1.0 });
-  // S16 dual synchronized energy pulses
-  for (const p of [-0.7, 0.7]) S(27.0, 'gammaout', 0.5, { p }); S(27.25, 'ui', 0.3, { f: E6 }); S(27.75, 'ui', 0.3, { f: B6 });
-  // S17 photons cross the body: sweeps, a scatter, an absorption, the pair arrives
-  { const hA = hitRing(EV_A.p[0], EV_A.p[1], Math.cos(EV_A.th), Math.sin(EV_A.th)), hB = hitRing(EV_A.p[0], EV_A.p[1], -Math.cos(EV_A.th), -Math.sin(EV_A.th)), v = Math.max(hA[2], hB[2]) / (T_REACH - EV_A.t0);
-    for (const E of [EV_B, EV_C, EV_A]) { S(E.t0, 'emitsoft', 0.35); S(E.t0 + 0.02, 'sweep', 0.35, { p: Math.cos(E.th) * 0.7, d: 0.5 }); }
-    S(EV_B.t0 + EV_B.sc / v, 'scatter', 0.5, { p: -0.4 }); S(EV_C.t0 + EV_C.ab / v, 'absorb', 0.5);
-    S(EV_A.t0 + hA[2] / v, 'detect', 0.75, { p: 0.7 }); S(EV_A.t0 + hB[2] / v, 'detect', 0.75, { p: -0.7 }); }
-  // S18-S20 crystal -> light -> electric signal (each on a bar downbeat)
-  S(31.0, 'dive', 0.4, { d: 0.4 }); S(31.3, 'gammain', 0.5, { d: T_XTAL - 31.3 }); S(T_XTAL, 'crystal', 0.8); S(T_XTAL + 0.02, 'etrack', 0.45, { d: 0.32 });
-  S(T_SCINT, 'scint', 0.75); for (let k = 0; k < 9; k++) S(T_SCINT + 0.22 + k * 0.055, 'sparkle', 0.22, { f: 4000 + hash(k + 40) * 3000, p: (hash(k) - 0.5) * 0.6 });
-  S(T_SIPM, 'convert', 0.7); FIRED.forEach(([i, j, tf], k) => S(tf, 'cell', 0.16, { f: 1800 + j * 120 + i * 30, p: (i / SP.cols - 0.5) * 0.8 }));
-  S(36.05, 'amp', 0.4, { d: 0.25 }); S(36.25, 'digit', 0.4, { f: 2400 }); S(36.35, 'digit', 0.4, { f: 3000 });
-  // S21-S24 coincidence, line of response, many events, time of flight
-  S(T_C1, 'ping', 0.55, { f: E6, p: -0.7 }); S(T_C2, 'ping', 0.55, { f: E6, p: 0.7 }); S(T_CC, 'coin', 0.7);
-  S(T_LOR, 'track', 0.55, { d: 0.4 });
-  for (let k = 0; k < EVN; k++) S(T_EV0 + k * BEAT / 4, 'evtick', 0.26 + 0.004 * k, { f: mtof(nm('E', 6) + pent[(k * 3) % 10]), p: (k % 2 ? 0.5 : -0.5) });
-  S(42.0, 'data', 0.3, { d: 1.9 }); S(42.75, 'shimmer', 0.3, { d: 1.2 });
-  { const c = Math.cos(TOF.th), s = Math.sin(TOF.th), h1 = hitRing(TOF.p[0], TOF.p[1], c, s), h2 = hitRing(TOF.p[0], TOF.p[1], -c, -s), v = (h1[2] - h2[2]) / 0.36;
-    S(TOF.t0, 'emitsoft', 0.35); S(TOF.t0 + h2[2] / v, 'tofclick', 0.6, { p: -0.6 }); S(TOF.t0 + h1[2] / v, 'tofclick', 0.6, { p: 0.6 });
-    S(45.0, 'compare', 0.55); S(45.3, 'shimmer', 0.35, { d: 0.8 });
-    for (const r0 of TOF_REPLAY) { S(r0 + h2[2] / (2 * v), 'tofclick', 0.3, { p: -0.6 }); S(r0 + h1[2] / (2 * v), 'tofclick', 0.3, { p: 0.6 }); } }
-  // S25 reconstruction -> warm reveal on bar 28
-  S(47.05, 'ui', 0.3, { f: E6 }); S(47.55, 'dive', 0.4, { d: 0.45 }); S(48.0, 'data', 0.45, { d: 1.3 }); S(48.6, 'swish', 0.3, { d: 0.8 });
-  for (let i = 0; i < 4; i++) S(49.4 + i * 0.25, 'iter', 0.45, { f: mtof(nm('B', 5) + [0, 3, 5, 7][i]) });
-  S(T_REVEAL, 'complete', 0.85);
-  // S26 PET + CT
-  S(51.0, 'pop', 0.35); S(51.65, 'slide', 0.45, { d: 0.85 }); S(T_FUSE, 'align', 0.75); S(53.34, 'select', 0.4); S(53.9, 'ui', 0.3, { f: E6 }); S(54.42, 'select', 0.4);
-  // S27 recap on the beat, title, smooth reverse zoom into the loop
-  S(55.0, 'swish', 0.35, { d: 0.3 });
-  RECAP.forEach(([name, t], i) => S(t, 'cut', 0.45, { f: mtof(nm('E', 5) + pent[i]) }));
-  S(T_TITLE, 'titlee', 0.85); S(59.45, 'revzoom', 0.35, { d: 0.5 });
+  const E6 = mtof(nm('E', 6)), B6 = mtof(nm('B', 6)), B5 = mtof(nm('B', 5)), pent = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22];
+  // S01 hook: the annihilation just before frame one (scheduled at the end; the loop fold carries it onto 0:00), two clicks, the line, many events, the image
+  for (const p of [-0.6, 0.6]) { S(DUR + TAU_A, 'annihilate', 0.6, { p }); S(DUR + TAU_A + 0.03, 'gammaout', 0.35, { p }); }
+  S(DUR + TAU_A, 'boom', 0.35);
+  for (const p of [-0.7, 0.7]) S(0.6, 'detect', 0.75, { p });
+  S(1.2, 'track', 0.5, { d: 0.3 });
+  for (let k = 0; k < 8; k++) S(2.0 + 0.5 * Math.pow(k / 8, 1 / 1.35), 'evtick', 0.22, { f: mtof(nm('E', 6) + pent[(k * 3) % 10]), p: (k % 2 ? 0.5 : -0.5) });
+  S(2.5, 'complete', 0.42);
+  // S02 the scanner
+  S(3.0, 'revzoom', 0.3, { d: 0.5 }); S(3.5, 'ui', 0.25, { f: E6 }); S(3.9, 'ui', 0.25, { f: B5 }); S(4.3, 'ui', 0.25, { f: E6 });
+  for (let i = 0; i < RING.n; i += 4) S(3.72 + i * 0.014, 'activate', 0.22, { f: 900 + i * 40, p: Math.cos(modAngle(i)) * 0.7 });
+  S(4.72, 'swish', 0.4, { d: 0.45 }); for (let r = 0; r < 5; r++) S(5.02 + r * 0.07, 'activate', 0.18, { f: 1400 + r * 160 });
+  S(5.3, 'select', 0.35); S(5.5, 'dive', 0.38, { d: 0.47 });
+  // S03 the earlier injection
+  S(6.0, 'click', 0.45); S(6.3, 'ui', 0.25, { f: E6 }); S(6.5, 'syringe', 0.42, { d: 0.85 }); S(6.55, 'flow', 0.28, { d: 1.1 }); S(7.25, 'lensw', 0.32, { d: 0.36 }); S(7.95, 'select', 0.35);
+  // S04 circulation
+  S(9.05, 'flow', 0.3, { d: 2.0 }); S(20 * BEAT, 'bloodpulse', 0.42); S(22 * BEAT, 'bloodpulse', 0.38); S(11.15, 'enter', 0.4, { d: 0.45 });
+  // S05 uptake: GLUT, trapping, the time-lapse
+  S(12.5, 'ui', 0.22, { f: B5 }); S(12.62, 'pass', 0.4); S(T_TRAP, 'lock', 0.5); S(13.6, 'tl', 0.35, { d: 0.4 });
+  for (let k = 0; k < 9; k++) S(13.8 + k * 0.13, 'trap', 0.24, { f: mtof(nm('E', 6) + pent[k % 10]), p: (hash(k + 3) - 0.5) * 0.8 });
+  // S06 into the molecule, the atom, the nucleus
+  S(15.05, 'lensw', 0.38, { d: 0.37 }); S(15.55, 'glint', 0.5, { f: B6 }); S(16.25, 'lensw', 0.36, { d: 0.37 }); S(16.62, 'dive', 0.35, { d: 0.48 }); S(17.2, 'ui', 0.22, { f: E6 });
+  // S07 beta-plus decay: build-up, conversion, emission
+  S(18.0, 'tense', 0.42, { d: T_DECAY - 18.0 }); S(T_DECAY - 0.9, 'charge', 0.32, { d: 0.88 });
+  S(T_DECAY, 'nuclear', 0.8); S(T_DECAY + 0.01, 'emit', 0.6); S(T_DECAY + 0.04, 'neutrino', 0.3);
+  S(T_DECAY + 0.08, 'ui', 0.22, { f: B5 }); S(T_DECAY + 0.45, 'ui', 0.22, { f: E6 }); S(21.4, 'swish', 0.3, { d: 0.5 });
+  // S08 the positron loses energy: decelerating, descending ticks
+  PT_VERT.forEach((uv, i) => S(22.0 + uv * 2.7, 'ptick', 0.32, { f: 3200 - i * 150, p: (i % 2 ? 0.35 : -0.35) }));
+  // S09 rising tension, the dance, half a beat of silence, THE DROP on the annihilation
+  S(25.05, 'tense', 0.5, { d: T_ANN - 0.234 - 25.05 }); S(T_ANN - 0.8, 'orbit', 0.5, { d: 0.56, accel: true });
+  S(T_ANN - 0.234, 'duck', 1, { d: 0.234, amt: 0.03, rel: 0.004 });
+  for (const p of [-0.8, 0.8]) { S(T_ANN, 'annihilate', 1.0, { p }); S(T_ANN + 0.05, 'gammaout', 0.6, { p }); }
+  S(T_ANN, 'boom', 0.9); S(T_ANN + 0.02, 'shimmer', 0.5, { d: 1.0 }); S(26.9, 'revwhoosh', 0.5, { d: 1.1 });
+  // S10 the same photons reach opposite detectors
+  for (const p of [-0.7, 0.7]) S(28.0, 'sweep', 0.4, { p, d: 0.5 });
+  for (const p of [-0.7, 0.7]) S(T_DET, 'detect', 0.78, { p });
+  S(30.45, 'dive', 0.4, { d: 0.98 });
+  // S11 crystal: absorption, energy deposition, excitation, light
+  S(31.32, 'gammain', 0.5, { d: T_XTAL - 31.32 }); S(T_XTAL, 'crystal', 0.8); S(T_XTAL + 0.02, 'etrack', 0.45, { d: 0.36 });
+  S(32.75, 'charge', 0.26, { d: 0.85 }); S(33.62, 'ping', 0.3, { f: B6 });
+  S(T_SCINT, 'scint', 0.75); for (let k = 0; k < 9; k++) S(T_SCINT + 0.22 + k * 0.055, 'sparkle', 0.2, { f: 4000 + hash(k + 40) * 3000, p: (hash(k) - 0.5) * 0.6 });
+  // S12 light -> charge -> pulse -> front end; the matching pulse
+  S(35.3, 'lensw', 0.3, { d: 0.32 }); S(T_SIPM, 'convert', 0.7); FIRED.forEach(([i, j, tf]) => S(tf, 'cell', 0.14, { f: 1800 + j * 120 + i * 30, p: (i / SP.cols - 0.5) * 0.8 }));
+  S(36.2, 'amp', 0.38, { d: 0.4 }); S(36.6, 'digit', 0.35, { f: 2400 });
+  S(T_SPLIT, 'digit', 0.35, { f: 3000, p: 0.5 }); S(T_SPLIT + 0.06, 'digit', 0.35, { f: 3000, p: -0.5 }); S(38.3, 'swish', 0.28, { d: 0.6 });
+  // S13 measurement: each field settles with a quiet tick
+  for (const [t0, p] of [[39.35, -0.4], [39.75, 0.4]]) for (let i = 0; i < 3; i++) S(t0 + 0.56 + i * 0.16, 'digit', 0.22, { f: 2000 + i * 400, p });
+  S(40.95, 'data', 0.3, { d: 1.0 });
+  // S14 coincidence: left tick, right tick, window, energy check, confirmation
+  S(42.0, 'ping', 0.45, { f: E6, p: -0.7 }); S(42.15, 'ping', 0.45, { f: E6, p: 0.7 }); S(42.45, 'tofclick', 0.4, { p: -0.5 }); S(42.6, 'tofclick', 0.4, { p: 0.5 });
+  S(42.8, 'compare', 0.45); S(T_CC, 'select', 0.35); S(43.45, 'coin', 0.72); S(43.9, 'ui', 0.18, { f: B5 });
+  // S15 line of response
+  S(T_LOR, 'track', 0.55, { d: 0.45 }); S(45.55, 'scan', 0.14, { d: 2.6 });
+  // S16 many events: accepted ticks on 16ths, rejected ones muted, layered acquisition
+  S(49.0, 'revzoom', 0.22, { d: 0.6 });
+  for (let k = 0; k < 26; k++) { const tk = T_MANY + k * BEAT / 4; if (k % 4 === 3) S(tk, 'qtick', 0.14, { f: 620, p: (k % 2 ? 0.4 : -0.4) }); else S(tk, 'evtick', 0.24 + 0.003 * k, { f: mtof(nm('E', 6) + pent[(k * 3) % 10]), p: (k % 2 ? 0.5 : -0.5) }); }
+  S(51.4, 'data', 0.3, { d: 1.8 }); S(52.0, 'shimmer', 0.3, { d: 1.2 }); S(53.15, 'swish', 0.32, { d: 0.6 });
+  // S17 reconstruction
+  S(54.0, 'data', 0.38, { d: 0.9 }); S(54.9, 'ui', 0.22, { f: E6 }); S(55.6, 'ui', 0.22, { f: B5 });
+  for (const t0 of [55.7, 55.85, 56.0]) S(t0, 'select', 0.25);
+  for (let i = 0; i < 4; i++) S(56.25 + i * BEAT, 'iter', 0.45, { f: mtof(nm('B', 5) + [0, 3, 5, 7][i]) });
+  S(T_FINAL, 'complete', 0.85);
+  // S18 PET + CT
+  S(60.0, 'slide', 0.4, { d: 0.8 }); S(60.8, 'slide', 0.35, { d: 0.5 }); S(61.35, 'slide', 0.4, { d: 0.5 }); S(T_FUSE, 'align', 0.75); S(62.6, 'confirm', 0.35);
+  S(62.7, 'select', 0.35); S(63.25, 'ui', 0.22, { f: E6 }); S(63.77, 'select', 0.35);
+  // S19 recap cuts on quarter-note triplets, the title, the reverse zoom into frame one
+  RECAP.forEach((r, i) => S(T_REC0 + i * TRIP, 'cut', 0.42, { f: mtof(nm('E', 5) + pent[i]) }));
+  S(T_TITLE, 'titlee', 0.85); S(T_HOME0, 'revzoom', 0.35, { d: 0.5 });
   return ev;
 }
 function allEvents() {

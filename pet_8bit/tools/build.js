@@ -14,7 +14,7 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>How PET Scanners Work</title>
-<meta name="description" content="How PET scanners use antimatter: a 60-second 8-bit scientific animation (HTML5 Canvas + Web Audio).">
+<meta name="description" content="How PET scanners use antimatter: a 70-second, 19-scene 8-bit scientific animation (HTML5 Canvas + Web Audio).">
 <style>
 :root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #35d9ff; }
 * { box-sizing: border-box; }
@@ -47,8 +47,8 @@ body { display: flex; flex-direction: column; min-height: 100%; }
 <div id="bar">
   <button id="play" class="btn" aria-label="Play"></button>
   <button id="replay" class="btn" aria-label="Replay"></button>
-  <input id="scrub" type="range" min="0" max="3599" step="1" value="0" aria-label="Seek">
-  <span id="time">0:00.0 / 1:00.0</span>
+  <input id="scrub" type="range" min="0" max="4199" step="1" value="0" aria-label="Seek">
+  <span id="time">0:00.0 / 1:10.0</span>
   <button id="mute" class="btn" aria-label="Mute"></button>
 </div>
 <div id="scene" aria-live="polite"></div>

@@ -4,7 +4,7 @@
 // Everything draws into one 270x480 Uint32 buffer (crisp pixels, no AA).
 // The buffer is shown 4x nearest-neighbour (1080x1920) by the player/export.
 // ============================================================================
-const W = 270, H = 480, FPS = 60, DUR = 60, NF = 3600;
+const W = 270, H = 480, FPS = 60, DUR = 70, NF = 4200;
 const CX = 135, CY = 240;
 let buf = new Uint32Array(W * H);
 const SPARE = [new Uint32Array(W * H), new Uint32Array(W * H), new Uint32Array(W * H), new Uint32Array(W * H)];
