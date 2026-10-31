@@ -1,0 +1,6 @@
+build/
+output/
+node_modules/
+build_export.log
+__pycache__/
+shot.png
