@@ -2,8 +2,8 @@
 
 **How electricity and lasers analyze your blood**, in 65 seconds and 27 micro-scenes grouped in 7 continuous
 sequences, 9:16, original 16-bit pixel art in a Kurzgesagt-style flat-science grammar, rendered entirely in code
-(HTML5 Canvas 2D and JavaScript), with an original lo-fi hip-hop soundtrack and soft SFX synthesised sample by sample
-in the same JavaScript. No narration, no subtitles, only short English labels. The example is a complete blood count
+(HTML5 Canvas 2D and JavaScript), with an original, story-driven electronic soundtrack and clean SFX synthesised sample
+by sample in the same JavaScript. No narration, no subtitles, only short English labels. The example is a complete blood count
 (CBC) on a benchtop hematology analyzer with an XN-type architecture (original design, no brand): electrical
 impedance for red cells and platelets, SLS photometry for hemoglobin, and fluorescence flow cytometry (WDF + WNR
 channels) for the white cells. It is an educational model; the values on screen are illustrative.
@@ -16,8 +16,8 @@ channels) for the white cells. It is an educational model; the values on screen 
 | | |
 |---|---|
 | Video | 1080×1920 at 60 fps, exactly 3,900 frames (65.000 s). H.264, yuv420p, BT.709. The 360×640 logical canvas is upscaled ×3 with nearest-neighbour, so every pixel stays crisp. |
-| Audio | Original lo-fi score on a 118.15 BPM grid played half-time (32 bars = 65.000 s), F major, plus 158 event-synced SFX. AAC 48 kHz stereo, mastered to −15 LUFS with the true peak at −1.75 dBTP. |
-| Loop | The needle rises, the screen clears and the camera ends on the exact framing of frame one (the last frame matches frame one pixel for pixel); the music tape-stops on the last half second and every note or tail that runs past 65 s wraps to 0:00. |
+| Audio | Original electronic score at 118.15 BPM (32 bars = 65.000 s), F major, plus 155 event-synced SFX. AAC 48 kHz stereo, mastered to −15 LUFS with the true peak at −1.75 dBTP. |
+| Loop | The needle rises, the screen clears and the camera ends on the exact framing of frame one (the last frame matches frame one pixel for pixel); the last bar is a riser that lands on bar 1, and every note or tail that runs past 65 s wraps to 0:00. |
 
 ## Render it yourself
 
@@ -34,7 +34,7 @@ node tools/export.js --audio-only     # soundtrack only -> build/audio.wav
 node tools/stills.js out.png 0 1.3 2.6 20.3 42.8 53.8 --scale 2   # check any frames
 ```
 
-No browser is needed for the export: the picture (about 3 ms per frame in Node) and the soundtrack (about 8 s) are
+No browser is needed for the export: the picture (about 3 ms per frame in Node) and the soundtrack (about 5 s) are
 both computed in Node; most of the time goes to the H.264 encode. To check the result:
 ```
 ffprobe output/cbc_8bit.mp4
@@ -52,27 +52,29 @@ The tube and the analyzer are in the very first frame, a count of millions lands
 previewed by 3 s:
 - **0.0 s** a purple-top (EDTA) blood tube stands in the analyzer's sampler under a steel needle.
 - **0.14 s** the needle pierces the cap; **0.42 s** it draws a little blood.
-- **0.8 s** match cut to the display, which slams in; **1.02 s** (on the beat) **RED BLOOD CELLS 4.80 MILLION / µL**
-  lands, WBC and PLT follow on the half beats. A chip says **RESULT PREVIEW**: a real run takes about a minute.
-- **1.9 s** a portal opens out of the number: one red cell slips into a tiny aperture, the voltage pulse rises
-  (its peak on the beat at 2.54 s) and the counter reads **RBC 0001** as it leaves: **ONE CELL → ONE PULSE**.
-- **3.0 s** the portal closes onto the needle and the film follows the blood from the start: **FOLLOW THE BLOOD**.
+- **0.8 s** match cut to the display, which eases in; **1.02 s** (on the beat) the red-cell count runs up to
+  **4.80 MILLION / µL**, WBC and PLT follow on the half beats. A chip says **RESULT PREVIEW**: a real run takes about a
+  minute.
+- **1.9 s** the camera pushes into the number and the aperture fades in under it: one red cell slips into the tiny
+  opening, the voltage pulse rises (its peak on the beat at 2.54 s) and the counter reads **RBC 0001** as it leaves:
+  **ONE CELL → ONE PULSE**.
+- **3.0 s** the camera pulls back to the needle and the film follows the blood from the start: **FOLLOW THE BLOOD**.
 
 ## One sample, one journey
 
 The film follows **one tube, one analyzer, one red cell through one aperture, one platelet, one hemoglobin cuvette,
 one white cell through one laser, one scattergram and one report**. The red cell that is counted, the cells lysed for
 hemoglobin and the white cell analysed by laser come from **separate measured aliquots** of the same sample, never
-one cell through every pathway. Micro-scenes inside a sequence join by camera moves, zoom portals (the next scale
-opens in a growing circle where the camera dives, and closes again on the way out) and short dithered dissolves; the
-only hard cuts are at 0.8 s, 27 s and 32 s.
+one cell through every pathway. Micro-scenes inside a sequence join by camera moves and zoom crossfades (the outgoing
+camera keeps pushing in or pulling out while the next scale settles in under a smooth blend); the only hard cuts are at
+0.8 s, 27 s and 32 s.
 
 | # | Time (s) | Caption / labels | What happens |
 |---|---|---|---|
 | **A** | **0–3** | **Hook** | |
 | 01 | 0–0.8 | — | The needle pierces the lavender cap and draws blood. |
-| 02 | 0.8–1.8 | RED BLOOD CELLS 4.80 MILLION / µL · WBC 7,200 / µL · PLT 250,000 / µL | The display slams in; the values land on the beat. |
-| 03 | 1.8–3 | ONE CELL → ONE PULSE | A portal from the number: one red cell, one voltage pulse, the counter adds one. |
+| 02 | 0.8–1.8 | RED BLOOD CELLS 4.80 MILLION / µL · WBC 7,200 / µL · PLT 250,000 / µL | The display eases in; the values count up on the beat. |
+| 03 | 1.8–3 | ONE CELL → ONE PULSE | The camera pushes into the number: one red cell, one voltage pulse, the counter adds one. |
 | **B** | **3–11** | **The sample** | |
 | 04 | 3–5 | FOLLOW THE BLOOD · SAMPLING NEEDLE · SYRINGE PUMP | The housing turns X-ray; the pump's piston draws the measured blood through the tubing to the valve. |
 | 05 | 5–7.5 | RED CELL ~7.5 µm · WHITE CELL ~12 µm · PLATELET ~2.5 µm | A dive into the tubing: tumbling red discs, a white cell with its purple nucleus and violet platelets ride the amber plasma, at their true relative sizes. |
@@ -101,7 +103,7 @@ only hard cuts are at 0.8 s, 27 s and 32 s.
 | 24 | 51–54 | EACH DOT = ONE CELL | The WDF scattergram: the first cell lands at its side-scatter and fluorescence heights; hundreds follow and four groups form (NEUT, LYMPH, MONO, EO). |
 | 25 | 54–56 | WNR ADDS BASOPHILS · WDF + WNR = 5-PART DIFF | The WNR plot (fluorescence vs forward scatter) slides in and the basophils separate; the five-part differential builds. |
 | **G** | **56–65** | **Results and loop** | |
-| 26 | 56–60 | ALL DATA → ONE REPORT | Impedance, laser and light data flow into the processor (calibration, dilution, flag rules, QC); a portal closes onto the display, where the report types in row by row; checks, then QC PASSED · NO FLAGS. |
+| 26 | 56–60 | ALL DATA → ONE REPORT | Impedance, laser and light data flow into the processor (calibration, dilution, flag rules, QC); the camera settles on the display, where the report types in row by row; checks, then QC PASSED · NO FLAGS. |
 | 27 | 60–65 | HOW BLOOD TEST MACHINES WORK | Pull back to the analyzer; four recap tiles pop in on the beats (RBC → PULSE, WBC → LASER, HGB → LIGHT, → REPORT); the needle rises, the screen clears and the camera returns to the tube: the last frame is frame one. |
 
 Honesty chips, one at a time for about 3 s each: RESULT PREVIEW, RELATIVE SIZES TO SCALE, SEPARATE ALIQUOTS,
@@ -131,37 +133,54 @@ LASER HITS, SLOWED DOWN, SIMPLIFIED OPTICS, COLOURS = SOFTWARE GROUPS, EXAMPLE V
 
 ## Sound design
 
-An original lo-fi hip-hop score, synthesised in plain JavaScript (no samples): a 118.15 BPM grid played half-time,
-so the groove sits at a laid-back 59 BPM, in F major on jazzy ii–V–I–vi changes (Gm9 – C13 – Fmaj9 – Dm9, two bars
-each). An FM electric piano with tremolo plays strummed, swung voicings; a warm saturated sine bass glides into each
-new chord; swung boom-bap drums (soft kick with a knock, dusty snare, rim clicks, swung hats, shaker); a kalimba riff
-with a ping-pong echo is the earworm (A–C–D, C–A–G–F) and keeps coming back; a soft pad, vinyl hiss and crackle, and
-tape wow and flutter that repeat exactly every 65 s; the bed breathes with the kick and sits in a plate reverb; the
-master rolls off the top like an old tape.
+An original electronic score, synthesised in plain JavaScript (no samples): 118.15 BPM in F major on the I–V–vi–IV
+pop changes (F – C – Dm – Bb, one chord per bar). One three-note motif (the chord's third, fifth and octave, in a
+3-3-2 rhythm) runs through the whole film and **changes instrument with each chapter**, so the music tells you where
+you are. The voices: band-limited saw and pulse oscillators through resonant filters (a bright pluck, a square
+"pulse" lead, a detuned saw "laser" lead with glide and vibrato, chip pulses and arpeggios), an FM glass bell, a
+bubbly marimba, detuned-saw pads, stabs and a supersaw for the drop, a filtered saw bass with a sine sub, and a
+drum kit (kick, clap, snare, rim, hats, shaker, crash) with risers, a downlifter, a sub impact and a heartbeat. Pads
+and bass breathe with the kick (sidechain); the leads sit in a dotted-eighth ping-pong delay and a plate reverb.
 
-| Bars (time) | Sequence | Music |
+| Bars (time) | Chapter | Music |
 |---|---|---|
-| 1–2 (0–4 s) | Hook | Full groove and the riff from the first frame |
-| 3–6 (4–12 s) | The sample | The riff again, then softer, leaving room for the pump and the pour |
-| 7–12 (12–24 s) | Impedance | Rim clicks instead of the snare and no riff: the pulse bips carry the melody |
-| 13–14 (24–27 s) | Time-lapse | The riff returns with a shaker |
-| 27–32 s | Hemoglobin | The music goes underwater (low-pass) exactly on the cut at 27 s and surfaces on the cut at 32 s; drums down to the kick |
-| 17–21 (32.5–42.7 s) | White cells | The groove returns with a pad; a snare fill into the laser hit |
-| 22–24 (42.7–48.75 s) | Slow-motion | Drumless: sustained chords, kalimba bells, a reverse cymbal into the next bar |
-| 25–28 (48.75–56.9 s) | Detection, data | Full groove with a shaker; the riff doubled a third below |
-| 29–30 (56.9–60.9 s) | Report | On the tonic; the QC chime |
-| 31–32 (60.9–65 s) | Recap, title | Recap bells on the beats, the riff's first notes under the title, a tape stop that falls back into bar 1 |
+| 1–2 (0–3 s) | Hook | Full groove from the first frame; the motif on a bright pluck with a bell an octave up; the band breathes out as the film goes back to the needle |
+| 3–6 (4–12 s) | The sample | Bouncy bass and shaker; the motif on a bubbly marimba; a riser into the next chapter |
+| 7–8 (12–16 s) | Impedance | An electric groove with ticking 16th hats; the motif on the square "pulse" lead |
+| 9–12 (16–24 s) | One cell at a time | Stripped to kick, ticks, pad and sub: the cell bips carry the tune |
+| 13–14 (24–27 s) | Time-lapse | Square arpeggios, rolling bass and a snare build… |
+| 27–32 s | Hemoglobin | …cut dead on the hard cut: a soft heartbeat, a pad and the motif on a glass bell |
+| 17–21 (32.5–42.7 s) | White cells | The motif on the laser lead, its filter opening bar by bar; a build with a snare roll and a riser; one beat of silence |
+| 22–24 (42.7–48.75 s) | The laser hit | The drop, half-time, exactly on the hit: sub impact, big chords, the laser lead an octave up |
+| 25–28 (48.75–56.9 s) | Detection, data | The driving section: the motif on chip pulses, chip arpeggios, rolling bass, chord stabs |
+| 29–30 (56.9–60.9 s) | Report | Everything together; the progression lands on the tonic for QC PASSED |
+| 31 (60.9–63 s) | Recap | One tile per beat, each in its chapter's instrument (square, laser, glass, pluck) |
+| 32 (63–65 s) | Title | The motif on all the leads and a riser that runs straight back into bar 1 |
 
-The SFX are soft, rounded and tuned to the key: the cap pierce and the aspiration, the display slam and the result
-ding, digital ticks for the other values, zoom whooshes for every portal, the pump motor, the diluent pour with
+The SFX are clean, rounded and tuned to the key: the cap pierce and the aspiration, a soft cut, the result ding,
+digital ticks for the other values, zoom whooshes for the scale changes, the pump motor, the diluent pour with
 bubbles, three ticks as the aliquots arrive, the current's hum, the scope switching on, **the pulse bip**, the count
 blips, the histogram run, soft pops as the cells burst, the SLS binding glitter, the LED click and its quiet tone, the
 hemoglobin result, dye pings, the flow, the laser's hum, the laser hit with a time-slowing sweep, the fluorescence
 shimmer, three scatter tones, detector clicks (one triad per cell), the plotting ticks, the colouring shimmer, five
-rising tones for the differential bars, data chirps, report ticks and checks, the QC chime, four recap bells, the
-needle retracting and the title chord. **The pulse bip is the voltage itself**: its loudness is computed from the same
-particle positions that draw the scope trace (A for red cells, a high E for platelets; A and E fit all four chords).
-Cells, light and current make no sound in reality: these are educational sonifications.
+rising tones for the differential bars, data chirps, report ticks and checks, the QC chime, the needle retracting and
+the title chord. **The pulse bip is the voltage itself**: its loudness is computed from the same particle positions
+that draw the scope trace (F for red cells, a high C for platelets, both in the key). Cells, light and current make
+no sound in reality: these are educational sonifications.
+
+## Revision: calmer picture, new score
+
+The first cut was judged too flashy and its lo-fi bed did not fit the theme. What changed:
+- No starburst flashes anywhere (cap pierce, counters, result screen, absorbed photons, cells crossing the laser);
+  a counter's frame lights up for a moment instead.
+- No slam zoom, overshoot or camera shake on the result screen; the values count up.
+- The nine circular zoom portals with white rings became zoom crossfades.
+- Glows are smooth radial blends at about half their former strength (LED, laser, fluorescence, photodiodes) instead
+  of dithered sparkle; fades and the X-ray see-through are smooth blends instead of checkerboard dithers.
+- Calmer details: fewer and slower current lines and ions, slower sheath streamlines, steady data packets instead of
+  flickering digits, no flashing newest dots on the scattergrams, a slower status light.
+- The lo-fi score was replaced by the chapter-by-chapter electronic score above (a build and a drop on the laser
+  hit, the motif changing instrument per chapter).
 
 ## Quality checks run before delivery
 
@@ -169,27 +188,27 @@ Cells, light and current make no sound in reality: these are educational sonific
   shot). The yellows: shots 01–03 and 06 last 0.8–1.5 s; they are the brief's hook micro-scenes and the short
   dilution beat, each one visual event, joined by camera moves.
 - **Skill film gate** (`film_gate.py`, on a 720×1280 QA proxy rendered at 30 fps from the same engine; the proxy is
-  not a deliverable): all three gates green. Fast-motion frames 0.132 (needs ≥ 0.06; worst 30 s window 0.074), no
-  blank stretch, blue-purple frames 0.000, still frames 4.6 % with the longest still stretch 0.33 s, 4.6 visual
-  events per 10 s, dead background 0.18, 3.7 push-ins per minute. The one yellow is the fixed-page-frame share, 0.30:
-  a diagnostic run shows it comes from the world, not from captions or logos. The camera is locked on the impedance
-  aperture from 13 to 25 s (the brief asks to hold the camera while a mechanism plays: approach, entry, exit) and
-  held during the laser slow-motion, so the aperture plate and the optics stay put while the scope, the counters and
-  the tags change around them. Captions and chips each leave after about 3 s.
-- **Motion scan** (`tools/qa_motion.js`, 30 fps): no window of 0.5 s or more with under 0.3 % of the pixels moving
-  (an earlier pass had two, while the WNR dots arrived: an acquisition sweep and a pulsing ring on the basophils
-  fixed them). Frames where more than 55 % of the pixels change are exactly the three planned cuts: 0.8 s (69 %),
-  27.0 s (86 %), 32.0 s (100 %). 0 % blue-purple frames. About 3.2 ms per frame in Node at the 360×640 logical size.
-- **Loop:** the last frame matches frame one exactly (0.00 % of its pixels differ; a normal frame step there is
-  0.30 %); the soundtrack's wrap has no jump.
+  not a deliverable): all three gates green. Fast-motion frames 0.141 (needs ≥ 0.06; worst 30 s window 0.085), no
+  blank stretch, blue-purple frames 0.000, still frames 4.5 % with the longest still stretch 0.33 s, 4.5 visual
+  events per 10 s, dead background 0.14, 3.7 push-ins per minute of which 1.8 fast (2.8 before the calmer revision),
+  crossfades 17 % of the transitions. The one yellow is the fixed-page-frame share, 0.33: a diagnostic run shows it
+  comes from the world, not from captions or logos. The camera is locked on the impedance aperture from 13 to 25 s
+  (the brief asks to hold the camera while a mechanism plays: approach, entry, exit) and held during the laser
+  slow-motion, so the aperture plate and the optics stay put while the scope, the counters and the tags change
+  around them. Captions and chips each leave after about 3 s.
+- **Motion scan** (`tools/qa_motion.js`, 30 fps): no window of 0.5 s or more with under 0.3 % of the pixels moving.
+  Only one frame step changes more than 55 % of the pixels sharply (by more than 24 luma levels): the cut at 0.8 s;
+  the crossfades are smooth, and the cuts at 27 s and 32 s join worlds of similar tone. 0 % blue-purple frames. About
+  3.4 ms per frame in Node at the 360×640 logical size.
+- **Loop:** the last frame matches frame one exactly (0.00 % of its pixels differ); the soundtrack's wrap has no jump.
 - **Audio** (numbers only, not a listening test; `tools/audio_qa.js`): exactly 65.000 s; −15.0 LUFS integrated,
-  −1.75 dBTP true peak, 3.4 LU loudness range (an even background bed). Bars sit at −16 to −18 dBFS RMS; the
-  drumless slow-motion bars dip to −19.0 and −20.7. 41 % of the energy is below 120 Hz and 58 % between 120 Hz and
-  2 kHz (a first pass had 74 % below 120 Hz: the kick got lighter with a mid knock and the bass gained harmonics, so
-  it reads on phone speakers). 746 music notes and hits, 158 SFX. A stem check (an SFX-only render against a
-  music-only render, same code) puts 149 of the 158 cues within 6 dB of the music in their strongest octave band or
-  above it (median +9.3 dB); the quieter ones are the current's hum bed and the dense plotting ticks, meant as
-  texture.
+  −1.75 dBTP true peak, 3.3 LU loudness range. Bars sit at −15 to −18 dBFS RMS; the drop (bar 22) is the loudest at
+  −15.1, while the sparse single-cell bar and the hemoglobin breakdown dip (−21.3, −18.6). 46 % of the energy is
+  below 120 Hz and 49 % between 120 Hz and 2 kHz (a first pass of the new score had 68 % below 120 Hz: its sub sat an
+  octave too low for phone speakers). 1,274 music notes and hits, 155 SFX. A stem check (an SFX-only render against
+  a music-only render, same code) puts 145 of the 155 cues within 6 dB of the music in their strongest octave band
+  or above it (median +3.2 dB): the cell bips +5 dB on average, the counts +16 dB, the result chimes +23 dB, the
+  laser hit +10 dB; the quieter ones are the current's hum bed, the transition swishes and the dense plotting ticks.
 - **Player:** headless Chromium smoke test (play, seek) with no errors; the soundtrack synthesises in the browser.
 - **Self-review against the skill's six failure modes:** no page frame or bullet slides (every shot is one visual
   event, captions and chips leave after 3 s, the camera changes from shot to shot); original compositions and an
@@ -197,7 +216,8 @@ Cells, light and current make no sound in reality: these are educational sonific
   analyzer, tubing, cells, chamber, electrodes, aperture, cuvette, LED, flow cell, laser, lenses, photodiodes,
   scattergram, processor, report); no dead ground (current dashes, drifting ions, flowing cells, photons, dust and
   data dots keep moving); one pixel-art style and palette from the first frame to the last, no blue-purple ground; no
-  people, no faces on cells or molecules. No separate reviewer agent was used.
+  people, no faces on cells or molecules; no flashing effects (no starbursts, portals or shake). No separate reviewer
+  agent was used.
 
 To run the skill's delivery gate on your own render:
 ```
@@ -266,6 +286,6 @@ colours are educational.
 | `src/15_flow.js` | the white-cell channel and lysis, the stained cell cut open, the flow cell, laser and optics, the pulse traces |
 | `src/16_data.js` | the WDF and WNR scattergrams, the processor, the recap tiles |
 | `src/23_scenes.js`, `src/24_overlay.js` | the 27 micro-scenes and their transitions; captions, tags, chips, title |
-| `src/30_audio.js` | the lo-fi synthesiser, the score, the SFX map, mixing and effects, the player's playback |
+| `src/30_audio.js` | the synthesiser (plucks, leads, chip, bell, marimba, pads, bass, drums, risers), the score, the SFX map, mixing and effects, the player's playback |
 | `src/40_player.js` | the player |
 | `tools/` | build, export (Node audio + ffmpeg video), mastering, stills, smoke test, motion scan, film-gate proxy, audio QA, profiler |

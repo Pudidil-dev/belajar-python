@@ -51,7 +51,7 @@ function dataMerge(cam, t, k) {
     text(FS, how, X(sx), Y(sy + 2), { sc: 2, c: P.SUB, ol: null, align: 'center' });
     const ex = cx + (i - 1) * 30, ey = cy - 58;
     lineW(X(sx), Y(sy + 20), X(ex), Y(ey), 2 * z, P.DG2);
-    for (let q = 0; q < 6; q++) { const u = ((t * 1.1 + q / 6 + i * 0.13) % 1); if (u > k * 1.2) continue; const b = hash(q + i * 7 + Math.floor(t * 4) * 3) > 0.5; const x = lerp(sx, ex, u), y = lerp(sy + 20, ey, u); text(FS, b ? '1' : '0', X(x), Y(y) - 5, { sc: 2, c: b ? P.DT4 : col, ol: null, align: 'center' }); }
+    for (let q = 0; q < 6; q++) { const u = ((t * 1.1 + q / 6 + i * 0.13) % 1); if (u > k * 1.2) continue; const b = hash(q + i * 7) > 0.5; const x = lerp(sx, ex, u), y = lerp(sy + 20, ey, u); text(FS, b ? '1' : '0', X(x), Y(y) - 5, { sc: 2, c: b ? P.DT4 : col, ol: null, align: 'center' }); }
   });
   // out to the report
   lineW(X(cx), Y(cy + 58), X(cx), Y(cy + 120), 2 * z, P.DT2);

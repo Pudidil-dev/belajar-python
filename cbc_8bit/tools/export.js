@@ -1,5 +1,5 @@
 'use strict';
-// Full export: lo-fi soundtrack synthesised in Node -> mastering
+// Full export: electronic soundtrack synthesised in Node -> mastering
 // -> 3900 frames from the same engine code -> H.264/yuv420p 1080x1920@60 + AAC.
 //   node tools/export.js [--video-only] [--audio-only] [--out output/cbc_8bit.mp4]
 const fs = require('fs');

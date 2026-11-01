@@ -14,7 +14,7 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>How Blood Test Machines Count Your Cells</title>
-<meta name="description" content="How electricity and lasers analyse your blood: a 65-second pixel-art scientific animation of an automated hematology analyzer (impedance counting, SLS hemoglobin photometry, fluorescence flow cytometry), with a lo-fi soundtrack synthesised in JavaScript.">
+<meta name="description" content="How electricity and lasers analyse your blood: a 65-second pixel-art scientific animation of an automated hematology analyzer (impedance counting, SLS hemoglobin photometry, fluorescence flow cytometry), with an electronic soundtrack synthesised in JavaScript.">
 <style>
 :root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #8fe9f5; }
 * { box-sizing: border-box; }

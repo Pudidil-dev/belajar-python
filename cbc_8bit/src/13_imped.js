@@ -32,7 +32,7 @@ function lineY(k, n, x, cells) {
   return clamp(y, -IMP.ah + 2 - (Math.abs(x) < IMP.hw ? 0 : 999), IMP.ah - 2 + (Math.abs(x) < IMP.hw ? 0 : 999));
 }
 // ion i: cations (even i) drift toward the - electrode (right), anions toward the + electrode (left)
-function ionPos(i, t, cells) { const cat = i % 2 === 0, k = (i % 15) - 7, u = ((hash(i + 900) + t * 0.05 * (cat ? 1 : -1)) % 1 + 1) % 1, x = lerp(-IMP.ex + 10, IMP.ex - 10, u); return [x, lineY(k, 7, x, cells) + (hash(i + 901) - 0.5) * 8]; }
+function ionPos(i, t, cells) { const cat = i % 2 === 0, k = (i % 11) - 5, u = ((hash(i + 900) + t * 0.05 * (cat ? 1 : -1)) % 1 + 1) % 1, x = lerp(-IMP.ex + 10, IMP.ex - 10, u); return [x, lineY(k, 5, x, cells) + (hash(i + 901) - 0.5) * 8]; }
 // o: { parts: [{k, keys}], t, current (0..1), ions, sheath, trace (bool), counts {rbc, plt}, hist (array of [k, v] events), histK, label }
 function impWorld(cam, t, o) {
   o = o || {};
@@ -59,18 +59,18 @@ function impWorld(cam, t, o) {
   // current lines (thin cyan) with moving dashes
   const cur = o.current === undefined ? 1 : o.current;
   if (cur > 0) {
-    const n = 7;
+    const n = 5;
     for (let k = -n; k <= n; k++) {
       let px_ = null, py_ = null;
       for (let x = -IMP.ex + 4; x <= IMP.ex - 4; x += 4) {
         const y = lineY(k, n, x, cells), sx = X(x), sy = Y(y);
-        if (px_ !== null && ((Math.floor((x - t * 60) / 12) % 2) === 0)) line(px_, py_, sx, sy, Math.abs(x) < IMP.hw + 20 ? P.EC3 : P.EC2, cur);
+        if (px_ !== null && ((Math.floor((x - t * 34) / 12) % 2) === 0)) line(px_, py_, sx, sy, Math.abs(x) < IMP.hw + 20 ? P.EC3 : P.EC2, cur);
         px_ = sx; py_ = sy;
       }
     }
   }
   // ions drifting along the current lines: cations (+) toward the right, anions (-) toward the left
-  if (o.ions) for (let i = 0; i < 30; i++) {
+  if (o.ions) for (let i = 0; i < 20; i++) {
     const cat = i % 2 === 0, [x, y] = ionPos(i, t, cells);
     disc(X(x), Y(y), 2.6 * z, cat ? P.EC3 : P.EC1); if (z > 1.1) text(FS, cat ? '+' : '-', X(x) - 1.5 * z, Y(y) - 2.5 * z, { sc: 1, c: cat ? P.EC0 : P.EC3, ol: null });
   }
@@ -106,7 +106,7 @@ function scope(x0, y0, x1, y1, parts, t, o) {
   if (o.label) text(FS, 'VOLTAGE', x0 + 4, y0 + 3, { sc: 1, c: P.SUB, ol: null });
 }
 // counter LCD
-function counter(x, y, label, n, col, sc) { sc = sc || 2; const s = label + ' ' + String(n).padStart(4, '0'); const w = textW(FS, s, sc); rect(x - 4, y - 4, x + w + 4, y + 7 * sc, P.DS0); frame(x - 4, y - 4, x + w + 4, y + 7 * sc, P.M5); text(FS, s, x, y, { sc, c: col, ol: null }); }
+function counter(x, y, label, n, col, sc, hl) { sc = sc || 2; const s = label + ' ' + String(n).padStart(4, '0'); const w = textW(FS, s, sc); rect(x - 4, y - 4, x + w + 4, y + 7 * sc, hl > 0 ? mixc(P.DS0, col, 0.25 * hl) : P.DS0); frame(x - 4, y - 4, x + w + 4, y + 7 * sc, hl > 0 ? mixc(P.M5, col, hl) : P.M5); text(FS, s, x, y, { sc, c: col, ol: null }); }
 // size histogram: events [[k, volume]], n shown
 function sizeHist(x0, y0, x1, y1, n, t, o) {
   o = o || {};

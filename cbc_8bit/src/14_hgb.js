@@ -41,7 +41,7 @@ function photometer(cam, t, o) {
   rect(X(-170), Y(40), X(170), Y(70), P.M5); rect(X(-170), Y(40), X(170), Y(43), P.M4);
   // LED in its holder
   rect(X(-160), Y(-30), X(-120), Y(40), P.M4); disc(X(-120), Y(0), 14 * z, P.LG0); disc(X(-120), Y(0), 11 * z, o.on ? P.LG2 : P.LG1); rect(X(-134), Y(-11), X(-120), Y(11), o.on ? P.LG2 : P.LG1);
-  if (o.on) glow(X(-118), Y(0), 26 * z, P.LG1, P.LG2, 0.5);
+  if (o.on) glow(X(-118), Y(0), 26 * z, P.LG1, P.LG2, 0.3);
   // cuvette (transparent) with the SLS-hemoglobin solution
   rect(X(-48), Y(-70), X(48), Y(40), P.TB1); rect(X(-44), Y(-66), X(44), Y(36), P.TB2);
   rect(X(-44), Y(-40), X(44), Y(36), P.HB1); rect(X(-44), Y(-40), X(44), Y(36), P.HB2, 0.35); rect(X(-44), Y(-40), X(44), Y(-37), P.HB3);
@@ -52,7 +52,7 @@ function photometer(cam, t, o) {
   if (o.on) for (let i = 0; i < 26; i++) {
     const u = ((t * 0.9 + i / 26) % 1), x = lerp(-110, 122, u), y = ((i * 7) % 11 - 5) * 2.2;
     const absorbed = hash(i * 31 + Math.floor(t * 0.9 + i / 26) * 7) < (o.absorb || 0) * 0.55, xa = -30 + hash(i + 77) * 60;
-    if (absorbed && x > xa) { if (x < xa + 8) flash(X(xa), Y(y), 3 * z, 1 - (x - xa) / 8, [P.HB1, P.HB2, P.HB3, P.C6]); continue; }
+    if (absorbed && x > xa) { if (x < xa + 6) disc(X(xa), Y(y), 1.6 * z * (1 - (x - xa) / 6), P.LG1); continue; }
     disc(X(x), Y(y), 2.2 * z, P.LG2); disc(X(x), Y(y), 1.1 * z, P.LG3);
   }
   // readout

@@ -221,13 +221,32 @@ function dashLine(x0, y0, x1, y1, c, on, off, phase) {
     line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
   }
 }
-// Kurzgesagt-style pixel glow: stacked dithered discs in darker tints
+// soft glow: a smooth radial blend toward c1 (and c2 in the core), no dither sparkle
+function mixc(a, b, k) { // blend two packed colours, k in 0..1
+  const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  return (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+}
 function glow(cx, cy, r, c1, c2, lv) {
   lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
-  disc(cx, cy, r, c1, 0.28 * lv);
-  disc(cx, cy, r * 0.62, c1, 0.55 * lv);
-  if (c2 !== undefined && c2 !== null) disc(cx, cy, r * 0.32, c2, 0.6 * lv);
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r)), x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / r; if (d >= 1) continue;
+    const i = y * W + x, u = 1 - d;
+    let c = mixc(buf[i], c1, 0.55 * lv * u * u);
+    if (c2 !== undefined && c2 !== null && d < 0.35) c = mixc(c, c2, 0.5 * lv * (1 - d / 0.35));
+    buf[i] = c;
+  }
 }
+// blend a whole buffer into buf (k = weight of src) — smooth crossfades
+function mixInto(dst, src, k) {
+  if (k <= 0) return; const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  for (let i = 0; i < dst.length; i++) {
+    const a = dst[i], b = src[i]; if (a === b) continue;
+    dst[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
+}
+// tint the whole frame toward colour c by k (a calm dim, no dither)
+function tintAll(c, k) { if (k <= 0) return; for (let i = 0; i < buf.length; i++) buf[i] = mixc(buf[i], c, k); }
 function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
   rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
 }

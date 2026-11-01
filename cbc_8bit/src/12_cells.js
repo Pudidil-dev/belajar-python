@@ -69,7 +69,7 @@ function wbc(x, y, r, kind, rot, o) {
       disc(px, py, Math.max(1, r * 0.045), lit ? P.EM2 : P.DY1, lv);
     }
   }
-  if (o.glow > 0) glow(x, y, r * 1.6, P.EM1, P.EM2, o.glow * 0.7);
+  if (o.glow > 0) glow(x, y, r * 1.7, P.EM1, P.EM2, o.glow * 0.45);
 }
 // platelet: small irregular fragment
 function platelet(x, y, r, rot, o) {

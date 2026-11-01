@@ -89,17 +89,17 @@ function flowCell(cam, t, o) {
   rect(X(-9), Y(-330), X(9), Y(150), P.EC1); poly(cam.pts([-9, 150, 9, 150, 74, 320, -74, 320]), P.EC1);   // sheath fluid
   // sheath streamlines converging, and the sample core narrowing (hydrodynamic focusing)
   const fk = o.focus === undefined ? 1 : o.focus;
-  for (const s_ of [-1, 1]) for (let j = 1; j <= 3; j++) { let px_ = null, py_ = null; for (let y = 320; y >= -330; y -= 6) { const w_ = y > 150 ? lerp(9, 74, (y - 150) / 170) : 9, x = s_ * w_ * j / 4, sx = X(x), sy = Y(y); if (px_ !== null && Math.floor((y + t * 120) / 14) % 2 === 0) line(px_, py_, sx, sy, P.EC3, 0.7); px_ = sx; py_ = sy; } }
+  for (const s_ of [-1, 1]) for (let j = 1; j <= 3; j++) { let px_ = null, py_ = null; for (let y = 320; y >= -330; y -= 6) { const w_ = y > 150 ? lerp(9, 74, (y - 150) / 170) : 9, x = s_ * w_ * j / 4, sx = X(x), sy = Y(y); if (px_ !== null && Math.floor((y + t * 70) / 14) % 2 === 0) line(px_, py_, sx, sy, P.EC3, 0.7); px_ = sx; py_ = sy; } }
   rect(X(-10), Y(262), X(10), Y(330), P.TB0); rect(X(-6), Y(250), X(6), Y(330), P.AM1);                  // sample nozzle
   const coreW = lerp(14, 2.4, fk);
   for (let y = 250; y >= -330; y -= 2) { const w_ = y > 150 ? lerp(coreW, 6, (y - 150) / 100) : coreW; rect(X(-w_ / 2), Y(y), X(w_ / 2), Y(y + 2), P.AM2, 0.8); }
   // laser diode and beam (bright red), beam stop, forward lens and photodiode
   const lz = o.laser === undefined ? 1 : o.laser, lx = OPTX.laser[0];
   rect(X(lx - 26), Y(-14), X(lx), Y(14), P.M4); rect(X(lx - 22), Y(-10), X(lx - 4), Y(10), P.M3); disc(X(lx), Y(0), 5 * z, P.LZ1);
-  if (lz > 0) { rect(X(lx), Y(-2.2), X(OPTX.stop[0]), Y(2.2), P.LZ1, lz); rect(X(lx), Y(-1), X(OPTX.stop[0]), Y(1), P.LZ2, lz); glow(X(0), Y(0), 10 * z, P.LZ1, P.LZ2, 0.3 * lz); }
+  if (lz > 0) { rect(X(lx), Y(-2.2), X(OPTX.stop[0]), Y(2.2), P.LZ1, lz); rect(X(lx), Y(-1), X(OPTX.stop[0]), Y(1), P.LZ2, lz); glow(X(0), Y(0), 10 * z, P.LZ1, P.LZ2, 0.15 * lz); }
   rect(X(OPTX.stop[0] - 3), Y(-7), X(OPTX.stop[0] + 3), Y(7), P.M6);                                                                  // beam stop
   ellipse(X(OPTX.fsLens[0]), Y(0), 5 * z, 22 * z, P.TB3); ellipse(X(OPTX.fsLens[0]), Y(0), 3 * z, 18 * z, P.TB2);
-  const pdBox = (x, y, lit, col) => { rect(X(x - 12), Y(y - 14), X(x + 12), Y(y + 14), P.M5); rect(X(x - 8), Y(y - 9), X(x + 8), Y(y + 9), P.PD1); rect(X(x - 6), Y(y - 7), X(x + 6), Y(y + 7), lit > 0 ? P.PD4 : P.PD3); if (lit > 0) glow(X(x), Y(y), 16 * z, col, P.PD5, 0.5 * lit); };
+  const pdBox = (x, y, lit, col) => { rect(X(x - 12), Y(y - 14), X(x + 12), Y(y + 14), P.M5); rect(X(x - 8), Y(y - 9), X(x + 8), Y(y + 9), P.PD1); rect(X(x - 6), Y(y - 7), X(x + 6), Y(y + 7), lit > 0 ? P.PD4 : P.PD3); if (lit > 0) glow(X(x), Y(y), 16 * z, col, P.PD5, 0.25 * lit); };
   const det = o.detect || 0, sh = o.show || {};
   pdBox(OPTX.fsPD[0], 0, sh.fs ? det : 0, P.SO1);
   // side collection: lens (on the diagonal), dichroic mirror (tilted), filter, two photodiodes
@@ -109,7 +109,7 @@ function flowCell(cam, t, o) {
   pdBox(OPTX.ssPD[0], OPTX.ssPD[1], sh.ss ? det : 0, P.DT2);
   pdBox(OPTX.flPD[0], OPTX.flPD[1], sh.fl ? det : 0, P.EM2);
   // other white cells in the core (one at a time through the beam)
-  if (o.extra) for (const e of o.extra) { if (e.y < -340 || e.y > 260) continue; const lit = Math.max(0, 1 - Math.abs(e.y) / 14) * lz; wbc(X(0), Y(e.y), R_WBC * (e.s || 0.8) * z, e.kind, t * 0.3 + e.ph, { pores: 1, dye: 1, glow: lit }); if (lit > 0) { flash(X(0), Y(e.y), 6 * z, lit, [P.LZ1, P.SO1, P.EM2, P.C6]); for (const a of [-0.1, 0.1]) dashLine(X(0), Y(0), X(OPTX.fsLens[0] - 6), Y(Math.tan(a) * (OPTX.fsLens[0] - 6)), P.SO2, 4, 2, -t * 60); dashLine(X(2), Y(2), X(OPTX.sLens[0]), Y(OPTX.sLens[1]), P.EM2, 3, 3, -t * 60); } }
+  if (o.extra) for (const e of o.extra) { if (e.y < -340 || e.y > 260) continue; const lit = Math.max(0, 1 - Math.abs(e.y) / 14) * lz; wbc(X(0), Y(e.y), R_WBC * (e.s || 0.8) * z, e.kind, t * 0.3 + e.ph, { pores: 1, dye: 1, glow: lit }); if (lit > 0) { for (const a of [-0.1, 0.1]) dashLine(X(0), Y(0), X(OPTX.fsLens[0] - 6), Y(Math.tan(a) * (OPTX.fsLens[0] - 6)), P.SO2, 4, 2, -t * 60); dashLine(X(2), Y(2), X(OPTX.sLens[0]), Y(OPTX.sLens[1]), P.EM2, 3, 3, -t * 60); } }
   // the followed white cell in the core
   const cy = o.cellY === undefined ? 200 : o.cellY, inBeam = Math.max(0, 1 - Math.abs(cy) / 14) * lz;
   if (cy > -340 && cy < 330) wbc(X(0), Y(cy), R_WBC * 0.9 * z, o.cellKind || 'neut', t * 0.3, { pores: 1, dye: 1, glow: o.fluor !== undefined ? o.fluor : inBeam });

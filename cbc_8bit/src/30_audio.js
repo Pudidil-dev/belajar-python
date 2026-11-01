@@ -1,19 +1,20 @@
 'use strict';
 // ============================================================================
-// AUDIO — an original lo-fi hip-hop score plus event-synced SFX, synthesised
-// sample by sample in plain JS (no samples, no Web Audio graph). The grid is
-// 118.15 BPM (32 bars = 65.000 s) played half-time, so the groove sits at a
-// laid-back 59 BPM: swung boom-bap drums, a warm saturated bass, FM electric
-// piano with tremolo on jazzy ii–V–I–vi changes in F major (Gm9 – C13 – Fmaj9 –
-// Dm9, two bars each), a kalimba riff that keeps coming back (the hook), vinyl
-// crackle and tape wobble (wow and flutter that repeat exactly every 65 s).
-// Arc: hook groove from frame 0 → lighter sample journey → impedance groove
-// with rim clicks (room for the pulse bips) → time-lapse lift → the music goes
-// "underwater" (low-pass) exactly on the cut to hemoglobin (27 s) and surfaces
-// on the cut to the white cells (32 s) → a short fill into the laser hit (bar
-// 22, 42.66 s) → floating, drumless slow-motion → the groove returns as time
-// resumes (48.75 s) → data and report → recap on the tonic → a tape stop that
-// falls back into bar 1. Every note and tail wraps at 65 s (seamless loop).
+// AUDIO — an original, story-driven electronic score plus event-synced SFX,
+// synthesised sample by sample in plain JS (no samples, no Web Audio graph).
+// 118.15 BPM (32 bars = 65.000 s), F major, I–V–vi–IV (F – C – Dm – Bb, one
+// chord per bar). One three-note motif (the chord's 3rd, 5th and octave, in a
+// 3-3-2 rhythm) runs through the whole film and changes instrument with the
+// chapter, so the music tells you where you are:
+//   hook — bright synth pluck · the sample's journey — bubbly marimba ·
+//   impedance — a square-wave "pulse" lead, then sparse so the cell bips carry
+//   the tune · time-lapse — square arpeggios · hemoglobin — the drums cut out
+//   on the hard cut, a soft heartbeat and a glass bell · white cells — a saw
+//   "laser" lead that builds, a one-beat gap, and a half-time drop exactly on
+//   the laser hit (42.66 s) · data — chip arpeggios on a driving beat ·
+//   report — everything together, landing on the tonic for QC PASSED ·
+//   recap — each tile pops with its chapter's instrument · title — a riser
+//   that runs straight back into bar 1 (seamless loop; every tail wraps).
 // The impedance "bip" is the voltage itself: its loudness is computed from the
 // same particle positions that draw the scope trace. Cells, light and current
 // make no sound: all effects are sonifications.
@@ -23,104 +24,117 @@ const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, 
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 const nm = (n, o) => 12 * (o + 1) + NOTE[n];
 const fq = (n, o) => mtof(nm(n, o));
-// ---------------------------------------------------------------- harmony (two bars per chord)
-const PROG = ['Gm9', 'C13', 'Fmaj9', 'Dm9'];
-const CH = {
-  Gm9: { rh: [['F', 3], ['A', 3], ['Bb', 3], ['D', 4]], root: ['G', 2], fifth: ['D', 3] },
-  C13: { rh: [['E', 3], ['A', 3], ['Bb', 3], ['D', 4]], root: ['C', 2], fifth: ['G', 2] },
-  Fmaj9: { rh: [['E', 3], ['G', 3], ['A', 3], ['C', 4]], root: ['F', 2], fifth: ['C', 3] },
-  Dm9: { rh: [['F', 3], ['A', 3], ['C', 4], ['E', 4]], root: ['D', 2], fifth: ['A', 2] },
-};
-const chordOf = b => PROG[Math.floor((b - 1) / 2) % 4];
-// the kalimba riff (8th-note steps over two bars, swung): A C D – C A G – F
-const RIFF_A = [[0, 'A', 5, 2], [3, 'C', 6, 2], [6, 'D', 6, 2], [8, 'C', 6, 1], [10, 'A', 5, 1], [11, 'G', 5, 3], [14, 'F', 5, 2]];
-const RIFF_A_V = [[0, 'A', 5, 2], [3, 'C', 6, 2], [6, 'D', 6, 2], [8, 'C', 6, 1], [10, 'A', 5, 1], [11, 'G', 5, 3], [14, 'E', 5, 2]];
-const RIFF_B = [[0, 'C', 6, 2], [3, 'D', 6, 2], [6, 'F', 6, 2], [8, 'E', 6, 1], [10, 'D', 6, 1], [11, 'C', 6, 3], [14, 'A', 5, 2]];
-const RIFF_B_V = [[0, 'C', 6, 2], [3, 'D', 6, 2], [6, 'E', 6, 2], [8, 'D', 6, 1], [10, 'C', 6, 1], [11, 'A', 5, 3], [14, 'G', 5, 2]];
-const SCALE = ['F', 'G', 'A', 'Bb', 'C', 'D', 'E'];
-function thirdBelow(n, o) { const i = SCALE.indexOf(n), j = i - 2; return j >= 0 ? [SCALE[j], o] : [SCALE[j + 7], o - (NOTE[SCALE[j + 7]] > NOTE[n] ? 1 : 0)]; }
-const SWING = 0.09;                                   // off-beat 8ths late by 9 % of a beat
-const st8 = (t0, s) => t0 + s * E8 + (s % 2 ? SWING * BEAT : 0);
-// sections (bars, 1-based): what plays where
-const BREAK = [27.0, 32.0];                           // "underwater" low-pass, on the two hard cuts
-const SUSP = [bt(84), barT(25)];                      // drumless slow-motion: the laser hit to "time resumes"
-const TAPE = 64.55;                                   // tape stop into the loop
+// ---------------------------------------------------------------- harmony and the motif
+const CHORDS = ['F', 'C', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb',
+  'F', 'C', 'Dm', 'Bb', 'C', 'F', 'C', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'Bb', 'C'];   // bar 21: dominant build · bar 22: the drop on F · 30: QC on F · 31–32: IV–V back into bar 1
+const CROOT = { F: 'F', C: 'C', Dm: 'D', Bb: 'Bb' }, CMIN = { Dm: 1 };
+function triad(ch, oct) { const r = nm(CROOT[ch], oct); return [r, r + (CMIN[ch] ? 3 : 4), r + 7]; }
+// motif: 3rd, 5th, octave of the chord, kept between D4 and F5
+function motifOf(ch) { const r = nm(CROOT[ch], 4), q = CMIN[ch] ? 3 : 4; let o = r + q > 72 ? -12 : 0; return [r + q + o, r + 7 + o, r + 12 + o]; }
+const MOTIF = [[0, 0, 2], [3, 1, 2], [6, 2, 5]], ANSWER = [[10, 1, 2], [12, 0, 3]];       // [16th step, motif note, length in 16ths]
+const GATES = [[27.0, 32.0], [bt(83), bt(84)]];                                         // the hemoglobin cut, the beat of silence before the drop
 // ---------------------------------------------------------------- score → events
 function musicEvents() {
-  const ev = [];
-  const E = (o) => ev.push(o);
-  for (let b = 1; b <= NBARS; b += 2) {
-    const t0 = barT(b), name = chordOf(b), c = CH[name], at = beat => t0 + beat * BEAT;
-    const susp = at(0) >= SUSP[0] - 0.01 && at(0) < SUSP[1] - 0.01, suspNext = b + 1 === 22;
-    // ---- Rhodes comping (strummed, swung): long chord, anticipation, push, top-note pickup
-    const rh = c.rh.map(([n, o]) => nm(n, o));
-    const hit = (beat, dur, v, notes) => (notes || rh).forEach((m, j) => E({ t: at(beat) + (beat % 1 ? SWING * BEAT : 0) + j * 0.012, d: dur * BEAT, k: 'rhodes', m, v: v * (0.9 + 0.2 * hash(b * 17 + j + beat * 5)) }));
-    if (susp) { hit(0, 7.6, 0.3); rh.slice(2).forEach((m, j) => E({ t: at(2) + j * 0.03, d: 5.5 * BEAT, k: 'rhodes', m: m + 12, v: 0.16 })); }
-    else if (suspNext) { hit(0, 2.6, 0.34); hit(3.5, 0.5, 0.26, rh.slice(2)); hit(4, 3.8, 0.34); }
-    else { hit(0, 2.6, 0.34); hit(3.5, 1.2, 0.26, rh.slice(1)); hit(5, 1.4, 0.3); hit(7, 0.8, 0.22, rh.slice(2)); }
-    // ---- bass: root, octave pickup, fifth, root, glide into the next chord
-    const R0 = nm(...c.root), F0 = nm(...c.fifth), next = nm(...CH[chordOf(b + 2 > NBARS ? 1 : b + 2)].root);
-    const B = (beat, dur, m, v, glide) => E({ t: at(beat) + (beat % 1 ? SWING * BEAT * 0.5 : 0), d: dur * BEAT, k: 'bass', m, v, glide });
-    if (susp) { B(0, 3.8, R0, 0.5); B(4, 3.8, R0, 0.45); }
-    else if (suspNext) { B(0, 2.4, R0, 0.55); B(3.5, 0.4, R0 + 12, 0.35); B(4, 3.8, R0, 0.5); }
-    else { B(0, 2.4, R0, 0.55); B(3.5, 0.4, R0 + 12, 0.35); B(5, 0.9, F0, 0.45); B(6, 1.3, R0, 0.5, next); }
-    // ---- pad (white-cell chapter, the slow-motion, the ending)
-    if ((b >= 17 && b <= 23) || b >= 29) E({ t: at(0), d: 8 * BEAT, k: 'pad', ms: rh.map(m => m + 12), v: susp ? 0.2 : 0.12 });
-  }
-  // ---- drums (half-time boom-bap, per two-bar unit; 'rim' replaces the snare while the pulses play)
-  for (let b = 1; b <= NBARS; b++) {
-    const t0 = barT(b), u = (b - 1) % 2, at = beat => t0 + beat * BEAT;
-    const inBreak = tt => tt >= BREAK[0] && tt < barT(17), inSusp = tt => tt >= SUSP[0] && tt < SUSP[1], late = tt => tt >= TAPE;
-    const ok = tt => !inSusp(tt) && !late(tt);
-    const K = (beat, v) => { const tt = at(beat) + (beat % 1 ? SWING * BEAT * 0.6 : 0); if (ok(tt)) E({ t: tt, d: 0.4, k: 'kick', v }); };
-    const S = (beat, v) => { const tt = at(beat); if (ok(tt) && !inBreak(tt)) E({ t: tt, d: 0.3, k: (b >= 7 && b <= 12) ? 'rim' : 'snare', v }); };
-    const Hh = (beat, v, open) => { const tt = at(beat) + (beat % 1 ? SWING * BEAT : 0); if (ok(tt) && !inBreak(tt)) E({ t: tt, d: open ? 0.3 : 0.06, k: 'hat', v, open, p: beat % 1 ? 0.25 : -0.2 }); };
-    // the 59-BPM pattern across two of our bars: kick 1, 2-a, 3-and; snare 2 and 4; swung 16th hats
-    if (u === 0) { K(0, 0.95); K(3.5, 0.7); S(2, 0.8); }
-    else { K(1, 0.85); if (b % 4 === 0) K(3.75, 0.45); S(2, 0.8); if (b % 4 === 0) S(3.5, 0.22); }
-    for (let i = 0; i < 8; i++) Hh(i / 2, (i % 2 ? 0.5 : 0.85) * (i % 4 === 0 ? 1 : 0.85), u === 1 && i === 7 && b % 4 === 0);
-    if ((b >= 13 && b <= 14) || (b >= 25 && b <= 28)) for (let i = 0; i < 16; i++) { const tt = at(i / 4) + (i % 2 ? SWING * BEAT * 0.5 : 0); if (ok(tt) && !inBreak(tt)) E({ t: tt, d: 0.08, k: 'shaker', v: i % 2 ? 0.5 : 0.3, p: 0.3 }); }
-  }
-  // the fill into the laser hit, the breath before the groove returns, soft crashes on section starts
-  for (let i = 0; i < 6; i++) ev.push({ t: bt(84) - 1.5 * BEAT + i * BEAT / 4, d: 0.3, k: 'snare', v: 0.25 + 0.1 * i });
-  ev.push({ t: SUSP[1] - 1.0, d: 1.0, k: 'revcym', v: 0.55 });
-  for (const tt of [0, barT(17), SUSP[1], barT(31)]) ev.push({ t: tt, d: 1.6, k: 'crash', v: 0.45 });
-  ev.push({ t: bt(84), d: 2.5, k: 'crash', v: 0.55 });
-  // ---- kalimba riff (the earworm), with a third below when the data pours in
-  const riff = (p, set, v, o) => {
-    o = o || {}; const t0 = o.t0 !== undefined ? o.t0 : barT(2 * p + 1);
-    set.forEach(([s, n, oc, l]) => {
-      if (o.only && !o.only(s)) return;
-      const tt = st8(t0, s); E({ t: tt, d: l * E8, k: 'kal', m: nm(n, oc), v });
-      if (o.third) { const [n2, o2] = thirdBelow(n, oc); E({ t: tt + 0.012, d: l * E8, k: 'kal', m: nm(n2, o2), v: o.third }); }
-    });
+  const ev = [], E = o => ev.push(o);
+  const at = (b, beat) => barT(b) + beat * BEAT, ch = b => CHORDS[b - 1];
+  const motif = (b, k, v, o) => {
+    o = o || {}; const ns = motifOf(ch(b)), lift = 12 * (o.lift || 0);
+    MOTIF.forEach(([st, j, l], i) => { if (!o.only || o.only(i)) E({ t: barT(b) + st * S16, d: l * S16, k, m: ns[j] + lift, v, cut: o.cut, post: o.post }); });
+    if (o.answer) ANSWER.forEach(([st, j, l]) => E({ t: barT(b) + st * S16, d: l * S16, k, m: ns[j] + lift, v: v * 0.8, cut: o.cut, post: o.post }));
   };
-  riff(0, RIFF_A, 0.36); riff(1, RIFF_A_V, 0.32); riff(2, RIFF_B, 0.22); riff(4, RIFF_A, 0.2, { only: s => s < 8 });
-  riff(6, RIFF_A, 0.3); riff(7, RIFF_B, 0.2, { only: s => s === 0 || s === 6 || s === 11 });
-  riff(8, RIFF_A, 0.34); riff(9, RIFF_B_V, 0.28); riff(10, RIFF_A, 0.28, { only: s => s < 8 });
-  [[44.69, 'A', 5], [45.7, 'E', 5], [46.72, 'F', 5], [47.73, 'C', 6]].forEach(([tt, n, o]) => E({ t: tt, d: 0.9, k: 'kal', m: nm(n, o), v: 0.24 }));
-  riff(12, RIFF_A, 0.34, { third: 0.18 }); riff(13, RIFF_B_V, 0.3, { third: 0.16 }); riff(14, RIFF_A, 0.3);
-  riff(15, RIFF_A, 0.3, { t0: barT(32), only: s => s <= 6 });           // the title: the riff's first three notes, then the tape stops
-  return ev.filter(e => e.t < TAPE);
+  const D = (b, beat, k, v, x) => E(Object.assign({ t: at(b, beat), d: 0.5, k, v }, x || {}));
+  const kick4 = (b, v, n) => { for (let i = 0; i < (n || 4); i++) D(b, i, 'kick', v); };
+  const claps = (b, v) => { D(b, 1, 'clap', v); D(b, 3, 'clap', v); };
+  const hats = (b, v, sixteenths, open) => { for (let i = 0; i < (sixteenths ? 16 : 8); i++) { const beat = i * (sixteenths ? 0.25 : 0.5), off = beat % 1 === 0.5; D(b, beat, 'hat', v * (off ? 1 : 0.6), { p: off ? 0.2 : -0.2, open: open && off }); } };
+  const shaker = (b, v) => { for (let i = 0; i < 16; i++) D(b, i / 4, 'shaker', v * (i % 2 ? 1 : 0.6), { p: 0.35 }); };
+  const roll = (b, from, to, step, v0, v1, k) => { for (let x = from; x < to - 1e-6; x += step) D(b, x, k || 'snare', lerp(v0, v1, (x - from) / (to - from))); };
+  const root = (b, oct) => nm(CROOT[ch(b)], oct);
+  const bassOff = (b, v) => { for (let i = 0; i < 4; i++) E({ t: at(b, i + 0.5), d: 0.42 * BEAT, k: 'bass', m: root(b, 2) + (i % 2 ? 12 : 0), v }); E({ t: at(b, 0), d: 1.8 * BEAT, k: 'sub', m: root(b, 2), v: v * 0.9 }); E({ t: at(b, 2), d: 1.8 * BEAT, k: 'sub', m: root(b, 2), v: v * 0.8 }); };
+  const bassRoll = (b, v) => { for (let i = 0; i < 16; i++) E({ t: at(b, i / 4), d: 0.2 * BEAT, k: 'roll', m: root(b, 2) + (i % 4 === 2 ? 12 : 0), v: v * (i % 4 === 0 ? 1 : 0.75) }); for (const beat of [0, 2]) E({ t: at(b, beat), d: 1.6 * BEAT, k: 'sub', m: root(b, 2), v: v * 0.6 }); };
+  const bassBounce = (b, v) => { [[0, 0, 0.7], [1.5, 7, 0.4], [2, 0, 0.7], [3.5, 12, 0.4]].forEach(([beat, iv, l]) => E({ t: at(b, beat), d: l * BEAT, k: 'bass', m: root(b, 2) + iv, v })); };
+  const pad = (b, v, cut, x) => E(Object.assign({ t: at(b, 0), d: 3.9 * BEAT, k: 'pad', ms: triad(ch(b), 4).concat([root(b, 3) + 12 + (CMIN[ch(b)] ? 10 : 11)]), v, cut: cut || 1400 }, x || {}));
+  const stabs = (b, v) => [0.5, 1.5, 2.75, 3.5].forEach(beat => E({ t: at(b, beat), d: 0.3 * BEAT, k: 'stab', ms: triad(ch(b), 4), v }));
+  const arp = (b, k, v, oct, up) => { const tr = triad(ch(b), oct), seq = up ? [0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6] : [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 2, 3]; for (let i = 0; i < 16; i++) { const s_ = seq[i], m = tr[s_ % 3] + 12 * Math.floor(s_ / 3); E({ t: at(b, i / 4), d: 0.22 * BEAT, k, m, v: v * (i % 4 === 0 ? 1 : 0.7), p: i % 2 ? 0.3 : -0.3 }); } };
+  // ---- A: hook (bars 1–2) — full groove from frame one; a breath from bar 2 beat 2 as the film goes back to the needle
+  for (const b of [1, 2]) { const n = b === 1 ? 4 : 2; kick4(b, 0.95, n); D(b, 1, 'clap', 0.6); if (b === 1) D(b, 3, 'clap', 0.6); for (let i = 0; i < n * 4; i++) D(b, i / 4, 'hat', i % 2 ? 0.55 : 0.3, { p: 0.2, open: b === 1 && i === 14 }); }
+  bassOff(1, 0.8); for (let i = 0; i < 2; i++) E({ t: at(2, i + 0.5), d: 0.42 * BEAT, k: 'bass', m: root(2, 2) + (i % 2 ? 12 : 0), v: 0.8 }); E({ t: at(2, 0), d: 1.8 * BEAT, k: 'sub', m: root(2, 2), v: 0.72 });
+  motif(1, 'pluck', 0.9); motif(1, 'glass', 0.25, { lift: 1 }); motif(2, 'pluck', 0.9, { answer: true }); motif(2, 'glass', 0.25, { lift: 1, answer: true });
+  pad(1, 0.5); E({ t: 0, d: 1.6, k: 'crash', v: 0.7 });
+  // ---- B: the sample (bars 3–6) — bouncy, lighter; bubbly marimba motif; a riser into the impedance chapter
+  for (let b = 3; b <= 6; b++) {
+    if (b <= 4) { D(b, 0, 'kick', 0.85); D(b, 2, 'kick', 0.8); if (b === 4) D(b, 2.75, 'kick', 0.5); } else kick4(b, 0.85);
+    claps(b, b <= 4 ? 0.35 : 0.5); shaker(b, 0.55); bassBounce(b, 0.7); pad(b, 0.35, 1100);
+    motif(b, 'bubble', 0.8, { answer: b >= 5 });
+  }
+  roll(6, 2, 4, 0.5, 0.15, 0.45); E({ t: at(6, 0), d: 4 * BEAT, k: 'riser', v: 0.55 });
+  // ---- C: impedance (bars 7–14) — an electric groove with ticking 16th hats; sparse while the single cell is measured
+  for (const b of [7, 8]) { kick4(b, 0.9); claps(b, 0.55); hats(b, 0.6, true); bassOff(b, 0.75); motif(b, 'square', 0.75, { answer: true }); }
+  E({ t: at(7, 0), d: 1.6, k: 'crash', v: 0.55 });
+  for (let b = 9; b <= 12; b++) {
+    D(b, 0, 'kick', 0.7); D(b, 2, 'kick', 0.6); hats(b, 0.28, true); pad(b, 0.4, 900);
+    E({ t: at(b, 0), d: 3.8 * BEAT, k: 'sub', m: root(b, 2), v: 0.55 });
+    if (b === 9) motif(b, 'square', 0.5);
+  }
+  roll(12, 3, 4, 0.25, 0.15, 0.35, 'rim');
+  for (const b of [13, 14]) { kick4(b, 0.95); claps(b, 0.6); hats(b, 0.65, true); shaker(b, 0.5); bassRoll(b, 0.7); arp(b, 'sqarp', 0.5, 5); motif(b, 'square', 0.75); }
+  E({ t: at(13, 0), d: 1.6, k: 'crash', v: 0.6 }); roll(14, 0, 1.25, 0.125, 0.25, 0.6);
+  // ---- D: hemoglobin (27–32 s) — the band drops out on the cut; a heartbeat, a pad and a glass-bell motif (rendered after the gate)
+  E({ t: 27.0, d: 0.7, k: 'down', v: 0.6, post: true });
+  for (const b of [14, 15, 16]) { const t0 = b === 14 ? 27.42 : barT(b); E({ t: t0, d: 0.3, k: 'heart', v: 0.85, post: true }); E({ t: t0 + 0.24, d: 0.3, k: 'heart', v: 0.55, post: true }); if (b === 16) { E({ t: t0 + BEAT * 2, d: 0.3, k: 'heart', v: 0.75, post: true }); E({ t: t0 + BEAT * 2 + 0.24, d: 0.3, k: 'heart', v: 0.5, post: true }); } }
+  pad(15, 0.55, 1600, { post: true, d: 4.2 * BEAT }); pad(16, 0.55, 1600, { post: true });
+  E({ t: 27.4, d: 1.0 * BAR, k: 'pad', ms: triad('C', 4), v: 0.4, cut: 1200, post: true });
+  motif(15, 'glass', 0.75, { post: true, answer: true }); motif(16, 'glass', 0.7, { post: true });
+  E({ t: 31.0, d: 1.5, k: 'revcym', v: 0.5, post: true }); roll(16, 3, 4, 0.25, 0.3, 0.7, 'snare'); ev.slice(-4).forEach(e => e.post = true);
+  E({ t: at(16, 3.75), d: 0.4, k: 'kick', v: 0.8, post: true });
+  // ---- E: white cells (bars 17–21) — the laser lead enters dark and opens up; a build, then one beat of silence
+  for (let b = 17; b <= 19; b++) { kick4(b, 0.9); claps(b, 0.55); hats(b, 0.55, false, true); bassOff(b, 0.75); pad(b, 0.3, 1000); motif(b, 'laser', 0.6, { cut: 900 + (b - 17) * 700, answer: b === 19 }); }
+  E({ t: at(17, 0), d: 1.6, k: 'crash', v: 0.6 });
+  kick4(20, 0.9); claps(20, 0.5); hats(20, 0.6, true); bassRoll(20, 0.7); arp(20, 'sqarp', 0.4, 5, true); motif(20, 'laser', 0.7, { cut: 3000, answer: true }); roll(20, 0, 4, 0.5, 0.2, 0.45);
+  for (let i = 0; i < 6; i++) D(21, i / 2, 'kick', 0.9); bassRoll(21, 0.75); motif(21, 'laser', 0.8, { cut: 4200, only: i => i < 2 }); roll(21, 0, 2, 0.25, 0.45, 0.75); roll(21, 2, 3, 0.125, 0.75, 1.0);
+  E({ t: at(20, 0), d: 7 * BEAT, k: 'riser', v: 0.8 });
+  // ---- the drop (bars 22–24): half-time on the laser hit — big chords, the laser lead an octave up, a sub impact
+  E({ t: at(22, 0), d: 2.5, k: 'impact', v: 0.9 }); E({ t: at(22, 0), d: 2.0, k: 'crash', v: 0.8 });
+  for (let b = 22; b <= 24; b++) {
+    D(b, 0, 'kick', 1.0); D(b, 2.5, 'kick', 0.75); if (b === 23) D(b, 3.75, 'kick', 0.6); D(b, 2, 'clap', 0.8); D(b, 2, 'snare', 0.5); hats(b, 0.5, false, true);
+    E({ t: at(b, 0), d: 3.9 * BEAT, k: 'sub', m: root(b, 2), v: 0.85 }); E({ t: at(b, 2.5), d: 1.3 * BEAT, k: 'bass', m: root(b, 2) + 12, v: 0.6 });
+    E({ t: at(b, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad(ch(b), 4).concat([root(b, 5)]), v: 0.75 });
+    motif(b, 'laser', 0.85, { lift: 1, cut: 5200, answer: true }); motif(b, 'pluck', 0.35, { answer: true });
+  }
+  roll(24, 2, 4, 0.25, 0.3, 0.8); E({ t: at(24, 0), d: 4 * BEAT, k: 'riser', v: 0.6 });
+  // ---- F: detection and data (bars 25–28) — the driving section: chip motif, chip arps, rolling bass, stabs
+  for (let b = 25; b <= 28; b++) { kick4(b, 0.95); claps(b, 0.7); hats(b, 0.65, true); shaker(b, 0.5); bassRoll(b, 0.85); stabs(b, 0.65); arp(b, 'chiparp', 0.65, 5, b >= 27); motif(b, 'chip', 0.85, { lift: 1, answer: true }); }
+  E({ t: at(25, 0), d: 1.6, k: 'crash', v: 0.7 }); roll(28, 2, 4, 0.25, 0.25, 0.7);
+  // ---- G: results (bars 29–30), recap (31), title and the run back into bar 1 (32)
+  for (const b of [29, 30]) { kick4(b, 0.95); claps(b, 0.6); hats(b, 0.55, false, true); bassOff(b, 0.8); pad(b, 0.45, 1800); stabs(b, 0.3); motif(b, 'pluck', 0.8, { answer: true }); motif(b, 'laser', 0.45, { lift: 1, cut: 4500, answer: true }); motif(b, 'glass', 0.3, { lift: 1 }); }
+  E({ t: at(29, 0), d: 1.6, k: 'crash', v: 0.7 }); E({ t: at(30, 0), d: 1.6, k: 'crash', v: 0.6 });
+  { // recap: one tile per beat, each in its chapter's instrument (impedance square, laser saw, hemoglobin glass, report chord)
+    const ns = motifOf('Bb'), inst = ['square', 'laser', 'glass', 'pluck'];
+    for (let i = 0; i < 4; i++) { E({ t: at(31, i), d: 0.9 * BEAT, k: inst[i], m: [ns[0], ns[1], ns[2], ns[2] + 4][i] + 12, v: 0.85, cut: 5000 }); D(31, i, 'kick', 0.8); }
+    E({ t: at(31, 3), d: 0.9 * BEAT, k: 'stab', ms: triad('Bb', 4), v: 0.6 }); claps(31, 0.45); hats(31, 0.4); bassOff(31, 0.7); pad(31, 0.45, 1600);
+  }
+  D(32, 0, 'kick', 0.9); D(32, 2, 'kick', 0.8); D(32, 1, 'clap', 0.5); bassOff(32, 0.7); pad(32, 0.5, 2000);
+  motif(32, 'pluck', 0.85); motif(32, 'laser', 0.5, { lift: 1, cut: 5000 }); motif(32, 'glass', 0.35, { lift: 1 });
+  roll(32, 2, 4, 0.125, 0.2, 0.75); E({ t: at(32, 1), d: 3 * BEAT, k: 'riser', v: 0.7 });
+  return ev;
 }
 // ---------------------------------------------------------------- SFX map (every cue belongs to a visible event)
 function sfxEvents() {
   const ev = [];
   const S = (t, k, v, x) => ev.push(Object.assign({ t, k, v: v === undefined ? 1 : v, p: 0, f: 440, d: 0.2 }, x || {}));
   // A: hook
-  S(0.14, 'pierce', 0.8); S(0.42, 'suck', 0.5, { d: 0.36 }); S(0.8, 'slam', 0.7, { d: 0.3 });
+  S(0.14, 'pierce', 1.0); S(0.42, 'suck', 0.9, { d: 0.36 }); S(0.8, 'cut', 0.6); S(0.8, 'tick', 0.5, { f: fq('C', 6) });
   S(T_RBC, 'ding', 0.75, { f: fq('A', 5) }); S(T_WBC, 'tick', 0.45, { f: fq('E', 6) }); S(T_PLT, 'tick', 0.45, { f: fq('G', 6) });
-  S(1.86, 'dive', 0.5, { d: 0.38 }); S(HOOK_RBC.keys[1][0] - 0.06, 'bip', 0.8, { part: HOOK_RBC, f: fq('A', 4), d: 0.6 }); S(T_HOOKCOUNT, 'count', 0.6, { f: fq('D', 6) });
+  S(1.86, 'dive', 0.5, { d: 0.38 }); S(HOOK_RBC.keys[1][0] - 0.06, 'bip', 0.8, { part: HOOK_RBC, f: fq('F', 4), d: 0.6 }); S(T_HOOKCOUNT, 'count', 0.85, { f: fq('D', 6) });
   S(3.0, 'undive', 0.45, { d: 0.3 });
   // B: the sample
   S(3.35, 'pump', 0.5, { d: 1.65 }); S(5.0, 'dive', 0.45, { d: 0.35 }); S(7.5, 'swish', 0.35, { d: 0.35 }); S(7.75, 'pour', 0.55, { d: 1.15 });
   S(9.0, 'undive', 0.4, { d: 0.35 }); [10.2, 10.3, 10.4].forEach((tt, i) => S(tt, 'tick', 0.4, { f: fq(['A', 'C', 'E'][i], 6) })); S(10.35, 'select', 0.4); S(10.7, 'dive', 0.45, { d: 0.3 });
   // C: impedance (the current hums; each cell's pulse is heard as its voltage)
-  S(11.0, 'hum', 0.45, { d: 16.0 }); S(13.35, 'ping', 0.35, { f: fq('C', 6) }); S(14.9, 'scope', 0.4);
-  S(RBC1.keys[1][0] - 0.1, 'bip', 0.9, { part: RBC1, f: fq('A', 4), d: RBC1.keys[4][0] - RBC1.keys[1][0] + 0.2 }); S(T_RBC1, 'count', 0.7, { f: fq('D', 6) });
-  S(PLT1.keys[1][0] - 0.06, 'bip', 0.8, { part: PLT1, f: fq('E', 6), d: 0.4 }); S(T_PLTC, 'count', 0.55, { f: fq('A', 6) });
-  S(RBC2.keys[1][0] - 0.06, 'bip', 0.8, { part: RBC2, f: fq('A', 4), d: 0.4 }); S(T_RBC2, 'count', 0.6, { f: fq('D', 6) });
-  STREAM.forEach(p => S(p.keys[1][0] - 0.12, 'bip', 0.32, { part: p, f: p.k === 'rbc' ? fq('A', 4) : fq('E', 6), d: 0.24 }));
+  S(11.0, 'hum', 0.3, { d: 16.0 }); S(13.35, 'ping', 0.35, { f: fq('C', 6) }); S(14.9, 'scope', 0.4);
+  S(RBC1.keys[1][0] - 0.1, 'bip', 0.9, { part: RBC1, f: fq('F', 4), d: RBC1.keys[4][0] - RBC1.keys[1][0] + 0.2 }); S(T_RBC1, 'count', 0.7, { f: fq('D', 6) });
+  S(PLT1.keys[1][0] - 0.06, 'bip', 0.8, { part: PLT1, f: fq('C', 6), d: 0.4 }); S(T_PLTC, 'count', 0.55, { f: fq('A', 6) });
+  S(RBC2.keys[1][0] - 0.06, 'bip', 0.8, { part: RBC2, f: fq('F', 4), d: 0.4 }); S(T_RBC2, 'count', 0.6, { f: fq('D', 6) });
+  STREAM.forEach(p => S(p.keys[1][0] - 0.12, 'bip', 0.32, { part: p, f: p.k === 'rbc' ? fq('F', 4) : fq('C', 6), d: 0.24 }));
   S(25.4, 'build', 0.4, { d: 1.4 });
   // D: hemoglobin
   S(27.0, 'cut', 0.5); HG_RBC.forEach((c, i) => S(27.72 + 0.05 * i + 0.04 * hash(i + 31), 'burst', 0.35, { f: fq(['C', 'D', 'F', 'G', 'A'][i % 5], 5) }));
@@ -138,90 +152,109 @@ function sfxEvents() {
   S(53.0, 'shimmer', 0.45, { d: 0.8 }); S(54.0, 'swish', 0.35, { d: 0.35 });
   ['F', 'G', 'A', 'C', 'D'].forEach((n, i) => S(55.0 + i * 0.12, 'tick', 0.42, { f: fq(n, 5) }));
   // G: results and loop
-  S(56.0, 'swish', 0.35, { d: 0.3 }); S(56.3, 'data', 0.4, { d: 1.4 }); S(57.95, 'undive', 0.4, { d: 0.35 });
+  S(56.0, 'swish', 0.35, { d: 0.3 }); S(56.3, 'data', 0.65, { d: 1.4 }); S(57.95, 'undive', 0.4, { d: 0.35 });
   for (let i = 0; i < 5; i++) S(REP0 + i * REPD, 'tick', 0.4, { f: fq(['C', 'D', 'F', 'G', 'A'][i], 6) });
   for (let i = 0; i < 4; i++) S(59.35 + i * 0.11, 'check', 0.4, { f: fq(['A', 'C', 'D', 'F'][i], 6) });
   S(59.6, 'result', 0.7); S(60.0, 'swish', 0.3, { d: 0.6 });
-  ['A', 'C', 'D', 'F'].forEach((n, i) => S(T_TILE(i), 'recap', 0.5, { f: fq(n, i < 3 ? 5 : 6) }));
   S(62.8, 'swish', 0.3, { d: 0.35 }); S(63.1, 'retract', 0.4, { d: 0.6 }); S(63.2, 'title', 0.55, { d: 1.2 });
   return ev;
 }
-const DUCK = { ding: 0.3, result: 0.3, hit: 0.4, slam: 0.25, count: 0.12 };
+const DUCK = { ding: 0.3, result: 0.3, hit: 0.35, count: 0.12 };
 // ---------------------------------------------------------------- synthesis helpers
-let SND_L = null, SND_R = null;                      // reverb send bus (set while rendering)
-const WOW = ta => 1 + 0.0022 * fsin(LOOPW(39) * ta) + 0.0007 * fsin(LOOPW(338) * ta + 1.3);
+let SND_L = null, SND_R = null, ECH_L = null, ECH_R = null, SCG = null;    // reverb send, delay send, sidechain gain (one value per 64 samples)
 const nz = i => hash(i) * 2 - 1;
-// write one voice into (L, R) (and the reverb send); wraps at 65 s; optional tremolo (stereo autopan)
+// write one voice into (L, R); wraps at 65 s; o: { send (reverb), echo (delay), duck (sidechain) }
 function voice(L, R, t0, dur, pan, gain, fn, o) {
   o = o || {};
-  const i0 = Math.round(t0 * SR), n = Math.max(1, Math.round(dur * SR)), snd = o.send || 0, tr = o.trem || 0;
+  const i0 = Math.round(t0 * SR), n = Math.max(1, Math.round(dur * SR)), snd = o.send || 0, ech = o.echo || 0, dk = !!o.duck;
   const pl = Math.cos((pan + 1) * Math.PI / 4) * gain, pr = Math.sin((pan + 1) * Math.PI / 4) * gain;
   for (let k = 0; k < n; k++) {
-    const s = fn(k / SR, k); if (s === 0) continue;
+    let s = fn(k / SR, k); if (s === 0) continue;
     let i = (i0 + k) % NS; if (i < 0) i += NS;
-    let l = s * pl, r = s * pr;
-    if (tr) { const m = tr * fsin(TAU * 4.3 * (t0 + k / SR)); l *= 1 + m; r *= 1 - m; }
+    if (dk) s *= SCG[i >> 6];
+    const l = s * pl, r = s * pr;
     L[i] += l; R[i] += r;
     if (snd) { SND_L[i] += l * snd; SND_R[i] += r * snd; }
+    if (ech) { ECH_L[i] += l * ech; ECH_R[i] += r * ech; }
   }
 }
 const dec = r => t => Math.exp(-t * r);
-// electric piano: 1:1 FM pair (index falls after the strike) + a short high tine ping
-function rhodesFn(f, t0, d, vel) {
-  let pc = 0, pt = 0; const I0 = 1.2 + 1.6 * vel;
+function blep(t, dt) { if (t < dt) { t /= dt; return t + t - t * t - 1; } if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+// state-variable filters (Chamberlin); cutoff in Hz, q = damping (lower = more resonant)
+function lpf() { let lo = 0, bp = 0; return (x, fc, q) => { const f = Math.min(0.8, TAU * fc / SR); lo += f * bp; const hi = x - lo - q * bp; bp += f * hi; return lo; }; }
+function bpf() { let lo = 0, bp = 0; return (x, fc, q) => { const f = Math.min(0.8, TAU * fc / SR); lo += f * bp; const hi = x - lo - q * bp; bp += f * hi; return bp; }; }
+const rel = (t, d, r) => t > d ? Math.max(0, 1 - (t - d) / r) : 1;
+// ---- tonal instruments
+function pluckFn(f, d) { let p1 = 0, p2 = 0; const F = lpf(), a = f * 1.0035 / SR, b = f * 0.9965 / SR; return t => { p1 += a; if (p1 >= 1) p1 -= 1; p2 += b; if (p2 >= 1) p2 -= 1; const x = (2 * p1 - 1 - blep(p1, a)) + (2 * p2 - 1 - blep(p2, b)); return F(x * 0.5, 380 + 5200 * Math.exp(-t * 15), 0.45) * (t < 0.003 ? t / 0.003 : 1) * Math.exp(-t * 4) * rel(t, d, 0.08); }; }
+function bubbleFn(f) { let p = 0, q = 0; return t => { const ff = f * (1 + 0.1 * Math.exp(-t * 50)); p += ff / SR; q += ff * 4 / SR; p -= Math.floor(p); q -= Math.floor(q); return (fsin(TAU * p) + 0.25 * fsin(TAU * q) * Math.exp(-t * 28)) * Math.exp(-t * 6.5) * (t < 0.002 ? t / 0.002 : 1); }; }
+function squareFn(f, d) { let p = 0; const F = lpf(), dt = f / SR; return t => { p += dt; if (p >= 1) p -= 1; const v = (p < 0.5 ? 1 : -1) + blep(p, dt) - blep((p + 0.5) % 1, dt); return F(v, 2800, 0.6) * (t < 0.004 ? t / 0.004 : 1) * (0.5 + 0.5 * Math.exp(-t * 7)) * rel(t, d, 0.05); }; }
+function glassFn(f) { let pc = 0, pm = 0; return t => { pc += f / SR; pm += f * 3.5 / SR; pc -= Math.floor(pc); pm -= Math.floor(pm); return fsin(TAU * pc + 1.2 * Math.exp(-t * 5) * fsin(TAU * pm)) * Math.exp(-t * 2.4) * (t < 0.004 ? t / 0.004 : 1); }; }
+function laserFn(f, d, f0, cut) {
+  const p = [0, 0, 0], det = [1, 1.006, 0.994], F = lpf();
   return t => {
-    const inc = f * WOW(t0 + t) / SR; pc += inc; pt += inc * 14; pc -= Math.floor(pc); pt -= Math.floor(pt);
-    const I = I0 * Math.exp(-t * 5) + 0.35;
-    const s = fsin(TAU * pc + I * fsin(TAU * pc)) + 0.14 * Math.exp(-t * 40) * fsin(TAU * pt);
-    return s * (t < 0.004 ? t / 0.004 : 1) * Math.exp(-t * 0.85) * (t > d ? Math.exp(-(t - d) * 14) : 1);
+    const g = f0 ? f0 * Math.pow(f / f0, Math.min(1, t / 0.05)) : f, vib = t > 0.16 ? 1 + 0.01 * fsin(TAU * 5.6 * t) : 1; let x = 0;
+    for (let j = 0; j < 3; j++) { const dt = g * vib * det[j] / SR; p[j] += dt; if (p[j] >= 1) p[j] -= 1; x += 2 * p[j] - 1 - blep(p[j], dt); }
+    return F(x / 3, cut * (0.65 + 0.35 * Math.exp(-t * 6)), 0.5) * (t < 0.008 ? t / 0.008 : 1) * rel(t, d, 0.08);
   };
 }
-function kalFn(f, t0) {
-  let p1 = 0, p2 = 0;
+function chipFn(f, d) { let p = 0; const dt = f / SR, w = 0.125; return t => { p += dt; if (p >= 1) p -= 1; const v = (p < w ? 1 : -1) + blep(p, dt) - blep((p - w + 1) % 1, dt) - (2 * w - 1); return v * (t < 0.002 ? t / 0.002 : 1) * (0.65 + 0.35 * Math.exp(-t * 10)) * rel(t, d, 0.03); }; }
+function chordFn(ms, d, cut, att, env) { // detuned saws through a low-pass: pads, stabs, the drop's supersaw
+  const n = ms.length * 2, ph = new Float64Array(n), dts = []; ms.forEach(m => { const f = mtof(m); dts.push(f * 1.005 / SR, f * 0.995 / SR); }); const F = lpf();
+  return t => { let x = 0; for (let j = 0; j < n; j++) { let q = ph[j] + dts[j]; if (q >= 1) q -= 1; ph[j] = q; x += 2 * q - 1; } const fc = env ? cut * (0.25 + 0.75 * Math.exp(-t * env)) : cut; return F(x / n, fc, 0.7) * Math.min(1, t / att) * rel(t, d, att > 0.1 ? 0.5 : 0.06) * (env ? Math.exp(-t * 3) : 1); };
+}
+function bassFn(f, d, kind) {
+  let p = 0, s = 0; const F = lpf(), dt = f / SR;
   return t => {
-    const inc = f * WOW(t0 + t) / SR; p1 += inc; p2 += inc * 5.95; p1 -= Math.floor(p1); p2 -= Math.floor(p2);
-    return (t < 0.002 ? t / 0.002 : 1) * (fsin(TAU * p1) * Math.exp(-t * 4.0) + 0.3 * fsin(TAU * p2) * Math.exp(-t * 24));
+    p += dt; if (p >= 1) p -= 1; s += dt; s -= Math.floor(s);
+    const y = kind === 'sub' ? 0.9 * fsin(TAU * s) + 0.3 * fsin(2 * TAU * s) : F(2 * p - 1 - blep(p, dt), 160 + (kind === 'roll' ? 900 : 1500) * Math.exp(-t * 20), 0.55) * 0.85 + 0.3 * fsin(TAU * s);
+    return y * (t < 0.004 ? t / 0.004 : 1) * rel(t, d, 0.03);
   };
 }
-function bassFn(f0, f1, d) {
-  let p = 0; const tg = d - 0.09;
-  return t => {
-    const f = f1 && t > tg ? f0 * Math.pow(f1 / f0, Math.min(1, (t - tg) / 0.09)) : f0;
-    p += f / SR; p -= Math.floor(p);
-    const s = Math.tanh(2.8 * fsin(TAU * p)) * 0.85 + 0.15 * fsin(2 * TAU * p);
-    return s * (t < 0.008 ? t / 0.008 : 1) * (0.8 + 0.2 * Math.exp(-t * 7)) * (t > d ? Math.max(0, 1 - (t - d) / 0.06) : 1);
-  };
+// ---- drums and effects
+function kickFn(seed) { let p = 0, q = 0; return (t, k) => { p += (58 + 115 * Math.exp(-t * 38)) / SR; q += 1600 / SR; return fsin(TAU * p) * Math.exp(-t * 9) * (t < 0.0015 ? t / 0.0015 : 1) + fsin(TAU * q) * 0.18 * Math.exp(-t * 110) + (t < 0.003 ? nz(k * 7 + seed) * 0.3 * (1 - t / 0.003) : 0); }; }
+function clapFn(seed) { const F = bpf(); return (t, k) => { let e = Math.exp(-t * 20) * 0.5; for (const o of [0, 0.009, 0.019]) if (t >= o) e += Math.exp(-(t - o) * 280) * 0.8; return F(nz(k * 3 + seed), 1400, 0.8) * e * 1.6; }; }
+function snareFn(seed) { const F = bpf(); let p = 0; return (t, k) => { p += 190 / SR; return F(nz(k * 5 + seed), 2300, 0.9) * Math.exp(-t * 20) * 1.5 + fsin(TAU * p) * Math.exp(-t * 32) * 0.45; }; }
+function rimFn(seed) { let p = 0; return (t, k) => { p += 1700 / SR; return fsin(TAU * p) * Math.exp(-t * 80) * 0.6 + nz(k * 11 + seed) * Math.exp(-t * 140) * 0.4; }; }
+function hatFn(seed, open) { let lp = 0; return (t, k) => { const x = nz(k * 11 + seed); lp += 0.55 * (x - lp); return (x - lp) * Math.exp(-t * (open ? 11 : 65)); }; }
+function shakerFn(seed) { const F = bpf(); return (t, k) => F(nz(k * 13 + seed), 6200, 1.0) * (t < 0.006 ? t / 0.006 : Math.exp(-(t - 0.006) * 32)) * 1.4; }
+function crashFn(seed) { let lp = 0; return (t, k) => { const x = nz(k * 17 + seed); lp += 0.4 * (x - lp); return (x - lp) * Math.exp(-t * 2.0) * (t < 0.002 ? t / 0.002 : 1); }; }
+function heartFn() { let p = 0; return t => { p += (46 + 34 * Math.exp(-t * 30)) / SR; return (fsin(TAU * p) + 0.25 * fsin(2 * TAU * p)) * Math.exp(-t * 11) * (t < 0.004 ? t / 0.004 : 1); }; }
+function riserFn(d, seed) { const F = bpf(); let p = 0; return (t, k) => { const u = clamp(t / d, 0, 1); p += 110 * Math.pow(4, u) / SR; p -= Math.floor(p); return (F(nz(k * 19 + seed), 300 * Math.pow(22, u), 0.7) + (2 * p - 1) * 0.12) * u * u; }; }
+function downFn(d, seed) { const F = bpf(); return (t, k) => { const u = clamp(t / d, 0, 1); return F(nz(k * 23 + seed), 6000 * Math.pow(0.05, u), 0.7) * (1 - u) * (1 - u); }; }
+function impactFn(seed) { let p = 0; return (t, k) => { p += (32 + 52 * Math.exp(-t * 6)) / SR; return fsin(TAU * p) * Math.exp(-t * 2.6) + (t < 0.05 ? nz(k * 29 + seed) * 0.3 * (1 - t / 0.05) : 0); }; }
+function revcymFn(d, seed) { let lp = 0; return (t, k) => { const x = nz(k * 31 + seed); lp += 0.4 * (x - lp); return (x - lp) * Math.pow(clamp(t / d, 0, 1), 2.4) * (t > d - 0.02 ? Math.max(0, (d - t) / 0.02) : 1); }; }
+// one music event
+const LEAD_PREV = {};
+function playMusic(e, L, R) {
+  const k = e.k, sd = Math.round(e.t * 1000), v = e.v;
+  switch (k) {
+    case 'pluck': voice(L, R, e.t, e.d + 0.5, -0.1, 0.32 * v, pluckFn(mtof(e.m), e.d), { send: 0.18, echo: 0.22 }); break;
+    case 'bubble': voice(L, R, e.t, 0.8, 0.1, 0.42 * v, bubbleFn(mtof(e.m)), { send: 0.2, echo: 0.2 }); break;
+    case 'square': voice(L, R, e.t, e.d + 0.1, 0.05, 0.17 * v, squareFn(mtof(e.m), e.d), { send: 0.15, echo: 0.25 }); break;
+    case 'glass': voice(L, R, e.t, 1.6, 0.15, 0.26 * v, glassFn(mtof(e.m)), { send: 0.4, echo: 0.2 }); break;
+    case 'laser': { const f = mtof(e.m), pf = LEAD_PREV.laser && e.t - LEAD_PREV.laser.t < 0.6 ? LEAD_PREV.laser.f : 0; LEAD_PREV.laser = { t: e.t + e.d, f }; voice(L, R, e.t, e.d + 0.12, -0.05, 0.23 * v, laserFn(f, e.d, pf, e.cut || 3000), { send: 0.2, echo: 0.28 }); break; }
+    case 'chip': voice(L, R, e.t, e.d + 0.05, 0.1, 0.15 * v, chipFn(mtof(e.m), e.d), { send: 0.12, echo: 0.25 }); break;
+    case 'sqarp': voice(L, R, e.t, e.d + 0.06, e.p || 0, 0.1 * v, squareFn(mtof(e.m), e.d), { send: 0.1, duck: 1 }); break;
+    case 'chiparp': voice(L, R, e.t, e.d + 0.04, e.p || 0, 0.1 * v, chipFn(mtof(e.m), e.d), { send: 0.1, duck: 1 }); break;
+    case 'pad': voice(L, R, e.t, e.d + 0.6, 0, 0.28 * v, chordFn(e.ms, e.d, e.cut || 1400, 0.25), { send: 0.4, duck: 1 }); break;
+    case 'stab': voice(L, R, e.t, e.d + 0.1, 0.1, 0.28 * v, chordFn(e.ms, e.d, 4200, 0.003, 14), { send: 0.15, duck: 1 }); break;
+    case 'supersaw': voice(L, R, e.t, e.d + 0.6, 0, 0.32 * v, chordFn(e.ms, e.d, 2600, 0.02), { send: 0.3, duck: 1 }); break;
+    case 'bass': case 'roll': case 'sub': voice(L, R, e.t, e.d + 0.05, 0, (k === 'sub' ? 0.16 : 0.22) * v, bassFn(mtof(e.m), e.d, k), { duck: k !== 'sub' }); break;
+    case 'kick': voice(L, R, e.t, 0.5, 0, 0.55 * v, kickFn(sd)); break;
+    case 'clap': voice(L, R, e.t, 0.35, 0.05, 0.36 * v, clapFn(sd), { send: 0.22 }); break;
+    case 'snare': voice(L, R, e.t, 0.3, -0.05, 0.26 * v, snareFn(sd), { send: 0.18 }); break;
+    case 'rim': voice(L, R, e.t, 0.1, 0.15, 0.22 * v, rimFn(sd), { send: 0.1 }); break;
+    case 'hat': voice(L, R, e.t, e.open ? 0.3 : 0.08, e.p || 0, 0.15 * v, hatFn(sd, e.open)); break;
+    case 'shaker': voice(L, R, e.t, 0.12, e.p || 0, 0.08 * v, shakerFn(sd)); break;
+    case 'crash': voice(L, R, e.t, e.d, 0, 0.15 * v, crashFn(sd), { send: 0.25 }); break;
+    case 'heart': voice(L, R, e.t, 0.35, 0, 0.6 * v, heartFn()); break;
+    case 'riser': voice(L, R, e.t, e.d, 0, 0.2 * v, riserFn(e.d, sd), { send: 0.3 }); break;
+    case 'down': voice(L, R, e.t, e.d, 0, 0.2 * v, downFn(e.d, sd), { send: 0.4 }); break;
+    case 'impact': voice(L, R, e.t, e.d, 0, 0.6 * v, impactFn(sd), { send: 0.2 }); break;
+    case 'revcym': voice(L, R, e.t, e.d, 0, 0.16 * v, revcymFn(e.d, sd), { send: 0.4 }); break;
+  }
 }
-function padFn(fs, t0, d) {
-  const ph = new Float64Array(fs.length * 2); let lp = 0;
-  return t => {
-    const w = WOW(t0 + t); let s = 0;
-    for (let j = 0; j < fs.length; j++) for (let q = 0; q < 2; q++) { const idx = j * 2 + q; let p = ph[idx] + fs[j] * w * (q ? 1.0045 : 0.9955) / SR; p -= Math.floor(p); ph[idx] = p; s += p < 0.5 ? 4 * p - 1 : 3 - 4 * p; }
-    lp += 0.06 * (s - lp);
-    return lp / (fs.length * 2) * Math.min(1, t / 0.7) * (t > d ? Math.max(0, 1 - (t - d) / 0.9) : 1);
-  };
-}
-function kickFn(seed) { let p = 0, q = 0; return (t, k) => { p += (54 + 90 * Math.exp(-t * 30)) / SR; q += 1700 / SR; return fsin(TAU * p) * Math.exp(-t * 7) * (t < 0.002 ? t / 0.002 : 1) + fsin(TAU * q) * 0.22 * Math.exp(-t * 90) + (t < 0.005 ? nz(k * 7 + seed) * 0.35 * (1 - t / 0.005) : 0); }; }
-function snareFn(seed) { let lp = 0, p = 0; return (t, k) => { lp += 0.32 * (nz(k * 3 + seed) - lp); p += 182 / SR; return lp * Math.exp(-t * 15) * 1.1 + fsin(TAU * p) * Math.exp(-t * 26) * 0.5; }; }
-function rimFn(seed) { let p = 0; return (t, k) => { p += 1650 / SR; return fsin(TAU * p) * Math.exp(-t * 70) * 0.6 + nz(k * 11 + seed) * Math.exp(-t * 120) * 0.5; }; }
-function hatFn(seed, open) { let hp = 0, prev = 0; return (t, k) => { const x = nz(k * 5 + seed); hp = 0.55 * (hp + x - prev); prev = x; return hp * Math.exp(-t * (open ? 10 : 52)); }; }
-function shakerFn(seed) { let hp = 0, prev = 0, lp = 0; return (t, k) => { const x = nz(k * 13 + seed); hp = 0.7 * (hp + x - prev); prev = x; lp += 0.5 * (hp - lp); return lp * (t < 0.012 ? t / 0.012 : Math.exp(-(t - 0.012) * 30)); }; }
-function crashFn(seed, d) { let lp = 0; return (t, k) => { lp += 0.45 * (nz(k * 17 + seed) - lp); return lp * Math.exp(-t * 2.2) * (t < 0.003 ? t / 0.003 : 1); }; }
-function playMusic(e, L, R, EL, ER) {
-  const k = e.k;
-  if (k === 'rhodes') voice(L, R, e.t, e.d + 0.3, (e.m % 7 - 3) * 0.06, 0.3 * e.v, rhodesFn(mtof(e.m), e.t, e.d, e.v), { send: 0.28, trem: 0.32 });
-  else if (k === 'kal') voice(EL, ER, e.t, 1.3, 0.1, 0.78 * e.v, kalFn(mtof(e.m), e.t), { send: 0.3 });
-  else if (k === 'bass') voice(L, R, e.t, e.d + 0.08, 0, 0.27 * e.v, bassFn(mtof(e.m), e.glide ? mtof(e.glide) : 0, e.d));
-  else if (k === 'pad') voice(L, R, e.t, e.d + 1.0, 0, 0.65 * e.v, padFn(e.ms.map(mtof), e.t, e.d), { send: 0.5, trem: 0.15 });
-  else if (k === 'kick') voice(L, R, e.t, 0.45, 0, 0.6 * e.v, kickFn(Math.round(e.t * 100)));
-  else if (k === 'snare') voice(L, R, e.t, 0.35, 0.06, 0.5 * e.v, snareFn(Math.round(e.t * 100)), { send: 0.18 });
-  else if (k === 'rim') voice(L, R, e.t, 0.12, 0.1, 0.28 * e.v, rimFn(Math.round(e.t * 100)), { send: 0.15 });
-  else if (k === 'hat') voice(L, R, e.t, e.open ? 0.35 : 0.08, e.p, 0.3 * e.v, hatFn(Math.round(e.t * 100), e.open));
-  else if (k === 'shaker') voice(L, R, e.t, 0.1, e.p, 0.16 * e.v, shakerFn(Math.round(e.t * 100)));
-  else if (k === 'crash') voice(L, R, e.t, e.d, 0, 0.16 * e.v, crashFn(Math.round(e.t * 100), e.d), { send: 0.3 });
-  else if (k === 'revcym') { const d = e.d; voice(L, R, e.t, d, 0, 0.16 * e.v, (t, kk) => nz(kk * 19 + 5) * Math.pow(t / d, 2.2) * (t > d - 0.02 ? (d - t) / 0.02 : 1), { send: 0.4 }); }
-}
-// ---------------------------------------------------------------- SFX: soft, rounded, tuned to F major
+// ---------------------------------------------------------------- SFX: clean, rounded, tuned to F major
 function playSfx(e, L, R) {
   const k = e.k, v = e.v, f = e.f || 440, p = e.p || 0, d = e.d || 0.2;
   const V = (t0, dur, g, fn, snd) => voice(L, R, t0, dur, p, g * v, fn, { send: snd === undefined ? 0.2 : snd });
@@ -295,74 +328,52 @@ function reverb(inL, inR, outL, outR, wet) {
     }
   });
 }
-// two cascaded one-pole low-passes whose cutoff follows cutAt(t), over [ta, tb]
-function sweepLP(ch, ta, tb, cutAt) {
-  const i0 = Math.round(ta * SR), i1 = Math.min(NS, Math.round(tb * SR)); let y1 = ch[i0], y2 = ch[i0];
-  for (let i = i0; i < i1; i++) { const a = 1 - Math.exp(-TAU * cutAt(i / SR) / SR); y1 += a * (ch[i] - y1); y2 += a * (y1 - y2); ch[i] = y2; }
-}
-// tape stop: the last stretch slows to a halt (pitch and speed fall together) and fades
-function tapeStop(ch, ta) {
-  const i0 = Math.round(ta * SR), n = NS - i0, src = ch.slice(i0, NS); let pos = 0;
-  for (let k = 0; k < n; k++) {
-    const u = k / n, sp = Math.pow(1 - u, 1.5), j = Math.floor(pos), fr = pos - j;
-    ch[i0 + k] = ((src[j] || 0) * (1 - fr) + (src[j + 1] || 0) * fr) * Math.pow(1 - u, 0.5);
-    pos += sp;
-  }
-}
 // ---------------------------------------------------------------- render: opts.bus 'm' (music only) / 's' (SFX only) / both
 function renderAudio(opts) {
   opts = opts || {};
   const L = new Float32Array(NS), R = new Float32Array(NS);
-  SND_L = new Float32Array(NS); SND_R = new Float32Array(NS);
+  SND_L = new Float32Array(NS); SND_R = new Float32Array(NS); ECH_L = new Float32Array(NS); ECH_R = new Float32Array(NS);
   const sfx = sfxEvents();
   if (opts.bus !== 's') {
-    const mus = musicEvents();
-    // tonal parts; the kalimba goes through a dotted-eighth ping-pong echo
-    let EL = new Float32Array(NS), ER = new Float32Array(NS);
-    for (const e of mus) if (!/^(kick|snare|rim|hat|shaker|crash|revcym)$/.test(e.k)) playMusic(e, L, R, EL, ER);
-    const D = Math.round(0.75 * BEAT * SR), fb = 0.4;
-    for (let i = 0; i < NS; i++) {
-      let el = 0, er = 0, w = 1;
-      for (let k = 1; k <= 5; k++) { w *= fb; const j = (i - k * D + NS * 5) % NS; if (k % 2) { el += w * ER[j]; er += w * EL[j]; } else { el += w * EL[j]; er += w * ER[j]; } }
-      L[i] += EL[i] + el * 0.55; R[i] += ER[i] + er * 0.55; SND_L[i] += el * 0.25; SND_R[i] += er * 0.25;
-    }
-    EL = null; ER = null;
-    // gentle sidechain: the tonal bed breathes with the kick
+    const inGate = t => GATES.some(([a, b]) => t >= a - 0.005 && t < b);
+    const mus = musicEvents().filter(e => e.post || !inGate(e.t));
+    // sidechain: the bed ducks under every kick (deeper in the drop)
+    SCG = new Float32Array((NS >> 6) + 2).fill(1);
     for (const e of mus) if (e.k === 'kick') {
-      const i0 = Math.round(e.t * SR), n = Math.round(0.32 * SR), att = Math.round(0.006 * SR);
-      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k - att) / SR * 10), g = 1 - 0.26 * e.v * a; L[i] *= g; R[i] *= g; }
+      const depth = (e.t >= bt(84) && e.t < barT(25) ? 0.55 : 0.4) * e.v, j0 = Math.round(e.t * SR) >> 6, n = Math.round(0.26 * SR) >> 6;
+      for (let q = 0; q < n; q++) { const j = (j0 + q) % SCG.length, u = q * 64 / SR, a = u < 0.004 ? u / 0.004 : Math.exp(-(u - 0.004) * 13); SCG[j] *= 1 - depth * a; }
     }
-    for (const e of mus) if (/^(kick|snare|rim|hat|shaker|crash|revcym)$/.test(e.k)) playMusic(e, L, R);
-    // vinyl: a quiet hiss and sparse crackle, all the way round the loop
-    let lpL = 0, lpR = 0;
-    for (let i = 0; i < NS; i++) { lpL += 0.18 * (nz(i * 3 + 1) - lpL); lpR += 0.18 * (nz(i * 3 + 2) - lpR); L[i] += lpL * 0.016; R[i] += lpR * 0.016; }
-    for (let c = 0; c < 420; c++) {
-      const i0 = Math.floor(hash(c + 9100) * NS), a = 0.04 + 0.22 * Math.pow(hash(c + 9101), 3), n = 24 + Math.floor(hash(c + 9102) * 80), side = hash(c + 9103);
-      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, s = nz(c * 977 + k) * a * Math.exp(-k / (n * 0.25)); L[i] += s * (side < 0.7 ? 1 : 0.3); R[i] += s * (side > 0.3 ? 1 : 0.3); }
+    LEAD_PREV.laser = null;
+    for (const e of mus) if (!e.post) playMusic(e, L, R);
+    // the gates: the band stops dead on the hemoglobin cut, and for one beat before the drop (reverb tails ring on)
+    for (const [a, b] of GATES) {
+      const i0 = Math.round(a * SR), i1 = Math.round(b * SR), r = Math.round(0.008 * SR);
+      for (let i = i0; i < i1; i++) { const g = i < i0 + r ? 1 - (i - i0) / r : i > i1 - r ? (i - (i1 - r)) / r : 0; L[i] *= g; R[i] *= g; ECH_L[i] *= g; ECH_R[i] *= g; }
     }
+    for (const e of mus) if (e.post) playMusic(e, L, R);
     // the music dips a little under the big hits
     for (const e of sfx) {
       const dk = DUCK[e.k]; if (!dk) continue;
       const i0 = Math.round(e.t * SR), n = Math.round(0.5 * SR), att = Math.round(0.01 * SR);
       for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k - att) / SR * 6), g = 1 - dk * a; L[i] *= g; R[i] *= g; }
     }
-    // underwater on the hemoglobin cut, surfacing on the white-cell cut
-    const cut = t => t < BREAK[0] ? 18000 : t < BREAK[0] + 0.06 ? lerp(18000, 650, (t - BREAK[0]) / 0.06) : t < BREAK[1] ? 650 : t < BREAK[1] + 0.12 ? lerp(650, 18000, (t - BREAK[1]) / 0.12) : 18000;
-    for (const ch of [L, R, SND_L, SND_R]) sweepLP(ch, BREAK[0] - 0.05, BREAK[1] + 0.2, cut);
-    for (const ch of [L, R, SND_L, SND_R]) tapeStop(ch, TAPE);
   }
   if (opts.bus !== 'm') for (const e of sfx) playSfx(e, L, R);
-  reverb(SND_L, SND_R, L, R, 0.9);
+  // dotted-eighth ping-pong delay on the leads (circular)
+  { const D = Math.round(0.75 * BEAT * SR), fb = 0.38;
+    for (let i = 0; i < NS; i++) { let el = 0, er = 0, w = 1; for (let k = 1; k <= 4; k++) { w *= fb; const j = (i - k * D + NS * 4) % NS; if (k % 2) { el += w * ECH_R[j]; er += w * ECH_L[j]; } else { el += w * ECH_L[j]; er += w * ECH_R[j]; } } L[i] += el; R[i] += er; SND_L[i] += el * 0.3; SND_R[i] += er * 0.3; } }
+  ECH_L = null; ECH_R = null; SCG = null;
+  reverb(SND_L, SND_R, L, R, 0.8);
   SND_L = null; SND_R = null;
-  // master: lo-fi top end (~9 kHz), DC blocking, soft saturation; circular, in place
-  const a = Math.exp(-TAU * 9000 / SR);
+  // master: DC blocking, a gentle top roll-off (~15 kHz) and soft saturation; circular, in place
+  const a = Math.exp(-TAU * 15000 / SR);
   for (const ch of [L, R]) {
     let y = 0, x1 = 0, hp = 0;
     for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
       const x = ch[i];
       y = a * y + (1 - a) * x;
       hp = 0.9993 * (hp + y - x1); x1 = y;
-      if (pass === 1) ch[i] = Math.tanh(hp * 1.1) / 1.1;
+      if (pass === 1) ch[i] = Math.tanh(hp * 1.15) / 1.15;
     }
   }
   return { L, R };

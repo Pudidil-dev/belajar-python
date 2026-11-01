@@ -77,13 +77,17 @@ function analyzerXray(cam, t, k, o) {
   if (k > 0) machineInterior(cam, t, o);
   if (k < 1) withDither(1 - k, () => drawAnalyzer(cam, t, o)); else { drawTube(cam, t, o); drawNeedle(cam, t, o); }
 }
-// draw fn's pixels only where the Bayer threshold < lv (a dithered see-through); TMP2 keeps the pixels underneath
+// draw fn at opacity lv (a smooth see-through / fade); TMP2 keeps the pixels underneath
 function withDither(lv, fn) {
   if (lv >= 1) { fn(); return; }
   if (lv <= 0) return;
   TMP2.set(buf);
   fn();
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (bay(x, y) >= lv) buf[i] = TMP2[i]; }
+  const ki = Math.round(lv * 256), kj = 256 - ki;
+  for (let i = 0; i < buf.length; i++) {
+    const a = TMP2[i], b = buf[i]; if (a === b) continue;
+    buf[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
 }
 // ---------------------------------------------------------------- inside the tubing: whole blood flowing (side-follow)
 const BLOOD_S = makeSuspension(21, 70, [['rbc', 0.88], ['plt', 0.09], ['wbc', 0.03]], -300, 300, -120, 120);

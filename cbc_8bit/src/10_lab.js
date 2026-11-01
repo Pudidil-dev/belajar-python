@@ -76,7 +76,7 @@ function drawAnalyzer(cam, t, o) {
   // tube holder ring and status light
   drawTube(cam, t, o);
   rect(X(ANZ.tubeX - 16), Y(ANZ.tubeBot - 26), X(ANZ.tubeX + 16), Y(ANZ.tubeBot - 12), P.M4); rect(X(ANZ.tubeX - 16), Y(ANZ.tubeBot - 26), X(ANZ.tubeX + 16), Y(ANZ.tubeBot - 24), P.M3);
-  const on = o.busy ? (Math.floor(t * 4) % 2 ? P.SG2 : P.SG1) : P.SG1;
+  const on = o.busy ? (Math.floor(t * 1.5) % 2 ? P.SG2 : P.SG1) : P.SG1;
   disc(X(b2 - 16), Y(b3 - 20), 3 * z, on); ring(X(b2 - 16), Y(b3 - 20), 5 * z, 1.2, P.M3);
   drawNeedle(cam, t, o);
 }
@@ -93,15 +93,16 @@ function resultUI(x0, y0, x1, y1, t, o) {
   const w = x1 - x0, sc = o.sc || Math.max(1, Math.floor(w / 110));
   uiFrame(x0, y0, x1, y1, 'RESULT  ·  SAMPLE 042', sc);
   const k = o.k || 0, L = x0 + 6 * sc;
+  // values count up from zero as they land (a measurement settling, no bounce)
+  const up = (v, t0, d) => v * eout(clamp((t - t0) / (d || 0.3), 0, 1)), grp = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   if (k > 0) {
-    const s = 1 + 0.3 * (1 - backOut(clamp((t - o.t1) / 0.25, 0, 1), 1.6)), big = Math.max(2, Math.round(sc * 2 * s));
+    const big = 2 * sc;
     text(FS, 'RED BLOOD CELLS', L, y0 + 14 * sc, { sc, c: P.RB3, ol: null });
-    text(FC, EX.rbc, L, y0 + 22 * sc - (big - 2 * sc) * 4, { sc: big, c: P.INK, ol: null });
+    text(FC, up(+EX.rbc, o.t1 || 0).toFixed(2), L, y0 + 22 * sc, { sc: big, c: P.INK, ol: null });
     text(FS, 'MILLION / µL', L, y0 + 43 * sc, { sc, c: P.SUB, ol: null });
-    if (t - o.t1 < 0.3) flash(L + textW(FC, EX.rbc, big) + 6 * sc, y0 + 30 * sc, 4 * sc, 1 - (t - o.t1) / 0.3, [P.RB1, P.RB2, P.RB3, P.C6]);
   }
-  if (k > 1) { text(FS, 'WBC', L, y0 + 55 * sc, { sc, c: P.WB3, ol: null }); text(FS, '7,200 / µL', L + 22 * sc, y0 + 55 * sc, { sc, c: P.INK, ol: null }); }
-  if (k > 2) { text(FS, 'PLT', L, y0 + 64 * sc, { sc, c: P.PL3, ol: null }); text(FS, '250,000 / µL', L + 22 * sc, y0 + 64 * sc, { sc, c: P.INK, ol: null }); }
+  if (k > 1) { text(FS, 'WBC', L, y0 + 55 * sc, { sc, c: P.WB3, ol: null }); text(FS, grp(up(7200, o.t2 || 0, 0.25)) + ' / µL', L + 22 * sc, y0 + 55 * sc, { sc, c: P.INK, ol: null }); }
+  if (k > 2) { text(FS, 'PLT', L, y0 + 64 * sc, { sc, c: P.PL3, ol: null }); text(FS, grp(up(250000, o.t3 || 0, 0.25)) + ' / µL', L + 22 * sc, y0 + 64 * sc, { sc, c: P.INK, ol: null }); }
   if (o.busy > 0) { const bw = 96 * sc * clamp(o.busy, 0, 1); rect(L, y1 - 8 * sc, L + bw, y1 - 6 * sc, P.SG2); text(FS, 'ASPIRATING', L, y1 - 16 * sc, { sc, c: P.SG2, ol: null }); }
 }
 // the full report: rows revealed 0..n (fractions type in), checks, differential bars, QC line; content within ~130 sc
