@@ -1,0 +1,2337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>How ECG Machines Read Your Heart</title>
+<meta name="description" content="How your heart's electrical activity becomes a waveform on a screen: a 48-second pixel-art scientific animation of a bedside ECG monitor (pacemaker cells, cardiac conduction, body-surface voltage, electrodes, differential amplifier, filters, ADC), with an electronic soundtrack synthesised in JavaScript.">
+<style>
+:root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #8fe9f5; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 500 14px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { display: flex; flex-direction: column; min-height: 100%; }
+#stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px 16px 6px; position: relative; }
+#screen { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #0b1020; box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0,0,0,.55); cursor: pointer; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); letter-spacing: .08em; }
+#bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 16px 6px; max-width: 720px; width: 100%; margin: 0 auto; }
+.btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.btn:hover { border-color: #3a4b7c; }
+.btn:focus-visible, #scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+#scrub { flex: 1 1 auto; min-width: 60px; height: 40px; background: transparent; -webkit-appearance: none; appearance: none; margin: 0; --p: 0%; }
+#scrub::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+#scrub::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+#scrub::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+#scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--ink); border: 0; }
+#scrub::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 0; }
+#time { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--sub); min-width: 104px; text-align: right; }
+#scene { text-align: center; color: var(--sub); font-size: 12px; letter-spacing: .06em; padding: 0 16px 12px; min-height: 28px; }
+@media (max-width: 420px) { #time { min-width: 0; font-size: 12px; } .btn { width: 36px; height: 36px; } #bar { gap: 6px; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a bedside ECG monitor beeps; the camera follows the cable to the chest electrodes and into the heart, where ion channels in a pacemaker cell start each beat; the activation spreads through the atria, the AV node, the His-Purkinje system and the ventricles, drawing the P wave, the QRS complex and the T wave; the body carries the resulting voltage differences to the skin, the electrodes sense them, and an amplifier, filters and an analog-to-digital converter turn them into the waveform on the screen"></canvas>
+  <div id="loading">LOADING…</div>
+</div>
+<div id="bar">
+  <button id="play" class="btn" aria-label="Play"></button>
+  <button id="replay" class="btn" aria-label="Replay"></button>
+  <input id="scrub" type="range" min="0" max="2879" step="1" value="0" aria-label="Seek">
+  <span id="time">0:00.0 / 0:48.0</span>
+  <button id="mute" class="btn" aria-label="Mute"></button>
+</div>
+<div id="scene" aria-live="polite"></div>
+<script>
+(function(){
+// ---- 00_core.js
+// ============================================================================
+// ECG 8-bit — core: pixel buffer, palette, rasterisers, masks, easing, camera.
+// Everything draws into one 360x640 Uint32 buffer (crisp pixels, no AA),
+// shown 3x nearest-neighbour (1080x1920) by the player / export.
+// W, H and buf can be swapped temporarily (withCanvas) to draw a world into a
+// larger square buffer, e.g. for a camera roll.
+// ============================================================================
+const FPS = 60, DUR = 48, NF = 2880;
+let W = 360, H = 640, CX = 180, CY = 320;
+const MAXPIX = 640 * 640;
+let buf = new Uint32Array(W * H);
+const SPARE = [new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX)];
+const FEEDBUF = SPARE[1].subarray(0, 360 * 640), TMPBUF = SPARE[3].subarray(0, 360 * 640), TMP2 = SPARE[4].subarray(0, 360 * 640);
+// draw into a w x h buffer (taken from SPARE[0]) and return it
+function withCanvas(w, h, fn) {
+  const oW = W, oH = H, oCX = CX, oCY = CY, oBuf = buf;
+  W = w; H = h; CX = w / 2; CY = h / 2; buf = SPARE[0].subarray(0, w * h);
+  try { fn(); } finally { const out = buf; W = oW; H = oH; CX = oCX; CY = oCY; buf = oBuf; withCanvas.last = out; }
+  return withCanvas.last;
+}
+function hexc(h) {
+  const n = parseInt(h.slice(1), 16);
+  return (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255)) >>> 0;
+}
+const P = {};
+const PAL_HEX = {
+  // ground: dark navy (hue <= 218, kept out of the blue-purple band)
+  K0: '#030812', BG: '#0B1A33', N1: '#0E2140', N2: '#132A4C', N3: '#1A355C', N4: '#23436F', N5: '#305788', N6: '#4470A3',
+  // ward wall, bed, sheet
+  BE0: '#141B28', BE1: '#1E2738', BE2: '#2A354C', BE3: '#3B4862', BE4: '#56658A', SH0: '#8A98A6', SH1: '#B8C4CE', SH2: '#DCE4EA',
+  // monitor housing (off-white), dark panels
+  MW: '#EEF2F6', M1: '#CDD5DE', M2: '#A9B4C2', M3: '#808C9E', M4: '#5B6679', M5: '#3D4657', M6: '#272E3B',
+  // monitor screen (green-black) and the ECG trace (neon green)
+  SC0: '#020A06', SC1: '#05150C', SC2: '#0A2414', SC3: '#12391F', EG0: '#0A3A1C', EG1: '#1A8A40', EG2: '#3CEB6E', EG3: '#A8FFC0', EG4: '#E6FFEE',
+  // electrodes (white foam, silver sensor), lead-wire clips (RA white, LA black, LL red), cables
+  AL0: '#48525F', AL1: '#748291', AL2: '#A3B1BF', AL3: '#CFD8E2', AL4: '#F0F4F8', EW: '#F4F8FF', CK: '#232A36', CR: '#E03A3A', CB0: '#2A3140', CB1: '#4A5466', CB2: '#6A7686',
+  // skin (a medium tone) and bone
+  SK0: '#4A2A20', SK1: '#7A4A36', SK2: '#A86A50', SK3: '#C98A6A', SK4: '#E8B494', BN0: '#5A5E66', BN1: '#9AA0AA', BN2: '#D4D8DE',
+  // heart muscle (crimson), blood in the chambers, vessels, valves
+  HM0: '#2E0810', HM1: '#5A0E1C', HM2: '#8E1628', HM3: '#C42A40', HM4: '#E85A6A', HM5: '#FF9AA2', BD0: '#1E0408', BD1: '#34070F', BD2: '#4C0B17',
+  VE0: '#3A1020', VE1: '#5E1A30', AO0: '#6A1020', AO1: '#9A1A2E', VL0: '#C8B8A8', VL1: '#E8DCD0',
+  // conduction system: SA node warm yellow, AV node orange, pathways electric cyan
+  SA0: '#7A5A10', SA1: '#C89A20', SA2: '#FFD84A', SA3: '#FFF0A0', AV0: '#7A3A10', AV1: '#C8661C', AV2: '#FF9A3C', AV3: '#FFD0A0',
+  CY0: '#0A3A48', CY1: '#14788A', CY2: '#38E0F0', CY3: '#A8F6FF',
+  // cells: membrane deep purple-red, extracellular fluid dark teal, cytoplasm dark maroon
+  MB0: '#2A0A1E', MB1: '#4A1434', MB2: '#6E1E4A', MB3: '#963462', MB4: '#C8628A', EX0: '#0B2228', EX1: '#103038', EX2: '#16424C', CT0: '#200C10', CT1: '#2E1218', CT2: '#40181F',
+  // ions: Na+ yellow, Ca2+ cyan, K+ purple
+  NA0: '#8A6A10', NA1: '#FFD84A', CA0: '#14788A', CA1: '#4AE6F4', KK0: '#4A2A7A', KK1: '#A878E8',
+  // body-surface potential bands: positive warm, negative cool
+  FP1: '#4A2214', FP2: '#7A361A', FP3: '#B8582A', FP4: '#F09A4A', FN1: '#0E3038', FN2: '#144A56', FN3: '#1C6E80', FN4: '#46AEC4',
+  // electrode gel, circuit board (dark), gold traces, chips, digital data (cyan / white)
+  GL0: '#16486A', GL1: '#2E7AA6', GL2: '#78BEE0', PB0: '#081018', PB1: '#0E1A26', PB2: '#16283A', PB3: '#22384E', AU0: '#6A4A0C', AU1: '#B48A22', AU2: '#E8C450',
+  CH0: '#090B0F', CH1: '#161A22', CH2: '#262C38', CH3: '#3E4656', DT0: '#062A34', DT1: '#0E5A6A', DT2: '#22A8C0', DT3: '#7CE8F8', DT4: '#E8FCFF',
+  // noise on the raw signal
+  NZ1: '#C86A3A', NZ2: '#F0A060',
+  // UI
+  INK: '#F4F8FF', SUB: '#9CC0E4', LBL: '#86E6FF', YEL: '#FFD84A', RED: '#FF6A6A', SH: '#02050C', C4: '#C8D4E6', C6: '#FFFFFF',
+};
+for (const k in PAL_HEX) P[k] = hexc(PAL_HEX[k]);
+
+// ---------------------------------------------------------------- math/ease
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const smooth = t => t * t * (3 - 2 * t);
+const eio = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eout = t => 1 - Math.pow(1 - t, 3);
+const ein = t => t * t * t;
+function bezierEase(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  return function (x) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const fx = ((ax * t + bx) * t + cx) * t - x;
+      const d = (3 * ax * t + 2 * bx) * t + cx;
+      if (Math.abs(fx) < 1e-6) break;
+      t -= fx / (d || 1e-6);
+      t = clamp(t, 0, 1);
+    }
+    return ((ay * t + by) * t + cy) * t;
+  };
+}
+const K75 = bezierEase(0.75, 0, 0.25, 1);      // Kurzgesagt camera ease
+const K50 = bezierEase(0.5, 0, 0.2, 1);
+function backOut(t, s) { s = s === undefined ? 1.70158 : s; t = clamp(t, 0, 1) - 1; return t * t * ((s + 1) * t + s) + 1; }
+const TAU = Math.PI * 2;
+
+// stateless hash -> [0,1)
+function hash(n) {
+  n = (n | 0) ^ 0x9e3779b9;
+  n = Math.imul(n ^ (n >>> 16), 0x21f0aaad);
+  n = Math.imul(n ^ (n >>> 15), 0x735a2d97);
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663));
+const hash3 = (a, b, c) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663) ^ Math.imul(c | 0, 83492791));
+function vnoise(x, s) { // 1-D value noise, smooth
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(hash2(i, s), hash2(i + 1, s), u);
+}
+
+// ---------------------------------------------------------------- dithering
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bay = (x, y) => (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+
+// ---------------------------------------------------------------- primitives
+function clear(c) { buf.fill(c); }
+function pset(x, y, c) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c; }
+function psetD(x, y, c, lv) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H && bay(x, y) < lv) buf[y * W + x] = c; }
+function rect(x0, y0, x1, y1, c, lv) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1));
+  const p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  if (a >= b || p >= q) return;
+  if (lv === undefined || lv >= 1) { for (let y = p; y < q; y++) buf.fill(c, y * W + a, y * W + b); return; }
+  if (lv <= 0) return;
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+}
+function frame(x0, y0, x1, y1, c) { rect(x0, y0, x1, y0 + 1, c); rect(x0, y1 - 1, x1, y1, c); rect(x0, y0, x0 + 1, y1, c); rect(x1 - 1, y0, x1, y1, c); }
+function disc(cx, cy, r, c, lv) {
+  if (r <= 0) return;
+  if (lv !== undefined && lv <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy, h = r * r - dy * dy;
+    if (h < 0) continue;
+    const s = Math.sqrt(h);
+    const a = Math.max(0, Math.ceil(cx - s - 0.5)), b = Math.min(W - 1, Math.floor(cx + s - 0.5));
+    if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+    else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+  }
+}
+function ring(cx, cy, r, w, c, lv) {
+  const ro = r + w / 2, ri = Math.max(0, r - w / 2);
+  const y0 = Math.max(0, Math.floor(cy - ro)), y1 = Math.min(H - 1, Math.ceil(cy + ro));
+  const x0 = Math.max(0, Math.floor(cx - ro)), x1 = Math.min(W - 1, Math.ceil(cx + ro));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+      if (d2 <= ro * ro && d2 >= ri * ri && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function ellipse(cx, cy, rx, ry, c, lv, rot) {
+  const R = Math.max(rx, ry);
+  const cs = Math.cos(rot || 0), sn = Math.sin(rot || 0);
+  const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
+  const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx;
+      const u = (dx * cs + dy * sn) / rx, v = (-dx * sn + dy * cs) / ry;
+      if (u * u + v * v <= 1 && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+// scanline polygon fill (even-odd) on pixel centres; pts = [x0,y0,x1,y1,...]
+const _xs = [];
+function poly(pts, c, lv) {
+  const n = pts.length >> 1; if (n < 3) return;
+  let ymin = Infinity, ymax = -Infinity;
+  for (let i = 0; i < n; i++) { const y = pts[2 * i + 1]; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+  const y0 = Math.max(0, Math.floor(ymin)), y1 = Math.min(H - 1, Math.ceil(ymax));
+  for (let y = y0; y <= y1; y++) {
+    const sy = y + 0.5; _xs.length = 0;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const yi = pts[2 * i + 1], yj = pts[2 * j + 1];
+      if ((yi > sy) !== (yj > sy)) { const xi = pts[2 * i], xj = pts[2 * j]; _xs.push(xi + (sy - yi) * (xj - xi) / (yj - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < _xs.length; k += 2) {
+      const a = Math.max(0, Math.ceil(_xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(_xs[k + 1] - 0.5));
+      if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+      else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// clip a segment to the screen (Liang-Barsky); returns null if outside
+function clipSeg(x0, y0, x1, y1, m) {
+  m = m || 2;
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  const p = [-dx, dx, -dy, dy], q = [x0 + m, W + m - 1 - x0, y0 + m, H + m - 1 - y0];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; }
+    else { const r = q[i] / p[i]; if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; } }
+  }
+  return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
+}
+function line(x0, y0, x1, y1, c, lv) {
+  const s = clipSeg(x0, y0, x1, y1); if (!s) return;
+  x0 = Math.floor(s[0]); y0 = Math.floor(s[1]); x1 = Math.floor(s[2]); y1 = Math.floor(s[3]);
+  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1, err = dx + dy;
+  for (let guard = 0; guard < 4000; guard++) {
+    if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H && (lv === undefined || bay(x0, y0) < lv)) buf[y0 * W + x0] = c;
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function lineW(x0, y0, x1, y1, w, c, lv) {
+  if (w <= 1.2) { line(x0, y0, x1, y1, c, lv); return; }
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1e-6;
+  const nx = -dy / L * w / 2, ny = dx / L * w / 2;
+  poly([x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny], c, lv);
+}
+function polyline(pts, c, lv) { for (let i = 0; i + 3 < pts.length; i += 2) line(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], c, lv); }
+function dashLine(x0, y0, x1, y1, c, on, off, phase) {
+  const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) return;
+  const per = on + off; let s = -((phase || 0) % per);
+  for (; s < L; s += per) {
+    const a = Math.max(0, s), b = Math.min(L, s + on); if (b <= a) continue;
+    line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
+  }
+}
+// soft glow: a smooth radial blend toward c1 (and c2 in the core), no dither sparkle
+function mixc(a, b, k) { // blend two packed colours, k in 0..1
+  const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  return (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+}
+function glow(cx, cy, r, c1, c2, lv) {
+  lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r)), x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / r; if (d >= 1) continue;
+    const i = y * W + x, u = 1 - d;
+    let c = mixc(buf[i], c1, 0.55 * lv * u * u);
+    if (c2 !== undefined && c2 !== null && d < 0.35) c = mixc(c, c2, 0.5 * lv * (1 - d / 0.35));
+    buf[i] = c;
+  }
+}
+// blend a whole buffer into buf (k = weight of src) — smooth crossfades
+function mixInto(dst, src, k) {
+  if (k <= 0) return; const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  for (let i = 0; i < dst.length; i++) {
+    const a = dst[i], b = src[i]; if (a === b) continue;
+    dst[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
+}
+// tint the whole frame toward colour c by k (a calm dim, no dither)
+function tintAll(c, k) { if (k <= 0) return; for (let i = 0; i < buf.length; i++) buf[i] = mixc(buf[i], c, k); }
+function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
+  rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
+}
+
+// ---------------------------------------------------------------- masks
+// Bounding-box masks for 16-bit style shading (outline, rim light, shadow)
+class Mask {
+  constructor(x0, y0, x1, y1) {
+    this.x0 = Math.max(-2, Math.floor(x0) - 2); this.y0 = Math.max(-2, Math.floor(y0) - 2);
+    this.x1 = Math.min(W + 2, Math.ceil(x1) + 2); this.y1 = Math.min(H + 2, Math.ceil(y1) + 2);
+    this.w = Math.max(0, this.x1 - this.x0); this.h = Math.max(0, this.y1 - this.y0);
+    this.d = new Uint8Array(this.w * this.h);
+  }
+  get(x, y) { x -= this.x0; y -= this.y0; return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; }
+  empty() { return this.w === 0 || this.h === 0; }
+}
+function maskFn(x0, y0, x1, y1, fn) { // fn(px+0.5, py+0.5) -> bool
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) if (fn(m.x0 + i + 0.5, m.y0 + j + 0.5)) m.d[j * m.w + i] = 1;
+  return m;
+}
+function maskPoly(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+  const m = new Mask(x0, y0, x1, y1); if (m.empty()) return m;
+  const n = pts.length >> 1;
+  for (let j = 0; j < m.h; j++) {
+    const sy = m.y0 + j + 0.5; _xs.length = 0;
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const yi = pts[2 * i + 1], yk = pts[2 * k + 1];
+      if ((yi > sy) !== (yk > sy)) { const xi = pts[2 * i], xk = pts[2 * k]; _xs.push(xi + (sy - yi) * (xk - xi) / (yk - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < _xs.length; q += 2) {
+      const a = Math.max(0, Math.ceil(_xs[q] - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(_xs[q + 1] - 0.5 - m.x0));
+      for (let i = a; i <= b; i++) m.d[j * m.w + i] = 1;
+    }
+  }
+  return m;
+}
+function _span(m, j, xa, xb) { // fill pixels whose centres lie in [xa, xb] on mask row j
+  const a = Math.max(0, Math.ceil(xa - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(xb - 0.5 - m.x0));
+  if (a <= b) m.d.fill(1, j * m.w + a, j * m.w + b + 1);
+}
+function maskDisc(cx, cy, r) {
+  const m = new Mask(cx - r, cy - r, cx + r, cy + r);
+  for (let j = 0; j < m.h; j++) { const dy = m.y0 + j + 0.5 - cy, h = r * r - dy * dy; if (h < 0) continue; const s = Math.sqrt(h); _span(m, j, cx - s, cx + s); }
+  return m;
+}
+function maskEll(cx, cy, rx, ry, rot) {
+  const R = Math.max(rx, ry), c = Math.cos(rot || 0), s = Math.sin(rot || 0);
+  const m = new Mask(cx - R, cy - R, cx + R, cy + R);
+  const A = c * c / (rx * rx) + s * s / (ry * ry), Bk = 2 * (c * s / (rx * rx) - s * c / (ry * ry)), Ck = s * s / (rx * rx) + c * c / (ry * ry);
+  for (let j = 0; j < m.h; j++) {
+    const dy = m.y0 + j + 0.5 - cy, B = Bk * dy, C = Ck * dy * dy - 1, disc_ = B * B - 4 * A * C;
+    if (disc_ < 0) continue; const q = Math.sqrt(disc_);
+    _span(m, j, cx + (-B - q) / (2 * A), cx + (-B + q) / (2 * A));
+  }
+  return m;
+}
+function maskRR(x0, y0, x1, y1, r) { // rounded rect
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j + 0.5; if (y < y0 || y > y1) continue;
+    const qy = Math.max(y0 + r - y, 0, y - (y1 - r));
+    if (qy > r) continue;
+    const dx = r - Math.sqrt(Math.max(0, r * r - qy * qy));
+    _span(m, j, x0 + dx, x1 - dx);
+  }
+  return m;
+}
+function mFill(m, c, lv, clip) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      if (clip && !clip(x, y)) continue;
+      if (lv === undefined || lv >= 1 || bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// pixels of m whose neighbour at (x-dx, y-dy) is outside m (the edge facing -dx,-dy)
+function mRim(m, c, dx, dy, lv) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const ii = i - dx, jj = j - dy;
+      const inside = ii >= 0 && jj >= 0 && ii < m.w && jj < m.h && m.d[jj * m.w + ii];
+      if (!inside && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function mOutline(m, c) { // inner 4-neighbour outline
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i === 0 || !m.d[j * m.w + i - 1]) || (i === m.w - 1 || !m.d[j * m.w + i + 1]) || (j === 0 || !m.d[(j - 1) * m.w + i]) || (j === m.h - 1 || !m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+function mOuter(m, c) { // outer 4-neighbour outline (1 px outside the shape)
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i > 0 && m.d[j * m.w + i - 1]) || (i < m.w - 1 && m.d[j * m.w + i + 1]) || (j > 0 && m.d[(j - 1) * m.w + i]) || (j < m.h - 1 && m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+// standard 16-bit shading: base, light rim top-left, shadow rim bottom-right, outline
+function shade(m, base, hi, lo, ol, opt) {
+  opt = opt || {};
+  mFill(m, base, opt.lv, opt.clip);
+  const k = opt.k || 1;
+  if (lo !== null && lo !== undefined) for (let s = 1; s <= k; s++) mRim(m, lo, -s, -s);
+  if (hi !== null && hi !== undefined) for (let s = 1; s <= (opt.kh || k); s++) mRim(m, hi, s, s);
+  if (ol !== null && ol !== undefined) { if (opt.outer) mOuter(m, ol); else mOutline(m, ol); }
+}
+
+// ---------------------------------------------------------------- camera
+class Cam {
+  constructor(cx, cy, z, ax, ay) { this.cx = cx; this.cy = cy; this.z = z; this.ax = ax === undefined ? CX : ax; this.ay = ay === undefined ? CY : ay; }
+  x(wx) { return (wx - this.cx) * this.z + this.ax; }
+  y(wy) { return (wy - this.cy) * this.z + this.ay; }
+  s(v) { return v * this.z; }
+  wx(sx) { return (sx - this.ax) / this.z + this.cx; }
+  wy(sy) { return (sy - this.ay) / this.z + this.cy; }
+  pts(arr) { const o = new Array(arr.length); for (let i = 0; i < arr.length; i += 2) { o[i] = this.x(arr[i]); o[i + 1] = this.y(arr[i + 1]); } return o; }
+}
+// keyframe track: [[t, cx, cy, z, easeFn?], ...] with log-zoom interpolation
+function camTrack(keys, t, ax, ay) {
+  if (t <= keys[0][0]) { const k = keys[0]; return new Cam(k[1], k[2], k[3], ax, ay); }
+  for (let i = 0; i + 1 < keys.length; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t <= b[0]) {
+      const e = b[4] || K75; const f = e(seg(t, a[0], b[0]));
+      const z = Math.exp(lerp(Math.log(a[3]), Math.log(b[3]), f));
+      // zoom-aware centre blend: keep motion even across big zoom changes
+      let g = f;
+      if (Math.abs(Math.log(b[3] / a[3])) > 0.2) { const za = a[3], zb = b[3]; g = (1 / za - 1 / z) / (1 / za - 1 / zb); g = clamp(g, 0, 1); }
+      return new Cam(lerp(a[1], b[1], g), lerp(a[2], b[2], g), z, ax, ay);
+    }
+  }
+  const k = keys[keys.length - 1]; return new Cam(k[1], k[2], k[3], ax, ay);
+}
+
+// ---------------------------------------------------------------- buffers
+function withBuffer(target, fn) { const old = buf; buf = target; try { fn(); } finally { buf = old; } }
+function copyBuf(dst, src) { dst.set(src); }
+// dithered dissolve: show b where bayer < k
+function dissolve(a, b, k, out) {
+  out = out || buf;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; out[i] = bay(x, y) < k ? b[i] : a[i]; }
+}
+
+
+// draw fn at opacity lv (a smooth see-through / fade); TMP2 keeps the pixels underneath
+function withDither(lv, fn) {
+  if (lv >= 1) { fn(); return; }
+  if (lv <= 0) return;
+  TMP2.set(buf);
+  fn();
+  const ki = Math.round(lv * 256), kj = 256 - ki;
+  for (let i = 0; i < buf.length; i++) {
+    const a = TMP2[i], b = buf[i]; if (a === b) continue;
+    buf[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
+}
+// a translucent box (for labels over busy pictures)
+function tintRect(x0, y0, x1, y1, c, k) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1)), p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) { const i = y * W + x; buf[i] = mixc(buf[i], c, k); }
+}
+
+// ---- 01_font.js
+// ============================================================================
+// Pixel fonts. FC: mixed-case caption/label font (cap height 7, descenders 2).
+// FS: micro font for axes and tags (5-row caps, row 6 = descender). FT: 9-row bold title.
+// ============================================================================
+function mkFont(h, defs, spaceW, base) {
+  const g = {};
+  for (const ch in defs) {
+    const rows = defs[ch].split('/');
+    const w = rows[0].length, off = (base && base[ch]) || 0;
+    const bits = new Array(h).fill(0);
+    rows.forEach((r, i) => { let v = 0; for (let k = 0; k < r.length; k++) if (r[k] === '#') v |= 1 << k; if (i + off < h) bits[i + off] = v; });
+    g[ch] = { w, bits };
+  }
+  g[' '] = { w: spaceW, bits: new Array(h).fill(0) };
+  return { h, g };
+}
+// FC: rows 0..6 = cap height, 7..8 = descenders. Lowercase x-height rows 2..6.
+const FC_DEF = {
+  A: '.###./#...#/#...#/#####/#...#/#...#/#...#', B: '####./#...#/#...#/####./#...#/#...#/####.', C: '.###./#...#/#..../#..../#..../#...#/.###.',
+  D: '####./#...#/#...#/#...#/#...#/#...#/####.', E: '#####/#..../#..../####./#..../#..../#####', F: '#####/#..../#..../####./#..../#..../#....',
+  G: '.###./#...#/#..../#.###/#...#/#...#/.####', H: '#...#/#...#/#...#/#####/#...#/#...#/#...#', I: '###/.#./.#./.#./.#./.#./###',
+  J: '..###/...#./...#./...#./#..#./#..#./.##..', K: '#...#/#..#./#.#../##.../#.#../#..#./#...#', L: '#..../#..../#..../#..../#..../#..../#####',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#', N: '#...#/##..#/#.#.#/#.#.#/#..##/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/.###.',
+  P: '####./#...#/#...#/####./#..../#..../#....', Q: '.###./#...#/#...#/#...#/#.#.#/#..#./.##.#', R: '####./#...#/#...#/####./#.#../#..#./#...#',
+  S: '.####/#..../#..../.###./....#/....#/####.', T: '#####/..#../..#../..#../..#../..#../..#..', U: '#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  V: '#...#/#...#/#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#', X: '#...#/#...#/.#.#./..#../.#.#./#...#/#...#',
+  Y: '#...#/#...#/.#.#./..#../..#../..#../..#..', Z: '#####/....#/...#./..#../.#.../#..../#####',
+  a: '..../..../.##./...#/.###/#..#/.###', b: '#.../#.../###./#..#/#..#/#..#/###.', c: '..../..../.##./#..#/#.../#..#/.##.',
+  d: '...#/...#/.###/#..#/#..#/#..#/.###', e: '..../..../.##./#..#/####/#.../.###', f: '..##/.#../####/.#../.#../.#../.#..',
+  g: '..../..../.###/#..#/#..#/.###/...#/#..#/.##.', h: '#.../#.../###./#..#/#..#/#..#/#..#', i: '.#./.../##./.#./.#./.#./###',
+  j: '..#/.../.##/..#/..#/..#/..#/#.#/.#.', k: '#.../#.../#..#/#.#./##../#.#./#..#', l: '##./.#./.#./.#./.#./.#./###',
+  m: '...../...../##.#./#.#.#/#.#.#/#.#.#/#.#.#', n: '..../..../###./#..#/#..#/#..#/#..#', o: '..../..../.##./#..#/#..#/#..#/.##.',
+  p: '..../..../###./#..#/#..#/#..#/###./#.../#...', q: '..../..../.###/#..#/#..#/#..#/.###/...#/...#', r: '..../..../#.##/##../#.../#.../#...',
+  s: '..../..../.###/#.../.##./...#/###.', t: '.#../.#../####/.#../.#../.#../..##', u: '..../..../#..#/#..#/#..#/#..#/.###',
+  v: '...../...../#...#/#...#/.#.#./.#.#./..#..', w: '...../...../#...#/#...#/#.#.#/#.#.#/.#.#.', x: '..../..../#..#/#..#/.##./#..#/#..#',
+  y: '..../..../#..#/#..#/#..#/#..#/.###/...#/.##.', z: '..../..../####/...#/.##./#.../####',
+  0: '.###./#...#/#..##/#.#.#/##..#/#...#/.###.', 1: '..#../.##../..#../..#../..#../..#../.###.', 2: '.###./#...#/....#/...#./..#../.#.../#####',
+  3: '####./....#/....#/.###./....#/....#/####.', 4: '...#./..##./.#.#./#..#./#####/...#./...#.', 5: '#####/#..../####./....#/....#/#...#/.###.',
+  6: '.###./#..../#..../####./#...#/#...#/.###.', 7: '#####/....#/...#./..#../.#.../.#.../.#...', 8: '.###./#...#/#...#/.###./#...#/#...#/.###.',
+  9: '.###./#...#/#...#/.####/....#/....#/.###.',
+  '.': '././././././#', ',': '././././././#/#/#.', ':': './#/./././#/.', '-': '..../..../..../####/..../..../....',
+  '+': '...../..#../..#../#####/..#../..#../.....', '=': '...../...../#####/...../#####/...../.....', '(': '.#/#./#./#./#./#./.#', ')': '#./.#/.#/.#/.#/.#/#.',
+  '/': '....#/...#./...#./..#../.#.../.#.../#....', '~': '...../...../.#..#/#.##./...../...../.....', '&': '.##../#..#./#.#../.#.../#.#.#/#..#./.##.#',
+  '!': '#/#/#/#/#/./#', '?': '.###./#...#/....#/...#./..#../...../..#..', "'": '#/#/./././././', '%': '##..#/##.#./...#./..#../.#.../.#.##/#..##',
+  '→': '......./....#../.....#./#######/.....#./....#../.......', '←': '......./..#..../.#...../#######/.#...../..#..../.......',
+  '↓': '..#../..#../..#../..#../#.#.#/.###./..#..', 'γ': '...../...../#...#/#...#/.#.#./.#.#./..#../.#.#./..#..',
+  '×': '...../...../#...#/.#.#./..#../.#.#./#...#', '^': '..#../.#.#./#...#/...../...../...../.....', '•': '...../...../.##../.##../...../...../.....',
+  '±': '..#../..#../#####/..#../..#../...../#####', '#': '.#.#./#####/.#.#./.#.#./#####/.#.#./.....', '_': '...../...../...../...../...../...../#####',
+  '°': '.##./#..#/.##./..../..../..../....', '⁻': '.../###/.../.../.../.../...', '⁺': '.#./###/.#./.../.../.../...', '⁶': '.##/#../##./#.#/.#./.../...', '·': '../../../##/##/../..', '≈': '...../.#..#/#.##./...../.#..#/#.##./.....', '≠': '...#./#####/..#../#####/.#.../...../.....',
+  '²': '.##./#..#/..#./.#../####/..../....', '³': '###./..#./.##./..#./###./..../....', 'µ': '..../..../#..#/#..#/#..#/#..#/###./#.../#...', '↔': '......./..#.#../.#...#./#######/.#...#./..#.#../.......', '≠': '...../....#/#####/..#../#####/#..../.....',
+  'α': '...../...../.##.#/#..#./#..#./#..#./.##.#', 'β': '.##../#..#./#.#../#..#./#..#./###../#..../#....', '◀': '...#/..##/.###/####/.###/..##/...#',
+  '₂': '..../..../..../..../.##./#..#/..#./.#../####', '÷': '...../..#../...../#####/...../..#../.....', 'λ': '#..../.#.../.#.../..#../.#.#./#...#/#...#',
+};
+const FC = mkFont(9, FC_DEF, 3);
+FC.g['–'] = FC.g['-'];
+// FS: 5-row micro font (caps, digits, a few lowercase for units)
+const FS = mkFont(6, {
+  A: '.##./#..#/####/#..#/#..#', B: '###./#..#/###./#..#/###.', C: '.###/#.../#.../#.../.###', D: '###./#..#/#..#/#..#/###.',
+  E: '####/#.../###./#.../####', F: '####/#.../###./#.../#...', G: '.###/#.../#.##/#..#/.###', H: '#..#/#..#/####/#..#/#..#',
+  I: '###/.#./.#./.#./###', J: '...#/...#/...#/#..#/.##.', K: '#..#/#.#./##../#.#./#..#', L: '#.../#.../#.../#.../####',
+  M: '#...#/##.##/#.#.#/#...#/#...#', N: '#..#/##.#/#.##/#..#/#..#', O: '.##./#..#/#..#/#..#/.##.', P: '###./#..#/###./#.../#...',
+  Q: '.##./#..#/#..#/#.#./.#.#', R: '###./#..#/###./#.#./#..#', S: '.###/#.../.##./...#/###.', T: '###/.#./.#./.#./.#.',
+  U: '#..#/#..#/#..#/#..#/.##.', V: '#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#.#.#/##.##/#...#', X: '#.#/#.#/.#./#.#/#.#',
+  Y: '#.#/#.#/.#./.#./.#.', Z: '####/...#/.##./#.../####',
+  0: '.##./#..#/#..#/#..#/.##.', 1: '.#./##./.#./.#./###', 2: '##./..#/.#./#../###', 3: '##./..#/.#./..#/##.', 4: '#.#/#.#/###/..#/..#',
+  5: '###/#../##./..#/##.', 6: '.##/#../###/#.#/###', 7: '###/..#/.#./.#./.#.', 8: '###/#.#/###/#.#/###', 9: '###/#.#/###/..#/##.',
+  a: '..../.##./..##/#.#./.###', c: '.../.##/#../#../.##', e: '..../.##./####/#.../.##.', k: '#.../#.#./##../#.#./#..#', l: '#/#/#/#/#',
+  m: '...../##.#./#.#.#/#.#.#/#.#.#', n: '.../##./#.#/#.#/#.#', o: '.../.#./#.#/#.#/.#.', s: '.../.##/##./..#/##.', t: '.#./###/.#./.#./..#',
+  i: '#/./#/#/#', h: '#../#../##./#.#/#.#', r: '.../#.#/##./#../#..', u: '.../#.#/#.#/#.#/.##', q: '.../.##/#.#/.##/..#', g: '.../.##/#.#/.##/##.',
+  ',': './././#/#', ':': './#/./#/.', '-': '.../.../###/.../...', '+': '.../.#./###/.#./...',
+  '(': '.#/#./#./#./.#', ')': '#./.#/.#/.#/#.', '/': '..#/.#./.#./.#./#..', '~': '..../.#.#/#.#./..../....', '%': '#..#/..#./.#../#.../#..#',
+  '→': '...#./....#/#####/....#/...#.', '↓': '.#./.#./.#./###/.#.', '×': '.../#.#/.#./#.#/...', '=': '.../###/.../###/...', "'": '#/#/./././',
+  '^': '.#./#.#/.../.../...', '!': '#/#/#/./#', '?': '##./..#/.#./.../.#.', 'γ': '#.#/#.#/.#./.#./#.#', '°': '##/##/../../..', '·': '../##/##/../..', '⁻': '###/.../.../.../...', '⁺': '.#./###/.#./.../...', '⁶': '.#/#./##/../..', '≈': '.#.#/#.#./.#.#/#.#./....', '≠': '..#/###/.#./###/#..',
+  p: '.../##./#.#/##./#../#..', b: '#../#../##./#.#/##.', d: '..#/..#/.##/#.#/.##', f: '.#/#./##/#./#.', v: '.../#.#/#.#/#.#/.#.',
+  w: '...../#...#/#.#.#/#.#.#/.#.#.', x: '.../#.#/.#./.#./#.#', y: '.../#.#/#.#/.##/..#/##.', z: '.../###/..#/.#./###',
+  '²': '##./..#/.#./###/...', 'µ': '.../#.#/#.#/#.#/###/#..', '³': '##./.#./##./.../...', '⁶': '.#./#../##./.../...', '↔': '......./.#...#./#######/.#...#./.......', '≠': '..#/###/.#./###/#..', 'α': '..../.#.#/#.#./#.#./.#.#', 'β': '.##./#..#/###./#..#/###./#...', 'j': '.#/../.#/.#/.#/#.',
+  '₂': '.../.../##./..#/.#./###', '÷': '.#./.../###/.../.#.', '[': '##/#./#./#./##', ']': '##/.#/.#/.#/##', '>': '#../.#./..#/.#./#..', '<': '..#/.#./#../.#./..#',
+}, 2);
+FS.g['.'] = { w: 1, bits: [0, 0, 0, 0, 1] };
+FS.g['–'] = FS.g['-'];
+// FT: 9-row title capitals (drawn bold)
+const FT = mkFont(9, {
+  H: '#...#/#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  W: '#.....#/#.....#/#.....#/#.....#/#..#..#/#..#..#/#.#.#.#/##...##/#.....#', S: '.###./#...#/#..../#..../.###./....#/....#/#...#/.###.',
+  P: '####./#...#/#...#/#...#/####./#..../#..../#..../#....', E: '####/#.../#.../#.../###./#.../#.../#.../####',
+  C: '.###./#...#/#..../#..../#..../#..../#..../#...#/.###.', T: '#####/..#../..#../..#../..#../..#../..#../..#../..#..',
+  A: '.###./#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', N: '#...#/##..#/##..#/#.#.#/#.#.#/#.#.#/#..##/#..##/#...#',
+  R: '####./#...#/#...#/#...#/####./#.#../#..#./#...#/#...#', K: '#...#/#..#./#.#../##.../##.../#.#../#..#./#...#/#...#',
+  U: '#...#/#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.', L: '#.../#.../#.../#.../#.../#.../#.../#.../####',
+  X: '#...#/#...#/.#.#./.#.#./..#../.#.#./.#.#./#...#/#...#', I: '###/.#./.#./.#./.#./.#./.#./.#./###',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#/#...#/#...#',
+  D: '####./#...#/#...#/#...#/#...#/#...#/#...#/#...#/####.', B: '####./#...#/#...#/#...#/####./#...#/#...#/#...#/####.', G: '.###./#...#/#..../#..../#.###/#...#/#...#/#...#/.###.', Y: '#...#/#...#/.#.#./.#.#./..#../..#../..#../..#../..#..', V: '#...#/#...#/#...#/#...#/#...#/.#.#./.#.#./.#.#./..#..',
+}, 3);
+function glyphOf(f, ch) { return f.g[ch] || f.g[ch.toUpperCase()] || f.g[ch.toLowerCase()] || f.g['?'] || f.g[' ']; }
+function textW(f, s, sc, bold) {
+  sc = sc || 2; let w = 0;
+  for (let i = 0; i < s.length; i++) { w += glyphOf(f, s[i]).w; if (i < s.length - 1) w += 1; }
+  return w * sc + (bold ? 1 : 0);
+}
+// draw text; returns width. opt: {sc, c, ol (outline colour or null), n (chars shown), bold, align, shadow, sd}
+function text(f, s, x, y, opt) {
+  opt = opt || {};
+  const sc = opt.sc || 2, c = opt.c === undefined ? P.INK : opt.c, ol = opt.ol === undefined ? P.SH : opt.ol;
+  const bold = opt.bold ? 1 : 0, n = opt.n === undefined ? s.length : Math.floor(opt.n);
+  const tw = textW(f, s, sc, bold);
+  if (opt.align === 'center') x -= tw / 2; else if (opt.align === 'right') x -= tw;
+  x = Math.round(x); y = Math.round(y);
+  const passes = [];
+  if (opt.shadow !== undefined && opt.shadow !== null) passes.push([opt.shadow, 0, 1, opt.sd || 1]);
+  if (ol !== null) passes.push([ol, 1, 0, 0]);
+  passes.push([c, 0, 0, 0]);
+  for (const [col, grow, isSh, sd] of passes) {
+    let cx = x;
+    for (let i = 0; i < s.length && i < n; i++) {
+      const g = glyphOf(f, s[i]);
+      for (let r = 0; r < f.h; r++) {
+        const bits = g.bits[r]; if (!bits) continue;
+        for (let k = 0; k < g.w; k++) if (bits & (1 << k)) {
+          const px = cx + k * sc, py = y + r * sc;
+          if (isSh) rect(px + sd, py + sd, px + sc + bold + sd, py + sc + sd, col);
+          else if (grow) rect(px - 1, py - 1, px + sc + bold + 1, py + sc + 1, col);
+          else rect(px, py, px + sc + bold, py + sc, col);
+        }
+      }
+      cx += (g.w + 1) * sc;
+    }
+  }
+  return tw;
+}
+function wrap(f, s, maxW, sc) {
+  const words = s.split(' '); const lines = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (textW(f, t, sc) <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur); return lines;
+}
+function wrapBal(f, s, maxW, sc) {
+  let best = wrap(f, s, maxW, sc); const n = best.length; if (n < 2) return best;
+  for (let w = maxW - 2; w > 24; w -= 2) { const L = wrap(f, s, w, sc); if (L.length > n) break; best = L; }
+  return best;
+}
+
+// ---- 02_pal.js
+// ============================================================================
+// Shared helpers: noise, splines, periodic wobble, pops, IK, vectors.
+// Colour code (fixed for the whole film; colours are educational): dark navy
+// ground; monitor dark with a green trace; heart muscle crimson; SA node warm
+// yellow; AV node orange; conduction pathways electric cyan; cell membrane
+// deep purple-red; Na+ yellow, Ca2+ cyan, K+ purple; electrodes white and
+// silver; electrical signal neon green; digital processing cyan.
+// ============================================================================
+// 2-D value noise in [0,1)
+function vn2(x, y, s) {
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash3(i, j, s), b = hash3(i + 1, j, s), c = hash3(i, j + 1, s), d = hash3(i + 1, j + 1, s);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// Catmull-Rom spline through control points -> dense flat polyline (open or closed)
+function spline(pts, n, closed) {
+  const m = pts.length / 2, out = [];
+  const P_ = i => closed ? ((i % m) + m) % m : clamp(i, 0, m - 1);
+  const segs = closed ? m : m - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = P_(i - 1), b = P_(i), c = P_(i + 1), d = P_(i + 2);
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      for (let q = 0; q < 2; q++) {
+        const p0 = pts[2 * a + q], p1 = pts[2 * b + q], p2 = pts[2 * c + q], p3 = pts[2 * d + q];
+        out.push(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3));
+      }
+    }
+  }
+  if (!closed) out.push(pts[2 * (m - 1)], pts[2 * (m - 1) + 1]);
+  return out;
+}
+// periodic wobble: every environmental motion repeats exactly every 48 s (seamless loop)
+const LOOPW = k => TAU * k / DUR;
+function wob(t, k, ph) { return Math.sin(LOOPW(k) * t + ph); }
+// UI switch (renders a scene without its captions)
+let UI_ON = true;
+// Kurzgesagt pop: ~90% at 0.25 s, ~108% overshoot, settles by 0.5 s
+const pop = (t, t0, d) => t < t0 ? 0 : backOut(clamp((t - t0) / (d || 0.5), 0, 1), 1.1);
+function pulse(t, t0, d) { return t < t0 ? 0 : Math.max(0, 1 - (t - t0) / d); }
+// 2-bone IK: knee position for a limb from (bx,by) to (tx,ty) with segment lengths L1, L2; side = +1/-1 bends the knee
+function ik(bx, by, tx, ty, L1, L2, side) {
+  let dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1e-6;
+  const dm = Math.min(d, L1 + L2 - 1e-3), dn = Math.max(dm, Math.abs(L1 - L2) + 1e-3);
+  const a = (L1 * L1 - L2 * L2 + dn * dn) / (2 * dn), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+  const ux = dx / d, uy = dy / d;
+  return [bx + ux * a - uy * h * side, by + uy * a + ux * h * side];
+}
+// small 3-vector helpers
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add3 = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+// seeded RNG (deterministic paths)
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gaussR(r) { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+// fast sine table (big per-pixel loops)
+const SIN_N = 4096, SIN_T = new Float32Array(SIN_N + 1);
+for (let i = 0; i <= SIN_N; i++) SIN_T[i] = Math.sin(i / SIN_N * TAU);
+function fsin(x) { const u = x / TAU; return SIN_T[Math.floor((u - Math.floor(u)) * SIN_N)]; }
+
+// ---- 03_clock.js
+// ============================================================================
+// THE CLOCK: 120 BPM, 24 bars of 4/4 = exactly 48.000 s. The heart on screen
+// beats at 72 BPM (one beat every 5/3 of a music beat). Micro-scene starts
+// follow the brief; key physical events are placed on beats. Also the ECG
+// model (Lead II, normal sinus rhythm, illustrative), the real-time beat
+// lattice for the monitor, and the slowed single beat's time map.
+// ============================================================================
+const NBARS = 24, BEAT = DUR / (NBARS * 4), BPM = 60 / BEAT, BAR = 4 * BEAT, E8 = BEAT / 2, S16 = BEAT / 4;
+const lin = x => x;
+const bt = n => n * BEAT;                 // time of beat n (0-based)
+const barT = b => (b - 1) * BAR;          // start of bar b (1-based)
+const SC_T = [0, 1, 2, 3, 5, 8, 10, 12, 15, 17, 19, 22, 24, 26, 29, 32, 35, 38, 40, 43, 48];
+const SEQ = { A: [0, 3], B: [3, 12], C: [12, 26], D: [26, 35], E: [35, 43], F: [43, 48] };
+const SCENE_NAMES = ['THE HEART MONITOR', 'FOLLOW THE ELECTRODE', 'ENTER THE HEART', 'THE SINOATRIAL NODE', 'PACEMAKER ION CURRENTS',
+  'ELECTRICAL ACTIVATION SPREADS', 'THE P WAVE', 'AV NODE DELAY', 'HIS BUNDLE AND BUNDLE BRANCHES', 'PURKINJE FIBERS',
+  'VENTRICULAR DEPOLARIZATION', 'THE QRS COMPLEX', 'VENTRICULAR REPOLARIZATION', 'ELECTRICAL FIELDS IN THE BODY', 'ECG ELECTRODES',
+  'DIFFERENTIAL VOLTAGE', 'SIGNAL AMPLIFICATION', 'NOISE FILTERING', 'ANALOG TO DIGITAL', 'THE HEART BECOMES A WAVEFORM'];
+function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[i + 1]) i++; return i; }
+const T = i => SC_T[i];
+// ---------------------------------------------------------------- the ECG (Lead II, normal sinus rhythm; mV against ms after the P onset)
+// [centre ms, amplitude mV, width before, width after]: P, Q, R, S, T (the T wave rises slowly and falls faster)
+const ECG_W = [[45, 0.15, 20, 20], [168, -0.08, 6, 6], [200, 1.15, 8, 8], [224, -0.28, 7, 9], [395, 0.30, 52, 34]];
+function ecgMV(ms) { let v = 0; for (const [c, a, w1, w2] of ECG_W) { const d = ms - c, w = d < 0 ? w1 : w2; if (Math.abs(d) < 5 * w) v += a * Math.exp(-(d * d) / (2 * w * w)); } return v; }
+const HR = 72, RR = 60 / HR, R_MS = 200;
+// real-time R peaks at n·RR from frame 0 (0, 0.83, 1.67, 2.5 s: the third lands on beat 5, and at 3 s the heart is in
+// diastole, ready for the slowed beat); near the end the same lattice shifted by 48 s, so the last beep is the loop point
+const R0 = 0;
+const rBase = t => t < DUR / 2 ? R0 : R0 + DUR;
+// the beat that contains time t (P onset ≤ t): returns ms since that P onset
+function beatMs(t) { const p0 = rBase(t) - R_MS / 1000, n = Math.floor((t - p0) / RR); return (t - (p0 + n * RR)) * 1000; }
+const ecgLive = t => ecgMV(beatMs(t));
+// R-peak times inside [a, b) (for beeps and labels)
+function rPeaks(a, b) { const out = []; for (const base of [R0, R0 + DUR]) { const n0 = Math.ceil((a - base) / RR), n1 = Math.floor((b - base) / RR); for (let n = n0; n <= n1; n++) { const tr = base + n * RR; if (tr >= a && tr < b && (base === R0 ? tr < DUR / 2 : tr >= DUR / 2)) out.push(tr); } } return out; }
+// ---------------------------------------------------------------- the slowed beat (3–26 s): story time → ms after the P onset
+// SA node fires · atria (P) · AV delay · His · bundle branches + Purkinje · ventricles (QRS, R on the drop at 22 s) · ST · T
+const PHYS = [[3.0, -60], [6.5, -12], [10.0, 0], [12.0, 90], [15.0, 145], [17.0, 152], [19.0, 162], [22.0, 200], [24.0, 250], [24.4, 320], [26.0, 480], [27.0, 560]];
+function physMs(t) { if (t <= PHYS[0][0]) return PHYS[0][1]; for (let i = 0; i + 1 < PHYS.length; i++) { const [ta, ma] = PHYS[i], [tb, mb] = PHYS[i + 1]; if (t <= tb) return lerp(ma, mb, (t - ta) / (tb - ta)); } return PHYS[PHYS.length - 1][1]; }
+// conduction milestones (ms) used by the heart map and the labels
+const MS = { SA: -12, ATRIA_END: 90, AV_IN: 52, AV_OUT: 145, HIS: 150, BB: 156, PURK: 162, V_END: 232, T_START: 320, T_END: 480 };
+
+// ---- 05_fx.js
+// ============================================================================
+// Paths (arc-length parameterised polylines) and small geometric helpers.
+// ============================================================================
+class Path {
+  constructor(pts) { // flat [x0,y0,x1,y1,...]
+    this.p = pts; this.n = pts.length >> 1; this.c = [0];
+    for (let i = 1; i < this.n; i++) this.c.push(this.c[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]));
+    this.L = this.c[this.n - 1];
+  }
+  _seg(s) { s = clamp(s, 0, this.L); let lo = 0, hi = this.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (this.c[m] <= s) lo = m; else hi = m; } return [lo, s]; }
+  at(s) { const [i, ss] = this._seg(s); const l = this.c[i + 1] - this.c[i] || 1e-9, f = (ss - this.c[i]) / l; return [lerp(this.p[2 * i], this.p[2 * i + 2], f), lerp(this.p[2 * i + 1], this.p[2 * i + 3], f)]; }
+  tan(s) { const [i] = this._seg(s); const dx = this.p[2 * i + 2] - this.p[2 * i], dy = this.p[2 * i + 3] - this.p[2 * i + 1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+  sub(s0, s1, step) { // flat points of the sub-path
+    step = step || 2; const out = []; s0 = clamp(s0, 0, this.L); s1 = clamp(s1, 0, this.L);
+    for (let s = s0; s < s1; s += step) { const q = this.at(s); out.push(q[0], q[1]); }
+    const q = this.at(s1); out.push(q[0], q[1]); return out;
+  }
+}
+// rotate (x,y) by angle a about the origin
+function rot(x, y, a) { const c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; }
+// is a screen rect visible (with margin)
+const onScreen = (x0, y0, x1, y1, m) => { m = m || 0; return x1 >= -m && x0 <= W + m && y1 >= -m && y0 <= H + m; };
+// ---------------------------------------------------------------- particles shared by every world
+// starburst flash (detections, interactions)
+function flash(x, y, r, k, cols) {
+  cols = cols || [P.DT1, P.DT2, P.DT3, P.C6];
+  if (k <= 0) return;
+  disc(x, y, r * 1.6, cols[0], 0.3 * k); disc(x, y, r, cols[1], 0.6 * k); disc(x, y, r * 0.55, cols[2]); disc(x, y, r * 0.28, cols[3]);
+  for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + 0.2, L = r * (i % 2 ? 1.5 : 2.4) * k; line(x + Math.cos(a) * r * 0.4, y + Math.sin(a) * r * 0.4, x + Math.cos(a) * L, y + Math.sin(a) * L, i % 2 ? cols[1] : cols[2]); }
+}
+// arrows and marks used by labels
+function arrowHead(x, y, ang, s, col) { const ca = Math.cos(ang), sa = Math.sin(ang); poly([x + ca * s, y + sa * s, x - ca * s * 0.7 - sa * s * 0.7, y - sa * s * 0.7 + ca * s * 0.7, x - ca * s * 0.7 + sa * s * 0.7, y - sa * s * 0.7 - ca * s * 0.7], col); }
+function crossMark(x, y, s, col) { for (const d of [-1, 0, 1]) { line(x - s + d, y - s, x + s + d, y + s, col); line(x + s + d, y - s, x - s + d, y + s, col); } }
+function checkMark(x, y, s, col) { const pts = [x - s, y, x - s * 0.3, y + s * 0.7, x + s, y - s * 0.8]; for (const d of [-1, 0, 1]) { line(pts[0], pts[1] + d, pts[2], pts[3] + d, col); line(pts[2], pts[3] + d, pts[4], pts[5] + d, col); } }
+
+// ---- 10_room.js
+// ============================================================================
+// THE WARD (world px, z = 1 → 360 px wide). An original bedside ECG monitor on
+// the wall (portrait layout: the Lead II sweep on top, the heart-rate numerics
+// below), its cable, and the patient's chest (neck to waist, no face) with a
+// simplified three-electrode monitoring set: RA (white clip), LA (black), LL
+// (red). The heart sits behind the sternum, slightly to the patient's left.
+// ============================================================================
+const MON = { x0: 26, y0: 70, x1: 334, y1: 470, scr: [40, 86, 320, 412] };
+const ELEC = { RA: [112, 652], LA: [250, 650], LL: [248, 882] };
+const YOKE = [296, 596];
+const HEART_AT = { x: 192, y: 772, s: 0.4 };          // heart-map origin and scale inside the torso
+const WARD_DUST = Array.from({ length: 30 }, (_, i) => ({ x: hash(i * 3 + 21) * 360, y: hash(i * 3 + 22) * 1100, k: 0.3 + hash(i * 3 + 23) * 0.7, ph: hash(i + 700) * TAU }));
+function wardBG(cam, t) {
+  rect(0, 0, W, H, P.BG);
+  const X = v => cam.x(v), Y = v => cam.y(v);
+  for (let i = -2; i < 9; i++) { const x = X(i * 64 - 20); rect(x, 0, x + 1, H, P.N1); }
+  rect(0, Y(520), W, Y(524), P.N2);                                                     // wall rail
+  for (const d of WARD_DUST) { const x = ((d.x + 8 * wob(t, 2, d.ph) - cam.cx * 0.25 * d.k) % 360 + 360) % 360, y = ((d.y - (t / DUR) * 640 * (1 + Math.round(d.k * 2)) - cam.cy * 0.25 * d.k) % 640 + 640) % 640; pset(x, y, d.k > 0.7 ? P.N6 : P.N4); }
+}
+// ---------------------------------------------------------------- the monitor
+function drawMonitor(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  // wall arm
+  rect(X(160), Y(30), X(200), Y(MON.y0 + 6), P.M5); rect(X(166), Y(30), X(172), Y(MON.y0 + 6), P.M4);
+  const mb = maskRR(X(MON.x0), Y(MON.y0), X(MON.x1), Y(MON.y1), 14 * z); shade(mb, P.M1, P.MW, P.M3, P.M4, { k: Math.max(1, Math.round(z)) });
+  const [s0, s1, s2, s3] = MON.scr;
+  const ms_ = maskRR(X(s0 - 5), Y(s1 - 5), X(s2 + 5), Y(s3 + 5), 5 * z); shade(ms_, P.M6, P.M5, P.K0, P.K0, {});
+  // the screen UI is drawn at the opening zoom and scaled with the camera, so its pixel text never jumps in size
+  const ui = withCanvas(MON_W, MON_H, () => { rect(0, 0, MON_W, MON_H, P.SC0); monitorUI(0, 0, MON_W, MON_H, t, o); });
+  const sx0 = X(s0), sy0 = Y(s1), sw = X(s2) - sx0, sh = Y(s3) - sy0;
+  const ca = Math.max(0, Math.floor(sx0)), cb = Math.min(W, Math.ceil(sx0 + sw)), cc = Math.max(0, Math.floor(sy0)), cd = Math.min(H, Math.ceil(sy0 + sh));
+  for (let y = cc; y < cd; y++) {
+    const v = Math.floor((y + 0.5 - sy0) / sh * MON_H); if (v < 0 || v >= MON_H) continue;
+    const row = v * MON_W, ro = y * W;
+    for (let x = ca; x < cb; x++) { const u = Math.floor((x + 0.5 - sx0) / sw * MON_W); if (u >= 0 && u < MON_W) buf[ro + x] = ui[row + u]; }
+  }
+  // buttons, knob, power light
+  for (let k = 0; k < 5; k++) { const bx = 52 + k * 38; const m = maskRR(X(bx), Y(424), X(bx + 28), Y(442), 4 * z); shade(m, P.M2, P.MW, P.M3, P.M4, {}); }
+  disc(X(292), Y(436), 13 * z, P.M4); disc(X(292), Y(436), 10 * z, P.M2); rect(X(291), Y(426), X(293), Y(433), P.M5);
+  disc(X(46), Y(456), 2.5 * z, P.EG2);
+  // the cable leaving the bottom right
+  rect(X(294), Y(MON.y1 - 4), X(306), Y(MON.y1 + 8), P.M4);
+}
+// the screen: Lead II sweep (3 s per screen, green), heart rate, a heart icon that pulses on each R peak
+const SWEEP = 3.0, MON_Z = 1.12, MON_W = Math.round((MON.scr[2] - MON.scr[0]) * MON_Z), MON_H = Math.round((MON.scr[3] - MON.scr[1]) * MON_Z);
+function monitorUI(x0, y0, x1, y1, t, o) {
+  const w = x1 - x0, h = y1 - y0, sc = Math.max(1, Math.floor(w / 110));
+  // header
+  rect(x0, y0, x1, y0 + 9 * sc, P.SC1);
+  text(FS, 'ECG', x0 + 4 * sc, y0 + 2 * sc, { sc, c: P.EG2, ol: null });
+  text(FS, 'LEAD II', x0 + 24 * sc, y0 + 2 * sc, { sc, c: P.EG3, ol: null });
+  text(FS, '25 mm/s', x1 - 4 * sc, y0 + 2 * sc, { sc, c: P.EG1, ol: null, align: 'right' });
+  // trace area with a faint grid
+  const ty0 = y0 + 12 * sc, ty1 = y0 + h * 0.5, tw = w - 8 * sc, tx0 = x0 + 4 * sc;
+  for (let gx = 0; gx <= 10; gx++) rect(tx0 + gx * tw / 10, ty0, tx0 + gx * tw / 10 + 1, ty1, P.SC2);
+  for (let gy = 0; gy <= 4; gy++) rect(tx0, lerp(ty0, ty1, gy / 4), tx0 + tw, lerp(ty0, ty1, gy / 4) + 1, P.SC2);
+  const base = lerp(ty0, ty1, 0.7), amp = (ty1 - ty0) * 0.52;
+  const head = ((t / SWEEP + 0.62) % 1) * tw;
+  let px_ = null, py_ = null;
+  for (let x = 0; x < tw; x++) {
+    const ahead = (x - head + tw) % tw; if (ahead > 0 && ahead < 7 * sc) { px_ = null; continue; }   // the erase bar ahead of the pen
+    const tw_ = t - ((head - x + tw) % tw) / tw * SWEEP, v = ecgLive(tw_), y = base - v * amp, sx = tx0 + x;
+    if (px_ !== null) lineW(px_, py_, sx, y, Math.max(1.6, sc * 0.9), P.EG2);
+    px_ = sx; py_ = y;
+  }
+  disc(tx0 + head, base - ecgLive(t) * amp, 1.6 * sc, P.EG4);
+  // P, QRS and T marked on the most recent full beat (the ending)
+  if (o.marks > 0) {
+    const rp = o.markR;                                   // one fixed beat, so the marks never hop
+    if (rp !== undefined && t - rp > 0.42 && t - rp < SWEEP * 0.98) {
+      const xr = tx0 + head - (t - rp) / SWEEP * tw, xx = x => x < tx0 ? x + tw : x, yy = ms => base - ecgMV(ms) * amp;
+      const mk = (s, dms, c, dx, dy, al) => { const x = xx(xr + dms / 1000 / SWEEP * tw); text(FC, s, x + dx * sc, yy(dms + R_MS) - dy * sc, { sc, c, ol: P.SH, align: al || 'center', n: o.marks * 4 }); };
+      mk('P', -155, P.SA2, 0, 16); mk('QRS', 0, P.EG4, 5, -4, 'left'); mk('T', 195, P.KK1, 0, 16);
+    }
+  }
+  // numerics
+  const ny = ty1 + 6 * sc;
+  rect(x0 + 3 * sc, ny, x1 - 3 * sc, y1 - 3 * sc, P.SC1);
+  text(FS, 'HR', x0 + 8 * sc, ny + 5 * sc, { sc, c: P.EG2, ol: null });
+  text(FS, 'bpm', x0 + 8 * sc, ny + 14 * sc, { sc, c: P.EG1, ol: null });
+  text(FC, String(HR), x0 + 34 * sc, ny + 4 * sc, { sc: 4 * sc, c: P.EG2, ol: null });
+  // heart icon: grows a little on each R peak (no flash)
+  const lastR = rPeaks(t - 0.4, t + 1e-6).pop(), pk = lastR === undefined ? 0 : Math.exp(-(t - lastR) * 9), hs = sc * (3 + 1.2 * pk), hx = x1 - 22 * sc, hy = ny + 16 * sc;
+  disc(hx - hs * 0.55, hy - hs * 0.2, hs * 0.62, P.EG2); disc(hx + hs * 0.55, hy - hs * 0.2, hs * 0.62, P.EG2); poly([hx - hs * 1.12, hy, hx + hs * 1.12, hy, hx, hy + hs * 1.2], P.EG2);
+  text(FS, 'NORMAL SINUS RHYTHM', x0 + 8 * sc, y1 - 12 * sc, { sc, c: P.EG1, ol: null });
+  // the ending's inset: the same heart beating in step with the trace, and what each wave means
+  if (o.pip > 0) withDither(o.pip, () => {
+    const px0 = x0 + 3 * sc, px1 = x1 - 3 * sc, py0 = ny, py1 = y1 - 3 * sc, ms = beatMs(t);
+    rect(px0, py0, px1, py1, P.K0); frame(px0, py0, px1, py1, P.EG1);
+    drawHeart(new Cam(0, 0, 1, 0, 0), ms, { at: { x: px0 + 50, y: py0 + (py1 - py0) * 0.6, s: 0.3 }, cond: 1 });
+    text(FS, 'HR ' + HR, px1 - 6, py0 + 6, { sc, c: P.EG2, ol: null, align: 'right' });
+    const act = ms >= -20 && ms < 125 ? 0 : ms >= 160 && ms < 260 ? 1 : ms >= 300 && ms < 500 ? 2 : -1;
+    [['P', 'ATRIA', P.SA2], ['QRS', 'VENTRICLES', P.EG4], ['T', 'RECOVERY', P.KK1]].forEach(([a, b, c], i) => {
+      const y = py0 + 40 + i * 30, on = act === i, lx = px0 + 104;
+      if (on) rect(lx - 6, y - 5, px1 - 6, y + 17, P.SC1);
+      text(FS, a, lx, y, { sc, c: on ? c : mixc(c, P.K0, 0.45), ol: null });
+      text(FS, b, lx + 38, y, { sc, c: on ? P.INK : P.SUB, ol: null });
+    });
+  });
+}
+// ---------------------------------------------------------------- the patient's chest (no face), electrodes, wires
+// a diagram-style chest: the neck fades into the dark above the collarbones; arms at the sides; gown and sheet below
+const TORSO = [158, 560, 202, 560, 210, 604, 296, 622, 330, 664, 322, 770, 300, 900, 292, 1000, 68, 1000, 60, 900, 38, 770, 30, 664, 64, 622, 150, 604];
+const ARM_L = [330, 664, 352, 700, 360, 800, 352, 930, 326, 932, 322, 800, 318, 712];
+const ARM_R = [30, 664, 8, 700, 0, 800, 8, 930, 34, 932, 38, 800, 42, 712];
+function torsoShape() { return TORSO; }
+// o: { xray (0..1 skin see-through), heartMs, cond }
+function drawTorso(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z, xr = o.xray || 0;
+  // the bed behind the patient
+  rect(0, Y(640), W, H, P.BE1); rect(0, Y(640), W, Y(645), P.BE2);
+  for (const A of [ARM_L, ARM_R]) { const m = maskPoly(cam.pts(A)); shade(m, P.SK2, P.SK3, P.SK1, P.SK0, { k: Math.max(1, Math.round(z)) }); }
+  const skin = () => {
+    const m = maskPoly(cam.pts(TORSO)); shade(m, P.SK2, P.SK3, P.SK1, P.SK0, { k: Math.max(1, Math.round(z)) });
+    // collarbones, the notch between them, the chest muscles, a centre line and lower-rib hints
+    for (const s_ of [-1, 1]) {
+      let px_ = null, py_ = null; for (let i = 0; i <= 10; i++) { const u = i / 10, x = 180 + s_ * (14 + u * 104), y = 620 + 9 * Math.sin(u * 3) - u * 6; if (px_ !== null) lineW(px_, py_, X(x), Y(y), 1.8 * z, P.SK1); px_ = X(x); py_ = Y(y); }
+      px_ = null; for (let i = 0; i <= 12; i++) { const u = i / 12, x = 180 + s_ * (8 + 104 * Math.sin(u * 1.5)), y = 700 + 64 * Math.sin(u * 2.4) * (1 - u * 0.3); if (px_ !== null) lineW(px_, py_, X(x), Y(y), 1.2 * z, mixc(P.SK2, P.SK1, 0.7)); px_ = X(x); py_ = Y(y); }
+    }
+    disc(X(180), Y(616), 5 * z, P.SK1); lineW(X(180), Y(640), X(180), Y(790), 1.2 * z, mixc(P.SK2, P.SK1, 0.6));
+    for (let k = 0; k < 3; k++) { const y = 846 + k * 20; lineW(X(112 + k * 5), Y(y), X(158), Y(y + 24), 1.2 * z, mixc(P.SK2, P.SK1, 0.45)); lineW(X(248 - k * 5), Y(y), X(202), Y(y + 24), 1.2 * z, mixc(P.SK2, P.SK1, 0.45)); }
+  };
+  if (xr < 1) withDither(1 - xr * 0.82, skin);
+  if (xr > 0) {
+    // inside: ribs and sternum (pale), the heart behind them
+    withDither(xr, () => {
+      const m = maskPoly(cam.pts(TORSO)); mFill(m, P.HM0);
+      if (o.heartMs !== undefined) drawHeart(cam, o.heartMs, { at: HEART_AT, cond: o.cond || 0 });
+      for (let k = 0; k < 6; k++) for (const s_ of [-1, 1]) { let px_ = null, py_ = null; for (let i = 0; i <= 12; i++) { const u = i / 12, x = 180 + s_ * (14 + u * 128), y = 650 + k * 44 + 30 * Math.sin(u * 2.4) - 6; if (px_ !== null) lineW(px_, py_, X(x), Y(y), 4 * z, P.BN0); px_ = X(x); py_ = Y(y); } }
+      rect(X(173), Y(628), X(187), Y(870), P.BN0);
+    });
+  }
+  // the neck fades into the dark (no head, no face)
+  for (let k = 0; k < 10; k++) tintRect(X(150), Y(552 + k * 5), X(210), Y(557 + k * 5), P.BG, 1 - k / 10);
+  // gown at the waist and the sheet below
+  const gw = maskPoly(cam.pts([40, 930, 320, 930, 330, 1010, 30, 1010])); shade(gw, P.FN2, P.FN3, P.FN1, P.K0, {});
+  const sh = maskPoly(cam.pts([0, 996, 360, 990, 360, 1160, 0, 1160])); shade(sh, P.SH1, P.SH2, P.SH0, P.SH0, {});
+  for (let k = 0; k < 4; k++) lineW(X(60 + k * 70), Y(1004), X(40 + k * 74), Y(1120), 1.4 * z, P.SH0);
+  drawLeads(cam, t, o);
+}
+function drawElectrode(cam, x, y, clip, hi) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  disc(X(x), Y(y), 15 * z, P.AL1); disc(X(x), Y(y), 14 * z, P.EW); disc(X(x - 3), Y(y - 3), 9 * z, P.C6);
+  disc(X(x), Y(y), 5 * z, P.AL1); disc(X(x), Y(y), 4 * z, P.AL3); disc(X(x - 1), Y(y - 1), 1.6 * z, P.AL4);
+  const m = maskRR(X(x - 6), Y(y - 18), X(x + 6), Y(y - 6), 2 * z); shade(m, clip, mixc(clip, P.C6, 0.4), mixc(clip, P.K0, 0.4), P.K0, {});
+  if (hi > 0) ring(X(x), Y(y), 20 * z, 1.5, P.YEL, hi);
+}
+function drawLeads(cam, t, o) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  const sag = (a, b, s) => { const out = []; for (let i = 0; i <= 14; i++) { const u = i / 14; out.push(lerp(a[0], b[0], u), lerp(a[1], b[1], u) + s * Math.sin(Math.PI * u)); } return out; };
+  const wire = (pts, c, wd) => { for (let i = 0; i + 3 < pts.length; i += 2) lineW(X(pts[i]), Y(pts[i + 1]), X(pts[i + 2]), Y(pts[i + 3]), wd * z, c); };
+  // trunk cable from the monitor to the yoke, then three lead wires
+  const trunk = sag([300, 476], YOKE, 18); wire(trunk, P.CB0, 5.4); wire(trunk, P.CB1, 3.2);
+  const leads = [[ELEC.RA, P.EW, -26], [ELEC.LA, P.CK, 16], [ELEC.LL, P.CR, 30]];
+  for (const [e, c, s] of leads) { const p = sag(YOKE, [e[0], e[1] - 16], s); wire(p, P.CB0, 3.4); wire(p, mixc(P.CB1, c, 0.35), 2); }
+  const m = maskRR(X(YOKE[0] - 9), Y(YOKE[1] - 8), X(YOKE[0] + 9), Y(YOKE[1] + 10), 3 * z); shade(m, P.CB1, P.CB2, P.CB0, P.K0, {});
+  const hi = o.hiElec || {};
+  drawElectrode(cam, ELEC.RA[0], ELEC.RA[1], P.EW, hi.RA || 0);
+  drawElectrode(cam, ELEC.LA[0], ELEC.LA[1], P.CK, hi.LA || 0);
+  drawElectrode(cam, ELEC.LL[0], ELEC.LL[1], P.CR, hi.LL || 0);
+}
+// the ward: monitor above, patient below
+function wardScene(cam, t, o) { wardBG(cam, t); drawTorso(cam, t, o || {}); drawMonitor(cam, t, o || {}); }
+
+// ---- 11_heart.js
+// ============================================================================
+// THE HEART (heart-map units: 1 unit = 1 px at z = 1, origin at the heart's
+// centre; the patient's left is the viewer's right, so the apex points down to
+// the right). A frontal four-chamber cut: right and left atria above the
+// fibrous AV ring (which insulates them from the ventricles), right and left
+// ventricles below with the septum between them, the superior vena cava and the
+// aortic arch on top. The conduction system: the SA node (yellow) where the
+// vena cava meets the right atrium, the AV node (orange) at the bottom of the
+// atrial septum, the His bundle through the ring, the right and left bundle
+// branches down the septum and the Purkinje network along the ventricle walls
+// (cyan). Every muscle pixel has an activation time (ms after the P onset):
+// the atria fill from the SA node outward, the ventricles from the Purkinje
+// endings outward; ventricular recovery runs the other way round (last
+// activated, first recovered), which keeps the T wave upright. Mechanical
+// contraction follows activation.
+// ============================================================================
+const HG = { x0: -160, y0: -244, w: 320, h: 424 };
+const R_OUT = 0, R_AMY = 1, R_VMY = 2, R_RA = 3, R_LA = 4, R_RV = 5, R_LV = 6, R_RING = 7, R_SVC = 8, R_AO = 9;
+const HREG = new Uint8Array(HG.w * HG.h), HACT = new Float32Array(HG.w * HG.h).fill(1e9), HREP = new Float32Array(HG.w * HG.h).fill(1e9), HSHD = new Uint8Array(HG.w * HG.h);
+const ringY = x => -30 - 22 * (x + 150) / 290;
+function ellV(x, y, cx, cy, rx, ry, rot) { const c = Math.cos(rot || 0), s = Math.sin(rot || 0), dx = x - cx, dy = y - cy, u = (dx * c + dy * s) / rx, v = (-dx * s + dy * c) / ry; return u * u + v * v; }
+// conduction pathways (heart units) with their activation window (ms)
+const SA_NODE = [-92, -134, 11, 6], AV_NODE = [-6, -49, 10, 6];
+const PATHS = [
+  { id: 'HIS', pts: [-4, -44, -1, -32, 2, -20], t0: 145, t1: 150 },
+  { id: 'LBB', pts: [2, -20, 9, 0, 17, 28, 28, 58, 42, 90, 56, 114], t0: 150, t1: 156 },
+  { id: 'RBB', pts: [2, -20, -3, 6, -1, 40, 8, 74, 24, 104], t0: 150, t1: 156 },
+  { id: 'MB', pts: [8, 74, -24, 80, -62, 70], t0: 154, t1: 158 },
+  { id: 'PLV', pts: [56, 114, 82, 92, 98, 60, 104, 24, 100, -6], t0: 156, t1: 162 },
+  { id: 'PRV', pts: [24, 104, -20, 112, -62, 98, -92, 60, -100, 16, -98, -10], t0: 156, t1: 162 },
+  { id: 'PS1', pts: [28, 58, 40, 50, 52, 30], t0: 155, t1: 159 }, { id: 'PS2', pts: [42, 90, 66, 80, 80, 66], t0: 156, t1: 160 },
+  { id: 'PS3', pts: [-1, 40, -20, 30, -34, 14], t0: 154, t1: 158 }, { id: 'PS4', pts: [98, 60, 84, 48, 74, 30], t0: 159, t1: 162 },
+  { id: 'PS5', pts: [-92, 60, -76, 50, -66, 30], t0: 159, t1: 162 }, { id: 'PS6', pts: [-62, 98, -50, 86, -40, 74], t0: 158, t1: 161 },
+];
+PATHS.forEach(p => { const P_ = new Path(p.pts); p.path = P_; });
+// ---------------------------------------------------------------- build the map once
+(function buildHeart() {
+  const W_ = HG.w, idx = (gx, gy) => gy * W_ + gx;
+  for (let gy = 0; gy < HG.h; gy++) for (let gx = 0; gx < W_; gx++) {
+    const x = gx + HG.x0 + 0.5, y = gy + HG.y0 + 0.5, ry_ = ringY(x);
+    const outer = ellV(x, y, -56, -86, 76, 66, 0) <= 1 || ellV(x, y, 50, -96, 66, 50, 0) <= 1 || ellV(x, y, 14, 50, 112, 120, -0.38) <= 1 || ellV(x, y, 56, 116, 50, 56, -0.5) <= 1;
+    let r = R_OUT;
+    if (outer) {
+      const ra = ellV(x, y, -62, -86, 50, 44, 0) <= 1, la = ellV(x, y, 48, -96, 46, 34, 0) <= 1;
+      const rv = ellV(x, y, -42, 46, 44, 70, -0.25) <= 1 || ellV(x, y, -68, ry_ + 2, 32, 16, 0) <= 1;
+      const lv = ellV(x, y, 48, 50, 30, 76, -0.45) <= 1 || ellV(x, y, 52, ry_ + 2, 30, 14, 0) <= 1;
+      const inTri = x > -100 && x < -36, inMit = x > 16 && x < 88;
+      if (Math.abs(y - ry_) < 3.5 && !((inTri && (ra || rv)) || (inMit && (la || lv)))) r = R_RING;
+      else if (y < ry_) r = ra || (inTri && rv) ? R_RA : la || (inMit && lv) ? R_LA : R_AMY;
+      else r = rv ? R_RV : lv ? R_LV : R_VMY;
+    } else {
+      if (x > -112 && x < -80 && y < -120) r = R_SVC;
+      const aoPath = [[26, -128], [26, -186], [42, -212], [80, -224], [114, -210], [122, -172]];
+      for (let i = 0; i + 1 < aoPath.length; i++) { const [ax, ay] = aoPath[i], [bx, by] = aoPath[i + 1], L = Math.hypot(bx - ax, by - ay), u = clamp(((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / (L * L), 0, 1), d = Math.hypot(x - ax - u * (bx - ax), y - ay - u * (by - ay)); if (d < 15) r = R_AO; }
+    }
+    HREG[idx(gx, gy)] = r;
+  }
+  // valve leaflets hanging into the ventricles
+  const leaflet = (x0, x1) => { const y0 = ringY(x0); for (let i = 0; i <= 30; i++) { const u = i / 30, x = lerp(x0, x1, u), y = lerp(y0, y0 + 24, u); const gx = Math.floor(x - HG.x0), gy = Math.floor(y - HG.y0); for (const [ox, oy] of [[0, 0], [1, 0]]) { const k = idx(gx + ox, gy + oy); if (HREG[k] === R_RV || HREG[k] === R_LV) HREG[k] = R_RING; } } };
+  leaflet(-98, -80); leaflet(-38, -56); leaflet(18, 36); leaflet(86, 66);
+  // activation: shortest paths through muscle (8-neighbour Dijkstra with a binary heap)
+  function flood(region, seeds, msPerUnit) {
+    const dist = new Float64Array(W_ * HG.h).fill(1e9), heap = [];
+    const push = (k, d) => { heap.push([d, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+    for (const [k, d] of seeds) if (d < dist[k]) { dist[k] = d; push(k, d); }
+    const nb = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
+    while (heap.length) {
+      const [d, k] = pop(); if (d > dist[k]) continue;
+      const gx = k % W_, gy = (k / W_) | 0;
+      for (const [ox, oy, c] of nb) { const nx = gx + ox, ny = gy + oy; if (nx < 0 || ny < 0 || nx >= W_ || ny >= HG.h) continue; const kk = idx(nx, ny); if (HREG[kk] !== region) continue; const nd = d + c * msPerUnit; if (nd < dist[kk]) { dist[kk] = nd; push(kk, nd); } }
+    }
+    return dist;
+  }
+  const near = (x, y, region) => { let best = -1, bd = 1e9; for (let oy = -8; oy <= 8; oy++) for (let ox = -8; ox <= 8; ox++) { const gx = Math.floor(x - HG.x0) + ox, gy = Math.floor(y - HG.y0) + oy; if (gx < 0 || gy < 0 || gx >= W_ || gy >= HG.h) continue; const k = idx(gx, gy); if (HREG[k] === region && ox * ox + oy * oy < bd) { bd = ox * ox + oy * oy; best = k; } } return best; };
+  // atria from the SA node
+  const aSeeds = []; for (let oy = -6; oy <= 6; oy++) for (let ox = -11; ox <= 11; ox++) { const k = near(SA_NODE[0] + ox, SA_NODE[1] + oy, R_AMY); if (k >= 0) aSeeds.push([k, 0]); }
+  const da = flood(R_AMY, aSeeds, 1);
+  let amax = 0; for (let k = 0; k < da.length; k++) if (HREG[k] === R_AMY && da[k] < 1e8) amax = Math.max(amax, da[k]);
+  for (let k = 0; k < da.length; k++) if (HREG[k] === R_AMY) { HACT[k] = da[k] < 1e8 ? 2 + da[k] / amax * 86 : 60; HREP[k] = 170 + HACT[k] * 0.5; }   // atria recover during the QRS (hidden in it on the ECG)
+  // ventricles from the bundle branches and the Purkinje endings
+  const vSeeds = [];
+  for (const p of PATHS) { if (p.id === 'HIS') continue; for (let s = 0; s <= p.path.L; s += 3) { const [x, y] = p.path.at(s), k = near(x, y, R_VMY); if (k >= 0) vSeeds.push([k, lerp(p.t0, p.t1, s / p.path.L)]); } }
+  const dv = flood(R_VMY, vSeeds, 0.62);
+  let vmax = 0, vmin = 1e9; for (let k = 0; k < dv.length; k++) if (HREG[k] === R_VMY && dv[k] < 1e8) { vmax = Math.max(vmax, dv[k]); vmin = Math.min(vmin, dv[k]); }
+  for (let k = 0; k < dv.length; k++) if (HREG[k] === R_VMY) {
+    const a = dv[k] < 1e8 ? MS.PURK - 8 + (dv[k] - vmin) / (vmax - vmin) * (MS.V_END - MS.PURK + 8) : 200;
+    HACT[k] = a; HREP[k] = 470 - (a - (MS.PURK - 8)) / (MS.V_END - MS.PURK + 8) * 140;
+  }
+  // 16-bit shading: outline on the outer edge, light rim facing up-left, shadow facing down-right; darker endocardium
+  for (let gy = 0; gy < HG.h; gy++) for (let gx = 0; gx < W_; gx++) {
+    const k = idx(gx, gy), r = HREG[k]; if (r === R_OUT) continue;
+    let sx = 0, sy = 0, edge = false, inner = false;
+    for (let oy = -3; oy <= 3; oy++) for (let ox = -3; ox <= 3; ox++) {
+      const nx = gx + ox, ny = gy + oy, rr = nx < 0 || ny < 0 || nx >= W_ || ny >= HG.h ? R_OUT : HREG[idx(nx, ny)];
+      if (rr === R_OUT) { sx += ox; sy += oy; if (Math.abs(ox) <= 1 && Math.abs(oy) <= 1) edge = true; }
+      if ((r === R_AMY || r === R_VMY) && rr >= R_RA && rr <= R_LV && Math.abs(ox) <= 1 && Math.abs(oy) <= 1) inner = true;
+      if (r >= R_RA && r <= R_LV && (rr === R_AMY || rr === R_VMY) && Math.abs(ox) <= 2 && Math.abs(oy) <= 2) inner = true;
+    }
+    HSHD[k] = edge ? 3 : sx + sy < -1 ? 1 : sx + sy > 1 ? 2 : inner ? 2 : 0;
+  }
+})();
+// ---------------------------------------------------------------- drawing
+const bump = (m, a, b, c) => m <= a || m >= c ? 0 : m < b ? smooth((m - a) / (b - a)) : smooth((c - m) / (c - b));
+// o: { at: {x, y, s} (where the map sits in the world), cond (0..1 conduction overlay), alpha }
+function drawHeart(cam, m, o) {
+  o = o || {};
+  const at = o.at || { x: 0, y: 0, s: 1 }, s = at.s, z = cam.z * s;
+  const cA = bump(m, 60, 140, 240), cV = bump(m, 240, 360, 560);
+  // screen bbox of the map
+  const sx0 = Math.max(0, Math.floor(cam.x(at.x + HG.x0 * s))), sx1 = Math.min(W, Math.ceil(cam.x(at.x + (HG.x0 + HG.w) * s)));
+  const sy0 = Math.max(0, Math.floor(cam.y(at.y + HG.y0 * s))), sy1 = Math.min(H, Math.ceil(cam.y(at.y + (HG.y0 + HG.h) * s)));
+  const colM = [[P.HM2, P.HM3, P.HM1, P.HM0], [P.HM4, P.HM5, P.HM3, P.HM1]];
+  for (let sy = sy0; sy < sy1; sy++) {
+    const ly0 = (cam.wy(sy + 0.5) - at.y) / s;
+    for (let sx = sx0; sx < sx1; sx++) {
+      let lx = (cam.wx(sx + 0.5) - at.x) / s, ly = ly0;
+      // contraction: sample a little farther out, so the chambers shrink toward their centres
+      const w = smooth(clamp((ly - ringY(lx) + 30) / 60, 0, 1)), kk = 1 + 0.07 * (cA * (1 - w) + cV * w);
+      if (kk > 1) { const cx_ = lerp(-20, 30, w), cy_ = lerp(-90, 60, w); lx = cx_ + (lx - cx_) * kk; ly = cy_ + (ly - cy_) * kk; }
+      const gx = Math.floor(lx - HG.x0), gy = Math.floor(ly - HG.y0);
+      if (gx < 0 || gy < 0 || gx >= HG.w || gy >= HG.h) continue;
+      const k = gy * HG.w + gx, r = HREG[k]; if (r === R_OUT) continue;
+      const sh = HSHD[k]; let c;
+      if (r === R_AMY || r === R_VMY) {
+        const a = HACT[k], rp = HREP[k];
+        const on = m >= a && m < rp + 25, f = m < rp ? 1 : 1 - (m - rp) / 25;
+        c = on ? mixc(colM[0][sh], colM[1][sh], f) : colM[0][sh];
+        if (m >= a && m - a < (r === R_AMY ? 3.2 : 2.2) && sh !== 3) c = mixc(c, P.C6, 0.55);
+      } else if (r >= R_RA && r <= R_LV) c = sh === 2 ? P.BD0 : sh === 3 ? P.HM0 : sh === 1 ? P.BD2 : P.BD1;
+      else if (r === R_RING) c = sh === 3 ? P.HM0 : sh === 2 ? P.VL0 : P.VL1;
+      else if (r === R_SVC) c = sh === 3 ? P.K0 : sh === 1 ? P.VE1 : P.VE0;
+      else c = sh === 3 ? P.K0 : sh === 1 ? P.AO1 : P.AO0;
+      buf[sy * W + sx] = c;
+    }
+  }
+  if ((o.cond || 0) > 0) withDither(o.cond, () => drawConduction(cam, m, at));
+}
+function drawConduction(cam, m, at) {
+  const s = at.s, X = v => cam.x(at.x + v * s), Y = v => cam.y(at.y + v * s), z = cam.z * s, lw = Math.max(1.2, 2.4 * z);
+  // pathways: dim until reached, bright once activated, a lighter front where the activation is now
+  for (const p of PATHS) {
+    const pts = p.path.sub(0, p.path.L, 2), n = pts.length / 2;
+    for (let i = 0; i + 1 < n; i++) {
+      const u = i / (n - 1), ta = lerp(p.t0, p.t1, u), x0 = X(pts[2 * i]), y0 = Y(pts[2 * i + 1]), x1 = X(pts[2 * i + 2]), y1 = Y(pts[2 * i + 3]);
+      const c = m < ta ? P.CY1 : m - ta < 2 ? P.CY3 : P.CY2;
+      lineW(x0, y0, x1, y1, lw + 1.2, P.CY0); lineW(x0, y0, x1, y1, lw, c);
+    }
+  }
+  // AV node: fills slowly (the delay), from the atrial side toward the His bundle
+  { const [x, y, rx, ry] = AV_NODE, f = clamp((m - MS.AV_IN) / (MS.AV_OUT - MS.AV_IN), 0, 1);
+    ellipse(X(x), Y(y), (rx + 1.5) * z, (ry + 1.5) * z, P.AV0); ellipse(X(x), Y(y), rx * z, ry * z, P.AV1);
+    if (f > 0) { const xm = lerp(x - rx, x + rx, f); for (let yy = -ry; yy <= ry; yy++) { const half = rx * Math.sqrt(Math.max(0, 1 - (yy / ry) ** 2)); const xa = x - half, xb = Math.min(x + half, xm); if (xb > xa) rect(X(xa), Y(y + yy), X(xb), Y(y + yy + 1), P.AV2); } }
+    if (m >= MS.AV_IN && m < MS.AV_OUT + 15) glow(X(x), Y(y), 16 * z, P.AV1, P.AV2, 0.35);
+    // the hold made visible: a ring of dots fills around the node while the signal waits
+    if (z > 0.8 && m >= MS.AV_IN - 4 && m < MS.AV_OUT + 30) {
+      const n = Math.round(f * 28), fade = m > MS.AV_OUT + 12 ? 1 - (m - MS.AV_OUT - 12) / 18 : 1;
+      for (let i = 0; i < 28; i++) { const a = -Math.PI / 2 + i / 28 * TAU, px = X(x + (rx + 6) * Math.cos(a)), py = Y(y + (ry + 6) * Math.sin(a)); disc(px, py, Math.max(1, 1.1 * z), i < n ? (fade < 1 && bay(Math.floor(px), Math.floor(py)) > fade ? P.AV0 : P.AV3) : P.AV0); }
+    } }
+  // SA node: fires first
+  { const [x, y, rx, ry] = SA_NODE, on = m >= MS.SA ? Math.max(0, 1 - (m - MS.SA) / 80) : 0.15 + 0.15 * Math.max(0, (m + 60) / 48);
+    ellipse(X(x), Y(y), (rx + 1.5) * z, (ry + 1.5) * z, P.SA0); ellipse(X(x), Y(y), rx * z, ry * z, on > 0.4 ? P.SA2 : P.SA1);
+    if (on > 0) glow(X(x), Y(y), 18 * z, P.SA1, P.SA3, 0.45 * on); }
+}
+
+// ---- 12_cell.js
+// ============================================================================
+// ONE CELL'S MEMBRANE (world px; the membrane lies along y = 0, outside above,
+// inside below). Three ion channels sit in the lipid bilayer; ions start in
+// their real compartments (Na⁺ and Ca²⁺ mostly outside, K⁺ mostly inside) and
+// only cross through an open channel, down their gradients. The charge signs
+// along the membrane flip as the inside becomes positive, and the voltage graph
+// follows the same model.
+//  • SA-node pacemaker cell: a slow Na⁺ leak through the "funny" (HCN) channel
+//    raises the voltage by itself; Ca²⁺ channels make the upstroke (no fast Na⁺
+//    upstroke here); K⁺ channels bring it back down; then it starts again.
+//  • Ventricular muscle cell: fast Na⁺ channels make the sharp upstroke, Ca²⁺
+//    channels hold the plateau, K⁺ channels repolarize it.
+// Also: a row of atrial muscle cells joined by gap junctions.
+// ============================================================================
+const MEM = { hw: 22, chX: [-80, 0, 80] };
+const CELL_KIND = {
+  pace: { ions: ['NA', 'CA', 'KK'], names: ['Na⁺', 'Ca²⁺', 'K⁺'], rest: -60, peak: 12,
+    gate: [[5.0, 6.5], [6.4, 7.0], [6.9, 7.75]], flux: [[4.975, 0.25, 6, 0.55], [6.4, 0.05, 6, 0.26], [6.775, 0.125, 6, 0.45]] },
+  vent: { ions: ['NA', 'CA', 'KK'], names: ['Na⁺', 'Ca²⁺', 'K⁺'], rest: -85, peak: 25,
+    gate: [[20.17, 20.47], [20.35, 24.3], [24.25, 25.3]], flux: [[20.17, 0.022, 10, 0.16], [20.29, 0.25, 6, 0.42], [24.275, 0.125, 8, 0.45]] },
+};
+function vmPacemaker(t) {
+  if (t < 5.0) return -60;
+  if (t < 6.5) return lerp(-60, -40, Math.pow((t - 5) / 1.5, 1.3));
+  if (t < 6.67) return lerp(-40, 12, smooth((t - 6.5) / 0.17));
+  if (t < 6.95) return lerp(12, 5, (t - 6.67) / 0.28);
+  if (t < 7.75) return lerp(5, -60, smooth((t - 6.95) / 0.8));
+  return lerp(-60, -56, clamp((t - 7.75) / 0.3, 0, 1));
+}
+function vmVentricle(t) {
+  if (t < 20.25) return -85;
+  if (t < 20.37) return lerp(-85, 25, smooth((t - 20.25) / 0.12));
+  if (t < 20.6) return lerp(25, 4, smooth((t - 20.37) / 0.23));
+  if (t < 24.3) return lerp(4, -2, (t - 20.6) / 3.7);
+  if (t < 25.3) return lerp(-2, -85, smooth((t - 24.3) / 1.0));
+  return -85;
+}
+// ions: rest positions in their compartments, and which ones will cross
+function makeIons(kind) {
+  const K = CELL_KIND[kind], out = [];
+  const add = (type, n, inside, seed) => { for (let i = 0; i < n; i++) out.push({ type, x0: (hash(seed + i * 3) - 0.5) * 340, y0: (inside ? 1 : -1) * (48 + hash(seed + i * 3 + 1) * 230), ph: hash(seed + i * 3 + 2) * TAU, flux: null }); };
+  add('NA', 22, false, 100); add('CA', 10, false, 200); add('KK', 20, true, 300); add('NA', 4, true, 400); add('KK', 3, false, 500);
+  // assign crossers: the outside ions nearest each channel cross inward (K⁺ the inside ones outward)
+  K.flux.forEach(([t0, dt, n, dur], c) => {
+    const type = K.ions[c], inward = type !== 'KK', cx = MEM.chX[c];
+    const cand = out.filter(o => o.type === type && !o.flux && (inward ? o.y0 < 0 : o.y0 > 0)).sort((a, b) => Math.abs(a.x0 - cx) + Math.abs(a.y0) * 0.5 - (Math.abs(b.x0 - cx) + Math.abs(b.y0) * 0.5));
+    cand.slice(0, n).forEach((o, i) => { o.flux = { t0: t0 + i * dt, dur, cx, x1: cx + (hash(c * 50 + i) - 0.5) * 120, y1: (inward ? 1 : -1) * (70 + hash(c * 50 + i + 7) * 140) }; });
+  });
+  return out;
+}
+const IONS = { pace: makeIons('pace'), vent: makeIons('vent') };
+function ionPosAt(o, t) {
+  const bx = 9 * Math.sin(t * 0.9 + o.ph), by = 7 * Math.cos(t * 1.1 + o.ph * 1.3);
+  const f = o.flux; if (!f || t < f.t0) return [o.x0 + bx, o.y0 + by, 0];
+  const u = clamp((t - f.t0) / f.dur, 0, 1), sgn = Math.sign(f.y1);
+  // rest → mouth of the channel → through the pore → into the other compartment
+  const pts = [[o.x0, o.y0], [f.cx, -sgn * 40], [f.cx, sgn * 40], [f.x1, f.y1]], seg_ = [0.4, 0.25, 0.35];
+  let acc = 0; for (let i = 0; i < 3; i++) { if (u <= acc + seg_[i] || i === 2) { const v = smooth(clamp((u - acc) / seg_[i], 0, 1)); const [ax, ay] = pts[i], [bx_, by_] = pts[i + 1]; const w = u >= 1 ? 1 : 0; return [lerp(ax, bx_, v) + bx * w, lerp(ay, by_, v) + by * w, u < 1 ? 1 : 0]; } acc += seg_[i]; }
+  return [f.x1 + bx, f.y1 + by, 0];
+}
+function ionDisc(x, y, type, z, moving) {
+  const r = (type === 'CA' ? 7 : 6) * z, c0 = P[type + '0'], c1 = P[type + '1'];
+  if (moving) glow(x, y, r * 2.2, c1, null, 0.3);
+  disc(x, y, r + 1, c0); disc(x, y, r, c1); disc(x - r * 0.35, y - r * 0.35, r * 0.3, mixc(c1, P.C6, 0.6));
+  // a pixel plus sign (two for Ca2+)
+  const pl = (cx, cy) => { const a = Math.max(1, Math.round(r * 0.32)); rect(cx - a, cy - 0.5, cx + a + 1, cy + 1.5, c0); rect(cx - 0.5, cy - a, cx + 1.5, cy + a + 1, c0); };
+  if (type === 'CA') { pl(x - r * 0.35, y + r * 0.1); pl(x + r * 0.4, y + r * 0.1); } else pl(x, y + r * 0.1);
+}
+// the membrane world; kind 'pace' | 'vent'
+function membraneWorld(cam, t, kind, o) {
+  o = o || {};
+  const K = CELL_KIND[kind], X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  // outside (dark teal fluid) and inside (dark maroon cytoplasm)
+  rect(0, 0, W, Y(-MEM.hw), P.EX0); rect(0, Y(MEM.hw), W, H, P.CT0);
+  for (let i = 0; i < 26; i++) { const x = X((hash(i + 900) - 0.5) * 380 + 10 * wob(t, 1, i)), y = Y(-60 - hash(i + 901) * 260); disc(x, y, 1.2 * z, P.EX1); }
+  for (let i = 0; i < 26; i++) { const x = X((hash(i + 950) - 0.5) * 380 + 10 * wob(t, 1, i + 3)), y = Y(60 + hash(i + 951) * 260); disc(x, y, 1.2 * z, P.CT1); }
+  text(FS, 'OUTSIDE THE CELL', 16, Y(-MEM.hw - 34) - 10, { sc: 2, c: P.LBL, ol: P.SH });
+  text(FS, 'INSIDE THE CELL', 16, Y(MEM.hw + 18) + 6, { sc: 2, c: P.HM5, ol: P.SH });
+  // the lipid bilayer
+  rect(0, Y(-MEM.hw + 3), W, Y(MEM.hw - 3), P.MB1);
+  for (let x = -200; x <= 200; x += 7) {
+    if (MEM.chX.some(cx => Math.abs(x - cx) < 22)) continue;
+    for (const s of [-1, 1]) { disc(X(x), Y(s * (MEM.hw - 3)), 3.2 * z, P.MB3); disc(X(x - 0.8), Y(s * (MEM.hw - 3) - 0.8), 1.5 * z, P.MB4); lineW(X(x - 1.5), Y(s * (MEM.hw - 6)), X(x - 1.5), Y(s * 3), 1, P.MB2); lineW(X(x + 1.5), Y(s * (MEM.hw - 6)), X(x + 1.5), Y(s * 3), 1, P.MB2); }
+  }
+  // channels: two subunits that part when the gate opens (tinted by their ion)
+  const vm = kind === 'pace' ? vmPacemaker(t) : vmVentricle(t);
+  MEM.chX.forEach((cx, c) => {
+    const [g0, g1] = K.gate[c], open = smooth(clamp((t - g0) / 0.12, 0, 1)) * (1 - smooth(clamp((t - g1) / 0.15, 0, 1)));
+    const ion = K.ions[c], tint = P[ion + '0'], hi = P[ion + '1'], gap = 4 + open * 12;
+    for (const s of [-1, 1]) {
+      const x0 = cx + s * (gap / 2 + 9), m = maskRR(X(x0 - 9), Y(-34), X(x0 + 9), Y(34), 7 * z);
+      shade(m, mixc(P.MB2, tint, 0.8), mixc(P.MB3, hi, 0.7), mixc(P.MB0, tint, 0.5), P.MB0, { k: Math.max(1, Math.round(z)) });
+    }
+    if (open > 0.05) { rect(X(cx - gap / 2 + 1), Y(-30), X(cx + gap / 2 - 1), Y(30), mixc(P.EX0, hi, 0.12 * open)); }
+    // the gate (a lid on the inside mouth) swings aside as the channel opens
+    const ga = open * 1.2, gx = cx + (gap / 2 + 6), gy = 34;
+    lineW(X(cx - gap / 2 - 2), Y(gy), X(lerp(cx + gap / 2 + 2, gx + 4, open)), Y(lerp(gy, gy + 12, Math.sin(ga) * 0.9)), 3 * z, mixc(P.MB3, hi, 0.5));
+  });
+  // charge signs: + outside / − inside at rest; they flip near the open channels as the inside turns positive
+  const f = clamp((vm - K.rest) / (K.peak - K.rest), 0, 1), N = 20;
+  for (let i = 0; i < N; i++) {
+    const x = -190 + i * 20, order = Math.min(...MEM.chX.map(cx => Math.abs(x - cx))) / 200, flipped = f > 0.15 + order * 0.8;
+    const outC = flipped ? '-' : '+', inC = flipped ? '+' : '-';
+    text(FC, outC, X(x), Y(-MEM.hw - 16), { sc: Math.max(1, Math.round(z)), c: outC === '+' ? P.FP4 : P.FN4, ol: null, align: 'center' });
+    text(FC, inC, X(x), Y(MEM.hw + 5), { sc: Math.max(1, Math.round(z)), c: inC === '+' ? P.FP4 : P.FN4, ol: null, align: 'center' });
+  }
+  // ions
+  for (const io of IONS[kind]) { const [x, y, mv] = ionPosAt(io, t); const sx = X(x), sy = Y(y); if (sx < -10 || sx > W + 10 || sy < -10 || sy > H + 10) continue; ionDisc(sx, sy, io.type, z, mv); }
+  return vm;
+}
+// voltage graph (screen space): the trace from tA to t on [tA, tB]; mV range [lo, hi]
+function vmGraph(x0, y0, x1, y1, t, tA, tB, fn, lo, hi, o) {
+  o = o || {};
+  rect(x0, y0, x1, y1, P.SC0); frame(x0, y0, x1, y1, P.M5);
+  const gx0 = x0 + 6, gx1 = x1 - 6, gy0 = y0 + 22, gy1 = y1 - 8, Ym = v => lerp(gy1, gy0, (v - lo) / (hi - lo));
+  text(FS, 'MEMBRANE VOLTAGE', x0 + 6, y0 + 5, { sc: 2, c: P.EG2, ol: null });
+  dashLine(gx0, Ym(0), gx1, Ym(0), P.SC3, 3, 3, 0); text(FS, '0 mV', gx1 - 2, Ym(0) - 14, { sc: 2, c: P.EG1, ol: null, align: 'right' });
+  if (o.thr !== undefined) { dashLine(gx0, Ym(o.thr), gx1, Ym(o.thr), P.SA1, 2, 3, 0); text(FS, 'THRESHOLD', gx0 + 2, Ym(o.thr) + 4, { sc: 2, c: P.SA2, ol: null }); }
+  let px_ = null, py_ = null; const tn = clamp(t, tA, tB);
+  for (let x = gx0; x <= gx1; x++) { const tt = lerp(tA, tB, (x - gx0) / (gx1 - gx0)); if (tt > tn) break; const y = Ym(fn(tt)); if (px_ !== null) lineW(px_, py_, x, y, 2, P.EG2); px_ = x; py_ = y; }
+  if (px_ !== null) disc(px_, py_, 2.5, P.EG4);
+}
+// ---------------------------------------------------------------- atrial muscle cells joined by gap junctions
+const GJ = { xs: [-275, -165, -55, 55, 165, 275], rows: [-144, -72, 0, 72, 144], hw: 52, hh: 31 };
+// a sheet of atrial muscle cells joined end to end; the activation enters from the left and each cell
+// fires a moment after current reaches it through the gap junctions
+const gjAct = (cx, ry) => 8.0 + (cx + 275) / 110 * 0.5;                      // one cell per eighth note (the SFX cascade)
+function gapJunctionWorld(cam, t) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(0, 0, W, H, P.EX0);
+  for (let i = 0; i < 30; i++) disc(X((hash(i + 1300) - 0.5) * 600 + 10 * wob(t, 1, i)), Y((hash(i + 1301) - 0.5) * 700), 1.2 * z, P.EX1);
+  GJ.rows.forEach((ry, ri) => {
+    const xs = GJ.xs.map(x => x + (ri % 2) * 55);
+    xs.forEach(cx => {
+      if (X(cx + GJ.hw) < -4 || X(cx - GJ.hw) > W + 4) return;
+      const act = smooth(clamp((t - gjAct(cx, ry)) / 0.18, 0, 1));
+      const m = maskRR(X(cx - GJ.hw + 2), Y(ry - GJ.hh), X(cx + GJ.hw - 2), Y(ry + GJ.hh), 10 * z);
+      shade(m, mixc(P.CT2, P.HM3, act * 0.75), mixc(P.MB3, P.HM5, act * 0.6), P.MB0, P.MB0, { k: Math.max(1, Math.round(z * 1.5)) });
+      for (let k = -4; k <= 4; k++) rect(X(cx + k * 10), Y(ry - GJ.hh + 6), X(cx + k * 10 + 1.2), Y(ry + GJ.hh - 6), mixc(P.CT1, P.HM2, act * 0.6));   // striations
+      ellipse(X(cx), Y(ry), 12 * z, 8 * z, mixc(P.MB1, P.HM1, act * 0.5));                                                        // nucleus
+      for (let k = 0; k < 5; k++) { const sx = cx - 36 + k * 18; text(FC, act > 0.5 ? '+' : '-', X(sx), Y(ry - GJ.hh + 7), { sc: Math.max(1, Math.round(z)), c: act > 0.5 ? P.FP4 : P.FN4, ol: null, align: 'center' }); }
+      if (act > 0 && act < 1) glow(X(cx), Y(ry), 60 * z, P.HM3, null, 0.35 * (1 - act));
+    });
+    // intercalated discs with gap-junction channels; ion current passes to the next cell just before it fires
+    for (let j = 0; j + 1 < xs.length; j++) {
+      const dx = (xs[j] + xs[j + 1]) / 2; if (X(dx) < -10 || X(dx) > W + 10) continue;
+      for (let y = -GJ.hh + 4; y < GJ.hh - 4; y += 4) rect(X(dx - 1 + ((y / 4) % 2 ? 1 : -1)), Y(ry + y), X(dx + 1 + ((y / 4) % 2 ? 1 : -1)), Y(ry + y + 4), P.MB4);
+      for (const gy of [-14, 0, 14]) { rect(X(dx - 4), Y(ry + gy - 3), X(dx + 4), Y(ry + gy + 3), P.CY1); rect(X(dx - 4), Y(ry + gy - 1), X(dx + 4), Y(ry + gy + 1), P.CY0); }
+      const ta = gjAct(xs[j], ry) + 0.05, tb = gjAct(xs[j + 1], ry) + 0.05;
+      if (t > ta && t < tb) for (let q = 0; q < 6; q++) { const u = ((t - ta) / (tb - ta) * 2 + q / 6) % 1, gy = [-14, 0, 14][q % 3]; disc(X(dx - 14 + u * 28), Y(ry + gy), 2.2 * z, q % 2 ? P.NA1 : P.KK1); }
+    }
+  });
+}
+
+// ---- 13_field.js
+// ============================================================================
+// FROM THE HEART TO THE SKIN (torso world, same coordinates as the ward).
+// The heart's coordinated activity acts like a changing electrical dipole; the
+// body's conductive tissues let it set up time-varying potentials everywhere,
+// drawn as equipotential bands (warm = positive, cool = negative). Nothing
+// travels from the heart to the skin: the bands simply change with the beat.
+// Lead II reads the difference between LL and RA (its axis points down to the
+// patient's left, along the main direction of ventricular activation, so its
+// R wave is tall). Then a cross-section of one electrode on the skin.
+// ============================================================================
+const LEAD_II = [0.5, 0.866];                          // RA → LL direction (viewer's right and down)
+// potential at world point (x, y) for the heart vector p = [px, py]
+function dipoleV(x, y, p) { const dx = x - HEART_AT.x, dy = y - HEART_AT.y, r2 = dx * dx + dy * dy + 900; return (p[0] * dx + p[1] * dy) / r2 * 60; }
+// the heart vector during the beat: along the Lead II axis, sized and signed by the Lead II voltage (simplified)
+function heartVec(ms) { const v = ecgMV(ms); return [LEAD_II[0] * v, LEAD_II[1] * v]; }
+const POS_C = () => [P.FP1, P.FP2, P.FP3, P.FP4], NEG_C = () => [P.FN1, P.FN2, P.FN3, P.FN4];
+// o: { ms, bands (0..1), arrow (0..1), axis (0..1) }
+function torsoField(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z, ms = o.ms, p = heartVec(ms);
+  wardBG(cam, t);
+  rect(0, Y(640), W, H, P.BE1);
+  // the see-through body
+  for (const A of [ARM_L, ARM_R]) { const m = maskPoly(cam.pts(A)); mFill(m, mixc(P.BE1, P.SK1, 0.55)); mOutline(m, P.SK2); }
+  const m = maskPoly(cam.pts(TORSO)); mFill(m, mixc(P.BE1, P.SK0, 0.85)); mOutline(m, P.SK3);
+  // equipotential bands inside the body
+  const k = o.bands === undefined ? 1 : o.bands, pc = POS_C(), nc = NEG_C();
+  if (k > 0) for (let j = 0; j < m.h; j++) {
+    const sy = m.y0 + j; if (sy < 0 || sy >= H) continue; const wy = cam.wy(sy + 0.5);
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const sx = m.x0 + i; if (sx < 0 || sx >= W) continue;
+      const v = dipoleV(cam.wx(sx + 0.5), wy, p), lvl = Math.max(-4, Math.min(4, Math.round(v / 0.22)));
+      if (lvl === 0) continue;
+      const c = lvl > 0 ? pc[lvl - 1] : nc[-lvl - 1], idx = sy * W + sx;
+      const vr = dipoleV(cam.wx(sx + 1.5), wy, p), vd = dipoleV(cam.wx(sx + 0.5), cam.wy(sy + 1.5), p), edge = Math.round(vr / 0.22) !== Math.round(v / 0.22) || Math.round(vd / 0.22) !== Math.round(v / 0.22);
+      buf[idx] = mixc(buf[idx], edge ? mixc(c, P.C6, 0.35) : c, 0.75 * k);
+    }
+  }
+  // ribs faintly, the heart (beating in real time), the electrodes and leads
+  for (let kk = 0; kk < 6; kk++) for (const s_ of [-1, 1]) { let px_ = null, py_ = null; for (let i = 0; i <= 12; i++) { const u = i / 12, x = 180 + s_ * (14 + u * 128), y = 650 + kk * 44 + 30 * Math.sin(u * 2.4) - 6; if (px_ !== null) lineW(px_, py_, X(x), Y(y), 3 * z, mixc(P.SK0, P.BN0, 0.4)); px_ = X(x); py_ = Y(y); } }
+  drawHeart(cam, ms, { at: HEART_AT, cond: 0.6 });
+  // the heart vector: an arrow from the heart along the current direction, length with the voltage
+  if ((o.arrow || 0) > 0) {
+    const L = 90 * Math.abs(ecgMV(ms)) / 1.15, sg = Math.sign(ecgMV(ms)) || 1, ex = HEART_AT.x + sg * LEAD_II[0] * L, ey = HEART_AT.y + sg * LEAD_II[1] * L;
+    if (L > 4) withDither(o.arrow, () => { lineW(X(HEART_AT.x), Y(HEART_AT.y), X(ex), Y(ey), 3 * z, P.C6); arrowHead(X(ex), Y(ey), Math.atan2(ey - HEART_AT.y, ex - HEART_AT.x), 6 * z, P.C6); });
+  }
+  // Lead II: the axis from RA to LL
+  if ((o.axis || 0) > 0) withDither(o.axis, () => dashLine(X(ELEC.RA[0]), Y(ELEC.RA[1]), X(ELEC.LL[0]), Y(ELEC.LL[1]), P.EG2, 5, 4, -t * 20));
+  for (const A of [ARM_L, ARM_R]) { const mm = maskPoly(cam.pts(A)); mOutline(mm, P.SK2); }
+  tintRect(0, Y(996), W, H, P.SH0, 0.6);
+  drawLeads(cam, t, { hiElec: o.hiElec || {} });
+}
+// ---------------------------------------------------------------- one electrode on the skin, in cross-section
+// layers (local px, y down): snap stud, foam backing, Ag/AgCl sensor, gel sponge, skin (stratum corneum, epidermis, dermis)
+function electrodeSection(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z, ms = beatMs(t), v = dipoleV(ELEC.LL[0], ELEC.LL[1], heartVec(ms));
+  rect(0, 0, W, H, P.BG);
+  // skin: dermis, epidermis, stratum corneum, tinted by the local potential (positive at LL during the QRS)
+  const tint = clamp(v / 1.2, -1, 1), skinTop = 30;
+  rect(0, Y(skinTop + 30), W, H, P.SK1); rect(0, Y(skinTop + 4), W, Y(skinTop + 30), P.SK2); rect(0, Y(skinTop), W, Y(skinTop + 4), P.SK3);
+  if (tint > 0.05) tintRect(0, Y(skinTop), W, H, P.FP3, 0.35 * tint); if (tint < -0.05) tintRect(0, Y(skinTop), W, H, P.FN3, -0.35 * tint);
+  for (let i = 0; i < 9; i++) { const x = -170 + i * 44 + 10 * Math.sin(i * 1.7); disc(X(x), Y(skinTop + 70 + 30 * hash(i + 40)), 5 * z, P.HM2); disc(X(x), Y(skinTop + 70 + 30 * hash(i + 40)), 3 * z, P.HM3); }
+  for (let i = 0; i < 26; i++) { const x = -180 + i * 14; rect(X(x), Y(skinTop + 6), X(x + 10), Y(skinTop + 14), P.SK3); }
+  // foam backing with adhesive edges, the gel sponge, the sensor, the stud
+  poly(cam.pts([-140, skinTop, -140, -2, 140, -2, 140, skinTop, 80, skinTop, 70, 2, -70, 2, -80, skinTop]), P.EW); rect(X(-140), Y(skinTop - 3), X(-80), Y(skinTop), P.AL3); rect(X(80), Y(skinTop - 3), X(140), Y(skinTop), P.AL3);
+  const gm = maskEll(X(0), Y(skinTop - 10), 68 * z, 22 * z); mFill(gm, P.GL1, 0.9, (x, y) => y >= Y(6)); mFill(gm, P.GL2, 0.35, (x, y) => y >= Y(6) && y < Y(12));
+  for (let i = 0; i < 14; i++) { const gx = -56 + i * 8.5 + 3 * Math.sin(t * 3 + i), gy = skinTop - 8 + 6 * Math.sin(t * 2 + i * 1.3); disc(X(gx), Y(gy), 1.6 * z, P.GL2); }
+  rect(X(-44), Y(0), X(44), Y(6), P.AL2); rect(X(-44), Y(4), X(44), Y(6), P.AL1);
+  const sm = maskRR(X(-14), Y(-40), X(14), Y(-2), 5 * z); shade(sm, P.AL2, P.AL4, P.AL1, P.AL0, {});
+  rect(X(-6), Y(-2), X(6), Y(2), P.AL1);
+  // the lead-wire clip and wire
+  const cm = maskRR(X(-22), Y(-66), X(40), Y(-34), 8 * z); shade(cm, P.CR, mixc(P.CR, P.C6, 0.4), mixc(P.CR, P.K0, 0.5), P.K0, {});
+  lineW(X(38), Y(-52), X(150), Y(-140), 6 * z, P.CB0); lineW(X(38), Y(-52), X(150), Y(-140), 3.6 * z, mixc(P.CB1, P.CR, 0.35));
+  return v;
+}
+
+// ---- 14_elec.js
+// ============================================================================
+// THE FRONT END (board world px; the camera pans left → right along it).
+// The LL wire goes to the instrumentation amplifier's + input and the RA wire
+// to its − input (the LA electrode serves as the reference in this simplified
+// three-electrode set). Interference that both electrodes share (most of the
+// mains hum) cancels in the subtraction; the small difference — Lead II — is
+// amplified about a thousand times. Baseline wander and muscle noise differ
+// between the electrodes, so they survive the subtraction; filters reduce them
+// (and can soften the waveform a little). The ADC then samples the voltage at
+// regular instants and the processor rebuilds the trace from the numbers.
+// ============================================================================
+const BRD = { x0: -230, x1: 850, y0: -150, y1: 150, conn: -170, amp: 10, flt: 240, adc: 430, cpu: 700, disp: 820 };
+// signals (mV at the electrodes; the shapes are illustrative, the hum is drawn slowed down)
+const humV = t => 0.32 * Math.sin(TAU * 9 * t) + 0.12 * Math.sin(TAU * 0.45 * t + 2);                         // shared by both electrodes
+const wanderV = t => 0.32 * Math.sin(TAU * 0.29 * t + 1) + 0.12 * Math.sin(TAU * 0.67 * t);                   // differs between electrodes
+const emgV = t => 0.07 * (hash(Math.floor(t * 170)) * 2 - 1) + 0.04 * (hash(Math.floor(t * 93) + 7) * 2 - 1);
+const vLL = t => 0.55 * ecgLive(t) + humV(t) + 0.5 * wanderV(t) + 0.5 * emgV(t);
+const vRA = t => -0.45 * ecgLive(t) + humV(t) - 0.5 * wanderV(t) - 0.5 * emgV(t + 0.37);
+const leadRaw = t => vLL(t) - vRA(t) + 0.1 * Math.sin(TAU * 9 * t);                                           // the hum mostly cancels
+function leadFiltered(t) { let s = 0, n = 0; for (let k = -3; k <= 3; k++) { s += ecgLive(t + k * 0.004); n++; } return s / n; }
+// a scrolling trace panel; o: { win, lo, hi, col, label, unit, dots (sample period), steps, pen }
+function wavePanel(x0, y0, x1, y1, t, fn, o) {
+  o = o || {};
+  const win = o.win || 2.4, lo = o.lo === undefined ? -1 : o.lo, hi = o.hi === undefined ? 1.6 : o.hi, col = o.col || P.EG2;
+  const gx0 = x0 + 4, gx1 = x1 - 4, gy0 = y0 + 18, gy1 = y1 - 5, Yv = v => lerp(gy1, gy0, (v - lo) / (hi - lo));
+  if (!o.overlay) {                                       // overlay: draw only the marks over a panel already drawn
+    rect(x0, y0, x1, y1, P.SC0); frame(x0, y0, x1, y1, o.frame || P.M5);
+    for (let k = 1; k < 6; k++) rect(lerp(gx0, gx1, k / 6), gy0, lerp(gx0, gx1, k / 6) + 1, gy1, P.SC2);
+    if (o.label) text(FS, o.label, x0 + 5, y0 + 4, { sc: 2, c: o.lcol || col, ol: null });
+    if (o.unit) text(FS, o.unit, x1 - 5, y0 + 4, { sc: 2, c: P.SUB, ol: null, align: 'right' });
+  }
+  const tOf = x => t - (gx1 - x) / (gx1 - gx0) * win;
+  if (o.dots) {
+    // samples at regular instants: a dot per sample (and the held value between them if steps)
+    const n0 = Math.ceil(tOf(gx0) / o.dots), n1 = Math.floor(t / o.dots); let prev = null;
+    for (let n = n0; n <= n1; n++) {
+      const ts = n * o.dots, x = gx1 - (t - ts) / win * (gx1 - gx0), y = clamp(Yv(fn(ts)), gy0, gy1);
+      if (o.ticks) rect(x, gy1 - 3, x + 1, gy1, P.DT2);
+      if (o.steps && prev) { rect(prev[0], prev[1], x, prev[1] + 2, col); rect(x - 1, Math.min(prev[1], y), x + 1, Math.max(prev[1], y) + 2, col); }
+      disc(x, y, 1.8, o.dcol || P.DT4); prev = [x, y];
+    }
+  } else {
+    let px_ = null, py_ = null;
+    for (let x = gx0; x <= gx1; x++) { const y = clamp(Yv(fn(tOf(x))), gy0, gy1); if (px_ !== null) lineW(px_, py_, x, y, o.lw || 2, col); px_ = x; py_ = y; }
+    if (o.pen !== false) disc(gx1, clamp(Yv(fn(t)), gy0, gy1), 2.4, P.EG4);
+  }
+  return { Yv, gx0, gx1, gy0, gy1, xOf: tt => gx1 - (t - tt) / win * (gx1 - gx0) };
+}
+// ---------------------------------------------------------------- the board
+function chipBox(cam, cx, cy, w, h, label, sub) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  for (let i = 0; i < 6; i++) { const u = cx - w / 2 + 8 + i * (w - 16) / 5; rect(X(u - 2), Y(cy - h / 2 - 7), X(u + 2), Y(cy - h / 2), P.AL2); rect(X(u - 2), Y(cy + h / 2), X(u + 2), Y(cy + h / 2 + 7), P.AL2); }
+  const m = maskRR(X(cx - w / 2), Y(cy - h / 2), X(cx + w / 2), Y(cy + h / 2), 4 * z); shade(m, P.CH1, P.CH2, P.CH0, P.K0, {});
+  disc(X(cx - w / 2 + 7), Y(cy - h / 2 + 7), 2 * z, P.CH3);
+  const sc = Math.max(1, Math.round(z * 1.6));
+  text(FS, label, X(cx), Y(cy + h / 2 - 14), { sc, c: P.DT3, ol: null, align: 'center' });
+  if (sub) text(FS, sub, X(cx), Y(cy + h / 2 + 12), { sc: Math.max(1, sc - 1), c: P.SUB, ol: null, align: 'center' });
+}
+// o: { hot: 'amp' | 'flt' | 'adc' | 'cpu' }
+function boardWorld(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(0, 0, W, H, P.BG);
+  const bm = maskRR(X(BRD.x0), Y(BRD.y0), X(BRD.x1), Y(BRD.y1), 10 * z); shade(bm, P.PB1, P.PB2, P.PB0, P.K0, {});
+  for (let x = BRD.x0 + 20; x < BRD.x1; x += 40) for (let y = BRD.y0 + 20; y < BRD.y1; y += 40) disc(X(x), Y(y), 1.4 * z, P.PB3);
+  // gold traces with a slow glint travelling along them (the signal path)
+  const tr = (pts, w) => { for (let i = 0; i + 3 < pts.length; i += 2) { lineW(X(pts[i]), Y(pts[i + 1]), X(pts[i + 2]), Y(pts[i + 3]), (w + 1.5) * z, P.AU0); lineW(X(pts[i]), Y(pts[i + 1]), X(pts[i + 2]), Y(pts[i + 3]), w * z, P.AU1); } };
+  const traces = [[BRD.conn + 20, -40, -70, -40, -70, -22, BRD.amp - 55, -22], [BRD.conn + 20, 40, -70, 40, -70, 22, BRD.amp - 55, 22], [BRD.conn + 20, 0, -90, 0, -90, 90, BRD.amp, 90, BRD.amp, 40],
+    [BRD.amp + 55, 0, BRD.flt - 45, 0], [BRD.flt + 45, 0, BRD.adc - 45, 0], [BRD.cpu + 55, 0, BRD.disp, 0]];
+  traces.forEach(p => tr(p, 3));
+  for (let b = 0; b < 6; b++) tr([BRD.adc + 45, -25 + b * 10, BRD.cpu - 55, -25 + b * 10], 1.6);
+  const flow = [[BRD.amp + 55, BRD.flt - 45], [BRD.flt + 45, BRD.adc - 45], [BRD.cpu + 55, BRD.disp]];
+  for (const [a, b] of flow) { const u = (t * 0.9) % 1, x = lerp(a, b, u); glow(X(x), Y(0), 7 * z, P.AU2, P.AU2, 0.35); }
+  // the input connector: RA, LA (reference), LL
+  const cm = maskRR(X(BRD.conn - 22), Y(-62), X(BRD.conn + 22), Y(62), 4 * z); shade(cm, P.M5, P.M4, P.M6, P.K0, {});
+  [['RA', -40, P.EW], ['LA', 0, P.CK], ['LL', 40, P.CR]].forEach(([n_, y, c]) => { disc(X(BRD.conn), Y(y), 7 * z, P.AL1); disc(X(BRD.conn), Y(y), 5 * z, c); text(FS, n_ === 'LA' ? 'REF' : n_, X(BRD.conn - 28), Y(y - 5), { sc: Math.max(1, Math.round(z * 1.5)), c: P.INK, ol: P.SH, align: 'right' }); });
+  // wires arriving from the electrodes (from the top-left)
+  [['RA', -40, P.EW], ['LA', 0, P.CK], ['LL', 40, P.CR]].forEach(([, y, c], i) => { const x0 = BRD.conn - 120, y0 = -260 + i * 12; lineW(X(x0), Y(y0), X(BRD.conn - 6), Y(y), 4 * z, P.CB0); lineW(X(x0), Y(y0), X(BRD.conn - 6), Y(y), 2.4 * z, mixc(P.CB1, c, 0.4)); });
+  // the instrumentation amplifier: a chip with the amplifier symbol (+ from LL, − from RA)
+  chipBox(cam, BRD.amp, 0, 110, 90, 'IN-AMP', '×1000');
+  poly(cam.pts([BRD.amp - 32, -30, BRD.amp - 32, 30, BRD.amp + 34, 0]), o.hot === 'amp' ? P.DT1 : P.CH2);
+  lineW(X(BRD.amp - 32), Y(-30), X(BRD.amp + 34), Y(0), 1.5 * z, P.DT3); lineW(X(BRD.amp - 32), Y(30), X(BRD.amp + 34), Y(0), 1.5 * z, P.DT3); lineW(X(BRD.amp - 32), Y(-30), X(BRD.amp - 32), Y(30), 1.5 * z, P.DT3);
+  text(FC, '+', X(BRD.amp - 26), Y(-24), { sc: Math.max(1, Math.round(z)), c: P.FP4, ol: null }); text(FC, '-', X(BRD.amp - 26), Y(12), { sc: Math.max(1, Math.round(z)), c: P.FN4, ol: null });
+  chipBox(cam, BRD.flt, 0, 90, 70, 'FILTER', '0.5–40 Hz');
+  chipBox(cam, BRD.adc, 0, 90, 70, 'ADC', 'SAMPLES');
+  chipBox(cam, BRD.cpu, 0, 110, 90, 'CPU', 'DIGITAL ECG');
+  // display connector
+  rect(X(BRD.disp), Y(-30), X(BRD.disp + 24), Y(30), P.M5); for (let k = 0; k < 6; k++) rect(X(BRD.disp + 4), Y(-24 + k * 9), X(BRD.disp + 20), Y(-20 + k * 9), P.AU1);
+  if (o.hot) { const hx = { amp: BRD.amp, flt: BRD.flt, adc: BRD.adc, cpu: BRD.cpu }[o.hot], hw = o.hot === 'amp' || o.hot === 'cpu' ? 62 : 52; ring(X(hx), Y(0), hw * z, 1.6, P.YEL); }
+}
+
+// ---- 23_scenes.js
+// ============================================================================
+// SCENE COMPOSITOR: 20 micro-scenes in 6 continuous sequences (SC_T, 120 BPM).
+// One patient, one monitor, three electrodes, one heart, one heartbeat followed
+// in slow motion, one Lead II waveform, one amplifier chain:
+// the monitor beeps → the cable → the electrodes → through the chest → the SA
+// node → one pacemaker cell's ion currents → gap junctions → the atria and the
+// P wave → the AV-node delay → His bundle and bundle branches → Purkinje
+// fibres → one ventricular cell → the QRS (the beep on the drop) → recovery and
+// the T wave → voltage bands across the body → one electrode on the skin → the
+// difference amplifier → amplification → filtering → the ADC → back to the
+// monitor (loop). Calm zoom crossfades join the scales; no flashes.
+// The picture is built in four passes: visual (the worlds and their
+// crossfades, by time, not by scene), hud (graphs and panels), tags (leader
+// labels), overlays (captions, chips, title).
+// ============================================================================
+function crossWorld(drawB, k) {
+  if (k <= 0) return; if (k >= 1) { drawB(); return; }
+  withBuffer(TMPBUF, drawB);
+  mixInto(buf, TMPBUF, k);
+}
+const ph = (t, a, b, e) => (e || smooth)(seg(t, a, b));
+const xf = (t, a, b) => smooth(seg(t, a, b));
+const zin = (t, a, b, from) => lerp(from === undefined ? 0.72 : from, 1, eout(seg(t, a, b)));   // from < 1 grows in, from > 1 settles out
+// ============================================================================ cameras (pure functions of t)
+const HA = [165, 236];                                                    // where the heart-world focus sits on screen
+const HC = (cx, cy, z) => new Cam(cx, cy, z, HA[0], HA[1]);
+// the heart-map camera that shows exactly what a ward / torso camera shows of the heart in the chest
+const heartFrom = cam => new Cam((cam.cx - HEART_AT.x) / HEART_AT.s, (cam.cy - HEART_AT.y) / HEART_AT.s, cam.z * HEART_AT.s, cam.ax, cam.ay);
+const zoomBy = (cam, f) => new Cam(cam.cx, cam.cy, cam.z * f, cam.ax, cam.ay);
+const HOOK = [180, 270, 1.12];
+// A: the monitor → down the cable → the three electrodes → into the chest (ends registered with the heart world)
+const hookCam = t => camTrack([[0.0, HOOK[0], HOOK[1], HOOK[2]], [1.0, 180, 274, 1.15, lin], [1.55, 246, 520, 1.02, K50], [2.05, 188, 742, 0.86, K50], [3.0, 195.6, 800, 2.5, K75]], t);
+// B: the whole heart → the SA node (and on into one of its cells); later the atria for the P wave
+function heartCamB(t) {
+  if (t < 7.0) { const u = K50(seg(t, 3.4, 5.0)); return HC(lerp(-6, -92, u), lerp(-14, -134, u), Math.exp(lerp(0, Math.log(2.6), u)) * (1 + 0.6 * ein(seg(t, 4.85, 5.4)))); }
+  return HC(-10, -96, 1.5 * zin(t, 9.55, 10.4, 1.9) * (1 + 0.05 * ph(t, 10.0, 12.0, lin)));
+}
+const paceCam = t => new Cam(0, -30, 1.45 * zin(t, 4.95, 5.6, 0.7) * (1 - 0.3 * xf(t, 7.8, 8.25)), 165, 330);
+const gjCam = t => { const u = K50(seg(t, 7.8, 10.0)); return new Cam(lerp(-110, 0, u), 0, Math.exp(lerp(Math.log(2.1), Math.log(0.8), u)), 165, 300); };
+// C: AV node → His bundle → bundle branches → Purkinje network → the whole ventricles
+const heartCamC = t => camTrack([[12.0, -10, -96, 1.575], [13.2, -6, -46, 3.2, K50], [15.0, -4, -42, 3.3, lin], [16.6, 14, 30, 1.9, K50], [17.0, 14, 30, 1.9, lin], [18.3, 0, 14, 1.02, K50], [22.0, 0, 14, 1.06, lin], [24.0, 0, 14, 1.08, lin], [26.0, 0, 14, 1.04, lin]], t, HA[0], HA[1]);
+// around the two visits to a ventricular cell the heart swells as we dive in and settles as we come back out
+function heartCamV(t) {
+  const f = t < 20.6 ? 1 + 0.8 * ein(seg(t, 19.55, 19.95)) : t < 23.0 ? lerp(1.8, 1, eout(seg(t, 21.35, 21.9))) : t < 25.0 ? 1 + 0.8 * ein(seg(t, 24.2, 24.6)) : lerp(1.8, 1, eout(seg(t, 25.45, 26.0)));
+  return zoomBy(heartCamC(t), f);
+}
+const ventCam = (t, t0, t1) => new Cam(0, -30, 1.45 * zin(t, t0, t0 + 0.6, 0.6) * (1 - 0.3 * xf(t, t1, t1 + 0.4)), 165, 330);
+const vent1 = t => ventCam(t, 19.55, 21.35), vent2 = t => ventCam(t, 24.2, 25.45);
+// D: pull out of the heart to the whole chest (starts registered with the heart world), then dive into the LL electrode
+const fieldCam = t => camTrack([[26.0, 192, 813.8, 2.6], [27.2, 186, 792, 0.82, K50], [29.0, 186, 792, 0.84, lin], [29.75, 248, 878, 2.6, ein]], t, 165, 330);
+// the field map follows one more beat, slowed hard around the R wave so the strongest pattern can be read
+const FIELD_MS = [[26.0, 480], [26.5, 900], [26.85, 1000], [27.2, 1030], [28.7, 1037], [29.1, 1073], [29.6, 1150], [30.0, 1230]];
+function fieldMs(t) {
+  let i = 0; while (i + 2 < FIELD_MS.length && t > FIELD_MS[i + 1][0]) i++;
+  const [ta, ma] = FIELD_MS[i], [tb, mb] = FIELD_MS[i + 1], m = lerp(ma, mb, clamp((t - ta) / (tb - ta), 0, 1));
+  return m > 633 ? m - RR * 1000 : m;
+}
+const elecCam = t => { const u = ein(seg(t, 31.5, 32.3)); return new Cam(lerp(0, 120, u), lerp(-10, -120, u), 1.6 * zin(t, 29.5, 30.1, 0.7), 165, 300); };
+// E: along the board, following the wires: connector → IN-AMP → FILTER → ADC → CPU
+const boardCam = t => camTrack([[31.9, -250, -170, 1.15], [32.8, -150, 0, 1.15, K50], [34.8, BRD.amp - 20, 0, 1.15, K50], [35.8, BRD.amp, 0, 1.5, K50], [38.0, BRD.amp + 10, 0, 1.5, lin], [38.6, BRD.flt, 0, 1.5, K50], [40.0, BRD.flt + 10, 0, 1.5, lin], [40.7, BRD.adc + 30, 0, 1.3, K50], [43.0, BRD.cpu + 40, 0, 1.25, lin]], t, 165, 324);
+const boardHot = t => t < 33.0 ? null : t < 38.4 ? 'amp' : t < 40.5 ? 'flt' : t < 42.2 ? 'adc' : 'cpu';
+// F: from the monitor's screen back out to the opening composition
+const endCam = t => camTrack([[42.8, 180, 176, 2.3], [44.2, HOOK[0], HOOK[1], HOOK[2], K50], [48.0, HOOK[0], HOOK[1], HOOK[2], lin]], t);
+// ============================================================================ worlds used here
+const HEART_DUST = Array.from({ length: 40 }, (_, i) => ({ x: (hash(i + 3100) - 0.5) * 700, y: (hash(i + 3101) - 0.5) * 900, k: 0.3 + 0.7 * hash(i + 3102), ph: hash(i + 3103) * TAU }));
+function heartWorld(cam, t, ms, cond) {
+  rect(0, 0, W, H, P.BG);
+  for (const d of HEART_DUST) { const x = cam.x(d.x + 10 * wob(t, 1, d.ph)), y = cam.y(d.y + 8 * wob(t, 2, d.ph)); disc(x, y, Math.max(1, d.k * 1.6 * Math.min(2, cam.z)), d.k > 0.7 ? P.N4 : P.N3); }
+  drawHeart(cam, ms, { cond: cond === undefined ? 1 : cond });
+}
+function fieldView(t) {
+  const off = 1 - ph(t, 29.0, 29.3);
+  torsoField(fieldCam(t), t, { ms: fieldMs(t), bands: ph(t, 26.2, 26.8), arrow: ph(t, 27.0, 27.3) * off, axis: ph(t, 27.8, 28.1) * off, hiElec: { LL: ph(t, 29.0, 29.3) } });
+}
+// ============================================================================ pass 1: the worlds and the crossfades between them
+function visual(t) {
+  if (t < 3.0) {                                                         // A: monitor → cable → electrodes → into the chest
+    const cam = hookCam(t), ms = beatMs(t), he = k => k * (1 - ph(t, 2.2, 2.35));
+    wardScene(cam, t, { xray: ph(t, 2.12, 2.55), heartMs: ms, cond: ph(t, 2.35, 2.75), hiElec: { RA: he(ph(t, 1.5, 1.65)), LA: he(ph(t, 1.625, 1.775)), LL: he(ph(t, 1.75, 1.9)) } });
+    if (t > 2.6) crossWorld(() => heartWorld(heartFrom(cam), t, ms, 1), xf(t, 2.6, 3.0));
+  }
+  else if (t < 4.95) heartWorld(heartCamB(t), t, physMs(t), 1);          // B: the SA node
+  else if (t < 5.4) { heartWorld(heartCamB(t), t, physMs(t), 1); crossWorld(() => membraneWorld(paceCam(t), t, 'pace'), xf(t, 4.95, 5.4)); }
+  else if (t < 7.8) membraneWorld(paceCam(t), t, 'pace');                //    one pacemaker cell's membrane
+  else if (t < 8.25) { membraneWorld(paceCam(t), t, 'pace'); crossWorld(() => gapJunctionWorld(gjCam(t), t), xf(t, 7.8, 8.25)); }
+  else if (t < 9.55) gapJunctionWorld(gjCam(t), t);                      //    cell to cell
+  else if (t < 10.0) { gapJunctionWorld(gjCam(t), t); crossWorld(() => heartWorld(heartCamB(t), t, physMs(t), 1), xf(t, 9.55, 10.0)); }
+  else if (t < 12.0) heartWorld(heartCamB(t), t, physMs(t), 1);          //    the atria: P wave
+  else if (t < 19.55) heartWorld(heartCamC(t), t, physMs(t), 1);         // C: AV node, His, branches, Purkinje
+  else if (t < 19.95) { heartWorld(heartCamV(t), t, physMs(t), 1); crossWorld(() => membraneWorld(vent1(t), t, 'vent'), xf(t, 19.55, 19.95)); }
+  else if (t < 21.35) membraneWorld(vent1(t), t, 'vent');                //    one ventricular cell: fast Na⁺, Ca²⁺ plateau
+  else if (t < 21.75) { membraneWorld(vent1(t), t, 'vent'); crossWorld(() => heartWorld(heartCamV(t), t, physMs(t), 1), xf(t, 21.35, 21.75)); }
+  else if (t < 24.2) heartWorld(heartCamV(t), t, physMs(t), 1);          //    QRS
+  else if (t < 24.6) { heartWorld(heartCamV(t), t, physMs(t), 1); crossWorld(() => membraneWorld(vent2(t), t, 'vent'), xf(t, 24.2, 24.6)); }
+  else if (t < 25.45) membraneWorld(vent2(t), t, 'vent');                //    K⁺ out
+  else if (t < 25.85) { membraneWorld(vent2(t), t, 'vent'); crossWorld(() => heartWorld(heartCamV(t), t, physMs(t), 1), xf(t, 25.45, 25.85)); }
+  else if (t < 26.0) heartWorld(heartCamV(t), t, physMs(t), 1);          //    T wave
+  else if (t < 26.45) { heartWorld(heartFrom(fieldCam(t)), t, fieldMs(t), 1); crossWorld(() => fieldView(t), xf(t, 26.0, 26.45)); }
+  else if (t < 29.5) fieldView(t);                                       // D: voltage across the body
+  else if (t < 29.95) { fieldView(t); crossWorld(() => electrodeSection(elecCam(t), t), xf(t, 29.5, 29.95)); }
+  else if (t < 31.9) electrodeSection(elecCam(t), t);                    //    one electrode on the skin
+  else if (t < 32.3) { electrodeSection(elecCam(t), t); crossWorld(() => boardWorld(boardCam(t), t, {}), xf(t, 31.9, 32.3)); }
+  else if (t < 42.8) boardWorld(boardCam(t), t, { hot: boardHot(t) });  // D–E: difference, gain, filter, ADC
+  else if (t < 43.25) { boardWorld(boardCam(t), t, { hot: boardHot(t) }); crossWorld(() => wardScene(endCam(t), t, {}), xf(t, 42.8, 43.25)); }
+  else wardScene(endCam(t), t, { marks: ph(t, 44.25, 44.45) * (1 - ph(t, 44.9, 45.1)), markR: DUR - 5 * RR, pip: ph(t, 43.5, 43.75) * (1 - ph(t, 44.85, 45.05)) });   // F: the waveform on the monitor
+}
+// ============================================================================ pass 2: graphs and panels
+// the slowed Lead II strip (one beat, real proportions; a playhead walks through it while the heart works above)
+const STRIP = [16, 404, 292, 494];
+function ecgStrip(t, a) {
+  if (a <= 0) return;
+  withDither(a, () => {
+    const [x0, y0, x1, y1] = STRIP, gx0 = x0 + 6, gx1 = x1 - 6, base = y1 - 24, amp = 40, X_ = ms => lerp(gx0, gx1, ms / 600), Yv = ms => base - ecgMV(ms) * amp;
+    rect(x0, y0, x1, y1, P.SC0); frame(x0, y0, x1, y1, P.EG1);
+    text(FS, 'LEAD II · SLOWED DOWN', x0 + 6, y0 + 5, { sc: 2, c: P.EG2, ol: null });
+    for (let k = 1; k < 12; k++) rect(X_(k * 50), y0 + 19, X_(k * 50) + 1, y1 - 3, P.SC2);
+    let px_ = null, py_ = null;
+    for (let x = gx0; x <= gx1; x++) { const y = Yv((x - gx0) / (gx1 - gx0) * 600); if (px_ !== null) line(px_, py_, x, y, P.SC3); px_ = x; py_ = y; }
+    const now = physMs(t), mNow = clamp(now, 0, 600); px_ = null;
+    for (let x = gx0; x <= X_(mNow); x++) { const y = Yv((x - gx0) / (gx1 - gx0) * 600); if (px_ !== null) lineW(px_, py_, x, y, 2.5, P.EG2); px_ = x; py_ = y; }
+    if (now > 0 && now < 600) { rect(X_(mNow), y0 + 19, X_(mNow) + 1, y1 - 3, P.EG3); disc(X_(mNow), Yv(mNow), 3, P.EG4); }
+    // each wave is named as soon as it has been drawn
+    const nm_ = (s, ms, c, dy, when) => { const k = clamp((now - when) / 12, 0, 1); if (k > 0) text(FC, s, X_(ms), Yv(ms) - dy, { sc: 2, c, ol: P.SH, align: 'center', n: k * 4 }); };
+    nm_('P', 45, P.SA2, 24, 70); nm_('T', 395, P.KK1, 26, 410);
+    { const k = clamp((now - 206) / 12, 0, 1); if (k > 0) text(FC, 'QRS', X_(200) + 9, Yv(200) + 6, { sc: 2, c: P.EG4, ol: P.SH, n: k * 4 }); }
+  });
+}
+const VM_BOX = [16, 96, 292, 196];
+const PT = [16, 96, 292, 174], PT2 = [16, 96, 292, 204], PM = [16, 180, 292, 248], PB = [16, 392, 292, 476];
+const panel = (r, t, fn, o) => wavePanel(r[0], r[1], r[2], r[3], t, fn, o);
+const SAMPLE = 0.0625;                                                     // ADC sample period (drawn far slower than real; 2 per 16th note)
+const sampleCount = ts => Math.round(2048 + leadFiltered(ts) * 1100);    // 12-bit numbers (illustrative)
+const RECAP = ['HEART CELLS', 'SKIN VOLTAGE', 'ELECTRODES', 'SIGNAL PROCESSING', 'ECG'];
+function hud(t) {
+  // B, C: the slowed strip under the heart
+  if (t >= 10.0 && t < 26.3) ecgStrip(t, ph(t, 10.0, 10.35) * (1 - ph(t, 25.95, 26.3)));
+  // membrane voltage during the cell visits
+  const gp = ph(t, 5.3, 5.6) * (1 - ph(t, 7.75, 8.0));
+  if (gp > 0) withDither(gp, () => vmGraph(VM_BOX[0], VM_BOX[1], VM_BOX[2], VM_BOX[3], t, 5.0, 8.0, vmPacemaker, -70, 20, { thr: -40 }));
+  const gv = ph(t, 19.8, 20.05) * (1 - ph(t, 21.25, 21.45)) + ph(t, 24.45, 24.65) * (1 - ph(t, 25.3, 25.5));
+  if (gv > 0) withDither(gv, () => vmGraph(VM_BOX[0], VM_BOX[1], VM_BOX[2], VM_BOX[3], t, 19.8, 25.8, vmVentricle, -95, 35));
+  // D–E: what the electrodes see, and what the front end does to it (panels morph into each other)
+  const a1 = ph(t, 30.0, 30.3) * (1 - ph(t, 34.85, 35.2)), a2 = ph(t, 32.3, 32.6) * (1 - ph(t, 34.85, 35.2)), a3 = ph(t, 33.5, 33.7) * (1 - ph(t, 34.85, 35.2));
+  if (a1 > 0) withDither(a1, () => panel(PT, t, vLL, { label: 'V(LL)', unit: 'mV', lo: -1.6, hi: 1.9, lcol: P.CR }));
+  if (a2 > 0) withDither(a2, () => panel(PM, t, vRA, { label: 'V(RA)', unit: 'mV', lo: -1.6, hi: 1.9, lcol: P.EW }));
+  if (a3 > 0) withDither(a3, () => panel(PB, t, leadRaw, { label: 'V(LL) - V(RA)', unit: 'mV', lo: -1.0, hi: 1.7, lcol: P.YEL }));
+  const a4 = ph(t, 34.9, 35.25) * (1 - ph(t, 38.0, 38.3));
+  if (a4 > 0) withDither(a4, () => { panel(PT, t, leadRaw, { label: 'IN  ≈ 1 mV', lo: -9, hi: 14, lcol: P.SUB }); panel(PB, t, leadRaw, { label: 'OUT  ≈ 1 V', lo: -1.0, hi: 1.7, lcol: P.EG3, lw: 3 }); });
+  const a5 = ph(t, 38.0, 38.3) * (1 - ph(t, 40.0, 40.3));
+  if (a5 > 0) withDither(a5, () => { panel(PT2, t, leadRaw, { label: 'RAW', lo: -1.0, hi: 1.8, lcol: P.NZ2, col: P.NZ2 }); panel(PB, t, leadFiltered, { label: 'FILTERED', lo: -1.0, hi: 1.7, lcol: P.EG3 }); });
+  const a6 = ph(t, 40.0, 40.3) * (1 - ph(t, 42.8, 43.2));
+  if (a6 > 0) withDither(a6, () => {
+    panel(PT2, t, leadFiltered, { label: 'ANALOG', lo: -1.0, hi: 1.7, lcol: P.EG3 });
+    withDither(ph(t, 40.3, 40.7), () => panel(PT2, t, leadFiltered, { lo: -1.0, hi: 1.7, dots: SAMPLE, ticks: 1, dcol: P.DT4, overlay: true }));
+    panel(PB, t, leadFiltered, { label: 'DIGITAL', lo: -1.0, hi: 1.7, lcol: P.DT3, dots: SAMPLE, steps: 1, col: P.DT2, dcol: P.DT3 });
+    // the numbers ride the data bus from the ADC to the CPU
+    const cam = boardCam(t), pk = ph(t, 40.45, 40.6);
+    if (pk > 0) for (let k = Math.ceil((t - 1.5) / 0.5); k <= Math.floor(t / 0.5); k++) {
+      const ts = k * 0.5, u = (t - ts) / 1.5; if (u < 0 || u > 1 || ts < 40.4) continue;
+      const s = String(sampleCount(ts)), x = cam.x(lerp(BRD.adc + 52, BRD.cpu - 62, u)) - textW(FS, s, 2) / 2, y = cam.y(0) - 7;
+      rect(x - 4, y - 4, x + textW(FS, s, 2) + 4, y + 16, P.K0); frame(x - 4, y - 4, x + textW(FS, s, 2) + 4, y + 16, P.DT2);
+      text(FS, s, x, y, { sc: 2, c: P.DT4, ol: null });
+    }
+  });
+  // F: the heart beside the waveform, then the recap
+  const a = ph(t, 44.95, 45.1) * (1 - ph(t, 46.6, 46.85));
+  if (a > 0) {
+    tintAll(P.K0, 0.62 * a);
+    RECAP.forEach((s, i) => {
+      const t0 = 45.0 + i * 0.25, k = ph(t, t0, t0 + 0.12) * (1 - ph(t, 46.6, 46.85)); if (k <= 0) return;
+      const y = 140 + i * 66, tw = textW(FC, s, 2), x = Math.round(154 - tw / 2), last = i === RECAP.length - 1;
+      withDither(k, () => {
+        rect(x - 10, y - 8, x + tw + 10, y + 26, P.K0); frame(x - 10, y - 8, x + tw + 10, y + 26, last ? P.EG2 : P.DT2);
+        text(FC, s, x, y, { sc: 2, c: last ? P.EG2 : P.INK, ol: null });
+        if (!last) { lineW(154, y + 30, 154, y + 48, 2, P.YEL); arrowHead(154, y + 52, Math.PI / 2, 5, P.YEL); }
+      });
+    });
+  }
+}
+// ============================================================================ pass 3: leader-line tags on the things themselves
+function tags(t) {
+  if (t < 3.0) {
+    const cam = hookCam(t);
+    tag('RA', cam.x(ELEC.RA[0]), cam.y(ELEC.RA[1]), 34, 196, 1.5, 2.3, t, P.C6, 3);
+    tag('LA', cam.x(ELEC.LA[0]), cam.y(ELEC.LA[1]), 238, 196, 1.625, 2.3, t, P.C4, 3);
+    tag('LL', cam.x(ELEC.LL[0]), cam.y(ELEC.LL[1]), 238, 452, 1.75, 2.3, t, P.RED, 3);
+    return;
+  }
+  if (t < 12.0) {
+    let cam = heartCamB(t);
+    tag('SA NODE', cam.x(SA_NODE[0]), cam.y(SA_NODE[1]), 150, 128, 3.5, 4.9, t, P.SA2, 3);
+    cam = paceCam(t);
+    tag('Na⁺ IN (SLOW)', cam.x(MEM.chX[0]), cam.y(-40), 22, 226, 5.5, 6.45, t, P.NA1, 3);
+    tag('Ca²⁺ IN', cam.x(MEM.chX[1]), cam.y(-40), 120, 226, 6.5, 7.3, t, P.CA1, 3);
+    tag('K⁺ OUT', cam.x(MEM.chX[2]), cam.y(40), 150, 466, 7.0, 7.75, t, P.KK1, 3);
+    cam = gjCam(t);
+    tag('GAP JUNCTIONS', cam.x((GJ.xs[1] + GJ.xs[2]) / 2), cam.y(-GJ.hh), 60, 160, 8.5, 9.5, t, P.CY2, 3);
+    cam = heartCamB(t);
+    tag('ATRIA', cam.x(70), cam.y(-130), 200, 110, 10.45, 11.95, t, P.HM5, 3);
+    return;
+  }
+  if (t < 26.0) {
+    let cam = heartCamC(t);
+    tag('AV NODE', cam.x(AV_NODE[0]), cam.y(AV_NODE[1] + AV_NODE[3]), 40, 330, 12.5, 14.95, t, P.AV2, 3);
+    tag('≈ 0.1 s DELAY', cam.x(AV_NODE[0] + AV_NODE[2]), cam.y(AV_NODE[1] - AV_NODE[3]), 150, 120, 13.5, 14.95, t, P.AV3, 2);
+    tag('BUNDLE OF HIS', cam.x(-1), cam.y(-32), 26, 120, 15.25, 16.6, t, P.CY2, 3);
+    tag('BUNDLE BRANCHES', cam.x(17), cam.y(28), 40, 340, 16.25, 16.98, t, P.CY2, 3);
+    tag('PURKINJE FIBERS', cam.x(98), cam.y(60), 70, 110, 17.75, 18.98, t, P.CY2, 3);
+    cam = vent1(t);
+    tag('FAST Na⁺ IN', cam.x(MEM.chX[0]), cam.y(-40), 22, 226, 20.25, 20.95, t, P.NA1, 3);
+    tag('Ca²⁺ PLATEAU', cam.x(MEM.chX[1]), cam.y(-40), 110, 226, 20.5, 21.3, t, P.CA1, 3);
+    cam = heartCamV(t);
+    tag('VENTRICLES ACTIVE', cam.x(66), cam.y(96), 96, 350, 22.15, 23.95, t, P.HM5, 2);
+    tag('ATRIA RECOVER', cam.x(-70), cam.y(-130), 22, 112, 22.3, 23.95, t, P.SUB, 2);
+    cam = vent2(t);
+    tag('K⁺ OUT', cam.x(MEM.chX[2]), cam.y(40), 150, 300, 24.5, 25.4, t, P.KK1, 3);
+    return;
+  }
+  if (t < 32.0) {
+    let cam = fieldCam(t);
+    tag('NEGATIVE', cam.x(ELEC.RA[0]), cam.y(ELEC.RA[1]), 20, 112, 27.25, 28.95, t, P.FN4, 3);
+    tag('POSITIVE', cam.x(ELEC.LL[0]), cam.y(ELEC.LL[1]), 165, 438, 27.5, 28.95, t, P.FP4, 3);
+    tag('LEAD II', cam.x(lerp(ELEC.RA[0], ELEC.LL[0], 0.55)), cam.y(lerp(ELEC.RA[1], ELEC.LL[1], 0.55)), 20, 398, 28.0, 28.95, t, P.EG2, 3);
+    cam = elecCam(t);
+    tag('LEAD WIRE', cam.x(100), cam.y(-100), 196, 196, 30.25, 31.6, t, P.CR, 3);
+    tag('Ag/AgCl SENSOR', cam.x(-40), cam.y(3), 20, 236, 30.5, 31.6, t, P.AL3, 2);
+    tag('CONDUCTIVE GEL', cam.x(-50), cam.y(20), 20, 268, 30.75, 31.6, t, P.GL2, 2);
+    tag('SKIN', cam.x(-80), cam.y(50), 20, 444, 31.0, 31.6, t, P.SK4, 3);
+    return;
+  }
+  if (t < 43.0) {
+    const cam = boardCam(t);
+    tag('+ INPUT: LL', cam.x(BRD.amp - 34), cam.y(-24), 150, 256, 33.0, 34.9, t, P.FP4, 2);
+    tag('- INPUT: RA', cam.x(BRD.amp - 34), cam.y(24), 150, 374, 33.25, 34.9, t, P.FN4, 2);
+    tag('× 1000', cam.x(BRD.amp + 30), cam.y(-48), 210, 196, 36.0, 37.95, t, P.YEL, 3);
+    const r = { Yv: v => lerp(PT2[3] - 5, PT2[1] + 18, (v + 1.0) / 2.8), x: tt => PT2[2] - 4 - (t - tt) / 2.4 * (PT2[2] - PT2[0] - 8) };
+    tag('BASELINE WANDER', r.x(t - 2.0), r.Yv(leadRaw(t - 2.0)), 20, 214, 38.5, 39.95, t, P.NZ2, 2);
+    tag('MAINS HUM', r.x(t - 1.12), r.Yv(leadRaw(t - 1.12)), 196, 214, 38.75, 39.95, t, P.NZ2, 2);
+    tag('MUSCLE NOISE', r.x(t - 0.45), r.Yv(leadRaw(t - 0.45)), 100, 240, 39.0, 39.95, t, P.NZ2, 2);
+    const ts = Math.floor((t - 0.3) / SAMPLE) * SAMPLE, ra = { Yv: v => lerp(PT2[3] - 5, PT2[1] + 18, (v + 1.0) / 2.7), x: tt => PT2[2] - 4 - (t - tt) / 2.4 * (PT2[2] - PT2[0] - 8) };
+    tag('SAMPLES', ra.x(ts), ra.Yv(leadFiltered(ts)), 24, 220, 40.5, 42.95, t, P.DT4, 3);
+    tag('NUMBERS', cam.x(lerp(BRD.adc + 52, BRD.cpu - 62, 0.5)), cam.y(0) + 12, 150, 372, 41.0, 42.95, t, P.DT3, 3);
+  }
+}
+// ============================================================================ frame
+function renderFrame(t) {
+  t = clamp(t, 0, DUR - 1e-6);
+  visual(t);
+  hud(t);
+  tags(t);
+  overlays(t);
+}
+function engineInit() { }
+
+// ---- 24_overlay.js
+// ============================================================================
+// TEXT LAYER, built to read at a glance on a phone: one caption at a time in a
+// solid dark box with a yellow accent bar (top left, big letters), leader-line
+// tags in solid boxes next to the thing they name (two sizes), one honesty
+// chip at a time (bottom left), and the closing title. Everything stays inside
+// the short-video safe area (x 14..292, y 36..506); nothing sits under the
+// right-hand buttons or the bottom description. Captions and chips leave after
+// about 3 s.
+// ============================================================================
+const SAFE = { l: 14, r: 292, t: 36, b: 506 };
+const CAP_X = 22, CAP_Y = 46;
+function caption(s, t0, t1, t) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const lines = wrapBal(FC, s, SAFE.r - CAP_X - 8, 2), cps = 56;
+  const out = t1 - t < 0.16 ? (t1 - t) / 0.16 : 1, inn = clamp((t - t0) / 0.14, 0, 1), k = Math.min(inn, out);
+  // the box: grows with the text, solid enough for any picture behind it
+  const wMax = Math.max(...lines.map(l => textW(FC, l, 2))), h = lines.length * 21 + 8;
+  tintRect(CAP_X - 8, CAP_Y - 6, CAP_X - 8 + (wMax + 16) * K75(k), CAP_Y - 6 + h, P.K0, 0.82);
+  rect(CAP_X - 8, CAP_Y - 6, CAP_X - 5, CAP_Y - 6 + h * K75(k), P.YEL);
+  let left = Math.min((t - t0 - 0.06) * cps, s.length * out + 0.01);
+  lines.forEach((ln, i) => {
+    if (left <= 0) return;
+    const n = Math.min(ln.length, left);
+    text(FC, ln, CAP_X, CAP_Y + i * 21, { sc: 2, n, c: P.INK, ol: P.SH });
+    left -= ln.length + 1;
+  });
+}
+// a leader-line tag: anchor (ax, ay) on the object, label box at (lx, ly) (top-left of the text); sc 2 or 3
+function tag(s, ax, ay, lx, ly, t0, t1, t, col, sc) {
+  if (!UI_ON || t < t0 || t > t1 || ax === null || !isFinite(ax) || !isFinite(ay)) return;
+  col = col === undefined ? P.INK : col; sc = sc || 2;
+  const age = t - t0, out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1, gk = K75(clamp(age / 0.18, 0, 1)) * out;
+  const th = 6 * sc, tw = textW(FS, s, sc), x0 = Math.round(clamp(lx, SAFE.l + 3, SAFE.r - tw - 3)), y0 = Math.round(clamp(ly, SAFE.t + 50, SAFE.b - th - 4));
+  ax = Math.round(ax); ay = Math.round(ay);
+  const ux = ax < x0 ? x0 - 4 : ax > x0 + tw ? x0 + tw + 3 : ax, uy = ay < y0 ? y0 - 4 : y0 + th + 2;
+  const ex = lerp(ax, ux, gk), ey = lerp(ay, uy, gk);
+  lineW(ax, ay, ex, ey, 2, P.SH); line(ax, ay, ex, ey, col);
+  disc(ax + 0.5, ay + 0.5, 2.5, P.SH); disc(ax + 0.5, ay + 0.5, 1.6, col);
+  if (gk < 1) return;
+  const n = clamp((age - 0.16) * 56, 0, s.length) * out;
+  if (n <= 0) return;
+  const pw = textW(FS, s.slice(0, Math.ceil(n)), sc);
+  rect(x0 - 4, y0 - 4, x0 + pw + 4, y0 + th + 2, P.K0); rect(x0 - 4, y0 + th + 2, x0 + pw + 4, y0 + th + 4, col);
+  text(FS, s, x0, y0, { sc, c: P.INK, ol: null, n });
+}
+// a plain label (no leader), typed in; align 'center' supported
+function label(s, x, y, t0, t1, t, col, align, f, sc) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  f = f || FS; sc = sc || 2;
+  const out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1, n = clamp((t - t0) * 56, 0, s.length) * out;
+  if (n <= 0) return;
+  text(f, s, x, y, { sc, c: col === undefined ? P.INK : col, ol: P.SH, n, align });
+}
+function chip(s, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const k = K75(clamp((t - t0) / 0.22, 0, 1)) * (t1 - t < 0.15 ? (t1 - t) / 0.15 : 1), tw = textW(FS, s, 2), y = 486;
+  const x = Math.round(lerp(-tw - 30, SAFE.l + 2, k));
+  rect(x - 5, y - 5, x + tw + 5, y + 15, P.K0); frame(x - 5, y - 5, x + tw + 5, y + 15, col === undefined ? P.N6 : col);
+  text(FS, s, x, y, { sc: 2, c: P.C4, ol: null });
+}
+// ---------------------------------------------------------------- the captions (the brief's context labels) and the honesty chips
+const CAPS = [
+  [2.25, 3.6, 'INSIDE THE HEART'], [3.7, 5.0, 'SA NODE: THE PACEMAKER'], [5.15, 8.0, 'ION CHANNELS'], [8.15, 10.0, 'ATRIAL DEPOLARIZATION'],
+  [10.1, 12.0, 'P WAVE'], [12.1, 15.0, 'AV NODE DELAY'], [15.1, 17.0, 'HIS–PURKINJE SYSTEM'], [17.1, 19.0, 'PURKINJE FIBERS'],
+  [19.1, 22.0, 'VENTRICULAR DEPOLARIZATION'], [22.05, 24.0, 'QRS COMPLEX'], [24.1, 26.0, 'VENTRICULAR REPOLARIZATION'],
+  [26.3, 29.0, 'BODY-SURFACE VOLTAGE'], [29.2, 32.0, 'ECG ELECTRODES'], [32.2, 35.0, 'VOLTAGE DIFFERENCE'], [35.1, 38.0, 'SIGNAL AMPLIFICATION'],
+  [38.1, 40.0, 'NOISE FILTERING'], [40.1, 43.0, 'ANALOG → DIGITAL'],
+];
+const CHIPS = [
+  [3.2, 6.2, 'SLOWED DOWN'], [26.6, 29.6, 'SIMPLIFIED FIELD MAP'], [30.2, 33.2, 'SENSES VOLTAGE · NO SHOCK'], [33.7, 35.0, 'SHARED HUM MOSTLY CANCELS'],
+  [35.4, 38.2, 'SAME SHAPE, BIGGER'], [38.4, 40.3, 'FILTERS CAN CHANGE SHAPE'], [40.5, 42.9, 'SAMPLES SHOWN SLOWED'],
+];
+function titleCard(t) {
+  const t0 = 46.9, t1 = 47.94;
+  if (!UI_ON || t < t0 || t > t1) return;
+  const out = t > t1 - 0.12 ? (t1 - t) / 0.12 : 1;
+  const lines = [[['HOW ', P.INK], ['ECG', P.EG2]], [['MACHINES WORK', P.INK]]];
+  let left = (t - t0) * 40;
+  tintRect(0, 32, W, 112, P.K0, 0.62 * Math.min(1, (t - t0) / 0.12) * out);
+  lines.forEach((segs, li) => {
+    const y = 40 + li * 34, total = textW(FT, segs.map(s => s[0]).join(''), 3, true);
+    let x = CX - total / 2;
+    for (const [s, c] of segs) {
+      if (left <= 0) break;
+      const k = Math.min(s.length, left);
+      if (out >= 1 || bay(0, y) < out) text(FT, s, x, y, { sc: 3, bold: true, c, ol: P.SH, n: k, shadow: P.SH, sd: 2 });
+      x += textW(FT, s, 3, true) + 3; left -= s.length;
+    }
+  });
+}
+function overlays(t) {
+  if (!UI_ON) return;
+  for (const [a, b, s] of CAPS) caption(s, a, Math.min(b, a + 3.2), t);
+  for (const [a, b, s] of CHIPS) chip(s, a, Math.min(b, a + 3.0), t);
+  titleCard(t);
+}
+
+// ---- 30_audio.js
+// ============================================================================
+// AUDIO — an original electronic score plus event-synced SFX, synthesised
+// sample by sample in plain JS (no samples, no Web Audio graph).
+// 120 BPM, 24 bars = 48.000 s, A major. The lead melody is a heartbeat drawn
+// in pitch — P (a small step up), Q-R-S (down, a leap up, down past the start)
+// and T (a rounded step) — and its R note on A is the monitor's own beep (A5,
+// 880 Hz). The melody changes instrument with the story:
+//   hook — a bright beep-lead · slowed heart and ion channels — a soft
+//   marimba over a half-time groove · AV node — the melody plays only its P,
+//   holds for the whole delay (ticking), then lands Q-R-S-T on the release ·
+//   His–Purkinje — plucks and 16th arps, a build, one eighth of silence ·
+//   QRS — the drop on the beep (22.0 s): saw lead and wide chords · the body
+//   and the electrode — glass bells, half-time · the electronics — chip lead
+//   and arps; the "×1000" lands on a downbeat; on "noise filtering" the whole
+//   band is literally low-pass filtered and opened again · the end — everything
+//   together, the recap climbs, and a riser runs straight back into bar 1
+//   (seamless loop; every tail wraps).
+// SFX are mixed forward: the band ducks under them, and they are tuned to the
+// A-major pentatonic (A B C# E F#) so they sit inside the music. Every cue is a
+// visible event (a beep on every R wave the picture shows, a bloop for each Na⁺
+// ion through its channel, a falling blip for each K⁺, one pluck per cell in
+// the gap-junction cascade, ticks for the AV-node hold, a hum that stops dead
+// when the difference amplifier cancels it, a sample tick per ADC sample …).
+// ============================================================================
+const SR = 48000, NS = Math.round(DUR * SR);
+const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const nm = (n, o) => 12 * (o + 1) + NOTE[n];
+const fq = (n, o) => mtof(nm(n, o));
+const PENT_OFF = [0, 2, 4, 7, 9];
+const pent = (i, o) => mtof(nm('A', o) + PENT_OFF[((i % 5) + 5) % 5] + 12 * Math.floor(i / 5));   // i-th step up the A pentatonic from A(o)
+// ---------------------------------------------------------------- harmony and the heartbeat melody
+const CHORDS = ['A', 'D', 'F#m', 'E', 'A', 'D', 'F#m', 'E', 'Bm', 'D', 'E', 'A',
+  'E', 'F#m', 'D', 'A', 'E', 'F#m', 'D', 'E', 'A', 'F#m', 'Bm', 'D'];               // every bar with a monitor beep holds an A (or A as a 7th)
+const CROOT = { A: 'A', D: 'D', 'F#m': 'F#', E: 'E', Bm: 'B' }, CMIN = { 'F#m': 1, Bm: 1 };
+function rootM(ch, oct) { let r = nm(CROOT[ch], oct); return r; }
+function triad(ch, oct) { const r = rootM(ch, oct); return [r, r + (CMIN[ch] ? 3 : 4), r + 7]; }
+// P Q R S T: [16th step, interval above the root (kept between B3 and A4), length in 16ths]
+function beatNotes(ch) { let r = rootM(ch, 4); if (r > 69) r -= 12; const q = CMIN[ch] ? 3 : 4; return { P: r + q, Q: r, R: r + 12, S: r - 5, T: r + 7, a: [r + 12, r + 7, r + q] }; }
+const MELODY = [[0, 'P', 1], [2, 'Q', 1], [3, 'R', 1], [4, 'S', 1], [6, 'T', 2]], ANSWER = [[10, 0, 1], [12, 1, 2], [14, 2, 2]];
+const GATES = [[2.9, 3.0], [21.75, 22.0]];                                   // the tape-stop into slow motion, the breath before the drop
+// ---------------------------------------------------------------- score → events
+function musicEvents() {
+  const ev = [], E = o => ev.push(o);
+  const at = (b, beat) => barT(b) + beat * BEAT, ch = b => CHORDS[b - 1];
+  const mel = (b, k, v, o) => {
+    o = o || {}; const N = beatNotes(ch(b)), lift = 12 * (o.lift || 0), t0 = barT(b) + (o.shift || 0) * BEAT;
+    MELODY.forEach(([st, j, l], i) => { if (!o.only || o.only(i)) E({ t: t0 + st * S16, d: l * S16, k, m: N[j] + lift, v: v * (j === 'R' ? 1.1 : 1), cut: o.cut, post: o.post }); });
+    if (o.answer) ANSWER.forEach(([st, j, l]) => E({ t: t0 + st * S16, d: l * S16, k, m: N.a[j] + lift, v: v * 0.8, cut: o.cut, post: o.post }));
+  };
+  const D = (b, beat, k, v, x) => E(Object.assign({ t: at(b, beat), d: 0.5, k, v }, x || {}));
+  const kick4 = (b, v, from) => { for (let i = from || 0; i < 4; i++) D(b, i, 'kick', v); };
+  const claps = (b, v) => { D(b, 1, 'clap', v); D(b, 3, 'clap', v); };
+  const hats = (b, v, sixteenths, open, from) => { for (let i = 0; i < (sixteenths ? 16 : 8); i++) { const beat = i * (sixteenths ? 0.25 : 0.5); if (beat < (from || 0)) continue; const off = beat % 1 === 0.5; D(b, beat, 'hat', v * (off ? 1 : 0.6), { p: off ? 0.2 : -0.2, open: open && off }); } };
+  const shaker = (b, v, from) => { for (let i = 0; i < 16; i++) { if (i / 4 < (from || 0)) continue; D(b, i / 4, 'shaker', v * (i % 2 ? 1 : 0.6), { p: 0.35 }); } };
+  const roll = (b, from, to, step, v0, v1, k) => { for (let x = from; x < to - 1e-6; x += step) D(b, x, k || 'snare', lerp(v0, v1, (x - from) / (to - from))); };
+  const root = (b, oct) => rootM(ch(b), oct), subR = b => { const r = rootM(ch(b), 1); return r < 28 ? r + 12 : r; };   // sub roots kept between E1 and D#2
+  const bassOff = (b, v, from) => { for (let i = from || 0; i < 4; i++) E({ t: at(b, i + 0.5), d: 0.42 * BEAT, k: 'bass', m: root(b, 2) + (i % 2 ? 12 : 0), v }); for (const beat of [0, 2]) if (beat >= (from || 0)) E({ t: at(b, beat), d: 1.8 * BEAT, k: 'sub', m: subR(b), v: v * 0.9 }); };
+  const bassRoll = (b, v, from) => { for (let i = (from || 0) * 4; i < 16; i++) E({ t: at(b, i / 4), d: 0.2 * BEAT, k: 'roll', m: root(b, 2) + (i % 4 === 2 ? 12 : 0), v: v * (i % 4 === 0 ? 1 : 0.75) }); for (const beat of [0, 2]) if (beat >= (from || 0)) E({ t: at(b, beat), d: 1.6 * BEAT, k: 'sub', m: subR(b), v: v * 0.6 }); };
+  const bassBounce = (b, v, from) => { [[0, 0, 0.7], [1.5, 7, 0.4], [2, 0, 0.7], [3.5, 12, 0.4]].forEach(([beat, iv, l]) => { if (beat >= (from || 0)) E({ t: at(b, beat), d: l * BEAT, k: 'bass', m: root(b, 2) + iv, v }); }); };
+  const pad = (b, v, cut, x) => E(Object.assign({ t: at(b, 0), d: 3.9 * BEAT, k: 'pad', ms: triad(ch(b), 3).concat([root(b, 4) + 7]), v, cut: cut || 1400 }, x || {}));
+  const stabs = (b, v) => [0.5, 1.5, 2.75, 3.5].forEach(beat => E({ t: at(b, beat), d: 0.3 * BEAT, k: 'stab', ms: triad(ch(b), 4), v }));
+  const arp = (b, k, v, oct, up, from) => { const tr = triad(ch(b), oct), seq = up ? [0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6] : [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 2, 3]; for (let i = (from || 0) * 4; i < 16; i++) { const s_ = seq[i], m = tr[s_ % 3] + 12 * Math.floor(s_ / 3); E({ t: at(b, i / 4), d: 0.22 * BEAT, k, m, v: v * (i % 4 === 0 ? 1 : 0.7), p: i % 2 ? 0.3 : -0.3 }); } };
+  const halfTime = (b, v, from) => { from = from || 0; if (from <= 0) D(b, 0, 'kick', 0.75 * v); if (from <= 2.5) D(b, 2.5, 'kick', 0.55 * v); if (from <= 2) D(b, 2, 'snap', 0.55 * v); shaker(b, 0.45 * v, from); };
+  // ---- A: the hook (0–2.9 s) — the full groove from frame one, the beep-lead plays the heartbeat
+  E({ t: 0, d: 1.6, k: 'crash', v: 0.7 });
+  kick4(1, 0.95); claps(1, 0.6); hats(1, 0.55, true); bassOff(1, 0.8); pad(1, 0.45, 1500);
+  mel(1, 'beepl', 0.85, { answer: true }); mel(1, 'glass', 0.22, { lift: 1 });
+  D(2, 0, 'kick', 0.95); D(2, 1, 'kick', 0.9); D(2, 1, 'clap', 0.6); hats(2, 0.5, true); for (let i = 0; i < 2; i++) E({ t: at(2, i + 0.5), d: 0.42 * BEAT, k: 'bass', m: root(2, 2) + (i % 2 ? 12 : 0), v: 0.8 });
+  E({ t: at(2, 0), d: 1.8 * BEAT, k: 'sub', m: subR(2), v: 0.7 }); E({ t: at(2, 0), d: 1.8 * BEAT, k: 'pad', ms: triad('D', 3).concat([root(2, 4) + 7]), v: 0.45, cut: 1500 });
+  mel(2, 'beepl', 0.85, { only: i => i < 4 });
+  // ---- B: slow motion — the SA node and its ion channels (3–12 s): half-time, a soft marimba
+  E({ t: 3.0, d: 2 * BEAT, k: 'pad', ms: triad('D', 3).concat([root(2, 4) + 7]), v: 0.4, cut: 900, post: true });
+  halfTime(2, 0.8, 2.5); E({ t: at(2, 2), d: 1.8 * BEAT, k: 'sub', m: subR(2), v: 0.5, post: true });
+  for (let b = 3; b <= 6; b++) { halfTime(b, b === 4 || b === 5 ? 0.75 : 0.9); pad(b, 0.38, 1000); bassBounce(b, 0.6); }
+  mel(3, 'marimba', 0.85, { answer: true });                                        // bar 4: the Ca²⁺ zip and K⁺ blips carry the tune; bar 5: the cascade
+  mel(6, 'marimba', 0.85, { answer: true }); mel(6, 'glass', 0.25, { lift: 1 });
+  E({ t: at(6, 2), d: 2 * BEAT, k: 'riser', v: 0.35 });
+  // ---- C: through the heart (12–21.75 s)
+  // bar 7–8a: the AV node holds the signal — the melody plays its P and waits; only ticks and a pad move
+  D(7, 0, 'kick', 0.7); D(7, 2, 'kick', 0.55); hats(7, 0.3); pad(7, 0.45, 800); E({ t: at(7, 0), d: 3.8 * BEAT, k: 'sub', m: subR(7), v: 0.5 });
+  mel(7, 'pluck', 0.9, { only: i => i === 0 });
+  pad(8, 0.45, 800, { d: 1.9 * BEAT }); E({ t: at(8, 0), d: 1.9 * BEAT, k: 'sub', m: subR(8), v: 0.45 }); hats(8, 0.3);
+  // 15.0 s: released — Q R S T land, the band comes in
+  { const N = beatNotes('E'); [['Q', 0, 1], ['R', 1, 1], ['S', 2, 1], ['T', 4, 2]].forEach(([j, st, l]) => E({ t: 15.0 + st * S16, d: l * S16, k: 'pluck', m: N[j], v: j === 'R' ? 1.0 : 0.9 })); }
+  E({ t: 15.0, d: 1.4, k: 'crash', v: 0.5 }); kick4(8, 0.9, 2); D(8, 3, 'clap', 0.6); hats(8, 0.55, true, false, 2); bassOff(8, 0.75, 2); pad(8, 0.4, 1600, { t: 15.0, d: 1.9 * BEAT });
+  for (const b of [9, 10]) { kick4(b, 0.92); claps(b, 0.6); hats(b, 0.55, true); bassRoll(b, 0.72); arp(b, 'sqarp', 0.42, 5, b === 10); pad(b, 0.35, 1400 + (b - 9) * 600); mel(b, 'pluck', 0.85, { answer: b === 9 }); }
+  roll(10, 2, 4, 0.5, 0.15, 0.4);
+  // bar 11: the build to the drop (the ventricular cell fires on 20.25 s), then one eighth of silence
+  kick4(11, 0.95); D(11, 2.5, 'kick', 0.7); D(11, 3, 'kick', 0.8); D(11, 3.25, 'kick', 0.7); D(11, 3.5, 'kick', 0.8);
+  bassRoll(11, 0.75); arp(11, 'sqarp', 0.45, 5, true); mel(11, 'pluck', 0.9, { lift: 1, only: i => i < 3 });
+  roll(11, 0, 2, 0.25, 0.3, 0.55); roll(11, 2, 3.5, 0.125, 0.55, 0.95);
+  E({ t: at(10, 0), d: 7.5 * BEAT, k: 'riser', v: 0.8 });
+  // ---- the drop (22–26 s): the QRS beep — saw lead on the heartbeat melody, wide chords
+  E({ t: 22.0, d: 2.5, k: 'impact', v: 0.85 }); E({ t: 22.0, d: 2.0, k: 'crash', v: 0.8 });
+  for (const b of [12, 13]) {
+    kick4(b, 1.0); if (b === 12) D(b, 3.75, 'kick', 0.6); claps(b, 0.75); hats(b, 0.55, false, true); shaker(b, 0.4);
+    E({ t: at(b, 0), d: 3.9 * BEAT, k: 'sub', m: subR(b), v: 0.8 }); for (const beat of [0.5, 1.5, 2.5, 3.5]) E({ t: at(b, beat), d: 0.4 * BEAT, k: 'bass', m: root(b, 2) + 12, v: 0.6 });
+    E({ t: at(b, 0), d: (b === 12 ? 3.8 : 1.8) * BEAT, k: 'supersaw', ms: triad(ch(b), 4).concat([root(b, 5)]), v: 0.7 });
+  }
+  mel(12, 'laser', 0.85, { cut: 5200, answer: true }); mel(12, 'pluck', 0.35, { lift: 1, answer: true });
+  stabs(13, 0.35); E({ t: at(13, 3), d: 1.0 * BEAT * 2, k: 'down', v: 0.5 });          // bar 13: the K⁺ blips are the melody
+  // ---- D: the body, the skin, the electrode (26–33.5 s): half-time, glass bells
+  for (let b = 14; b <= 16; b++) { halfTime(b, 0.9); pad(b, 0.42, 1300); E({ t: at(b, 0), d: 3.8 * BEAT, k: 'sub', m: subR(b), v: 0.55 }); }
+  mel(14, 'glass', 0.9, { only: i => true }); hats(16, 0.35); mel(16, 'glass', 0.85, { shift: 2, only: i => true });
+  E({ t: at(15, 0), d: 3.6 * BEAT, k: 'pad', ms: triad('D', 4), v: 0.18, cut: 3000 });
+  // bar 17: the raw electrode voltages hum on the board … until the subtraction cancels it (33.5 s) and the beat drops in
+  for (let i = 0; i < 6; i++) E({ t: at(17, i * 0.5), d: 0.4 * BEAT, k: 'bass', m: root(17, 2) + (i % 2 ? 12 : 0), v: 0.55 });
+  pad(17, 0.35, 900); D(17, 0, 'kick', 0.7); D(17, 2, 'snap', 0.5);
+  kick4(17, 0.95, 3); D(17, 3.5, 'kick', 0.85); D(17, 3, 'clap', 0.6); hats(17, 0.55, true, false, 3); E({ t: at(17, 3), d: 1.0, k: 'crash', v: 0.45 });
+  // ---- E: the electronics (34–42 s): chip lead and arps, driving
+  kick4(18, 0.95); claps(18, 0.6); hats(18, 0.5); bassRoll(18, 0.75); pad(18, 0.35, 1600); mel(18, 'chip', 0.8);
+  E({ t: at(18, 2), d: 2 * BEAT, k: 'riser', v: 0.6 }); roll(18, 3, 4, 0.125, 0.3, 0.8);
+  E({ t: 36.0, d: 2.2, k: 'impact', v: 0.7 }); E({ t: 36.0, d: 1.8, k: 'crash', v: 0.75 });   // "× 1000"
+  for (const b of [19, 20, 21]) {
+    kick4(b, 1.0); claps(b, 0.7); hats(b, 0.6, true); shaker(b, 0.45); bassRoll(b, 0.85); stabs(b, 0.5);
+    arp(b, 'chiparp', 0.55, 5, b === 21); mel(b, 'chip', 0.85, { lift: b === 21 ? 1 : 0, answer: true });
+  }
+  E({ t: 40.0, d: 1.4, k: 'crash', v: 0.5 });
+  // ---- F: the monitor again, the recap, the title, and the run back into bar 1 (42–48 s)
+  kick4(22, 0.95); claps(22, 0.6); hats(22, 0.5, true); bassOff(22, 0.8); pad(22, 0.45, 1800); mel(22, 'pluck', 0.85); mel(22, 'glass', 0.3, { lift: 1 });
+  E({ t: 43.0, d: 1.6, k: 'crash', v: 0.55 });
+  kick4(23, 0.95); claps(23, 0.55); hats(23, 0.5, true); bassOff(23, 0.8); pad(23, 0.5, 2000); E({ t: at(23, 0), d: 1.5, k: 'crash', v: 0.35 });
+  kick4(24, 0.9); D(24, 1, 'clap', 0.5); bassOff(24, 0.75); pad(24, 0.5, 2200); mel(24, 'pluck', 0.8); mel(24, 'laser', 0.45, { lift: 1, cut: 5000 });
+  roll(24, 2, 4, 0.125, 0.2, 0.8); E({ t: at(24, 1), d: 3 * BEAT, k: 'riser', v: 0.7 });
+  return ev;
+}
+// ---------------------------------------------------------------- SFX map (every cue belongs to a visible event)
+function sfxEvents() {
+  const ev = [];
+  const S = (t, k, v, x) => ev.push(Object.assign({ t, k, v: v === undefined ? 1 : v, p: 0, f: 440, d: 0.2 }, x || {}));
+  // the monitor beeps on every real-time R wave the picture shows (the loop point 48 s ≡ 0 s carries one)
+  for (const r of rPeaks(-0.01, 3.0)) S(r, 'beep', 0.9);
+  for (const r of rPeaks(42.99, DUR - 0.01)) S(r, 'beep', 0.9);
+  S(22.0, 'beep', 1.0, { big: 1 });                                             // the slowed beat's QRS: the drop
+  // A: hook
+  S(1.0, 'swish', 0.55, { d: 0.55 }); [['A', 6], ['C#', 7], ['E', 7]].forEach(([n, o], i) => S(1.5 + i * 0.125, 'snap', 0.8, { f: fq(n, o), p: [-0.4, 0.4, 0.3][i] }));
+  S(2.05, 'dive', 0.55, { d: 0.55 }); S(2.6, 'dive', 0.5, { d: 0.4 }); S(2.75, 'tapestop', 0.6, { d: 0.25 });
+  S(3.0, 'arrive', 0.7); S(3.0, 'slowmo', 0.5, { d: 0.7 });
+  // B: the SA node, one pacemaker cell, gap junctions, the atria
+  S(3.5, 'pop', 0.7, { f: fq('E', 6) }); S(3.6, 'swell', 0.35, { d: 1.3 }); S(4.95, 'dive', 0.5, { d: 0.45 });
+  S(5.0, 'gate', 0.6, { f: fq('A', 3), p: -0.3 });
+  for (let i = 0; i < 6; i++) S(5.25 + i * 0.25, 'bloop', 0.75, { f: pent(i, 4), p: -0.25 });               // each Na⁺ through the funny channel; Vm creeps up
+  S(6.4, 'gate', 0.6, { f: fq('E', 3) }); S(6.5, 'zip', 0.85, { d: 0.17 });                                // Ca²⁺ upstroke
+  S(6.9, 'gate', 0.6, { f: fq('B', 3), p: 0.3 });
+  for (let i = 0; i < 6; i++) S(7.0 + i * 0.125, 'blip', 0.7, { f: pent(10 - i, 4), p: 0.3 });             // each K⁺ leaving; Vm falls back
+  S(7.8, 'undive', 0.45, { d: 0.45 });
+  for (let i = 0; i < 7; i++) S(8.0 + i * 0.25, 'cell', 0.8, { f: pent(5 + i, 4), p: -0.6 + i * 0.2 });   // one pluck per cell as the activation hops along
+  S(9.55, 'undive', 0.5, { d: 0.45 }); S(10.0, 'bloom', 0.55, { d: 1.6 });
+  // C: the AV hold, His, the branches, Purkinje, one ventricular cell
+  S(12.0, 'swish', 0.5, { d: 0.6 }); S(12.5, 'pop', 0.65, { f: fq('C#', 6) });
+  for (let i = 0; i < 10; i++) S(12.5 + i * 0.25, 'tick', 0.32 + 0.03 * i, { f: i % 2 ? fq('E', 6) : fq('A', 6), p: i % 2 ? 0.25 : -0.25 });
+  S(15.0, 'release', 0.85); S(15.25, 'pop', 0.55, { f: fq('E', 6) });
+  S(16.25, 'branch', 0.8);
+  for (let i = 0; i < 10; i++) S(17.75 + i * 0.125, 'spark', 0.55, { f: pent(8 + i, 4), p: (i % 2 ? 1 : -1) * (0.2 + 0.07 * i) });
+  S(19.55, 'dive', 0.5, { d: 0.4 }); S(20.17, 'gate', 0.5, { f: fq('A', 3) }); S(20.25, 'zap', 1.0);
+  for (let i = 0; i < 4; i++) S(20.5 + i * 0.25, 'bloop', 0.55, { f: fq('E', 5), ca: 1, p: 0.15 });           // Ca²⁺ trickling in: the plateau
+  S(21.35, 'undive', 0.45, { d: 0.4 }); S(21.5, 'inhale', 0.5, { d: 0.25 });
+  S(24.2, 'dive', 0.45, { d: 0.4 }); S(24.25, 'gate', 0.5, { f: fq('B', 3) });
+  for (let i = 0; i < 8; i++) S(24.5 + i * 0.125, 'blip', 0.7, { f: pent(10 - i, 4), p: 0.3 - i * 0.08 });  // K⁺ out: the T wave
+  S(25.45, 'undive', 0.45, { d: 0.4 });
+  // D: the voltage map, one electrode
+  S(26.0, 'undive', 0.55, { d: 0.6 }); S(27.0, 'ripple', 0.75, { d: 1.3 }); S(27.25, 'neg', 0.75); S(27.5, 'pos', 0.75); S(28.0, 'measure', 0.7);
+  S(29.0, 'snap', 0.7, { f: fq('A', 6), p: 0.3 }); S(29.1, 'dive', 0.55, { d: 0.6 }); S(30.0, 'squish', 0.65);
+  [['A', 5], ['C#', 6], ['E', 6], ['A', 6]].forEach(([n, o], i) => S(30.25 + i * 0.25, 'pop', 0.6, { f: fq(n, o), p: i % 2 ? 0.25 : -0.25 }));
+  S(31.6, 'swish', 0.5, { d: 0.6 });
+  // D–E: the board — hum, cancellation, gain, filtering, sampling
+  S(32.25, 'hum', 0.55, { d: 1.25 }); S(33.0, 'pop', 0.6, { f: fq('E', 6), p: 0.2 }); S(33.25, 'pop', 0.6, { f: fq('A', 5), p: -0.2 }); S(33.5, 'cancel', 0.9);
+  S(34.8, 'swish', 0.45, { d: 0.5 }); S(35.0, 'boost', 0.75, { d: 1.0 }); S(36.0, 'hit', 1.0);
+  S(38.0, 'fsweep', 0.6, { d: 1.6 }); [38.5, 38.75, 39.0].forEach((tt, i) => S(tt, 'crackle', 0.6, { f: pent(3 + i, 5), p: [-0.3, 0.3, 0] [i] }));
+  S(40.0, 'digital', 0.75, { d: 0.3 }); S(40.3, 'adc', 0.45, { d: 2.6 });
+  for (let k = 0; k < 5; k++) S(40.5 + k * 0.5, 'packet', 0.6, { f: pent(5 + [0, 2, 4, 3, 5][k], 4), p: -0.3 + 0.15 * k });
+  // F: the monitor, the recap, the title
+  S(42.8, 'undive', 0.5, { d: 0.45 }); S(43.5, 'pop', 0.55, { f: fq('E', 6) });
+  [['A', 6], ['C#', 7], ['E', 7]].forEach(([n, o], i) => S(44.25 + i * 0.07, 'tick', 0.5, { f: fq(n, o) }));
+  [['A', 5], ['C#', 6], ['E', 6], ['F#', 6], ['A', 6]].forEach(([n, o], i) => S(45.0 + i * 0.25, 'level', i === 4 ? 1.0 : 0.75, { f: fq(n, o), last: i === 4 }));
+  S(46.9, 'title', 0.75, { d: 1.0 });
+  return ev;
+}
+// how far the band dips under each SFX (the SFX are the stars)
+const DUCK = { beep: 0.35, zap: 0.45, hit: 0.4, cancel: 0.35, level: 0.3, release: 0.35, bloop: 0.18, blip: 0.16, cell: 0.22, ripple: 0.3, title: 0.3, snap: 0.15, pop: 0.14, spark: 0.14, zip: 0.3, branch: 0.25, packet: 0.14, crackle: 0.12, neg: 0.2, pos: 0.2, measure: 0.2, arrive: 0.25, digital: 0.2, tick: 0.06 };
+// ---------------------------------------------------------------- synthesis helpers
+let SND_L = null, SND_R = null, ECH_L = null, ECH_R = null, SCG = null;    // reverb send, delay send, sidechain gain (one value per 64 samples)
+const nz = i => hash(i) * 2 - 1;
+// write one voice into (L, R); wraps at 48 s; o: { send (reverb), echo (delay), duck (sidechain) }
+function voice(L, R, t0, dur, pan, gain, fn, o) {
+  o = o || {};
+  const i0 = Math.round(t0 * SR), n = Math.max(1, Math.round(dur * SR)), snd = o.send || 0, ech = o.echo || 0, dk = !!o.duck;
+  const pl = Math.cos((pan + 1) * Math.PI / 4) * gain, pr = Math.sin((pan + 1) * Math.PI / 4) * gain;
+  for (let k = 0; k < n; k++) {
+    let s = fn(k / SR, k); if (s === 0) continue;
+    let i = (i0 + k) % NS; if (i < 0) i += NS;
+    if (dk) s *= SCG[i >> 6];
+    const l = s * pl, r = s * pr;
+    L[i] += l; R[i] += r;
+    if (snd) { SND_L[i] += l * snd; SND_R[i] += r * snd; }
+    if (ech) { ECH_L[i] += l * ech; ECH_R[i] += r * ech; }
+  }
+}
+const dec = r => t => Math.exp(-t * r);
+function blep(t, dt) { if (t < dt) { t /= dt; return t + t - t * t - 1; } if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+// state-variable filters (Chamberlin); cutoff in Hz, q = damping (lower = more resonant)
+function lpf() { let lo = 0, bp = 0; return (x, fc, q) => { const f = Math.min(0.8, TAU * fc / SR); lo += f * bp; const hi = x - lo - q * bp; bp += f * hi; return lo; }; }
+function bpf() { let lo = 0, bp = 0; return (x, fc, q) => { const f = Math.min(0.8, TAU * fc / SR); lo += f * bp; const hi = x - lo - q * bp; bp += f * hi; return bp; }; }
+const rel = (t, d, r) => t > d ? Math.max(0, 1 - (t - d) / r) : 1;
+// ---- tonal instruments
+function beepLeadFn(f, d) { let p = 0; return t => { p += f / SR; p -= Math.floor(p); return (fsin(TAU * p) + 0.22 * fsin(3 * TAU * p) + 0.1 * fsin(2 * TAU * p)) * (t < 0.003 ? t / 0.003 : 1) * (0.55 + 0.45 * Math.exp(-t * 9)) * rel(t, d, 0.04); }; }
+function pluckFn(f, d) { let p1 = 0, p2 = 0; const F = lpf(), a = f * 1.0035 / SR, b = f * 0.9965 / SR; return t => { p1 += a; if (p1 >= 1) p1 -= 1; p2 += b; if (p2 >= 1) p2 -= 1; const x = (2 * p1 - 1 - blep(p1, a)) + (2 * p2 - 1 - blep(p2, b)); return F(x * 0.5, 380 + 5200 * Math.exp(-t * 15), 0.45) * (t < 0.003 ? t / 0.003 : 1) * Math.exp(-t * 4) * rel(t, d, 0.08); }; }
+function marimbaFn(f) { let p = 0, q = 0; return t => { p += f / SR; q += f * 3.98 / SR; p -= Math.floor(p); q -= Math.floor(q); return (fsin(TAU * p) + 0.35 * fsin(TAU * q) * Math.exp(-t * 30)) * Math.exp(-t * 7) * (t < 0.002 ? t / 0.002 : 1); }; }
+function squareFn(f, d) { let p = 0; const F = lpf(), dt = f / SR; return t => { p += dt; if (p >= 1) p -= 1; const v = (p < 0.5 ? 1 : -1) + blep(p, dt) - blep((p + 0.5) % 1, dt); return F(v, 2800, 0.6) * (t < 0.004 ? t / 0.004 : 1) * (0.5 + 0.5 * Math.exp(-t * 7)) * rel(t, d, 0.05); }; }
+function glassFn(f) { let pc = 0, pm = 0; return t => { pc += f / SR; pm += f * 3.5 / SR; pc -= Math.floor(pc); pm -= Math.floor(pm); return fsin(TAU * pc + 1.2 * Math.exp(-t * 5) * fsin(TAU * pm)) * Math.exp(-t * 2.4) * (t < 0.004 ? t / 0.004 : 1); }; }
+function laserFn(f, d, f0, cut) {
+  const p = [0, 0, 0], det = [1, 1.006, 0.994], F = lpf();
+  return t => {
+    const g = f0 ? f0 * Math.pow(f / f0, Math.min(1, t / 0.04)) : f, vib = t > 0.16 ? 1 + 0.01 * fsin(TAU * 5.6 * t) : 1; let x = 0;
+    for (let j = 0; j < 3; j++) { const dt = g * vib * det[j] / SR; p[j] += dt; if (p[j] >= 1) p[j] -= 1; x += 2 * p[j] - 1 - blep(p[j], dt); }
+    return F(x / 3, cut * (0.65 + 0.35 * Math.exp(-t * 6)), 0.5) * (t < 0.006 ? t / 0.006 : 1) * rel(t, d, 0.07);
+  };
+}
+function chipFn(f, d) { let p = 0; const dt = f / SR, w = 0.125; return t => { p += dt; if (p >= 1) p -= 1; const v = (p < w ? 1 : -1) + blep(p, dt) - blep((p - w + 1) % 1, dt) - (2 * w - 1); return v * (t < 0.002 ? t / 0.002 : 1) * (0.65 + 0.35 * Math.exp(-t * 10)) * rel(t, d, 0.03); }; }
+function chordFn(ms, d, cut, att, env) { // detuned saws through a low-pass: pads, stabs, the drop's supersaw
+  const n = ms.length * 2, ph = new Float64Array(n), dts = []; ms.forEach(m => { const f = mtof(m); dts.push(f * 1.005 / SR, f * 0.995 / SR); }); const F = lpf();
+  return t => { let x = 0; for (let j = 0; j < n; j++) { let q = ph[j] + dts[j]; if (q >= 1) q -= 1; ph[j] = q; x += 2 * q - 1; } const fc = env ? cut * (0.25 + 0.75 * Math.exp(-t * env)) : cut; return F(x / n, fc, 0.7) * Math.min(1, t / att) * rel(t, d, att > 0.1 ? 0.5 : 0.06) * (env ? Math.exp(-t * 3) : 1); };
+}
+function bassFn(f, d, kind) {
+  let p = 0, s = 0; const F = lpf(), dt = f / SR;
+  return t => {
+    p += dt; if (p >= 1) p -= 1; s += dt; s -= Math.floor(s);
+    const y = kind === 'sub' ? 0.9 * fsin(TAU * s) + 0.3 * fsin(2 * TAU * s) : F(2 * p - 1 - blep(p, dt), 160 + (kind === 'roll' ? 900 : 1500) * Math.exp(-t * 20), 0.55) * 0.85 + 0.3 * fsin(TAU * s);
+    return y * (t < 0.004 ? t / 0.004 : 1) * rel(t, d, 0.03);
+  };
+}
+// ---- drums and effects
+function kickFn(seed) { let p = 0, q = 0; return (t, k) => { p += (60 + 120 * Math.exp(-t * 38)) / SR; q += 1600 / SR; return fsin(TAU * p) * Math.exp(-t * 11) * (t < 0.0015 ? t / 0.0015 : 1) + fsin(TAU * q) * 0.18 * Math.exp(-t * 110) + (t < 0.003 ? nz(k * 7 + seed) * 0.3 * (1 - t / 0.003) : 0); }; }
+function clapFn(seed) { const F = bpf(); return (t, k) => { let e = Math.exp(-t * 20) * 0.5; for (const o of [0, 0.009, 0.019]) if (t >= o) e += Math.exp(-(t - o) * 280) * 0.8; return F(nz(k * 3 + seed), 1400, 0.8) * e * 1.6; }; }
+function snapFn(seed) { const F = bpf(); let p = 0; return (t, k) => { p += 900 / SR; return F(nz(k * 3 + seed), 2600, 0.6) * Math.exp(-t * 60) * 1.4 + fsin(TAU * p) * Math.exp(-t * 90) * 0.35; }; }
+function snareFn(seed) { const F = bpf(); let p = 0; return (t, k) => { p += 190 / SR; return F(nz(k * 5 + seed), 2300, 0.9) * Math.exp(-t * 20) * 1.5 + fsin(TAU * p) * Math.exp(-t * 32) * 0.45; }; }
+function hatFn(seed, open) { let lp = 0; return (t, k) => { const x = nz(k * 11 + seed); lp += 0.55 * (x - lp); return (x - lp) * Math.exp(-t * (open ? 11 : 65)); }; }
+function shakerFn(seed) { const F = bpf(); return (t, k) => F(nz(k * 13 + seed), 6200, 1.0) * (t < 0.006 ? t / 0.006 : Math.exp(-(t - 0.006) * 32)) * 1.4; }
+function crashFn(seed) { let lp = 0; return (t, k) => { const x = nz(k * 17 + seed); lp += 0.4 * (x - lp); return (x - lp) * Math.exp(-t * 2.0) * (t < 0.002 ? t / 0.002 : 1); }; }
+function riserFn(d, seed) { const F = bpf(); let p = 0; return (t, k) => { const u = clamp(t / d, 0, 1); p += 110 * Math.pow(4, u) / SR; p -= Math.floor(p); return (F(nz(k * 19 + seed), 300 * Math.pow(22, u), 0.7) + (2 * p - 1) * 0.12) * u * u; }; }
+function downFn(d, seed) { const F = bpf(); return (t, k) => { const u = clamp(t / d, 0, 1); return F(nz(k * 23 + seed), 6000 * Math.pow(0.05, u), 0.7) * (1 - u) * (1 - u); }; }
+function impactFn(seed) { let p = 0; return (t, k) => { p += (32 + 52 * Math.exp(-t * 6)) / SR; return fsin(TAU * p) * Math.exp(-t * 2.6) + (t < 0.05 ? nz(k * 29 + seed) * 0.3 * (1 - t / 0.05) : 0); }; }
+// one music event
+const LEAD_PREV = {};
+function playMusic(e, L, R) {
+  const k = e.k, sd = Math.round(e.t * 1000), v = e.v;
+  switch (k) {
+    case 'beepl': voice(L, R, e.t, e.d + 0.1, 0.05, 0.2 * v, beepLeadFn(mtof(e.m), e.d), { send: 0.15, echo: 0.25 }); break;
+    case 'pluck': voice(L, R, e.t, e.d + 0.5, -0.1, 0.3 * v, pluckFn(mtof(e.m), e.d), { send: 0.18, echo: 0.22 }); break;
+    case 'marimba': voice(L, R, e.t, 0.8, 0.1, 0.36 * v, marimbaFn(mtof(e.m)), { send: 0.2, echo: 0.2 }); break;
+    case 'glass': voice(L, R, e.t, 1.6, 0.15, 0.24 * v, glassFn(mtof(e.m)), { send: 0.4, echo: 0.2 }); break;
+    case 'laser': { const f = mtof(e.m), pf = LEAD_PREV.laser && e.t - LEAD_PREV.laser.t < 0.3 ? LEAD_PREV.laser.f : 0; LEAD_PREV.laser = { t: e.t + e.d, f }; voice(L, R, e.t, e.d + 0.1, -0.05, 0.22 * v, laserFn(f, e.d, pf, e.cut || 3000), { send: 0.2, echo: 0.28 }); break; }
+    case 'chip': voice(L, R, e.t, e.d + 0.05, 0.1, 0.14 * v, chipFn(mtof(e.m), e.d), { send: 0.12, echo: 0.25 }); break;
+    case 'sqarp': voice(L, R, e.t, e.d + 0.06, e.p || 0, 0.09 * v, squareFn(mtof(e.m), e.d), { send: 0.1, duck: 1 }); break;
+    case 'chiparp': voice(L, R, e.t, e.d + 0.04, e.p || 0, 0.09 * v, chipFn(mtof(e.m), e.d), { send: 0.1, duck: 1 }); break;
+    case 'pad': voice(L, R, e.t, e.d + 0.6, 0, 0.26 * v, chordFn(e.ms, e.d, e.cut || 1400, 0.25), { send: 0.4, duck: 1 }); break;
+    case 'stab': voice(L, R, e.t, e.d + 0.1, 0.1, 0.26 * v, chordFn(e.ms, e.d, 4200, 0.003, 14), { send: 0.15, duck: 1 }); break;
+    case 'supersaw': voice(L, R, e.t, e.d + 0.6, 0, 0.3 * v, chordFn(e.ms, e.d, 2600, 0.02), { send: 0.3, duck: 1 }); break;
+    case 'bass': case 'roll': case 'sub': voice(L, R, e.t, e.d + 0.05, 0, (k === 'sub' ? 0.115 : 0.19) * v, bassFn(mtof(e.m), e.d, k), { duck: k !== 'sub' }); break;
+    case 'kick': voice(L, R, e.t, 0.5, 0, 0.52 * v, kickFn(sd)); break;
+    case 'clap': voice(L, R, e.t, 0.35, 0.05, 0.34 * v, clapFn(sd), { send: 0.22 }); break;
+    case 'snap': voice(L, R, e.t, 0.15, 0.1, 0.3 * v, snapFn(sd), { send: 0.25 }); break;
+    case 'snare': voice(L, R, e.t, 0.3, -0.05, 0.24 * v, snareFn(sd), { send: 0.18 }); break;
+    case 'hat': voice(L, R, e.t, e.open ? 0.3 : 0.08, e.p || 0, 0.19 * v, hatFn(sd, e.open)); break;
+    case 'shaker': voice(L, R, e.t, 0.12, e.p || 0, 0.1 * v, shakerFn(sd)); break;
+    case 'crash': voice(L, R, e.t, e.d, 0, 0.14 * v, crashFn(sd), { send: 0.25 }); break;
+    case 'riser': voice(L, R, e.t, e.d, 0, 0.18 * v, riserFn(e.d, sd), { send: 0.3 }); break;
+    case 'down': voice(L, R, e.t, e.d, 0, 0.18 * v, downFn(e.d, sd), { send: 0.4 }); break;
+    case 'impact': voice(L, R, e.t, e.d, 0, 0.55 * v, impactFn(sd), { send: 0.2 }); break;
+  }
+}
+// ---------------------------------------------------------------- SFX: crisp, rounded, tuned to the A pentatonic
+function playSfx(e, L, R) {
+  const k = e.k, v = e.v * 1.25, f = e.f || 440, p = e.p || 0, d = e.d || 0.2;
+  const V = (t0, dur, g, fn, snd, pan) => voice(L, R, t0, dur, pan === undefined ? p : pan, g * v, fn, { send: snd === undefined ? 0.2 : snd });
+  const sine = (fAt, envFn) => { let ph = 0; return t => { ph += fAt(t) / SR; ph -= Math.floor(ph); return fsin(TAU * ph) * envFn(t); }; };
+  const bell = (f0, r, idx) => { let pc = 0, pm = 0; return t => { pc += f0 / SR; pm += f0 * 3.5 / SR; pc -= Math.floor(pc); pm -= Math.floor(pm); return fsin(TAU * pc + idx * Math.exp(-t * 8) * fsin(TAU * pm)) * Math.exp(-t * r) * (t < 0.002 ? t / 0.002 : 1); }; };
+  const noiseLP = (cutAt, envFn, seed) => { let lp = 0, lp2 = 0; return (t, kk) => { const a = 1 - Math.exp(-TAU * cutAt(t) / SR); lp += a * (nz(kk * 7 + seed) - lp); lp2 += a * (lp - lp2); return lp2 * envFn(t); }; };
+  const swell = dd => t => Math.sin(Math.PI * clamp(t / dd, 0, 1));
+  const att = (a, r) => t => (t < a ? t / a : 1) * Math.exp(-Math.max(0, t - a) * r);
+  switch (k) {
+    // the monitor's QRS beep: a clean A5 tone (a bigger, wider one on the drop)
+    case 'beep': {
+      const len = e.big ? 0.2 : 0.11, env = t => (t < 0.004 ? t / 0.004 : 1) * (t > len ? Math.max(0, 1 - (t - len) / 0.03) : 1);
+      let ph = 0; V(e.t, len + 0.04, 0.34, t => { ph += 880 / SR; ph -= Math.floor(ph); return (fsin(TAU * ph) + 0.12 * fsin(3 * TAU * ph)) * env(t); }, 0.18);
+      if (e.big) { V(e.t, 0.6, 0.16, bell(1760, 6, 0.6), 0.4, -0.4); V(e.t, 0.6, 0.16, bell(1318.5, 6, 0.6), 0.4, 0.4); }
+      break;
+    }
+    case 'snap': V(e.t, 0.03, 0.5, noiseLP(() => 7000, dec(260), 3)); V(e.t, 0.14, 0.42, sine(t => f * (1 + 0.25 * Math.exp(-t * 80)), dec(32)), 0.25); break;
+    case 'pop': V(e.t, 0.16, 0.45, sine(t => f * (1.5 - 0.5 * Math.min(1, t * 40)), att(0.002, 26)), 0.25); V(e.t, 0.012, 0.15, noiseLP(() => 5000, dec(400), 5)); break;
+    case 'tick': V(e.t, 0.08, 0.36, sine(() => f, dec(60)), 0.15); break;
+    case 'gate': V(e.t, 0.05, 0.35, noiseLP(() => 2500, dec(120), 7)); V(e.t, 0.12, 0.35, sine(t => f * (1 + 0.6 * Math.exp(-t * 60)), dec(38)), 0.1); break;
+    case 'bloop': { // an ion through its channel: a rounded upward glide (Ca²⁺ a little rounder)
+      const up = e.ca ? 0.25 : 0.45; V(e.t, 0.22, 0.42, sine(t => f * (1 - up + up * Math.min(1, t / 0.05)), att(0.004, e.ca ? 12 : 16)), 0.3); break;
+    }
+    case 'blip': V(e.t, 0.14, 0.38, sine(t => f * (1 + 0.35 * Math.exp(-t * 45)), att(0.002, 22)), 0.3); break;
+    case 'zip': { // the pacemaker's Ca²⁺ upstroke: a fast rising zip with a sparkle on top
+      let ph = 0; V(e.t, d + 0.08, 0.32, t => { const u = clamp(t / d, 0, 1); ph += (220 * Math.pow(8, u)) / SR; ph -= Math.floor(ph); return (2 * ph - 1) * 0.5 * (t < d ? 0.4 + 0.6 * u : Math.max(0, 1 - (t - d) / 0.08)); }, 0.2);
+      V(e.t + d, 0.5, 0.2, bell(fq('A', 6), 6, 0.9), 0.4); break;
+    }
+    case 'zap': { // the ventricular cell's fast Na⁺ upstroke: a snappy laser-zap, a thump, and a bright ring
+      let ph = 0; V(e.t, 0.16, 0.42, t => { ph += (180 * Math.pow(14, Math.min(1, t / 0.1))) / SR; ph -= Math.floor(ph); return (2 * ph - 1) * 0.55 * (t < 0.1 ? 1 : Math.max(0, 1 - (t - 0.1) / 0.06)); }, 0.2);
+      V(e.t, 0.25, 0.5, sine(t => 60 + 90 * Math.exp(-t * 30), dec(14)), 0.05); V(e.t, 0.04, 0.3, noiseLP(() => 6000, dec(120), 9));
+      V(e.t + 0.1, 0.8, 0.24, bell(fq('E', 6), 4.5, 1.0), 0.45, -0.3); V(e.t + 0.1, 0.8, 0.2, bell(fq('A', 6), 4.5, 1.0), 0.45, 0.3); break;
+    }
+    case 'cell': V(e.t, 0.5, 0.36, bell(f, 7, 1.1), 0.35); V(e.t, 0.08, 0.2, sine(t => f * 0.5 * (1 + 2 * Math.exp(-t * 50)), dec(40))); break;
+    case 'bloom': [['A', 4], ['C#', 5], ['E', 5], ['A', 5]].forEach(([n, o], i) => V(e.t + i * 0.06, d, 0.12, sine(() => fq(n, o), t => Math.sin(Math.PI * clamp(t / d, 0, 1)) * (1 - 0.3 * t / d)), 0.6, -0.3 + 0.2 * i)); break;
+    case 'release': // the AV node lets go: a whoosh down the bundle and a two-note chime
+      V(e.t, 0.35, 0.3, noiseLP(t => 7000 * Math.pow(0.08, t / 0.35), swell(0.35), 11), 0.3);
+      V(e.t, 0.6, 0.3, bell(fq('E', 6), 5, 1.0), 0.4, -0.2); V(e.t + 0.125, 0.8, 0.3, bell(fq('B', 5), 4, 1.0), 0.4, 0.2); break;
+    case 'branch': V(e.t, 0.7, 0.3, bell(fq('C#', 6), 5, 0.9), 0.4, -0.7); V(e.t + 0.06, 0.7, 0.3, bell(fq('E', 6), 5, 0.9), 0.4, 0.7); V(e.t, 0.25, 0.2, noiseLP(t => 3000 + 3000 * t, swell(0.25), 13), 0.3, 0); break;
+    case 'spark': V(e.t, 0.3, 0.28, bell(f, 10, 0.7), 0.4); break;
+    case 'inhale': V(e.t, d, 0.3, noiseLP(t => 800 + 7000 * (t / d) ** 2, t => (t / d) ** 2, 15), 0.2); break;
+    case 'ripple': // the voltage pattern blooming across the chest: a chorus of bells over a soft swell
+      for (let i = 0; i < 6; i++) V(e.t + i * 0.05, 1.2, 0.12, bell(pent(i * 2, 5), 3.5, 0.7), 0.6, -0.6 + 0.24 * i);
+      V(e.t, d, 0.18, noiseLP(() => 900, swell(d), 17), 0.4, 0); break;
+    case 'neg': V(e.t, 0.5, 0.42, sine(t => fq('A', 3) * (1 - 0.06 * t), att(0.006, 6)), 0.3, -0.3); V(e.t, 0.5, 0.15, sine(() => fq('E', 4), att(0.006, 8)), 0.3, -0.3); break;
+    case 'pos': V(e.t, 0.6, 0.3, bell(fq('A', 5), 4, 1.0), 0.35, 0.3); V(e.t, 0.6, 0.2, bell(fq('E', 6), 5, 0.8), 0.35, 0.3); break;
+    case 'measure': V(e.t, 0.12, 0.3, sine(() => fq('A', 5), dec(30)), 0.25, -0.3); V(e.t + 0.08, 0.4, 0.34, sine(() => fq('E', 6), dec(9)), 0.35, 0.3); break;
+    case 'squish': V(e.t, 0.3, 0.3, noiseLP(t => 600 + 900 * Math.exp(-t * 10), att(0.01, 10), 19), 0.2); V(e.t, 0.3, 0.3, sine(t => 120 + 60 * Math.exp(-t * 20), dec(14)), 0.1); break;
+    case 'hum': { // the shared mains hum on both electrodes (buzzy A, a little unsteady)
+      const h = fq('A', 2); V(e.t, d, 0.3, (t) => { const a = Math.min(1, t / 0.15) * (0.85 + 0.15 * fsin(TAU * 3.1 * t)); return a * (fsin(TAU * h * t) * 0.5 + fsin(TAU * 2 * h * t) * 0.35 + fsin(TAU * 3 * h * t) * 0.3 + fsin(TAU * 5 * h * t) * 0.18); }, 0.05); break;
+    }
+    case 'cancel': // the subtraction: the hum is gone — a clean, satisfying chord
+      V(e.t, 0.03, 0.3, noiseLP(() => 4000, dec(200), 21));
+      [['A', 5], ['C#', 6], ['E', 6], ['A', 6]].forEach(([n, o], i) => V(e.t + i * 0.025, 1.2, 0.17, bell(fq(n, o), 3.2, 0.8), 0.5, -0.45 + 0.3 * i)); break;
+    case 'boost': { let ph = 0; V(e.t, d, 0.26, t => { const u = clamp(t / d, 0, 1); ph += (110 * Math.pow(8, u)) / SR; ph -= Math.floor(ph); return (fsin(TAU * ph) + 0.3 * (2 * ph - 1)) * u * u * (t > d - 0.02 ? (d - t) / 0.02 : 1); }, 0.2); break; }
+    case 'hit': // "× 1000": a punchy thump and a wide chord
+      V(e.t, 0.5, 0.55, sine(t => 48 + 60 * Math.exp(-t * 18), dec(7)), 0.05);
+      [['A', 5], ['E', 6], ['A', 6], ['C#', 7]].forEach(([n, o], i) => V(e.t + i * 0.015, 1.4, 0.13, bell(fq(n, o), 2.6, 1.2), 0.55, -0.5 + 0.33 * i)); break;
+    case 'fsweep': V(e.t, d, 0.24, noiseLP(t => 9000 * Math.pow(0.04, Math.min(1, t / (d * 0.45))) * (t > d * 0.6 ? Math.pow(25, (t - d * 0.6) / (d * 0.4)) : 1), swell(d), 23), 0.35); break;
+    case 'crackle': for (let i = 0; i < 3; i++) V(e.t + i * 0.025, 0.02, 0.25, noiseLP(() => 6000, dec(300), 25 + i)); V(e.t, 0.14, 0.32, sine(t => f * (1 + 0.5 * Math.exp(-t * 60)), dec(30)), 0.2); break;
+    case 'digital': for (let i = 0; i < 6; i++) V(e.t + i * 0.04, 0.05, 0.28, (() => { let ph = 0; const ff = pent(5 + i * 2, 4); return t => { ph += ff / SR; ph -= Math.floor(ph); return (ph < 0.25 ? 1 : -1) * Math.exp(-t * 50) * 0.5; }; })(), 0.15, -0.4 + 0.16 * i); break;
+    case 'adc': { // one tiny click per sample (2 per 16th note), alternating sides
+      const n = Math.round(d / 0.0625); for (let i = 0; i < n; i++) V(e.t + i * 0.0625, 0.012, 0.16 * (i % 2 ? 0.8 : 1), noiseLP(() => 9000, dec(500), 27 + i), 0.05, i % 2 ? 0.45 : -0.45); break;
+    }
+    case 'packet': for (let i = 0; i < 2; i++) V(e.t + i * 0.06, 0.07, 0.38, (() => { let ph = 0; const ff = f * (i ? 1.5 : 1); return t => { ph += ff / SR; ph -= Math.floor(ph); return (ph < 0.5 ? 1 : -1) * Math.exp(-t * 35) * 0.45; }; })(), 0.2); break;
+    case 'level': V(e.t, 0.9, e.last ? 0.42 : 0.32, bell(f, 3.4, 1.1), 0.4); V(e.t, 0.12, 0.2, sine(t => f * 0.5 * (1 + 3 * t), dec(30))); if (e.last) V(e.t, 1.0, 0.18, bell(f * 1.5, 3, 0.8), 0.5, 0.3); break;
+    case 'title': [['A', 4], ['C#', 5], ['E', 5], ['A', 5], ['C#', 6]].forEach(([n, o], i) => V(e.t + i * 0.035, d + 0.8, 0.13, bell(fq(n, o), 1.6, 0.9), 0.5, -0.4 + 0.2 * i)); break;
+    case 'arrive': V(e.t, 0.6, 0.45, sine(t => 52 + 30 * Math.exp(-t * 12), dec(5)), 0.15); V(e.t, 0.6, 0.12, bell(fq('A', 5), 4, 0.6), 0.5); break;
+    case 'slowmo': V(e.t, d, 0.2, noiseLP(t => 5000 * Math.pow(0.08, t / d), swell(d), 29), 0.4); break;
+    case 'tapestop': { let ph = 0; V(e.t, d, 0.22, t => { const u = clamp(t / d, 0, 1); ph += (220 * (1 - u * 0.92)) / SR; ph -= Math.floor(ph); return (2 * ph - 1) * 0.5 * (1 - u); }, 0.1); break; }
+    case 'swell': V(e.t, d, 0.1, sine(t => fq('E', 5) * (1 + 0.02 * t), swell(d)), 0.5); V(e.t, d, 0.08, sine(() => fq('A', 5), swell(d)), 0.5); break;
+    case 'dive': V(e.t, d, 0.26, noiseLP(t => 600 + 7000 * (t / d) ** 2, swell(d), 31), 0.25); V(e.t, d, 0.1, sine(t => 300 + 700 * t / d, swell(d))); break;
+    case 'undive': V(e.t, d, 0.24, noiseLP(t => 6000 - 5200 * t / d, swell(d), 33), 0.25); break;
+    case 'swish': V(e.t, d, 0.2, noiseLP(t => 1500 + 3000 * Math.sin(Math.PI * t / d), swell(d), 35), 0.3); break;
+  }
+}
+// ---------------------------------------------------------------- effects
+// plate-like Schroeder reverb (4 damped combs + 2 allpasses per side), run twice round the loop so the tail wraps
+function reverb(inL, inR, outL, outR, wet) {
+  const C = [1116, 1188, 1277, 1356].map(n => Math.round(n * SR / 44100)), A = [556, 441].map(n => Math.round(n * SR / 44100));
+  [[inL, outL, 0], [inR, outR, 23]].forEach(([inp, out, sp]) => {
+    const c0 = new Float32Array(C[0] + sp), c1 = new Float32Array(C[1] + sp), c2 = new Float32Array(C[2] + sp), c3 = new Float32Array(C[3] + sp);
+    const a0 = new Float32Array(A[0] + sp), a1 = new Float32Array(A[1] + sp);
+    let i0 = 0, i1 = 0, i2 = 0, i3 = 0, j0 = 0, j1 = 0, f0 = 0, f1 = 0, f2 = 0, f3 = 0;
+    const fb = 0.86, dm = 0.32, dm1 = 1 - dm;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = inp[i] * 0.2; let o, y = 0;
+      o = c0[i0]; f0 = o * dm1 + f0 * dm; c0[i0] = x + f0 * fb; if (++i0 >= c0.length) i0 = 0; y += o;
+      o = c1[i1]; f1 = o * dm1 + f1 * dm; c1[i1] = x + f1 * fb; if (++i1 >= c1.length) i1 = 0; y += o;
+      o = c2[i2]; f2 = o * dm1 + f2 * dm; c2[i2] = x + f2 * fb; if (++i2 >= c2.length) i2 = 0; y += o;
+      o = c3[i3]; f3 = o * dm1 + f3 * dm; c3[i3] = x + f3 * fb; if (++i3 >= c3.length) i3 = 0; y += o;
+      o = a0[j0]; a0[j0] = y + o * 0.5; y = o - y; if (++j0 >= a0.length) j0 = 0;
+      o = a1[j1]; a1[j1] = y + o * 0.5; y = o - y; if (++j1 >= a1.length) j1 = 0;
+      if (pass === 1) out[i] += y * wet;
+    }
+  });
+}
+// "noise filtering": the whole band is low-pass filtered (38.0–38.6 s down to ~450 Hz) and opened again by 39.75 s
+const FILT = { a: 38.0, b: 38.6, c: 39.0, d: 39.75, lo: 450 };
+function bandFilter(L, R) {
+  const i0 = Math.round((FILT.a - 0.05) * SR), i1 = Math.round((FILT.d + 0.05) * SR);
+  for (const ch of [L, R]) {
+    const F = lpf();
+    for (let i = i0; i < i1; i++) {
+      const t = i / SR, u = t < FILT.b ? seg(t, FILT.a, FILT.b) : t < FILT.c ? 1 : 1 - seg(t, FILT.c, FILT.d);
+      const fc = 16000 * Math.pow(FILT.lo / 16000, smooth(u)), y = F(ch[i], fc, 0.55);
+      const w = t < FILT.a ? 0 : t > FILT.d ? 0 : 1;
+      ch[i] = w ? y : ch[i];
+    }
+  }
+}
+// ---------------------------------------------------------------- render: opts.bus 'm' (music only) / 's' (SFX only) / both
+function renderAudio(opts) {
+  opts = opts || {};
+  const L = new Float32Array(NS), R = new Float32Array(NS);
+  SND_L = new Float32Array(NS); SND_R = new Float32Array(NS); ECH_L = new Float32Array(NS); ECH_R = new Float32Array(NS);
+  const sfx = sfxEvents();
+  if (opts.bus !== 's') {
+    const inGate = t => GATES.some(([a, b]) => t >= a - 0.005 && t < b);
+    const mus = musicEvents().filter(e => e.post || !inGate(e.t));
+    // sidechain: the bed ducks under every kick
+    SCG = new Float32Array((NS >> 6) + 2).fill(1);
+    for (const e of mus) if (e.k === 'kick') {
+      const depth = (e.t >= 22.0 && e.t < 26.0 ? 0.55 : 0.4) * e.v, j0 = Math.round(e.t * SR) >> 6, n = Math.round(0.26 * SR) >> 6;
+      for (let q = 0; q < n; q++) { const j = (j0 + q) % SCG.length, u = q * 64 / SR, a = u < 0.004 ? u / 0.004 : Math.exp(-(u - 0.004) * 13); SCG[j] *= 1 - depth * a; }
+    }
+    LEAD_PREV.laser = null;
+    for (const e of mus) if (!e.post) playMusic(e, L, R);
+    // the gates: the band stops for the tape-stop into slow motion, and for the eighth before the drop (reverb tails ring on)
+    for (const [a, b] of GATES) {
+      const i0 = Math.round(a * SR), i1 = Math.round(b * SR), r = Math.round(0.008 * SR);
+      for (let i = i0; i < i1; i++) { const g = i < i0 + r ? 1 - (i - i0) / r : i > i1 - r ? (i - (i1 - r)) / r : 0; L[i] *= g; R[i] *= g; ECH_L[i] *= g; ECH_R[i] *= g; }
+    }
+    for (const e of mus) if (e.post) playMusic(e, L, R);
+    bandFilter(L, R);
+    // the band dips under the SFX
+    for (const e of sfx) {
+      const dk = DUCK[e.k]; if (!dk) continue;
+      const i0 = Math.round(e.t * SR), n = Math.round(0.45 * SR), att = Math.round(0.006 * SR);
+      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k - att) / SR * 7), g = 1 - dk * a; L[i] *= g; R[i] *= g; }
+    }
+  }
+  if (opts.bus !== 'm') for (const e of sfx) playSfx(e, L, R);
+  // dotted-eighth ping-pong delay on the leads (circular)
+  { const D = Math.round(0.75 * BEAT * SR), fb = 0.36;
+    for (let i = 0; i < NS; i++) { let el = 0, er = 0, w = 1; for (let k = 1; k <= 4; k++) { w *= fb; const j = (i - k * D + NS * 4) % NS; if (k % 2) { el += w * ECH_R[j]; er += w * ECH_L[j]; } else { el += w * ECH_L[j]; er += w * ECH_R[j]; } } L[i] += el; R[i] += er; SND_L[i] += el * 0.3; SND_R[i] += er * 0.3; } }
+  ECH_L = null; ECH_R = null; SCG = null;
+  reverb(SND_L, SND_R, L, R, 0.8);
+  SND_L = null; SND_R = null;
+  // master: DC blocking, a gentle top roll-off (~15 kHz) and soft saturation; circular, in place
+  const a = Math.exp(-TAU * 15000 / SR);
+  for (const ch of [L, R]) {
+    let y = 0, x1 = 0, hp = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = ch[i];
+      y = a * y + (1 - a) * x;
+      hp = 0.9993 * (hp + y - x1); x1 = y;
+      if (pass === 1) ch[i] = Math.tanh(hp * 1.15) / 1.15;
+    }
+  }
+  return { L, R };
+}
+// ---------------------------------------------------------------- player playback (one buffer, the audio clock drives the picture)
+const LIVE = { ctx: null, buf: null, src: null, gain: null, muted: false, startAt: 0, offset: 0, ready: false };
+function liveInit() {
+  if (LIVE.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  LIVE.ctx = new AC({ sampleRate: SR });
+  LIVE.gain = LIVE.ctx.createGain(); LIVE.gain.gain.value = 0.9; LIVE.gain.connect(LIVE.ctx.destination);
+}
+function liveBuild() {
+  if (LIVE.buf) return;
+  liveInit();
+  const a = renderAudio();
+  const b = LIVE.ctx.createBuffer(2, NS, SR); b.getChannelData(0).set(a.L); b.getChannelData(1).set(a.R);
+  LIVE.buf = b; LIVE.ready = true;
+}
+function livePlay(t) {
+  liveBuild();
+  if (LIVE.ctx.state === 'suspended') LIVE.ctx.resume();
+  const s = LIVE.ctx.createBufferSource(); s.buffer = LIVE.buf; s.connect(LIVE.gain);
+  LIVE.startAt = LIVE.ctx.currentTime + 0.03; LIVE.offset = t; s.start(LIVE.startAt, t); LIVE.src = s;
+}
+function livePause() { if (LIVE.src) { try { LIVE.src.stop(); } catch (e) { } LIVE.src = null; } }
+function liveNow() { return LIVE.offset + Math.max(0, LIVE.ctx.currentTime - LIVE.startAt); }
+function liveMute(m) { LIVE.muted = m; if (LIVE.gain) LIVE.gain.gain.value = m ? 0 : 0.9; }
+
+// ---- 40_player.js
+// ============================================================================
+// PLAYER: 360x640 canvas shown with nearest-neighbour scaling, controls
+// outside the composition. Audio starts on the first user gesture; the audio
+// clock drives the picture, so pause / resume / seek never duplicate sounds.
+// ============================================================================
+const PL = { t: 0, playing: false, wallT0: 0, pos0: 0, audioOK: true, scrubbing: false, img: null, cx: null };
+function plClock() {
+  if (!PL.playing) return PL.t;
+  if (PL.audioOK && LIVE.ctx) return liveNow();
+  return PL.pos0 + (performance.now() - PL.wallT0) / 1000;
+}
+function plDraw(t) {
+  renderFrame(t);
+  const d = PL.img.data, u = new Uint32Array(d.buffer); u.set(buf);
+  PL.cx.putImageData(PL.img, 0, 0);
+}
+function plFmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+function plUI() {
+  const el = PL.el;
+  el.play.innerHTML = PL.playing ? ICON.pause : ICON.play;
+  el.play.setAttribute('aria-label', PL.playing ? 'Pause' : 'Play');
+  el.mute.innerHTML = LIVE.muted ? ICON.muted : ICON.sound;
+  el.mute.setAttribute('aria-label', LIVE.muted ? 'Unmute' : 'Mute');
+  if (!PL.scrubbing) el.scrub.value = String(Math.round(PL.t * FPS));
+  el.time.textContent = plFmt(PL.t) + ' / ' + plFmt(DUR);
+  const i = sceneIndex(PL.t);
+  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / ' + SCENE_NAMES.length + '  ' + SCENE_NAMES[i];
+  el.scrub.style.setProperty('--p', (PL.t / DUR * 100).toFixed(2) + '%');
+}
+function plPlay() {
+  if (PL.t >= DUR - 1 / FPS) PL.t = 0;
+  PL.playing = true; PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  try { livePlay(PL.t); if (LIVE.muted) liveMute(true); } catch (e) { PL.audioOK = false; }
+  PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  plUI();
+}
+function plPause() {
+  PL.t = plClock(); PL.playing = false;
+  try { livePause(); } catch (e) { }
+  plUI();
+}
+function plSeek(t, keepPlaying) {
+  t = clamp(t, 0, DUR - 1 / FPS);
+  const was = PL.playing;
+  if (was) { try { livePause(); } catch (e) { } PL.playing = false; }
+  PL.t = t; plDraw(t);
+  if (was && keepPlaying !== false) plPlay(); else plUI();
+}
+function plLoop() {
+  if (PL.playing) {
+    let t = plClock();
+    if (t >= DUR - 1 / FPS) { t = DUR - 1 / FPS; PL.t = t; plDraw(t); plPause(); }
+    else { PL.t = t; plDraw(t); plUI(); }
+  }
+  requestAnimationFrame(plLoop);
+}
+const ICON = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/></svg>',
+  replay: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1.5L7 6l5 4.5V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15 8.6a4.6 4.6 0 0 1 0 6.8l-1.3-1.3a2.8 2.8 0 0 0 0-4.2zM17.6 6a8.3 8.3 0 0 1 0 12l-1.3-1.3a6.5 6.5 0 0 0 0-9.4z"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15.2 9.3l1.3-1.3 2.2 2.2 2.2-2.2 1.3 1.3-2.2 2.2 2.2 2.2-1.3 1.3-2.2-2.2-2.2 2.2-1.3-1.3 2.2-2.2z"/></svg>',
+};
+function plStart() {
+  const cv = document.getElementById('screen');
+  PL.cx = cv.getContext('2d', { alpha: false });
+  PL.img = PL.cx.createImageData(W, H);
+  PL.el = { play: document.getElementById('play'), replay: document.getElementById('replay'), mute: document.getElementById('mute'), scrub: document.getElementById('scrub'), time: document.getElementById('time'), scene: document.getElementById('scene') };
+  PL.el.replay.innerHTML = ICON.replay;
+  PL.el.scrub.max = String(NF - 1);
+  const fit = () => {
+    const stage = document.getElementById('stage');
+    const aw = stage.clientWidth, ah = stage.clientHeight;
+    let s = Math.min(aw / W, ah / H);
+    if (s >= 2) s = Math.floor(s);                       // integer scale when there is room
+    cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
+  };
+  addEventListener('resize', fit); fit();
+  PL.el.play.onclick = () => (PL.playing ? plPause() : plPlay());
+  PL.el.replay.onclick = () => { plSeek(0, false); plPlay(); };
+  PL.el.mute.onclick = () => { try { liveInit(); liveMute(!LIVE.muted); } catch (e) { LIVE.muted = !LIVE.muted; } plUI(); };
+  const sc = PL.el.scrub;
+  sc.addEventListener('input', () => { PL.scrubbing = true; const t = (+sc.value) / FPS; if (PL.playing) { try { livePause(); } catch (e) { } PL.playing = false; PL.resumeAfter = true; } PL.t = t; plDraw(t); plUI(); });
+  sc.addEventListener('change', () => { PL.scrubbing = false; if (PL.resumeAfter) { PL.resumeAfter = false; plPlay(); } else plUI(); });
+  cv.addEventListener('click', () => (PL.playing ? plPause() : plPlay()));
+  addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); PL.playing ? plPause() : plPlay(); }
+    else if (e.key === 'ArrowRight') plSeek(PL.t + (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'ArrowLeft') plSeek(PL.t - (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'm') PL.el.mute.click();
+    else if (e.key === 'r') PL.el.replay.click();
+  });
+  document.getElementById('loading').remove();
+  plDraw(0); plUI(); requestAnimationFrame(plLoop);
+  // synthesise the soundtrack once (a couple of seconds) right after the first frame is on screen
+  PL.el.scene.textContent = 'preparing audio…';
+  setTimeout(() => { try { liveBuild(); } catch (e) { PL.audioOK = false; } plUI(); }, 60);
+}
+// public API (used by the MP4 export through Playwright)
+if (typeof window !== 'undefined') {
+  window.ECG = { W, H, FPS, DUR, NF, renderFrame, getBuf: () => buf, renderAudio, sceneIndex, seek: t => plSeek(t, false) };
+  const boot = () => setTimeout(() => { engineInit(); if (!/[?&]headless/.test(location.search)) plStart(); window.ECG.ready = true; }, 30);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+}
+
+})();
+</script>
+</body>
+</html>
