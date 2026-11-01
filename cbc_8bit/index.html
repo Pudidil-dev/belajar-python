@@ -1,0 +1,2483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>How Blood Test Machines Count Your Cells</title>
+<meta name="description" content="How electricity and lasers analyse your blood: a 65-second pixel-art scientific animation of an automated hematology analyzer (impedance counting, SLS hemoglobin photometry, fluorescence flow cytometry), with a lo-fi soundtrack synthesised in JavaScript.">
+<style>
+:root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #8fe9f5; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 500 14px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { display: flex; flex-direction: column; min-height: 100%; }
+#stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px 16px 6px; position: relative; }
+#screen { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #0b1020; box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0,0,0,.55); cursor: pointer; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); letter-spacing: .08em; }
+#bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 16px 6px; max-width: 720px; width: 100%; margin: 0 auto; }
+.btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.btn:hover { border-color: #3a4b7c; }
+.btn:focus-visible, #scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+#scrub { flex: 1 1 auto; min-width: 60px; height: 40px; background: transparent; -webkit-appearance: none; appearance: none; margin: 0; --p: 0%; }
+#scrub::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+#scrub::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+#scrub::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+#scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--ink); border: 0; }
+#scrub::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 0; }
+#time { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--sub); min-width: 104px; text-align: right; }
+#scene { text-align: center; color: var(--sub); font-size: 12px; letter-spacing: .06em; padding: 0 16px 12px; min-height: 28px; }
+@media (max-width: 420px) { #time { min-width: 0; font-size: 12px; } .btn { width: 36px; height: 36px; } #bar { gap: 6px; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a blood tube is sampled by a hematology analyzer; red cells and platelets are counted as electrical pulses in a tiny aperture, hemoglobin is measured by light absorption, white cells are stained and passed through a red laser, and the signals become a complete blood count"></canvas>
+  <div id="loading">LOADING…</div>
+</div>
+<div id="bar">
+  <button id="play" class="btn" aria-label="Play"></button>
+  <button id="replay" class="btn" aria-label="Replay"></button>
+  <input id="scrub" type="range" min="0" max="3899" step="1" value="0" aria-label="Seek">
+  <span id="time">0:00.0 / 1:05.0</span>
+  <button id="mute" class="btn" aria-label="Mute"></button>
+</div>
+<div id="scene" aria-live="polite"></div>
+<script>
+(function(){
+// ---- 00_core.js
+// ============================================================================
+// CBC 8-bit — core: pixel buffer, palette, rasterisers, masks, easing, camera.
+// Everything draws into one 360x640 Uint32 buffer (crisp pixels, no AA),
+// shown 3x nearest-neighbour (1080x1920) by the player / export.
+// W, H and buf can be swapped temporarily (withCanvas) to draw a world into a
+// larger square buffer, e.g. for a camera roll.
+// ============================================================================
+const FPS = 60, DUR = 65, NF = 3900;
+let W = 360, H = 640, CX = 180, CY = 320;
+const MAXPIX = 640 * 640;
+let buf = new Uint32Array(W * H);
+const SPARE = [new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX)];
+const FEEDBUF = SPARE[1].subarray(0, 360 * 640), TMPBUF = SPARE[3].subarray(0, 360 * 640), TMP2 = SPARE[4].subarray(0, 360 * 640);
+// draw into a w x h buffer (taken from SPARE[0]) and return it
+function withCanvas(w, h, fn) {
+  const oW = W, oH = H, oCX = CX, oCY = CY, oBuf = buf;
+  W = w; H = h; CX = w / 2; CY = h / 2; buf = SPARE[0].subarray(0, w * h);
+  try { fn(); } finally { const out = buf; W = oW; H = oH; CX = oCX; CY = oCY; buf = oBuf; withCanvas.last = out; }
+  return withCanvas.last;
+}
+function hexc(h) {
+  const n = parseInt(h.slice(1), 16);
+  return (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255)) >>> 0;
+}
+const P = {};
+const PAL_HEX = {
+  // ground: dark navy (hue <= 218, kept out of the blue-purple band)
+  K0: '#030812', BG: '#0B1A33', N1: '#0E2140', N2: '#132A4C', N3: '#1A355C', N4: '#23436F', N5: '#305788', N6: '#4470A3',
+  // lab bench and wall
+  BE0: '#141B28', BE1: '#1E2738', BE2: '#2A354C', BE3: '#3B4862', BE4: '#56658A',
+  // analyzer housing (off-white), panels (dark grey), accent strip
+  MW: '#EEF2F6', M1: '#CDD5DE', M2: '#A9B4C2', M3: '#808C9E', M4: '#5B6679', M5: '#3D4657', M6: '#272E3B', AC1: '#1E6A80', AC2: '#3AA8C8',
+  // screens
+  DS0: '#050B14', DS1: '#08121F', DS2: '#0E1C2E', DG: '#16304A', DG2: '#21486A',
+  // metal (needle, electrodes, aperture plate)
+  AL0: '#48525F', AL1: '#748291', AL2: '#A3B1BF', AL3: '#CFD8E2', AL4: '#F0F4F8',
+  // tube (clear plastic), lavender (EDTA) cap, label
+  TB0: '#4E6274', TB1: '#8BA2B6', TB2: '#C6D6E4', TB3: '#E8F1F8', CP0: '#2E1A48', CP1: '#5A3A86', CP2: '#8A66BE', CP3: '#B8A0E0',
+  // whole blood
+  BL0: '#3A0610', BL1: '#6E0C1C', BL2: '#A01428', BL3: '#C8243A',
+  // red cells crimson, white cells off-white with purple nuclei, platelets violet, plasma amber
+  RB0: '#4A0812', RB1: '#8A1422', RB2: '#D8243A', RB3: '#F25A6A', RB4: '#FF9AA6',
+  WB0: '#6E6858', WB1: '#B8B2A0', WB2: '#E2DCCB', WB3: '#F0EBDD', WB4: '#FFFFFF', NU0: '#2A1240', NU1: '#4E2A7A', NU2: '#7A4AA8', NU3: '#A880D0',
+  PL0: '#3A2058', PL1: '#6A4A9A', PL2: '#9A7AD0', PL3: '#C6AEEC', AM0: '#5A3A10', AM1: '#9A6A20', AM2: '#E0A040', AM3: '#F6D08A',
+  // conductive electrolyte (soft cyan), current, ions
+  EC0: '#0E3A48', EC1: '#1E6A80', EC2: '#7FD8E8', EC3: '#C6F2FA',
+  // electrical pulses neon green, digital data cyan / white
+  SG0: '#052E16', SG1: '#128A3C', SG2: '#3CEB6E', SG3: '#B8FFD0', DT0: '#062A34', DT1: '#0E5A6A', DT2: '#22A8C0', DT3: '#7CE8F8', DT4: '#E8FCFF',
+  // laser red, scatter warm orange / cyan, fluorescence green, photodetectors metallic blue
+  LZ0: '#5A0A0A', LZ1: '#B01818', LZ2: '#FF4040', LZ3: '#FF9A8A', SO0: '#7A3A08', SO1: '#E8781C', SO2: '#FFB24A', SO3: '#FFE0A0',
+  EM0: '#0D4A1E', EM1: '#1E9A40', EM2: '#5CFF85', EM3: '#C6FFD4', PD0: '#0C2440', PD1: '#1A4A7A', PD2: '#2E6AA8', PD3: '#5A92D0', PD4: '#A6C8F0', PD5: '#E0EEFF',
+  // hemoglobin photometry: LED light (yellow-green), SLS detergent, SLS-hemoglobin complex, hemoglobin
+  LG0: '#3A5A0A', LG1: '#7AAA1A', LG2: '#C8F04A', LG3: '#EEFFA6', LY0: '#5E5434', LY1: '#B8A870', LY2: '#EEE6C6', HB0: '#4A1A10', HB1: '#8A3A1E', HB2: '#C0603A', HB3: '#E8946A',
+  // dye (not glowing until excited), silicon, circuit board, gold, chips
+  DY0: '#1E4A2A', DY1: '#3C8A50', SI0: '#1A1E26', SI1: '#2E3440', SI2: '#4A5466', PT0: '#4A2E12', PT1: '#8A5C26', NT0: '#0C3434', NT1: '#1A5E5C', NT2: '#3A9894',
+  CB0: '#04200F', CB1: '#0A3A1E', CB2: '#105A2E', CB3: '#1C7E40', CB4: '#36A85C', AU0: '#6A4A0C', AU1: '#B48A22', AU2: '#E8C450', CH0: '#090B0F', CH1: '#161A22', CH2: '#262C38', CH3: '#3E4656',
+  // software group colours on the scattergrams (labels, not cell colours)
+  GNE: '#7FD8E8', GLY: '#F27ACB', GMO: '#3CEB6E', GEO: '#FF7A4A', GBA: '#FFD84A',
+  // UI
+  INK: '#F4F8FF', SUB: '#9CC0E4', LBL: '#86E6FF', YEL: '#FFD84A', RED: '#FF6A6A', SH: '#02050C', C4: '#C8D4E6', C6: '#FFFFFF',
+};
+for (const k in PAL_HEX) P[k] = hexc(PAL_HEX[k]);
+
+// ---------------------------------------------------------------- math/ease
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const smooth = t => t * t * (3 - 2 * t);
+const eio = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eout = t => 1 - Math.pow(1 - t, 3);
+const ein = t => t * t * t;
+function bezierEase(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  return function (x) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const fx = ((ax * t + bx) * t + cx) * t - x;
+      const d = (3 * ax * t + 2 * bx) * t + cx;
+      if (Math.abs(fx) < 1e-6) break;
+      t -= fx / (d || 1e-6);
+      t = clamp(t, 0, 1);
+    }
+    return ((ay * t + by) * t + cy) * t;
+  };
+}
+const K75 = bezierEase(0.75, 0, 0.25, 1);      // Kurzgesagt camera ease
+const K50 = bezierEase(0.5, 0, 0.2, 1);
+function backOut(t, s) { s = s === undefined ? 1.70158 : s; t = clamp(t, 0, 1) - 1; return t * t * ((s + 1) * t + s) + 1; }
+const TAU = Math.PI * 2;
+
+// stateless hash -> [0,1)
+function hash(n) {
+  n = (n | 0) ^ 0x9e3779b9;
+  n = Math.imul(n ^ (n >>> 16), 0x21f0aaad);
+  n = Math.imul(n ^ (n >>> 15), 0x735a2d97);
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663));
+const hash3 = (a, b, c) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663) ^ Math.imul(c | 0, 83492791));
+function vnoise(x, s) { // 1-D value noise, smooth
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(hash2(i, s), hash2(i + 1, s), u);
+}
+
+// ---------------------------------------------------------------- dithering
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bay = (x, y) => (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+
+// ---------------------------------------------------------------- primitives
+function clear(c) { buf.fill(c); }
+function pset(x, y, c) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c; }
+function psetD(x, y, c, lv) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H && bay(x, y) < lv) buf[y * W + x] = c; }
+function rect(x0, y0, x1, y1, c, lv) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1));
+  const p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  if (a >= b || p >= q) return;
+  if (lv === undefined || lv >= 1) { for (let y = p; y < q; y++) buf.fill(c, y * W + a, y * W + b); return; }
+  if (lv <= 0) return;
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+}
+function frame(x0, y0, x1, y1, c) { rect(x0, y0, x1, y0 + 1, c); rect(x0, y1 - 1, x1, y1, c); rect(x0, y0, x0 + 1, y1, c); rect(x1 - 1, y0, x1, y1, c); }
+function disc(cx, cy, r, c, lv) {
+  if (r <= 0) return;
+  if (lv !== undefined && lv <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy, h = r * r - dy * dy;
+    if (h < 0) continue;
+    const s = Math.sqrt(h);
+    const a = Math.max(0, Math.ceil(cx - s - 0.5)), b = Math.min(W - 1, Math.floor(cx + s - 0.5));
+    if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+    else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+  }
+}
+function ring(cx, cy, r, w, c, lv) {
+  const ro = r + w / 2, ri = Math.max(0, r - w / 2);
+  const y0 = Math.max(0, Math.floor(cy - ro)), y1 = Math.min(H - 1, Math.ceil(cy + ro));
+  const x0 = Math.max(0, Math.floor(cx - ro)), x1 = Math.min(W - 1, Math.ceil(cx + ro));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+      if (d2 <= ro * ro && d2 >= ri * ri && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function ellipse(cx, cy, rx, ry, c, lv, rot) {
+  const R = Math.max(rx, ry);
+  const cs = Math.cos(rot || 0), sn = Math.sin(rot || 0);
+  const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
+  const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx;
+      const u = (dx * cs + dy * sn) / rx, v = (-dx * sn + dy * cs) / ry;
+      if (u * u + v * v <= 1 && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+// scanline polygon fill (even-odd) on pixel centres; pts = [x0,y0,x1,y1,...]
+const _xs = [];
+function poly(pts, c, lv) {
+  const n = pts.length >> 1; if (n < 3) return;
+  let ymin = Infinity, ymax = -Infinity;
+  for (let i = 0; i < n; i++) { const y = pts[2 * i + 1]; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+  const y0 = Math.max(0, Math.floor(ymin)), y1 = Math.min(H - 1, Math.ceil(ymax));
+  for (let y = y0; y <= y1; y++) {
+    const sy = y + 0.5; _xs.length = 0;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const yi = pts[2 * i + 1], yj = pts[2 * j + 1];
+      if ((yi > sy) !== (yj > sy)) { const xi = pts[2 * i], xj = pts[2 * j]; _xs.push(xi + (sy - yi) * (xj - xi) / (yj - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < _xs.length; k += 2) {
+      const a = Math.max(0, Math.ceil(_xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(_xs[k + 1] - 0.5));
+      if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+      else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// clip a segment to the screen (Liang-Barsky); returns null if outside
+function clipSeg(x0, y0, x1, y1, m) {
+  m = m || 2;
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  const p = [-dx, dx, -dy, dy], q = [x0 + m, W + m - 1 - x0, y0 + m, H + m - 1 - y0];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; }
+    else { const r = q[i] / p[i]; if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; } }
+  }
+  return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
+}
+function line(x0, y0, x1, y1, c, lv) {
+  const s = clipSeg(x0, y0, x1, y1); if (!s) return;
+  x0 = Math.floor(s[0]); y0 = Math.floor(s[1]); x1 = Math.floor(s[2]); y1 = Math.floor(s[3]);
+  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1, err = dx + dy;
+  for (let guard = 0; guard < 4000; guard++) {
+    if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H && (lv === undefined || bay(x0, y0) < lv)) buf[y0 * W + x0] = c;
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function lineW(x0, y0, x1, y1, w, c, lv) {
+  if (w <= 1.2) { line(x0, y0, x1, y1, c, lv); return; }
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1e-6;
+  const nx = -dy / L * w / 2, ny = dx / L * w / 2;
+  poly([x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny], c, lv);
+}
+function polyline(pts, c, lv) { for (let i = 0; i + 3 < pts.length; i += 2) line(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], c, lv); }
+function dashLine(x0, y0, x1, y1, c, on, off, phase) {
+  const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) return;
+  const per = on + off; let s = -((phase || 0) % per);
+  for (; s < L; s += per) {
+    const a = Math.max(0, s), b = Math.min(L, s + on); if (b <= a) continue;
+    line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
+  }
+}
+// Kurzgesagt-style pixel glow: stacked dithered discs in darker tints
+function glow(cx, cy, r, c1, c2, lv) {
+  lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
+  disc(cx, cy, r, c1, 0.28 * lv);
+  disc(cx, cy, r * 0.62, c1, 0.55 * lv);
+  if (c2 !== undefined && c2 !== null) disc(cx, cy, r * 0.32, c2, 0.6 * lv);
+}
+function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
+  rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
+}
+
+// ---------------------------------------------------------------- masks
+// Bounding-box masks for 16-bit style shading (outline, rim light, shadow)
+class Mask {
+  constructor(x0, y0, x1, y1) {
+    this.x0 = Math.max(-2, Math.floor(x0) - 2); this.y0 = Math.max(-2, Math.floor(y0) - 2);
+    this.x1 = Math.min(W + 2, Math.ceil(x1) + 2); this.y1 = Math.min(H + 2, Math.ceil(y1) + 2);
+    this.w = Math.max(0, this.x1 - this.x0); this.h = Math.max(0, this.y1 - this.y0);
+    this.d = new Uint8Array(this.w * this.h);
+  }
+  get(x, y) { x -= this.x0; y -= this.y0; return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; }
+  empty() { return this.w === 0 || this.h === 0; }
+}
+function maskFn(x0, y0, x1, y1, fn) { // fn(px+0.5, py+0.5) -> bool
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) if (fn(m.x0 + i + 0.5, m.y0 + j + 0.5)) m.d[j * m.w + i] = 1;
+  return m;
+}
+function maskPoly(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+  const m = new Mask(x0, y0, x1, y1); if (m.empty()) return m;
+  const n = pts.length >> 1;
+  for (let j = 0; j < m.h; j++) {
+    const sy = m.y0 + j + 0.5; _xs.length = 0;
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const yi = pts[2 * i + 1], yk = pts[2 * k + 1];
+      if ((yi > sy) !== (yk > sy)) { const xi = pts[2 * i], xk = pts[2 * k]; _xs.push(xi + (sy - yi) * (xk - xi) / (yk - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < _xs.length; q += 2) {
+      const a = Math.max(0, Math.ceil(_xs[q] - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(_xs[q + 1] - 0.5 - m.x0));
+      for (let i = a; i <= b; i++) m.d[j * m.w + i] = 1;
+    }
+  }
+  return m;
+}
+function _span(m, j, xa, xb) { // fill pixels whose centres lie in [xa, xb] on mask row j
+  const a = Math.max(0, Math.ceil(xa - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(xb - 0.5 - m.x0));
+  if (a <= b) m.d.fill(1, j * m.w + a, j * m.w + b + 1);
+}
+function maskDisc(cx, cy, r) {
+  const m = new Mask(cx - r, cy - r, cx + r, cy + r);
+  for (let j = 0; j < m.h; j++) { const dy = m.y0 + j + 0.5 - cy, h = r * r - dy * dy; if (h < 0) continue; const s = Math.sqrt(h); _span(m, j, cx - s, cx + s); }
+  return m;
+}
+function maskEll(cx, cy, rx, ry, rot) {
+  const R = Math.max(rx, ry), c = Math.cos(rot || 0), s = Math.sin(rot || 0);
+  const m = new Mask(cx - R, cy - R, cx + R, cy + R);
+  const A = c * c / (rx * rx) + s * s / (ry * ry), Bk = 2 * (c * s / (rx * rx) - s * c / (ry * ry)), Ck = s * s / (rx * rx) + c * c / (ry * ry);
+  for (let j = 0; j < m.h; j++) {
+    const dy = m.y0 + j + 0.5 - cy, B = Bk * dy, C = Ck * dy * dy - 1, disc_ = B * B - 4 * A * C;
+    if (disc_ < 0) continue; const q = Math.sqrt(disc_);
+    _span(m, j, cx + (-B - q) / (2 * A), cx + (-B + q) / (2 * A));
+  }
+  return m;
+}
+function maskRR(x0, y0, x1, y1, r) { // rounded rect
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j + 0.5; if (y < y0 || y > y1) continue;
+    const qy = Math.max(y0 + r - y, 0, y - (y1 - r));
+    if (qy > r) continue;
+    const dx = r - Math.sqrt(Math.max(0, r * r - qy * qy));
+    _span(m, j, x0 + dx, x1 - dx);
+  }
+  return m;
+}
+function mFill(m, c, lv, clip) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      if (clip && !clip(x, y)) continue;
+      if (lv === undefined || lv >= 1 || bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// pixels of m whose neighbour at (x-dx, y-dy) is outside m (the edge facing -dx,-dy)
+function mRim(m, c, dx, dy, lv) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const ii = i - dx, jj = j - dy;
+      const inside = ii >= 0 && jj >= 0 && ii < m.w && jj < m.h && m.d[jj * m.w + ii];
+      if (!inside && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function mOutline(m, c) { // inner 4-neighbour outline
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i === 0 || !m.d[j * m.w + i - 1]) || (i === m.w - 1 || !m.d[j * m.w + i + 1]) || (j === 0 || !m.d[(j - 1) * m.w + i]) || (j === m.h - 1 || !m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+function mOuter(m, c) { // outer 4-neighbour outline (1 px outside the shape)
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i > 0 && m.d[j * m.w + i - 1]) || (i < m.w - 1 && m.d[j * m.w + i + 1]) || (j > 0 && m.d[(j - 1) * m.w + i]) || (j < m.h - 1 && m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+// standard 16-bit shading: base, light rim top-left, shadow rim bottom-right, outline
+function shade(m, base, hi, lo, ol, opt) {
+  opt = opt || {};
+  mFill(m, base, opt.lv, opt.clip);
+  const k = opt.k || 1;
+  if (lo !== null && lo !== undefined) for (let s = 1; s <= k; s++) mRim(m, lo, -s, -s);
+  if (hi !== null && hi !== undefined) for (let s = 1; s <= (opt.kh || k); s++) mRim(m, hi, s, s);
+  if (ol !== null && ol !== undefined) { if (opt.outer) mOuter(m, ol); else mOutline(m, ol); }
+}
+
+// ---------------------------------------------------------------- camera
+class Cam {
+  constructor(cx, cy, z, ax, ay) { this.cx = cx; this.cy = cy; this.z = z; this.ax = ax === undefined ? CX : ax; this.ay = ay === undefined ? CY : ay; }
+  x(wx) { return (wx - this.cx) * this.z + this.ax; }
+  y(wy) { return (wy - this.cy) * this.z + this.ay; }
+  s(v) { return v * this.z; }
+  wx(sx) { return (sx - this.ax) / this.z + this.cx; }
+  wy(sy) { return (sy - this.ay) / this.z + this.cy; }
+  pts(arr) { const o = new Array(arr.length); for (let i = 0; i < arr.length; i += 2) { o[i] = this.x(arr[i]); o[i + 1] = this.y(arr[i + 1]); } return o; }
+}
+// keyframe track: [[t, cx, cy, z, easeFn?], ...] with log-zoom interpolation
+function camTrack(keys, t, ax, ay) {
+  if (t <= keys[0][0]) { const k = keys[0]; return new Cam(k[1], k[2], k[3], ax, ay); }
+  for (let i = 0; i + 1 < keys.length; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t <= b[0]) {
+      const e = b[4] || K75; const f = e(seg(t, a[0], b[0]));
+      const z = Math.exp(lerp(Math.log(a[3]), Math.log(b[3]), f));
+      // zoom-aware centre blend: keep motion even across big zoom changes
+      let g = f;
+      if (Math.abs(Math.log(b[3] / a[3])) > 0.2) { const za = a[3], zb = b[3]; g = (1 / za - 1 / z) / (1 / za - 1 / zb); g = clamp(g, 0, 1); }
+      return new Cam(lerp(a[1], b[1], g), lerp(a[2], b[2], g), z, ax, ay);
+    }
+  }
+  const k = keys[keys.length - 1]; return new Cam(k[1], k[2], k[3], ax, ay);
+}
+
+// ---------------------------------------------------------------- buffers
+function withBuffer(target, fn) { const old = buf; buf = target; try { fn(); } finally { buf = old; } }
+function copyBuf(dst, src) { dst.set(src); }
+// dithered dissolve: show b where bayer < k
+function dissolve(a, b, k, out) {
+  out = out || buf;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; out[i] = bay(x, y) < k ? b[i] : a[i]; }
+}
+
+
+// ---- 01_font.js
+// ============================================================================
+// Pixel fonts. FC: mixed-case caption/label font (cap height 7, descenders 2).
+// FS: micro font for axes and tags (5-row caps, row 6 = descender). FT: 9-row bold title.
+// ============================================================================
+function mkFont(h, defs, spaceW, base) {
+  const g = {};
+  for (const ch in defs) {
+    const rows = defs[ch].split('/');
+    const w = rows[0].length, off = (base && base[ch]) || 0;
+    const bits = new Array(h).fill(0);
+    rows.forEach((r, i) => { let v = 0; for (let k = 0; k < r.length; k++) if (r[k] === '#') v |= 1 << k; if (i + off < h) bits[i + off] = v; });
+    g[ch] = { w, bits };
+  }
+  g[' '] = { w: spaceW, bits: new Array(h).fill(0) };
+  return { h, g };
+}
+// FC: rows 0..6 = cap height, 7..8 = descenders. Lowercase x-height rows 2..6.
+const FC_DEF = {
+  A: '.###./#...#/#...#/#####/#...#/#...#/#...#', B: '####./#...#/#...#/####./#...#/#...#/####.', C: '.###./#...#/#..../#..../#..../#...#/.###.',
+  D: '####./#...#/#...#/#...#/#...#/#...#/####.', E: '#####/#..../#..../####./#..../#..../#####', F: '#####/#..../#..../####./#..../#..../#....',
+  G: '.###./#...#/#..../#.###/#...#/#...#/.####', H: '#...#/#...#/#...#/#####/#...#/#...#/#...#', I: '###/.#./.#./.#./.#./.#./###',
+  J: '..###/...#./...#./...#./#..#./#..#./.##..', K: '#...#/#..#./#.#../##.../#.#../#..#./#...#', L: '#..../#..../#..../#..../#..../#..../#####',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#', N: '#...#/##..#/#.#.#/#.#.#/#..##/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/.###.',
+  P: '####./#...#/#...#/####./#..../#..../#....', Q: '.###./#...#/#...#/#...#/#.#.#/#..#./.##.#', R: '####./#...#/#...#/####./#.#../#..#./#...#',
+  S: '.####/#..../#..../.###./....#/....#/####.', T: '#####/..#../..#../..#../..#../..#../..#..', U: '#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  V: '#...#/#...#/#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#', X: '#...#/#...#/.#.#./..#../.#.#./#...#/#...#',
+  Y: '#...#/#...#/.#.#./..#../..#../..#../..#..', Z: '#####/....#/...#./..#../.#.../#..../#####',
+  a: '..../..../.##./...#/.###/#..#/.###', b: '#.../#.../###./#..#/#..#/#..#/###.', c: '..../..../.##./#..#/#.../#..#/.##.',
+  d: '...#/...#/.###/#..#/#..#/#..#/.###', e: '..../..../.##./#..#/####/#.../.###', f: '..##/.#../####/.#../.#../.#../.#..',
+  g: '..../..../.###/#..#/#..#/.###/...#/#..#/.##.', h: '#.../#.../###./#..#/#..#/#..#/#..#', i: '.#./.../##./.#./.#./.#./###',
+  j: '..#/.../.##/..#/..#/..#/..#/#.#/.#.', k: '#.../#.../#..#/#.#./##../#.#./#..#', l: '##./.#./.#./.#./.#./.#./###',
+  m: '...../...../##.#./#.#.#/#.#.#/#.#.#/#.#.#', n: '..../..../###./#..#/#..#/#..#/#..#', o: '..../..../.##./#..#/#..#/#..#/.##.',
+  p: '..../..../###./#..#/#..#/#..#/###./#.../#...', q: '..../..../.###/#..#/#..#/#..#/.###/...#/...#', r: '..../..../#.##/##../#.../#.../#...',
+  s: '..../..../.###/#.../.##./...#/###.', t: '.#../.#../####/.#../.#../.#../..##', u: '..../..../#..#/#..#/#..#/#..#/.###',
+  v: '...../...../#...#/#...#/.#.#./.#.#./..#..', w: '...../...../#...#/#...#/#.#.#/#.#.#/.#.#.', x: '..../..../#..#/#..#/.##./#..#/#..#',
+  y: '..../..../#..#/#..#/#..#/#..#/.###/...#/.##.', z: '..../..../####/...#/.##./#.../####',
+  0: '.###./#...#/#..##/#.#.#/##..#/#...#/.###.', 1: '..#../.##../..#../..#../..#../..#../.###.', 2: '.###./#...#/....#/...#./..#../.#.../#####',
+  3: '####./....#/....#/.###./....#/....#/####.', 4: '...#./..##./.#.#./#..#./#####/...#./...#.', 5: '#####/#..../####./....#/....#/#...#/.###.',
+  6: '.###./#..../#..../####./#...#/#...#/.###.', 7: '#####/....#/...#./..#../.#.../.#.../.#...', 8: '.###./#...#/#...#/.###./#...#/#...#/.###.',
+  9: '.###./#...#/#...#/.####/....#/....#/.###.',
+  '.': '././././././#', ',': '././././././#/#/#.', ':': './#/./././#/.', '-': '..../..../..../####/..../..../....',
+  '+': '...../..#../..#../#####/..#../..#../.....', '=': '...../...../#####/...../#####/...../.....', '(': '.#/#./#./#./#./#./.#', ')': '#./.#/.#/.#/.#/.#/#.',
+  '/': '....#/...#./...#./..#../.#.../.#.../#....', '~': '...../...../.#..#/#.##./...../...../.....', '&': '.##../#..#./#.#../.#.../#.#.#/#..#./.##.#',
+  '!': '#/#/#/#/#/./#', '?': '.###./#...#/....#/...#./..#../...../..#..', "'": '#/#/./././././', '%': '##..#/##.#./...#./..#../.#.../.#.##/#..##',
+  '→': '......./....#../.....#./#######/.....#./....#../.......', '←': '......./..#..../.#...../#######/.#...../..#..../.......',
+  '↓': '..#../..#../..#../..#../#.#.#/.###./..#..', 'γ': '...../...../#...#/#...#/.#.#./.#.#./..#../.#.#./..#..',
+  '×': '...../...../#...#/.#.#./..#../.#.#./#...#', '^': '..#../.#.#./#...#/...../...../...../.....', '•': '...../...../.##../.##../...../...../.....',
+  '±': '..#../..#../#####/..#../..#../...../#####', '#': '.#.#./#####/.#.#./.#.#./#####/.#.#./.....', '_': '...../...../...../...../...../...../#####',
+  '°': '.##./#..#/.##./..../..../..../....', '⁻': '.../###/.../.../.../.../...', '⁺': '.#./###/.#./.../.../.../...', '⁶': '.##/#../##./#.#/.#./.../...', '·': '../../../##/##/../..', '≈': '...../.#..#/#.##./...../.#..#/#.##./.....', '≠': '...#./#####/..#../#####/.#.../...../.....',
+  '²': '.##./#..#/..#./.#../####/..../....', '³': '###./..#./.##./..#./###./..../....', 'µ': '..../..../#..#/#..#/#..#/#..#/###./#.../#...', '↔': '......./..#.#../.#...#./#######/.#...#./..#.#../.......', '≠': '...../....#/#####/..#../#####/#..../.....',
+  'α': '...../...../.##.#/#..#./#..#./#..#./.##.#', 'β': '.##../#..#./#.#../#..#./#..#./###../#..../#....', '◀': '...#/..##/.###/####/.###/..##/...#',
+  '₂': '..../..../..../..../.##./#..#/..#./.#../####', '÷': '...../..#../...../#####/...../..#../.....', 'λ': '#..../.#.../.#.../..#../.#.#./#...#/#...#',
+};
+const FC = mkFont(9, FC_DEF, 3);
+FC.g['–'] = FC.g['-'];
+// FS: 5-row micro font (caps, digits, a few lowercase for units)
+const FS = mkFont(6, {
+  A: '.##./#..#/####/#..#/#..#', B: '###./#..#/###./#..#/###.', C: '.###/#.../#.../#.../.###', D: '###./#..#/#..#/#..#/###.',
+  E: '####/#.../###./#.../####', F: '####/#.../###./#.../#...', G: '.###/#.../#.##/#..#/.###', H: '#..#/#..#/####/#..#/#..#',
+  I: '###/.#./.#./.#./###', J: '...#/...#/...#/#..#/.##.', K: '#..#/#.#./##../#.#./#..#', L: '#.../#.../#.../#.../####',
+  M: '#...#/##.##/#.#.#/#...#/#...#', N: '#..#/##.#/#.##/#..#/#..#', O: '.##./#..#/#..#/#..#/.##.', P: '###./#..#/###./#.../#...',
+  Q: '.##./#..#/#..#/#.#./.#.#', R: '###./#..#/###./#.#./#..#', S: '.###/#.../.##./...#/###.', T: '###/.#./.#./.#./.#.',
+  U: '#..#/#..#/#..#/#..#/.##.', V: '#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#.#.#/##.##/#...#', X: '#.#/#.#/.#./#.#/#.#',
+  Y: '#.#/#.#/.#./.#./.#.', Z: '####/...#/.##./#.../####',
+  0: '.##./#..#/#..#/#..#/.##.', 1: '.#./##./.#./.#./###', 2: '##./..#/.#./#../###', 3: '##./..#/.#./..#/##.', 4: '#.#/#.#/###/..#/..#',
+  5: '###/#../##./..#/##.', 6: '.##/#../###/#.#/###', 7: '###/..#/.#./.#./.#.', 8: '###/#.#/###/#.#/###', 9: '###/#.#/###/..#/##.',
+  a: '..../.##./..##/#.#./.###', c: '.../.##/#../#../.##', e: '..../.##./####/#.../.##.', k: '#.../#.#./##../#.#./#..#', l: '#/#/#/#/#',
+  m: '...../##.#./#.#.#/#.#.#/#.#.#', n: '.../##./#.#/#.#/#.#', o: '.../.#./#.#/#.#/.#.', s: '.../.##/##./..#/##.', t: '.#./###/.#./.#./..#',
+  i: '#/./#/#/#', h: '#../#../##./#.#/#.#', r: '.../#.#/##./#../#..', u: '.../#.#/#.#/#.#/.##', q: '.../.##/#.#/.##/..#', g: '.../.##/#.#/.##/##.',
+  ',': './././#/#', ':': './#/./#/.', '-': '.../.../###/.../...', '+': '.../.#./###/.#./...',
+  '(': '.#/#./#./#./.#', ')': '#./.#/.#/.#/#.', '/': '..#/.#./.#./.#./#..', '~': '..../.#.#/#.#./..../....', '%': '#..#/..#./.#../#.../#..#',
+  '→': '...#./....#/#####/....#/...#.', '↓': '.#./.#./.#./###/.#.', '×': '.../#.#/.#./#.#/...', '=': '.../###/.../###/...', "'": '#/#/./././',
+  '^': '.#./#.#/.../.../...', '!': '#/#/#/./#', '?': '##./..#/.#./.../.#.', 'γ': '#.#/#.#/.#./.#./#.#', '°': '##/##/../../..', '·': '../##/##/../..', '⁻': '###/.../.../.../...', '⁺': '.#./###/.#./.../...', '⁶': '.#/#./##/../..', '≈': '.#.#/#.#./.#.#/#.#./....', '≠': '..#/###/.#./###/#..',
+  p: '.../##./#.#/##./#../#..', b: '#../#../##./#.#/##.', d: '..#/..#/.##/#.#/.##', f: '.#/#./##/#./#.', v: '.../#.#/#.#/#.#/.#.',
+  w: '...../#...#/#.#.#/#.#.#/.#.#.', x: '.../#.#/.#./.#./#.#', y: '.../#.#/#.#/.##/..#/##.', z: '.../###/..#/.#./###',
+  '²': '##./..#/.#./###/...', 'µ': '.../#.#/#.#/#.#/###/#..', '³': '##./.#./##./.../...', '⁶': '.#./#../##./.../...', '↔': '......./.#...#./#######/.#...#./.......', '≠': '..#/###/.#./###/#..', 'α': '..../.#.#/#.#./#.#./.#.#', 'β': '.##./#..#/###./#..#/###./#...', 'j': '.#/../.#/.#/.#/#.',
+  '₂': '.../.../##./..#/.#./###', '÷': '.#./.../###/.../.#.', '[': '##/#./#./#./##', ']': '##/.#/.#/.#/##', '>': '#../.#./..#/.#./#..', '<': '..#/.#./#../.#./..#',
+}, 2);
+FS.g['.'] = { w: 1, bits: [0, 0, 0, 0, 1] };
+FS.g['–'] = FS.g['-'];
+// FT: 9-row title capitals (drawn bold)
+const FT = mkFont(9, {
+  H: '#...#/#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  W: '#.....#/#.....#/#.....#/#.....#/#..#..#/#..#..#/#.#.#.#/##...##/#.....#', S: '.###./#...#/#..../#..../.###./....#/....#/#...#/.###.',
+  P: '####./#...#/#...#/#...#/####./#..../#..../#..../#....', E: '####/#.../#.../#.../###./#.../#.../#.../####',
+  C: '.###./#...#/#..../#..../#..../#..../#..../#...#/.###.', T: '#####/..#../..#../..#../..#../..#../..#../..#../..#..',
+  A: '.###./#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', N: '#...#/##..#/##..#/#.#.#/#.#.#/#.#.#/#..##/#..##/#...#',
+  R: '####./#...#/#...#/#...#/####./#.#../#..#./#...#/#...#', K: '#...#/#..#./#.#../##.../##.../#.#../#..#./#...#/#...#',
+  U: '#...#/#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.', L: '#.../#.../#.../#.../#.../#.../#.../#.../####',
+  X: '#...#/#...#/.#.#./.#.#./..#../.#.#./.#.#./#...#/#...#', I: '###/.#./.#./.#./.#./.#./.#./.#./###',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#/#...#/#...#',
+  D: '####./#...#/#...#/#...#/#...#/#...#/#...#/#...#/####.', B: '####./#...#/#...#/#...#/####./#...#/#...#/#...#/####.', G: '.###./#...#/#..../#..../#.###/#...#/#...#/#...#/.###.', Y: '#...#/#...#/.#.#./.#.#./..#../..#../..#../..#../..#..', V: '#...#/#...#/#...#/#...#/#...#/.#.#./.#.#./.#.#./..#..',
+}, 3);
+function glyphOf(f, ch) { return f.g[ch] || f.g[ch.toUpperCase()] || f.g[ch.toLowerCase()] || f.g['?'] || f.g[' ']; }
+function textW(f, s, sc, bold) {
+  sc = sc || 2; let w = 0;
+  for (let i = 0; i < s.length; i++) { w += glyphOf(f, s[i]).w; if (i < s.length - 1) w += 1; }
+  return w * sc + (bold ? 1 : 0);
+}
+// draw text; returns width. opt: {sc, c, ol (outline colour or null), n (chars shown), bold, align, shadow, sd}
+function text(f, s, x, y, opt) {
+  opt = opt || {};
+  const sc = opt.sc || 2, c = opt.c === undefined ? P.INK : opt.c, ol = opt.ol === undefined ? P.SH : opt.ol;
+  const bold = opt.bold ? 1 : 0, n = opt.n === undefined ? s.length : Math.floor(opt.n);
+  const tw = textW(f, s, sc, bold);
+  if (opt.align === 'center') x -= tw / 2; else if (opt.align === 'right') x -= tw;
+  x = Math.round(x); y = Math.round(y);
+  const passes = [];
+  if (opt.shadow !== undefined && opt.shadow !== null) passes.push([opt.shadow, 0, 1, opt.sd || 1]);
+  if (ol !== null) passes.push([ol, 1, 0, 0]);
+  passes.push([c, 0, 0, 0]);
+  for (const [col, grow, isSh, sd] of passes) {
+    let cx = x;
+    for (let i = 0; i < s.length && i < n; i++) {
+      const g = glyphOf(f, s[i]);
+      for (let r = 0; r < f.h; r++) {
+        const bits = g.bits[r]; if (!bits) continue;
+        for (let k = 0; k < g.w; k++) if (bits & (1 << k)) {
+          const px = cx + k * sc, py = y + r * sc;
+          if (isSh) rect(px + sd, py + sd, px + sc + bold + sd, py + sc + sd, col);
+          else if (grow) rect(px - 1, py - 1, px + sc + bold + 1, py + sc + 1, col);
+          else rect(px, py, px + sc + bold, py + sc, col);
+        }
+      }
+      cx += (g.w + 1) * sc;
+    }
+  }
+  return tw;
+}
+function wrap(f, s, maxW, sc) {
+  const words = s.split(' '); const lines = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (textW(f, t, sc) <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur); return lines;
+}
+function wrapBal(f, s, maxW, sc) {
+  let best = wrap(f, s, maxW, sc); const n = best.length; if (n < 2) return best;
+  for (let w = maxW - 2; w > 24; w -= 2) { const L = wrap(f, s, w, sc); if (L.length > n) break; best = L; }
+  return best;
+}
+
+// ---- 02_pal.js
+// ============================================================================
+// Shared helpers: noise, splines, periodic wobble, pops, IK, vectors.
+// Colour code (fixed for the whole film; colours are educational): dark navy
+// ground; red blood cells crimson; white blood cells off-white with purple
+// nuclei; platelets violet; plasma amber; conductive electrolyte soft cyan;
+// electrodes silver; electrical current thin cyan; electrical pulses neon
+// green; laser red; scattered light warm orange / cyan; fluorescence green;
+// photodetectors metallic blue; digital data cyan / white.
+// ============================================================================
+// 2-D value noise in [0,1)
+function vn2(x, y, s) {
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash3(i, j, s), b = hash3(i + 1, j, s), c = hash3(i, j + 1, s), d = hash3(i + 1, j + 1, s);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// Catmull-Rom spline through control points -> dense flat polyline (open or closed)
+function spline(pts, n, closed) {
+  const m = pts.length / 2, out = [];
+  const P_ = i => closed ? ((i % m) + m) % m : clamp(i, 0, m - 1);
+  const segs = closed ? m : m - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = P_(i - 1), b = P_(i), c = P_(i + 1), d = P_(i + 2);
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      for (let q = 0; q < 2; q++) {
+        const p0 = pts[2 * a + q], p1 = pts[2 * b + q], p2 = pts[2 * c + q], p3 = pts[2 * d + q];
+        out.push(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3));
+      }
+    }
+  }
+  if (!closed) out.push(pts[2 * (m - 1)], pts[2 * (m - 1) + 1]);
+  return out;
+}
+// periodic wobble: every environmental motion repeats exactly every 65 s (seamless loop)
+const LOOPW = k => TAU * k / DUR;
+function wob(t, k, ph) { return Math.sin(LOOPW(k) * t + ph); }
+// UI switch (renders a scene without its captions)
+let UI_ON = true;
+// Kurzgesagt pop: ~90% at 0.25 s, ~108% overshoot, settles by 0.5 s
+const pop = (t, t0, d) => t < t0 ? 0 : backOut(clamp((t - t0) / (d || 0.5), 0, 1), 1.1);
+function pulse(t, t0, d) { return t < t0 ? 0 : Math.max(0, 1 - (t - t0) / d); }
+// 2-bone IK: knee position for a limb from (bx,by) to (tx,ty) with segment lengths L1, L2; side = +1/-1 bends the knee
+function ik(bx, by, tx, ty, L1, L2, side) {
+  let dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1e-6;
+  const dm = Math.min(d, L1 + L2 - 1e-3), dn = Math.max(dm, Math.abs(L1 - L2) + 1e-3);
+  const a = (L1 * L1 - L2 * L2 + dn * dn) / (2 * dn), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+  const ux = dx / d, uy = dy / d;
+  return [bx + ux * a - uy * h * side, by + uy * a + ux * h * side];
+}
+// small 3-vector helpers
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add3 = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+// seeded RNG (deterministic paths)
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gaussR(r) { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+// fast sine table (big per-pixel loops)
+const SIN_N = 4096, SIN_T = new Float32Array(SIN_N + 1);
+for (let i = 0; i <= SIN_N; i++) SIN_T[i] = Math.sin(i / SIN_N * TAU);
+function fsin(x) { const u = x / TAU; return SIN_T[Math.floor((u - Math.floor(u)) * SIN_N)]; }
+
+// ---- 03_clock.js
+// ============================================================================
+// THE CLOCK: 118.15 BPM (32 bars of 4/4 = exactly 65.000 s), played half-time
+// as a lo-fi groove. Micro-scene starts follow the brief; key physical events
+// inside them are placed on beats. Also: the example values shown on screen
+// (illustrative, not a patient's results), the impedance pulse model and the
+// size-histogram model.
+// ============================================================================
+const NBARS = 32, BEAT = DUR / (NBARS * 4), BPM = 60 / BEAT, BAR = 4 * BEAT, E8 = BEAT / 2, S16 = BEAT / 4;
+const lin = x => x;
+const bt = n => n * BEAT;                 // time of beat n (0-based)
+const barT = b => (b - 1) * BAR;          // start of bar b (1-based)
+// the 27 micro-scenes (start times) and the 7 continuous sequences
+const SC_T = [0, 0.8, 1.8, 3, 5, 7.5, 9, 11, 13, 15, 18, 21, 23, 25, 27, 29, 32, 34, 36, 38, 41, 45, 48, 51, 54, 56, 60, 65];
+const SEQ = { A: [0, 3], B: [3, 11], C: [11, 27], D: [27, 32], E: [32, 45], F: [45, 56], G: [56, 65] };
+const SCENE_NAMES = ['BLOOD ENTERS THE MACHINE', 'MILLIONS OF CELLS', 'ONE CELL, ONE SIGNAL', 'FOLLOW THE BLOOD SAMPLE', 'INSIDE WHOLE BLOOD',
+  'CONTROLLED DILUTION', 'THREE MEASUREMENT PATHWAYS', 'THE CONDUCTIVE LIQUID', 'THE MICROSCOPIC APERTURE', 'BEFORE THE CELL PASSES',
+  'THE CELL CHANGES RESISTANCE', 'ONE ELECTRICAL PULSE', 'CELL SIZE CHANGES PULSE HEIGHT', 'COUNTING MANY CELLS', 'RELEASE THE HEMOGLOBIN',
+  'LIGHT MEASURES HEMOGLOBIN', 'WHITE BLOOD CELL CHANNEL', 'REMOVE RBC INTERFERENCE', 'FLUORESCENT STAINING', 'HYDRODYNAMIC FOCUSING',
+  'THE LASER HITS THE CELL', 'THREE OPTICAL MEASUREMENTS', 'PHOTONS BECOME ELECTRICAL SIGNALS', 'BUILDING THE SCATTERGRAM',
+  'COMPLETING THE WBC DIFFERENTIAL', 'DIGITAL COMPLETE BLOOD COUNT', 'FINAL PAYOFF AND LOOP'];
+function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[i + 1]) i++; return i; }
+const T = i => SC_T[i];                   // micro-scene start (0-based index)
+// ---------------------------------------------------------------- example values (illustrative)
+const EX = { rbc: '4.80', wbc: '7.20', plt: '250', hgb: '14.2', diff: [['NEUT', 58.0], ['LYMPH', 30.0], ['MONO', 7.0], ['EO', 4.0], ['BASO', 1.0]] };
+// ---------------------------------------------------------------- impedance model
+// sensing-zone response: 0 outside, rising as the particle enters, flat inside, falling as it leaves
+// x: particle centre relative to the aperture centre (world units), hw: aperture half-length, r: particle radius
+function senseK(x, hw, r) { const d = Math.abs(x); if (d >= hw + r) return 0; if (d <= hw - r) return 1; const u = (hw + r - d) / (2 * r); return u * u * (3 - 2 * u); }
+// pulse height is proportional to particle volume (relative units: red cell 1.0, platelet ~0.12, drawn x1.6 for visibility)
+const VOL = { rbc: 1.0, plt: 0.2 };
+// size histogram model (volumes in fL): platelets ~ 2-20 fL, red cells ~ 60-120 fL
+function sizeSample(i) { const isP = hash(i * 13 + 5) < 0.45; const g = (hash(i * 7 + 1) + hash(i * 7 + 2) + hash(i * 7 + 3) - 1.5) * 1.15; return isP ? { k: 'plt', v: Math.max(2, 9 + g * 4) } : { k: 'rbc', v: 90 + g * 13 }; }
+
+// ---- 05_fx.js
+// ============================================================================
+// Paths (arc-length parameterised polylines) and small geometric helpers.
+// ============================================================================
+class Path {
+  constructor(pts) { // flat [x0,y0,x1,y1,...]
+    this.p = pts; this.n = pts.length >> 1; this.c = [0];
+    for (let i = 1; i < this.n; i++) this.c.push(this.c[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]));
+    this.L = this.c[this.n - 1];
+  }
+  _seg(s) { s = clamp(s, 0, this.L); let lo = 0, hi = this.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (this.c[m] <= s) lo = m; else hi = m; } return [lo, s]; }
+  at(s) { const [i, ss] = this._seg(s); const l = this.c[i + 1] - this.c[i] || 1e-9, f = (ss - this.c[i]) / l; return [lerp(this.p[2 * i], this.p[2 * i + 2], f), lerp(this.p[2 * i + 1], this.p[2 * i + 3], f)]; }
+  tan(s) { const [i] = this._seg(s); const dx = this.p[2 * i + 2] - this.p[2 * i], dy = this.p[2 * i + 3] - this.p[2 * i + 1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+  sub(s0, s1, step) { // flat points of the sub-path
+    step = step || 2; const out = []; s0 = clamp(s0, 0, this.L); s1 = clamp(s1, 0, this.L);
+    for (let s = s0; s < s1; s += step) { const q = this.at(s); out.push(q[0], q[1]); }
+    const q = this.at(s1); out.push(q[0], q[1]); return out;
+  }
+}
+// rotate (x,y) by angle a about the origin
+function rot(x, y, a) { const c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; }
+// is a screen rect visible (with margin)
+const onScreen = (x0, y0, x1, y1, m) => { m = m || 0; return x1 >= -m && x0 <= W + m && y1 >= -m && y0 <= H + m; };
+// ---------------------------------------------------------------- particles shared by every world
+// starburst flash (detections, interactions)
+function flash(x, y, r, k, cols) {
+  cols = cols || [P.DT1, P.DT2, P.DT3, P.C6];
+  if (k <= 0) return;
+  disc(x, y, r * 1.6, cols[0], 0.3 * k); disc(x, y, r, cols[1], 0.6 * k); disc(x, y, r * 0.55, cols[2]); disc(x, y, r * 0.28, cols[3]);
+  for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + 0.2, L = r * (i % 2 ? 1.5 : 2.4) * k; line(x + Math.cos(a) * r * 0.4, y + Math.sin(a) * r * 0.4, x + Math.cos(a) * L, y + Math.sin(a) * L, i % 2 ? cols[1] : cols[2]); }
+}
+// arrows and marks used by labels
+function arrowHead(x, y, ang, s, col) { const ca = Math.cos(ang), sa = Math.sin(ang); poly([x + ca * s, y + sa * s, x - ca * s * 0.7 - sa * s * 0.7, y - sa * s * 0.7 + ca * s * 0.7, x - ca * s * 0.7 + sa * s * 0.7, y - sa * s * 0.7 - ca * s * 0.7], col); }
+function crossMark(x, y, s, col) { for (const d of [-1, 0, 1]) { line(x - s + d, y - s, x + s + d, y + s, col); line(x + s + d, y - s, x - s + d, y + s, col); } }
+function checkMark(x, y, s, col) { const pts = [x - s, y, x - s * 0.3, y + s * 0.7, x + s, y - s * 0.8]; for (const d of [-1, 0, 1]) { line(pts[0], pts[1] + d, pts[2], pts[3] + d, col); line(pts[2], pts[3] + d, pts[4], pts[5] + d, col); } }
+
+// ---- 10_lab.js
+// ============================================================================
+// THE LAB AND THE ANALYZER (world px, z = 1 shows the whole bench).
+// An original benchtop hematology analyzer (XN-type architecture, own design):
+// a touchscreen on the left, a closed-tube sampler bay on the right with a
+// piercing needle on a vertical carriage, and an EDTA tube with a lavender
+// (purple) cap standing in the holder. The display shows the result screen
+// (hook) and the full report (end); values are illustrative.
+// ============================================================================
+const ANZ = { x0: 14, x1: 346, y0: 196, y1: 500, scr: [30, 232, 178, 352], bay: [192, 246, 306, 496], tubeX: 249, capY: 326, tubeTop: 342, tubeBot: 454, bloodY: 362, railY0: 250, needleL: 58 };
+const LAB_DUST = Array.from({ length: 34 }, (_, i) => ({ x: hash(i * 3 + 11) * 360, y: hash(i * 3 + 12) * 640, k: 0.3 + hash(i * 3 + 13) * 0.7, ph: hash(i + 900) * TAU }));
+function labBG(cam, t) {
+  rect(0, 0, W, H, P.BG);
+  const X = v => cam.x(v), Y = v => cam.y(v);
+  for (let i = -2; i < 8; i++) { const x = X(i * 70); rect(x, 0, x + 1, Y(500), P.N1); }
+  for (const [sx, sy, sw] of [[-40, 150, 130], [260, 130, 150]]) {
+    rect(X(sx), Y(sy), X(sx + sw), Y(sy + 4), P.BE2);
+    for (let k = 0; k < 4; k++) { const bx = sx + 10 + k * 28, h = 16 + 10 * hash(k + sx); rect(X(bx), Y(sy - h), X(bx + 14), Y(sy), P.N3); rect(X(bx + 2), Y(sy - h + 3), X(bx + 4), Y(sy - 3), P.N4); }
+  }
+  for (const d of LAB_DUST) { const x = ((d.x + 9 * wob(t, 2, d.ph) - cam.cx * 0.3 * d.k) % 360 + 360) % 360, y = ((d.y - (t / DUR) * 640 * (1 + Math.round(d.k * 2)) - cam.cy * 0.3 * d.k) % 640 + 640) % 640; pset(x, y, d.k > 0.7 ? P.N6 : P.N5); }
+  rect(0, Y(500), W, Y(506), P.BE4); rect(0, Y(506), W, Y(512), P.BE3); rect(0, Y(512), W, H, P.BE1);
+}
+// ---------------------------------------------------------------- the tube (EDTA, lavender cap) and the needle
+// pierce: 0 needle up .. 1 needle tip in the blood; draw: 0..1 blood drawn up the needle
+function needleTip(pierce) { return ANZ.capY - 22 + pierce * 64; }
+function drawTube(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z, x = ANZ.tubeX, hw = 11;
+  // body (clear), blood, meniscus, rounded bottom
+  rect(X(x - hw), Y(ANZ.tubeTop), X(x + hw), Y(ANZ.tubeBot - hw), P.TB2);
+  disc(X(x), Y(ANZ.tubeBot - hw), hw * z, P.TB2);
+  rect(X(x - hw + 1.5), Y(ANZ.bloodY), X(x + hw - 1.5), Y(ANZ.tubeBot - hw), P.BL2); disc(X(x), Y(ANZ.tubeBot - hw), (hw - 1.5) * z, P.BL2);
+  rect(X(x - hw + 1.5), Y(ANZ.bloodY), X(x + hw - 1.5), Y(ANZ.bloodY + 2), P.BL3); rect(X(x + 3), Y(ANZ.bloodY + 4), X(x + hw - 2.5), Y(ANZ.tubeBot - 14), P.BL1);
+  rect(X(x - hw + 2.5), Y(ANZ.tubeTop + 4), X(x - hw + 4), Y(ANZ.tubeBot - 14), P.TB3);                // highlight
+  // label with barcode (leaves a window on the blood)
+  rect(X(x - hw), Y(ANZ.tubeTop + 30), X(x + 1), Y(ANZ.tubeTop + 92), P.MW);
+  for (let k = 0; k < 7; k++) rect(X(x - hw + 2 + k * 1.5), Y(ANZ.tubeTop + 62), X(x - hw + 2.6 + k * 1.5 + (k % 3 === 0 ? 0.6 : 0)), Y(ANZ.tubeTop + 86), P.M6);
+  rect(X(x - hw), Y(ANZ.tubeTop + 30), X(x + 1), Y(ANZ.tubeTop + 34), P.CP1);
+  // lavender cap (rubber stopper)
+  const m = maskRR(X(x - hw - 2), Y(ANZ.capY), X(x + hw + 2), Y(ANZ.tubeTop + 4), 3 * z); shade(m, P.CP1, P.CP2, P.CP0, P.CP0, { k: Math.max(1, Math.round(z)) });
+  for (let k = 0; k < 6; k++) rect(X(x - hw + k * 4), Y(ANZ.capY + 2), X(x - hw + k * 4 + 1.2), Y(ANZ.tubeTop + 2), P.CP0);
+  disc(X(x), Y(ANZ.capY + 2), 3 * z, P.CP0);
+}
+function drawNeedle(cam, t, o) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z, x = ANZ.tubeX, pierce = o.pierce || 0, draw = o.draw || 0;
+  const tip = needleTip(pierce), top = tip - ANZ.needleL;
+  // vertical rail and the carriage block
+  rect(X(x + 16), Y(ANZ.railY0), X(x + 20), Y(ANZ.capY - 4), P.M4); rect(X(x + 17), Y(ANZ.railY0), X(x + 18), Y(ANZ.capY - 4), P.M3);
+  const bm = maskRR(X(x - 9), Y(top - 16), X(x + 22), Y(top + 2), 2 * z); shade(bm, P.M3, P.M2, P.M5, P.M6, {});
+  rect(X(x - 6), Y(top - 12), X(x + 6), Y(top - 8), P.AC2);
+  // the needle (steel), with the blood drawn up its bore
+  rect(X(x - 1.4), Y(top), X(x + 1.4), Y(tip), P.AL2); rect(X(x - 1.4), Y(top), X(x - 0.6), Y(tip), P.AL4);
+  poly(cam.pts([x - 1.4, tip - 3, x + 1.4, tip - 3, x, tip + 1.5]), P.AL3);
+  if (draw > 0) { const by = lerp(tip, tip - ANZ.needleL + 4, draw); rect(X(x - 0.5), Y(by), X(x + 0.5), Y(tip - 2), P.BL3); }
+  // the tubing leaving the carriage
+  lineW(X(x + 4), Y(top - 14), X(x + 30), Y(top - 40), 2.4 * z, P.TB1);
+}
+// ---------------------------------------------------------------- the analyzer
+function drawAnalyzer(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  // body
+  const mb = maskRR(X(ANZ.x0), Y(ANZ.y0), X(ANZ.x1), Y(ANZ.y1), 10 * z); shade(mb, P.M1, P.MW, P.M2, P.M4, { k: Math.max(1, Math.round(z)) });
+  rect(X(ANZ.x0 + 6), Y(ANZ.y0 + 6), X(ANZ.x1 - 6), Y(ANZ.y0 + 22), P.MW);
+  rect(X(ANZ.x0 + 6), Y(ANZ.y0 + 24), X(ANZ.x1 - 6), Y(ANZ.y0 + 27), P.AC1);
+  for (let k = 0; k < 10; k++) rect(X(ANZ.x0 + 20 + k * 9), Y(ANZ.y1 - 30), X(ANZ.x0 + 24 + k * 9), Y(ANZ.y1 - 12), P.M2);
+  // touchscreen
+  const [s0, s1, s2, s3] = ANZ.scr;
+  const ms = maskRR(X(s0 - 4), Y(s1 - 4), X(s2 + 4), Y(s3 + 4), 4 * z); shade(ms, P.M6, P.M5, P.K0, P.K0, {});
+  rect(X(s0), Y(s1), X(s2), Y(s3), P.DS0);
+  if (o.screen) o.screen(X(s0), Y(s1), X(s2), Y(s3));
+  // sampler bay
+  const [b0, b1, b2, b3] = ANZ.bay;
+  const mbay = maskRR(X(b0), Y(b1), X(b2), Y(b3), 6 * z); shade(mbay, P.M5, P.M4, P.M6, P.M6, {});
+  rect(X(b0 + 8), Y(b1 + 8), X(b2 - 8), Y(b3 - 8), P.M6);
+  // tube holder ring and status light
+  drawTube(cam, t, o);
+  rect(X(ANZ.tubeX - 16), Y(ANZ.tubeBot - 26), X(ANZ.tubeX + 16), Y(ANZ.tubeBot - 12), P.M4); rect(X(ANZ.tubeX - 16), Y(ANZ.tubeBot - 26), X(ANZ.tubeX + 16), Y(ANZ.tubeBot - 24), P.M3);
+  const on = o.busy ? (Math.floor(t * 4) % 2 ? P.SG2 : P.SG1) : P.SG1;
+  disc(X(b2 - 16), Y(b3 - 20), 3 * z, on); ring(X(b2 - 16), Y(b3 - 20), 5 * z, 1.2, P.M3);
+  drawNeedle(cam, t, o);
+}
+function labScene(cam, t, o) { labBG(cam, t); drawAnalyzer(cam, t, o || {}); }
+// ---------------------------------------------------------------- display UIs (drawn into the screen rect)
+function uiFrame(x0, y0, x1, y1, title, sc) {
+  rect(x0, y0, x1, y1, P.DS1); rect(x0, y0, x1, y0 + 9 * sc, P.DS2);
+  text(FS, title, x0 + 4 * sc, y0 + 2 * sc, { sc, c: P.SUB, ol: null });
+}
+// the hook's result screen: k = 0..3 how many values have landed; t1 = time the RBC number lands; busy = 0..1 progress bar
+// layout in sc units (sc = screen width / 110): everything left-aligned inside ~100 sc so it stays clear of the
+// right-hand app buttons when the display fills the frame
+function resultUI(x0, y0, x1, y1, t, o) {
+  const w = x1 - x0, sc = o.sc || Math.max(1, Math.floor(w / 110));
+  uiFrame(x0, y0, x1, y1, 'RESULT  ·  SAMPLE 042', sc);
+  const k = o.k || 0, L = x0 + 6 * sc;
+  if (k > 0) {
+    const s = 1 + 0.3 * (1 - backOut(clamp((t - o.t1) / 0.25, 0, 1), 1.6)), big = Math.max(2, Math.round(sc * 2 * s));
+    text(FS, 'RED BLOOD CELLS', L, y0 + 14 * sc, { sc, c: P.RB3, ol: null });
+    text(FC, EX.rbc, L, y0 + 22 * sc - (big - 2 * sc) * 4, { sc: big, c: P.INK, ol: null });
+    text(FS, 'MILLION / µL', L, y0 + 43 * sc, { sc, c: P.SUB, ol: null });
+    if (t - o.t1 < 0.3) flash(L + textW(FC, EX.rbc, big) + 6 * sc, y0 + 30 * sc, 4 * sc, 1 - (t - o.t1) / 0.3, [P.RB1, P.RB2, P.RB3, P.C6]);
+  }
+  if (k > 1) { text(FS, 'WBC', L, y0 + 55 * sc, { sc, c: P.WB3, ol: null }); text(FS, '7,200 / µL', L + 22 * sc, y0 + 55 * sc, { sc, c: P.INK, ol: null }); }
+  if (k > 2) { text(FS, 'PLT', L, y0 + 64 * sc, { sc, c: P.PL3, ol: null }); text(FS, '250,000 / µL', L + 22 * sc, y0 + 64 * sc, { sc, c: P.INK, ol: null }); }
+  if (o.busy > 0) { const bw = 96 * sc * clamp(o.busy, 0, 1); rect(L, y1 - 8 * sc, L + bw, y1 - 6 * sc, P.SG2); text(FS, 'ASPIRATING', L, y1 - 16 * sc, { sc, c: P.SG2, ol: null }); }
+}
+// the full report: rows revealed 0..n (fractions type in), checks, differential bars, QC line; content within ~130 sc
+function reportUI(x0, y0, x1, y1, t, o) {
+  const w = x1 - x0, h = y1 - y0, sc = o.sc || Math.max(1, Math.floor(Math.min(w, h) / 130)), L = x0 + 6 * sc;
+  uiFrame(x0, y0, x1, y1, 'COMPLETE BLOOD COUNT  ·  EXAMPLE', sc);
+  const rows = [['RBC', EX.rbc, '×10⁶/µL', P.RB3], ['WBC', EX.wbc, '×10³/µL', P.WB3], ['PLT', EX.plt, '×10³/µL', P.PL3], ['HGB', EX.hgb, 'g/dL', P.HB3]];
+  const n = o.rows || 0;
+  rows.forEach(([nm_, v, u, col], i) => {
+    const k = clamp(n - i, 0, 1); if (k <= 0) return;
+    const y = y0 + 13 * sc + i * 14 * sc;
+    text(FS, nm_, L, y + 2 * sc, { sc, c: col, ol: null, n: k * 6 });
+    text(FC, v, x0 + 30 * sc, y, { sc, c: P.INK, ol: null, n: k * 6 });
+    text(FC, u, x0 + 30 * sc + textW(FC, v, sc) + 4 * sc, y, { sc, c: P.SUB, ol: null, n: k * 9 });
+    if (o.checks > i * 0.2 && k >= 1) checkMark(x0 + 120 * sc, y + 4 * sc, 3 * sc, P.SG2);
+  });
+  const dk = clamp(n - 4, 0, 1);
+  if (dk > 0) {
+    const yb = y0 + 71 * sc, cols = [P.GNE, P.GLY, P.GMO, P.GEO, P.GBA];
+    EX.diff.forEach(([nm_, pct], i) => {
+      const y = yb + i * 8 * sc;
+      text(FS, nm_, L, y, { sc, c: cols[i], ol: null, n: dk * 8 });
+      rect(x0 + 34 * sc, y + sc, x0 + 34 * sc + Math.max(sc, 66 * sc * pct / 60 * dk), y + 5 * sc, cols[i]);
+      text(FS, pct.toFixed(1) + '%', x0 + 128 * sc, y, { sc, c: P.INK, ol: null, align: 'right', n: dk * 8 });
+    });
+  }
+  if (o.qc > 0) { const y = y0 + 114 * sc; checkMark(L + 3 * sc, y + 3 * sc, 3 * sc, P.SG2); text(FS, 'QC PASSED  ·  NO FLAGS', L + 10 * sc, y, { sc, c: P.SG2, ol: null, n: o.qc * 24 }); }
+}
+
+// ---- 11_fluid.js
+// ============================================================================
+// FLUIDICS (lab world px inside the analyzer, plus two microscopic views).
+// The needle's tubing runs to a sampling valve driven by a syringe pump (the
+// pump's piston is what moves the blood); a measured portion goes to a mixing
+// chamber where conductive diluent is added; three outlets carry measured
+// aliquots to the RBC/PLT impedance detector, the hemoglobin photometer and the
+// WBC flow cytometer (separate reagents, separate measurements). Reagent
+// bottles sit at the bottom of the housing.
+// ============================================================================
+const FLU = {
+  tube: [279, 270, 279, 232, 276, 216, 252, 210, 214, 210],   // needle carriage → valve
+  valve: [200, 212], pump: [96, 204, 170, 220],
+  tube2: [186, 220, 160, 236, 142, 262, 140, 300],            // valve → mixing chamber
+  mix: [140, 318, 26],                                       // chamber centre and radius
+  outA: [160, 340, 196, 372, 222, 398],                       // → RBC/PLT detector
+  outB: [158, 330, 230, 330, 286, 342],                       // → HGB photometer
+  outC: [136, 344, 132, 400, 160, 444],                       // → WBC flow cytometer
+  detA: [210, 386, 252, 418], detB: [278, 330, 322, 360], detC: [150, 432, 214, 470],
+  bottles: [[30, 'EC2', 'DILUENT'], [62, 'LY2', 'SLS'], [94, 'WB2', 'LYSE'], [126, 'DY1', 'DYE']],
+};
+const FLU_P = { tube: new Path(FLU.tube), tube2: new Path(FLU.tube2), A: new Path(FLU.outA), B: new Path(FLU.outB), C: new Path(FLU.outC) };
+function pathPx(cam, p, w, col, lv) { const pts = p.sub(0, p.L, 2); for (let i = 0; i + 3 < pts.length; i += 2) lineW(cam.x(pts[i]), cam.y(pts[i + 1]), cam.x(pts[i + 2]), cam.y(pts[i + 3]), w, col, lv); }
+// a slug of liquid inside a path: from s0 to s1 (world length units)
+function slug(cam, p, s0, s1, w, col) { s0 = clamp(s0, 0, p.L); s1 = clamp(s1, 0, p.L); if (s1 <= s0) return; const pts = p.sub(s0, s1, 1.5); for (let i = 0; i + 3 < pts.length; i += 2) lineW(cam.x(pts[i]), cam.y(pts[i + 1]), cam.x(pts[i + 2]), cam.y(pts[i + 3]), w, col); }
+// o: { blood (0..1 slug progress along tube+tube2), piston (0..1), mixFill (0..1), dil (0..1), alq [a, b, c] (0..1 each), hi ('A'|'B'|'C'), labels }
+function machineInterior(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(X(ANZ.x0 + 4), Y(ANZ.y0 + 4), X(ANZ.x1 - 4), Y(ANZ.y1 - 4), P.K0);
+  for (let y = ANZ.y0 + 10; y < ANZ.y1; y += 24) rect(X(ANZ.x0 + 4), Y(y), X(ANZ.x1 - 4), Y(y + 1), P.N1);
+  // reagent bottles
+  for (const [bx, col, nm_] of FLU.bottles) {
+    rect(X(bx), Y(470), X(bx + 26), Y(496), P.TB0); rect(X(bx + 2), Y(476), X(bx + 24), Y(494), P[col]); rect(X(bx + 8), Y(462), X(bx + 18), Y(470), P.TB0);
+    if (z > 1.4) text(FS, nm_, X(bx + 13), Y(498), { sc: Math.max(1, Math.round(z * 0.7)), c: P.SUB, ol: null, align: 'center' });
+  }
+  lineW(X(43), Y(462), X(43), Y(330), 1.6 * z, P.EC1); lineW(X(43), Y(330), X(FLU.mix[0] - 24), Y(326), 1.6 * z, P.EC1);  // diluent line
+  // syringe pump: barrel, piston (its movement drives the fluid)
+  const [p0, p1, p2, p3] = FLU.pump, pk = o.piston || 0;
+  rect(X(p0), Y(p1), X(p2), Y(p3), P.TB1); rect(X(p0 + 2), Y(p1 + 2), X(p2 - 2), Y(p3 - 2), P.TB2);
+  const px = lerp(p2 - 10, p0 + 18, pk); rect(X(px), Y(p1 + 1), X(px + 4), Y(p3 - 1), P.M4); rect(X(px + 4), Y((p1 + p3) / 2 - 1.5), X(p2 + 26), Y((p1 + p3) / 2 + 1.5), P.M3);
+  rect(X(p2 + 26), Y(p1 - 4), X(p2 + 30), Y(p3 + 4), P.M4);
+  if (z > 1.4) text(FS, 'PUMP', X(p0 + 4), Y(p1 - 9), { sc: Math.max(1, Math.round(z * 0.7)), c: P.SUB, ol: null });
+  // sampling valve
+  const [vx, vy] = FLU.valve; disc(X(vx), Y(vy), 9 * z, P.M4); disc(X(vx), Y(vy), 7 * z, P.M3); lineW(X(vx - 5 * Math.cos(t * 2)), Y(vy - 5 * Math.sin(t * 2)), X(vx + 5 * Math.cos(t * 2)), Y(vy + 5 * Math.sin(t * 2)), 2 * z, P.M5);
+  // tubing (clear) and the blood slug
+  pathPx(cam, FLU_P.tube, 4 * z, P.TB0); pathPx(cam, FLU_P.tube, 2.4 * z, P.TB2);
+  pathPx(cam, FLU_P.tube2, 4 * z, P.TB0); pathPx(cam, FLU_P.tube2, 2.4 * z, P.TB2);
+  const L1 = FLU_P.tube.L, L2 = FLU_P.tube2.L, bp = (o.blood || 0) * (L1 + L2), len = 26;
+  slug(cam, FLU_P.tube, bp - len, bp, 2.4 * z, P.BL3); if (bp > L1) slug(cam, FLU_P.tube2, bp - L1 - len, bp - L1, 2.4 * z, P.BL3);
+  // mixing chamber: blood in, diluent in, mixing
+  const [mx, my, mr] = FLU.mix;
+  rect(X(mx - mr), Y(my - mr), X(mx + mr), Y(my + mr), P.TB0); rect(X(mx - mr + 2), Y(my - mr + 2), X(mx + mr - 2), Y(my + mr - 2), P.TB2);
+  const fill = o.mixFill || 0, dil = o.dil || 0;
+  if (fill > 0) {
+    const ytop = my + mr - 2 - (2 * mr - 4) * fill;
+    rect(X(mx - mr + 2), Y(ytop), X(mx + mr - 2), Y(my + mr - 2), dil > 0.5 ? P.RB4 : dil > 0.2 ? P.RB3 : P.BL2);
+    if (dil > 0) for (let k = 0; k < 6; k++) { const a = t * 6 + k, rr = mr * 0.5 * (0.4 + 0.6 * ((k * 0.37) % 1)); disc(X(mx + Math.cos(a) * rr * 0.7), Y(my + 6 + Math.sin(a) * rr * 0.5), 1.5 * z, P.EC3); }
+  }
+  if (z > 1.4) text(FS, 'MIXING CHAMBER', X(mx), Y(my + mr + 4), { sc: Math.max(1, Math.round(z * 0.7)), c: P.SUB, ol: null, align: 'center' });
+  // three outlets and detectors
+  const outs = [['A', FLU_P.A, FLU.detA, 'RBC/PLT', P.EC2], ['B', FLU_P.B, FLU.detB, 'HGB', P.LG2], ['C', FLU_P.C, FLU.detC, 'WBC', P.LZ2]];
+  outs.forEach(([id, p, d, nm_, col], i) => {
+    const hi = o.hi === id;
+    pathPx(cam, p, 3.4 * z, hi ? P.AC2 : P.TB0); pathPx(cam, p, 2 * z, P.TB2);
+    const a = o.alq ? o.alq[i] : 0; if (a > 0) slug(cam, p, a * p.L - 16, a * p.L, 2 * z, P.RB3);
+    const m = maskRR(X(d[0]), Y(d[1]), X(d[2]), Y(d[3]), 3 * z); shade(m, P.M5, P.M4, P.M6, hi ? P.AC2 : P.M6, {});
+    disc(X((d[0] + d[2]) / 2), Y((d[1] + d[3]) / 2), 4 * z, col);
+    if (o.labels > 0 && z > 0.9) text(FS, nm_, X((d[0] + d[2]) / 2), Y(d[3] + 3), { sc: Math.max(1, Math.round(z * 0.8)), c: hi ? P.INK : P.SUB, ol: P.SH, align: 'center', n: o.labels * 10 });
+  });
+  // processor board (top right)
+  rect(X(262), Y(232), X(334), Y(290), P.CB2); rect(X(276), Y(244), X(312), Y(272), P.CH1); frame(X(276), Y(244), X(312), Y(272), o.cpu ? P.DT3 : P.CH3);
+}
+// the analyzer with an X-ray housing: k = 0 solid .. 1 see-through
+function analyzerXray(cam, t, k, o) {
+  labBG(cam, t);
+  if (k > 0) machineInterior(cam, t, o);
+  if (k < 1) withDither(1 - k, () => drawAnalyzer(cam, t, o)); else { drawTube(cam, t, o); drawNeedle(cam, t, o); }
+}
+// draw fn's pixels only where the Bayer threshold < lv (a dithered see-through); TMP2 keeps the pixels underneath
+function withDither(lv, fn) {
+  if (lv >= 1) { fn(); return; }
+  if (lv <= 0) return;
+  TMP2.set(buf);
+  fn();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (bay(x, y) >= lv) buf[i] = TMP2[i]; }
+}
+// ---------------------------------------------------------------- inside the tubing: whole blood flowing (side-follow)
+const BLOOD_S = makeSuspension(21, 70, [['rbc', 0.88], ['plt', 0.09], ['wbc', 0.03]], -300, 300, -120, 120);
+function tubeFlow(cam, t, o) {
+  o = o || {};
+  rect(0, 0, W, H, P.AM1); rect(0, 0, W, H, P.AM2, 0.25);
+  // tube walls
+  rect(0, cam.y(-150), W, cam.y(-136), P.TB1); rect(0, cam.y(-136), W, cam.y(-133), P.TB3);
+  rect(0, cam.y(136), W, cam.y(150), P.TB1); rect(0, cam.y(133), W, cam.y(136), P.TB0);
+  drawSuspension(cam, BLOOD_S, t, { v: o.v === undefined ? 60 : o.v });
+  // a guaranteed white cell and platelets near the centre for the labels
+  const wx = o.wx || 0;
+  wbc(cam.x(wx), cam.y(-10), R_WBC * cam.z, 'neut', t * 0.3);
+  platelet(cam.x(wx + 70), cam.y(48), R_PLT * cam.z * 1.1, t);
+  platelet(cam.x(wx - 60), cam.y(70), R_PLT * cam.z, t + 1);
+  rbc(cam.x(wx - 70), cam.y(-60), R_RBC * cam.z, 0.1, 0.3);
+}
+// ---------------------------------------------------------------- inside the mixing chamber: dilution
+const MIX_S = makeSuspension(33, 160, [['rbc', 0.9], ['plt', 0.08], ['wbc', 0.02]], -140, 140, -240, 240);
+function mixWorld(cam, t, o) {
+  o = o || {};
+  const d = o.dil || 0;
+  // background: dense blood (amber-red) → diluted (soft cyan electrolyte), joined by a swirling mixing front
+  const th = d * 1.3 - 0.15;
+  for (let by = 0; by < H; by += 2) for (let bx = 0; bx < W; bx += 2) {
+    const n = vn2((bx - cam.x(0)) / (36 * cam.z) + t * 0.35, (by - cam.y(0)) / (36 * cam.z) - t * 0.2, 77) * 0.65 + vn2(bx / 13, by / 13, 78) * 0.35;
+    const c = n < th - 0.05 ? (bay(bx >> 1, by >> 1) < 0.35 ? P.EC0 : P.EC1) : n < th ? P.EC2 : (bay(bx >> 1, by >> 1) < 0.5 ? P.BL1 : P.AM1);
+    buf[by * W + bx] = c; buf[by * W + bx + 1] = c; buf[(by + 1) * W + bx] = c; buf[(by + 1) * W + bx + 1] = c;
+  }
+  // diluent jets and swirl
+  if (d > 0 && d < 1) for (let k = 0; k < 18; k++) { const a = t * 3 + k * 0.7, r_ = 60 + (k * 37) % 180; disc(cam.x(Math.cos(a) * r_), cam.y(Math.sin(a) * r_ * 1.2), 2.4 * cam.z, P.EC3, 0.6); }
+  // cells: crowded at first, then spread apart (and fewer per view) as the volume grows
+  drawSuspension(cam, MIX_S, t, { v: 8, spread: d, only: c => d < 0.6 || hash(Math.floor(c.x * 7 + c.y)) < 1.25 - d });
+}
+
+// ---- 12_cells.js
+// ============================================================================
+// BLOOD CELLS (screen px; scale set by the caller). Relative sizes follow the
+// real cells: red cell ~7.5 µm, platelet ~2.5 µm, white cells 10–15 µm.
+// Red cell: a biconcave disc with no nucleus — face-on it reads as a bright rim
+// round a dimpled centre, edge-on as a dumbbell; it tumbles as it flows.
+// White cell: off-white with granules and a purple nucleus whose shape depends
+// on the type (segmented neutrophil, round lymphocyte, kidney monocyte,
+// bilobed eosinophil with orange granules, basophil with dark granules).
+// Platelet: a small irregular violet fragment with a few granules.
+// ============================================================================
+const UM = 4;                              // world units per micrometre (1 µm = 4 px at z = 1)
+const R_RBC = 3.75 * UM, R_PLT = 1.25 * UM, R_WBC = 6.2 * UM;
+// red cell: (x, y) centre, r radius px, tilt 0 (face-on) .. 1 (edge-on), rot (in-plane angle)
+function rbc(x, y, r, tilt, rot, o) {
+  o = o || {};
+  const asp = Math.max(0.26, Math.cos(tilt * Math.PI / 2)), rx = r, ry = r * asp;
+  const c0 = o.ghost ? P.RB1 : P.RB0, c1 = o.ghost ? P.RB1 : P.RB1, c2 = o.ghost ? P.RB1 : P.RB2, c3 = o.ghost ? P.RB2 : P.RB3;
+  if (o.ghost) { ellipse(x, y, rx + 1, ry + 1, c0, o.lv === undefined ? 0.55 : o.lv, rot); ellipse(x, y, rx - 1.5, ry - 1.5, P.BG, o.lv === undefined ? 0.55 : o.lv, rot); return; }
+  ellipse(x, y, rx + 1, ry + 1, c0, o.lv, rot);
+  if (asp > 0.45) {
+    // face-on-ish: bright rim, darker dimpled centre, highlight on the upper-left rim
+    ellipse(x, y, rx, ry, c3, o.lv, rot);
+    const ca = Math.cos(rot), sa = Math.sin(rot);
+    ellipse(x + ca * r * 0.06, y + sa * r * 0.06 + r * 0.05, rx * 0.56, ry * 0.56, c2, o.lv, rot);
+    ellipse(x + ca * r * 0.1, y + sa * r * 0.1 + r * 0.08, rx * 0.34, ry * 0.34, c1, o.lv, rot);
+    if (r > 6) disc(x - rx * 0.5, y - ry * 0.55, Math.max(1, r * 0.12), P.RB4, o.lv);
+  } else {
+    // edge-on: a dumbbell, thick rims at both ends, thin in the middle
+    ellipse(x, y, rx, ry, c2, o.lv, rot);
+    const ca = Math.cos(rot), sa = Math.sin(rot);
+    for (const s of [-1, 1]) { disc(x + ca * rx * 0.66 * s, y + sa * rx * 0.66 * s, ry * 1.25, c0, o.lv); disc(x + ca * rx * 0.66 * s, y + sa * rx * 0.66 * s, ry * 1.12, c3, o.lv); disc(x + ca * rx * 0.66 * s - ry * 0.3, y + sa * rx * 0.66 * s - ry * 0.3, ry * 0.45, P.RB4, o.lv); }
+    ellipse(x, y, rx * 0.5, ry * 0.55, c1, o.lv, rot);
+  }
+}
+// white cell: kind 'neut' | 'lymph' | 'mono' | 'eo' | 'baso'; o: { pores, dye (0..1 bound), glow (0..1 excited), cut (show nucleic acids) }
+function wbc(x, y, r, kind, rot, o) {
+  o = o || {};
+  const lv = o.lv;
+  // membrane (slightly lumpy), cytoplasm
+  for (let i = 0; i < 9; i++) { const a = rot + i * TAU / 9, rr = r * (0.9 + 0.08 * Math.sin(i * 2.7 + 1)); disc(x + Math.cos(a) * rr * 0.18, y + Math.sin(a) * rr * 0.18, rr + 1, P.WB0, lv); }
+  for (let i = 0; i < 9; i++) { const a = rot + i * TAU / 9, rr = r * (0.9 + 0.08 * Math.sin(i * 2.7 + 1)); disc(x + Math.cos(a) * rr * 0.18, y + Math.sin(a) * rr * 0.18, rr, P.WB2, lv); }
+  disc(x - r * 0.12, y - r * 0.14, r * 0.78, P.WB3, lv); disc(x - r * 0.42, y - r * 0.46, r * 0.14, P.WB4, lv);
+  // granules
+  const gcol = kind === 'eo' ? P.SO1 : kind === 'baso' ? P.NU0 : P.WB1, ng = kind === 'eo' || kind === 'baso' ? 26 : 14;
+  for (let i = 0; i < ng; i++) { const a = hash(i + 50) * TAU, d = Math.sqrt(hash(i + 51)) * r * 0.82; disc(x + Math.cos(a + rot) * d, y + Math.sin(a + rot) * d, Math.max(1, r * (kind === 'eo' ? 0.07 : 0.05)), gcol, lv); }
+  // nucleus
+  const ca = Math.cos(rot), sa = Math.sin(rot), R = (dx, dy) => [x + (dx * ca - dy * sa) * r, y + (dx * sa + dy * ca) * r];
+  const lobes = kind === 'neut' ? [[-0.36, 0.08, 0.26], [0.02, -0.22, 0.27], [0.36, 0.1, 0.25]]
+    : kind === 'lymph' ? [[0.04, 0.02, 0.64]]
+    : kind === 'mono' ? [[-0.2, -0.1, 0.4], [0.16, -0.18, 0.36], [0.28, 0.16, 0.3], [-0.24, 0.24, 0.3]]
+    : kind === 'eo' ? [[-0.3, 0.05, 0.3], [0.3, 0.02, 0.3]]
+    : [[-0.1, 0, 0.36], [0.2, 0.08, 0.3]];
+  const L = lobes.map(([dx, dy, rr]) => { const [px, py] = R(dx, dy); return [px, py, rr * r]; });
+  if (kind === 'neut') for (let i = 0; i + 1 < L.length; i++) lineW(L[i][0], L[i][1], L[i + 1][0], L[i + 1][1], Math.max(1.5, r * 0.12), P.NU1, lv);
+  for (const [px, py, rr] of L) disc(px, py, rr + 1, P.NU0, lv);
+  for (const [px, py, rr] of L) disc(px, py, rr, P.NU1, lv);
+  for (const [px, py, rr] of L) disc(px - rr * 0.25, py - rr * 0.28, rr * 0.55, P.NU2, lv);
+  for (const [px, py, rr] of L) if (rr > 4) disc(px - rr * 0.4, py - rr * 0.42, Math.max(1, rr * 0.16), P.NU3, lv);
+  // after the lysis reagent: small pores in the membrane
+  if (o.pores > 0) for (let i = 0; i < 10; i++) { const a = rot + i * TAU / 10 + 0.2; disc(x + Math.cos(a) * r * 0.93, y + Math.sin(a) * r * 0.93, Math.max(1, r * 0.05) * o.pores, P.BG, lv); }
+  // dye bound to nucleic acids (DNA in the nucleus, RNA in the cytoplasm): dim until excited
+  if (o.dye > 0) {
+    const n = Math.floor(o.dye * 40);
+    for (let i = 0; i < n; i++) {
+      const inNuc = i % 3 !== 0, lb = L[i % L.length], a = hash(i + 300) * TAU, d = Math.sqrt(hash(i + 301));
+      const px = inNuc ? lb[0] + Math.cos(a) * d * lb[2] * 0.8 : x + Math.cos(a) * d * r * 0.8, py = inNuc ? lb[1] + Math.sin(a) * d * lb[2] * 0.8 : y + Math.sin(a) * d * r * 0.8;
+      const lit = o.glow > 0;
+      disc(px, py, Math.max(1, r * 0.045), lit ? P.EM2 : P.DY1, lv);
+    }
+  }
+  if (o.glow > 0) glow(x, y, r * 1.6, P.EM1, P.EM2, o.glow * 0.7);
+}
+// platelet: small irregular fragment
+function platelet(x, y, r, rot, o) {
+  o = o || {};
+  const ca = Math.cos(rot), sa = Math.sin(rot);
+  const parts = [[0, 0, 1], [0.5, -0.2, 0.62], [-0.45, 0.25, 0.58]];
+  for (const [dx, dy, s] of parts) disc(x + (dx * ca - dy * sa) * r, y + (dx * sa + dy * ca) * r, r * s + 1, P.PL0, o.lv);
+  for (const [dx, dy, s] of parts) disc(x + (dx * ca - dy * sa) * r, y + (dx * sa + dy * ca) * r, r * s, P.PL2, o.lv);
+  disc(x - r * 0.25, y - r * 0.3, r * 0.4, P.PL3, o.lv);
+  if (r > 4) { disc(x + r * 0.2, y + r * 0.15, Math.max(1, r * 0.16), P.PL0, o.lv); disc(x - r * 0.3, y + r * 0.3, Math.max(1, r * 0.12), P.PL1, o.lv); }
+}
+// ---------------------------------------------------------------- a flowing suspension (world coords)
+// cells move with the fluid at speed v (world units / s) along +x, wrap inside [x0, x1]; density by kind
+function makeSuspension(seed, n, kinds, x0, x1, y0, y1) {
+  const r = mulberry(seed), out = [];
+  for (let i = 0; i < n; i++) {
+    const u = r(); let k = 'rbc'; let acc = 0; for (const [kk, p] of kinds) { acc += p; if (u < acc) { k = kk; break; } }
+    out.push({ k, x: x0 + r() * (x1 - x0), y: y0 + r() * (y1 - y0), ph: r() * TAU, sp: 0.75 + 0.5 * r(), tilt: r(), wt: ['neut', 'neut', 'lymph', 'mono', 'eo'][Math.floor(r() * 5)] });
+  }
+  return { cells: out, x0, x1, y0, y1 };
+}
+function cellPos(c, S, t, v) {
+  const W_ = S.x1 - S.x0;
+  let x = c.x + t * v * c.sp; x = S.x0 + (((x - S.x0) % W_) + W_) % W_;
+  return [x, c.y + 6 * Math.sin(t * 0.9 + c.ph)];
+}
+// draw a suspension through a camera; o: { v, scale, only (filter), spread (0..1 dilution), cx, cy (spread centre) }
+function drawSuspension(cam, S, t, o) {
+  o = o || {};
+  const z = cam.z * (o.scale || 1), v = o.v === undefined ? 40 : o.v, sp = o.spread || 0;
+  for (const c of S.cells) {
+    if (o.only && !o.only(c)) continue;
+    let [x, y] = cellPos(c, S, t, v);
+    if (sp > 0) { const cx = o.cx || 0, cy = o.cy || 0; x = cx + (x - cx) * (1 + sp * 1.6); y = cy + (y - cy) * (1 + sp * 1.6); }
+    const sx = cam.x(x), sy = cam.y(y); if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+    const tilt = 0.5 + 0.5 * Math.sin(t * 1.3 * c.sp + c.ph * 3);
+    if (c.k === 'rbc') rbc(sx, sy, R_RBC * z, tilt, c.ph + t * 0.4, { lv: o.lv });
+    else if (c.k === 'plt') platelet(sx, sy, R_PLT * z, c.ph + t, { lv: o.lv });
+    else wbc(sx, sy, R_WBC * z, c.wt, c.ph * 2 + t * 0.3, { lv: o.lv });
+  }
+}
+
+// ---- 13_imped.js
+// ============================================================================
+// IMPEDANCE COUNTING (world px, origin at the aperture centre).
+// Two chambers of conductive electrolyte joined by one small aperture in a
+// plate; a silver electrode in each chamber; a constant current flows between
+// them, carried by ions (cations one way, anions the other — no free electrons
+// in the liquid). Every current line must squeeze through the aperture, so the
+// aperture sets the resistance. Sheath flow lines the diluted cells up on the
+// axis. While a cell (an insulator) is inside the aperture it pushes
+// electrolyte aside, the current lines bend round it, the resistance rises and
+// so does the voltage across the electrodes: one pulse per cell, its height
+// proportional to the cell's volume. The trace below is computed from the
+// cell's position, so the pulse can never start before the cell enters.
+// ============================================================================
+const IMP = { hw: 15, ah: 24, cy0: -150, cy1: 150, ex: 165, nozzle: -70, scope: [-160, -318, 160, -214], hist: [-160, 186, 160, 300], s: 2.2 };
+// a particle trajectory: list of [t, x] keys (linear between), kind, phase
+function trajX(keys, t) { if (t <= keys[0][0]) return keys[0][1]; for (let i = 0; i + 1 < keys.length; i++) { const [ta, xa] = keys[i], [tb, xb] = keys[i + 1]; if (t <= tb) return lerp(xa, xb, smooth(seg(t, ta, tb)) * 0.5 + seg(t, ta, tb) * 0.5); } return keys[keys.length - 1][1]; }
+function particleR(k) { return k === 'rbc' ? 10 : 3.4; }                // red cell 7.5 µm : platelet 2.5 µm; aperture 48 px wide
+// voltage at time t from a set of particles: sum of volume x sensing response
+function impSignal(parts, t) { let v = 0; for (const p of parts) { if (t < p.keys[0][0] - 0.05 || t > p.keys[p.keys.length - 1][0] + 0.05) continue; const x = trajX(p.keys, t), r = p.r || particleR(p.k); v += (p.vol || VOL[p.k]) * senseK(x, IMP.hw, r * 0.9); } return v; }
+// current-line shape: line k of n spreads over the chamber far away and squeezes into the aperture
+function lineY(k, n, x, cells) {
+  const far = (IMP.cy1 - 22) * k / n, near = (IMP.ah - 4) * k / n;
+  const d = Math.max(0, Math.abs(x) - IMP.hw), s = smooth(clamp(d / 150, 0, 1));
+  let y = lerp(near, far, s);
+  // bend round any cell near this point (the cell is an insulator)
+  for (const c of cells) {
+    const dx = x - c.x, rr = c.r + 3; if (Math.abs(dx) > rr * 1.6) continue;
+    const dy = y - c.y, push = (rr - Math.abs(dy)) * Math.exp(-(dx * dx) / (rr * rr));
+    if (push > 0) y += (dy >= 0 ? 1 : -1) * push * (Math.abs(x) < IMP.hw + 4 ? 0.6 : 1);
+  }
+  return clamp(y, -IMP.ah + 2 - (Math.abs(x) < IMP.hw ? 0 : 999), IMP.ah - 2 + (Math.abs(x) < IMP.hw ? 0 : 999));
+}
+// ion i: cations (even i) drift toward the - electrode (right), anions toward the + electrode (left)
+function ionPos(i, t, cells) { const cat = i % 2 === 0, k = (i % 15) - 7, u = ((hash(i + 900) + t * 0.05 * (cat ? 1 : -1)) % 1 + 1) % 1, x = lerp(-IMP.ex + 10, IMP.ex - 10, u); return [x, lineY(k, 7, x, cells) + (hash(i + 901) - 0.5) * 8]; }
+// o: { parts: [{k, keys}], t, current (0..1), ions, sheath, trace (bool), counts {rbc, plt}, hist (array of [k, v] events), histK, label }
+function impWorld(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(0, 0, W, H, P.BG);
+  // chamber: electrolyte (soft cyan), walls, aperture plate
+  rect(X(-178), Y(IMP.cy0), X(178), Y(IMP.cy1), P.EC0); rect(X(-178), Y(IMP.cy0), X(178), Y(IMP.cy1), P.EC1, 0.35);
+  rect(X(-182), Y(IMP.cy0 - 10), X(182), Y(IMP.cy0), P.M5); rect(X(-182), Y(IMP.cy1), X(182), Y(IMP.cy1 + 10), P.M5);
+  rect(X(-IMP.hw), Y(IMP.cy0), X(IMP.hw), Y(-IMP.ah), P.M4); rect(X(-IMP.hw), Y(IMP.ah), X(IMP.hw), Y(IMP.cy1), P.M4);
+  rect(X(-IMP.hw), Y(IMP.cy0), X(-IMP.hw + 3), Y(-IMP.ah), P.M3); rect(X(-IMP.hw), Y(IMP.ah), X(-IMP.hw + 3), Y(IMP.cy1), P.M3);
+  rect(X(-IMP.hw), Y(-IMP.ah - 3), X(IMP.hw), Y(-IMP.ah), P.M2); rect(X(-IMP.hw), Y(IMP.ah), X(IMP.hw), Y(IMP.ah + 3), P.M2);
+  // electrodes (silver plates) and their wires up to the electronics
+  for (const s of [-1, 1]) {
+    const ex = s * IMP.ex;
+    rect(X(ex - 4), Y(-96), X(ex + 4), Y(96), P.AL1); rect(X(ex - 4), Y(-96), X(ex - 1), Y(96), P.AL3);
+    lineW(X(ex), Y(-96), X(ex), Y(IMP.cy0 - 30), 2 * z, P.AL2); lineW(X(ex), Y(IMP.cy0 - 30), X(s * 40), Y(IMP.cy0 - 30), 2 * z, P.AL2);
+  }
+  // the electronics box between the wires: constant current source + amplifier
+  rect(X(-40), Y(IMP.cy0 - 46), X(40), Y(IMP.cy0 - 14), P.CH1); frame(X(-40), Y(IMP.cy0 - 46), X(40), Y(IMP.cy0 - 14), P.CH3);
+  if (z > 0.7) text(FS, 'CURRENT SOURCE', X(0), Y(IMP.cy0 - 40), { sc: Math.max(1, Math.round(z * 0.8)), c: P.SUB, ol: null, align: 'center' });
+  if (z > 0.7) text(FS, '+', X(-IMP.ex - 16), Y(-8), { sc: Math.max(1, Math.round(z * 1.6)), c: P.EC3, ol: null }), text(FS, '-', X(IMP.ex + 10), Y(-8), { sc: Math.max(1, Math.round(z * 1.6)), c: P.EC3, ol: null });
+  // particles now
+  const parts = (o.parts || []).filter(p => t >= p.keys[0][0] && t <= p.keys[p.keys.length - 1][0]), cells = parts.map(p => ({ x: trajX(p.keys, t), y: p.y || 0, r: p.r || particleR(p.k), k: p.k, rot: p.rot || 0 }));
+  // current lines (thin cyan) with moving dashes
+  const cur = o.current === undefined ? 1 : o.current;
+  if (cur > 0) {
+    const n = 7;
+    for (let k = -n; k <= n; k++) {
+      let px_ = null, py_ = null;
+      for (let x = -IMP.ex + 4; x <= IMP.ex - 4; x += 4) {
+        const y = lineY(k, n, x, cells), sx = X(x), sy = Y(y);
+        if (px_ !== null && ((Math.floor((x - t * 60) / 12) % 2) === 0)) line(px_, py_, sx, sy, Math.abs(x) < IMP.hw + 20 ? P.EC3 : P.EC2, cur);
+        px_ = sx; py_ = sy;
+      }
+    }
+  }
+  // ions drifting along the current lines: cations (+) toward the right, anions (-) toward the left
+  if (o.ions) for (let i = 0; i < 30; i++) {
+    const cat = i % 2 === 0, [x, y] = ionPos(i, t, cells);
+    disc(X(x), Y(y), 2.6 * z, cat ? P.EC3 : P.EC1); if (z > 1.1) text(FS, cat ? '+' : '-', X(x) - 1.5 * z, Y(y) - 2.5 * z, { sc: 1, c: cat ? P.EC0 : P.EC3, ol: null });
+  }
+  // sheath flow: streamlines converging on the aperture; the sample nozzle on the axis
+  const shv = o.sheath === true ? 1 : (o.sheath || 0);
+  if (shv > 0) for (let k = -3; k <= 3; k++) { if (k === 0) continue; let px_ = null, py_ = null; for (let x = IMP.nozzle - 90; x <= -IMP.hw; x += 4) { const s = smooth(clamp((-IMP.hw - x) / 110, 0, 1)), y = k * lerp(6, 34, s), sx = X(x), sy = Y(y); if (px_ !== null && (Math.floor((x - t * 90) / 10) % 2 === 0)) line(px_, py_, sx, sy, P.EC3, 0.6 * shv); px_ = sx; py_ = sy; } }
+  rect(X(IMP.nozzle - 120), Y(-6), X(IMP.nozzle), Y(6), P.TB1); rect(X(IMP.nozzle - 120), Y(-3), X(IMP.nozzle), Y(3), P.AM1);
+  // the particles
+  for (const c of cells) {
+    if (c.x < -200 || c.x > 200) continue;
+    if (c.k === 'rbc') rbc(X(c.x), Y(c.y), c.r * z, 0.45, Math.PI / 2 + c.rot);
+    else platelet(X(c.x), Y(c.y), c.r * z, c.rot + t);
+  }
+  // the sensing zone outline
+  if (o.zone > 0) { dashLine(X(-IMP.hw), Y(-IMP.ah), X(IMP.hw), Y(-IMP.ah), P.YEL, 3, 2, 0); dashLine(X(-IMP.hw), Y(IMP.ah), X(IMP.hw), Y(IMP.ah), P.YEL, 3, 2, 0); }
+  return { cells };
+}
+// the scope: voltage vs time, newest at the right; win seconds shown
+function scope(x0, y0, x1, y1, parts, t, o) {
+  o = o || {};
+  rect(x0, y0, x1, y1, P.DS0); frame(x0, y0, x1, y1, P.M5);
+  for (let i = 1; i < 6; i++) rect(lerp(x0, x1, i / 6), y0 + 1, lerp(x0, x1, i / 6) + 1, y1 - 1, P.DG);
+  for (let j = 1; j < 3; j++) rect(x0 + 1, lerp(y0, y1, j / 3), x1 - 1, lerp(y0, y1, j / 3) + 1, P.DG);
+  const win = o.win || 3, base = y1 - 10, amp = (y1 - y0 - 20) / (o.max || 1.05);
+  let px_ = null, py_ = null;
+  for (let x = x0 + 2; x <= x1 - 2; x += 1) {
+    const tt = t - (x1 - 2 - x) / (x1 - x0 - 4) * win;
+    const v = impSignal(parts, tt) + (hash(Math.floor(tt * 400)) - 0.5) * 0.012, y = base - v * amp;
+    if (px_ !== null) lineW(px_, py_, x, y, 2, P.SG2);
+    px_ = x; py_ = y;
+  }
+  disc(x1 - 3, py_, 2.5, P.SG3);
+  if (o.label) text(FS, 'VOLTAGE', x0 + 4, y0 + 3, { sc: 1, c: P.SUB, ol: null });
+}
+// counter LCD
+function counter(x, y, label, n, col, sc) { sc = sc || 2; const s = label + ' ' + String(n).padStart(4, '0'); const w = textW(FS, s, sc); rect(x - 4, y - 4, x + w + 4, y + 7 * sc, P.DS0); frame(x - 4, y - 4, x + w + 4, y + 7 * sc, P.M5); text(FS, s, x, y, { sc, c: col, ol: null }); }
+// size histogram: events [[k, volume]], n shown
+function sizeHist(x0, y0, x1, y1, n, t, o) {
+  o = o || {};
+  rect(x0, y0, x1, y1, P.DS1); frame(x0, y0, x1, y1, P.M5);
+  const bins = new Array(40).fill(0), vmax = 160;
+  for (let i = 0; i < n; i++) { const e = sizeSample(i), b = Math.floor(clamp(e.v / vmax, 0, 0.999) * 40); bins[b] += 1; }
+  const mx = Math.max(6, ...bins), bw = (x1 - x0 - 8) / 40;
+  for (let b = 0; b < 40; b++) { const h = bins[b] / mx * (y1 - y0 - 22), bx = x0 + 4 + b * bw, isP = b * vmax / 40 < 30; rect(bx, y1 - 14 - h, bx + bw - 1, y1 - 14, isP ? P.PL2 : P.RB2); }
+  rect(x0 + 4, y1 - 14, x1 - 4, y1 - 13, P.SUB);
+  text(FS, 'PULSE HEIGHT  ~  CELL VOLUME', (x0 + x1) / 2, y1 - 10, { sc: 1, c: P.SUB, ol: null, align: 'center' });
+  if (n > 30 && o.labels) { text(FS, 'PLT', x0 + 4 + 2.5 * bw, y0 + 6, { sc: 2, c: P.PL3, ol: P.SH, align: 'center' }); text(FS, 'RBC', x0 + 4 + 22.5 * bw, y0 + 6, { sc: 2, c: P.RB3, ol: P.SH, align: 'center' }); }
+}
+
+// ---- 14_hgb.js
+// ============================================================================
+// HEMOGLOBIN (separate aliquot; world px). An SLS (sodium lauryl sulfate)
+// reagent lyses the red cells: detergent molecules open the membranes, the
+// hemoglobin inside is released, and SLS binds it as a stable coloured
+// SLS–hemoglobin complex. In the photometer an LED shines through the cuvette;
+// the complex absorbs part of the light; the photosensor measures what is
+// transmitted; absorbance → concentration through the assay's calibration.
+// No cells are counted here.
+// ============================================================================
+const HG_RBC = Array.from({ length: 9 }, (_, i) => ({ x: -130 + (i % 3) * 130 + (hash(i + 5000) - 0.5) * 40, y: -170 + Math.floor(i / 3) * 170 + (hash(i + 5001) - 0.5) * 40, ph: hash(i + 5002) * TAU }));
+const HG_SLS = Array.from({ length: 60 }, (_, i) => ({ x: (hash(i + 5100) - 0.5) * 380, y: (hash(i + 5101) - 0.5) * 620, a: hash(i + 5102) * TAU, ph: hash(i + 5103) * TAU }));
+function slsMol(x, y, a, z) { const ca = Math.cos(a), sa = Math.sin(a); lineW(x, y, x + ca * 8 * z, y + sa * 8 * z, 1.4 * z, P.LY1); disc(x, y, 2.4 * z, P.LY0); disc(x, y, 1.8 * z, P.LY2); }
+function hbMol(x, y, z, bound, rot) {
+  for (let k = 0; k < 4; k++) { const a = rot + k * TAU / 4, px = x + Math.cos(a) * 2.6 * z, py = y + Math.sin(a) * 2.6 * z; disc(px, py, 2.6 * z, bound ? P.HB0 : P.RB0); disc(px, py, 2 * z, bound ? P.HB1 : P.RB1); disc(px - 0.6 * z, py - 0.6 * z, 0.8 * z, bound ? P.HB3 : P.RB3); }
+  if (bound) for (let k = 0; k < 3; k++) { const a = rot + k * TAU / 3 + 0.5; slsMol(x + Math.cos(a) * 7 * z, y + Math.sin(a) * 7 * z, a, z * 0.7); }
+}
+// k: 0 intact .. 0.4 membranes open .. 0.7 hemoglobin out .. 1 complexes formed
+function hgbLysis(cam, t, k) {
+  const z = cam.z;
+  rect(0, 0, W, H, P.EC0); rect(0, 0, W, H, P.HB0, 0.25 * smooth(clamp((k - 0.5) * 2, 0, 1)));
+  // detergent molecules drifting in, sticking to membranes
+  for (const s of HG_SLS) { const x = s.x + 10 * Math.sin(t * 0.8 + s.ph), y = s.y + 8 * Math.cos(t * 0.7 + s.ph); slsMol(cam.x(x), cam.y(y), s.a + t * 0.5, z); }
+  HG_RBC.forEach((c, i) => {
+    const x = cam.x(c.x), y = cam.y(c.y), r = 34 * z, open = smooth(clamp((k - 0.15) / 0.3, 0, 1)), out = smooth(clamp((k - 0.35) / 0.35, 0, 1)), bnd = smooth(clamp((k - 0.65) / 0.3, 0, 1));
+    if (open < 1) rbc(x, y, r, 0.15, c.ph, {});
+    else rbc(x, y, r * (1 + 0.15 * out), 0.15, c.ph, { ghost: true, lv: 0.6 * (1 - out) });
+    // hemoglobin released: molecules spread out from the cell
+    if (open > 0.5) for (let m = 0; m < 9; m++) {
+      const a = c.ph + m * TAU / 9 + 0.3, d = (6 + m % 3 * 8 + out * 40) * z;
+      hbMol(x + Math.cos(a) * d, y + Math.sin(a) * d, z * 1.05, bnd > (m / 9), t * 0.6 + m);
+    }
+  });
+}
+// the photometer: LED (left) → cuvette → photosensor (right); o: { on, absorb (0..1 concentration shown), reading (0..1) }
+function photometer(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(0, 0, W, H, P.BG);
+  // bench block
+  rect(X(-170), Y(40), X(170), Y(70), P.M5); rect(X(-170), Y(40), X(170), Y(43), P.M4);
+  // LED in its holder
+  rect(X(-160), Y(-30), X(-120), Y(40), P.M4); disc(X(-120), Y(0), 14 * z, P.LG0); disc(X(-120), Y(0), 11 * z, o.on ? P.LG2 : P.LG1); rect(X(-134), Y(-11), X(-120), Y(11), o.on ? P.LG2 : P.LG1);
+  if (o.on) glow(X(-118), Y(0), 26 * z, P.LG1, P.LG2, 0.5);
+  // cuvette (transparent) with the SLS-hemoglobin solution
+  rect(X(-48), Y(-70), X(48), Y(40), P.TB1); rect(X(-44), Y(-66), X(44), Y(36), P.TB2);
+  rect(X(-44), Y(-40), X(44), Y(36), P.HB1); rect(X(-44), Y(-40), X(44), Y(36), P.HB2, 0.35); rect(X(-44), Y(-40), X(44), Y(-37), P.HB3);
+  for (let i = 0; i < 18; i++) hbMol(X(-38 + (i % 6) * 15), Y(-28 + Math.floor(i / 6) * 22 + 3 * Math.sin(t * 2 + i)), z * 0.8, true, t + i);
+  // photosensor (metallic blue)
+  rect(X(120), Y(-30), X(160), Y(40), P.M4); rect(X(122), Y(-14), X(134), Y(14), P.PD1); rect(X(124), Y(-11), X(132), Y(11), o.reading > 0 ? P.PD4 : P.PD3);
+  // light: photons cross; some are absorbed in the cuvette, fewer arrive
+  if (o.on) for (let i = 0; i < 26; i++) {
+    const u = ((t * 0.9 + i / 26) % 1), x = lerp(-110, 122, u), y = ((i * 7) % 11 - 5) * 2.2;
+    const absorbed = hash(i * 31 + Math.floor(t * 0.9 + i / 26) * 7) < (o.absorb || 0) * 0.55, xa = -30 + hash(i + 77) * 60;
+    if (absorbed && x > xa) { if (x < xa + 8) flash(X(xa), Y(y), 3 * z, 1 - (x - xa) / 8, [P.HB1, P.HB2, P.HB3, P.C6]); continue; }
+    disc(X(x), Y(y), 2.2 * z, P.LG2); disc(X(x), Y(y), 1.1 * z, P.LG3);
+  }
+  // readout
+  if (o.reading > 0) {
+    const rx = X(-150), ry = Y(110), sc = Math.max(1, Math.round(z * 1.4));
+    rect(rx - 6, ry - 6, rx + 230 * Math.min(1, z), ry + 26 * sc, P.DS0); frame(rx - 6, ry - 6, rx + 230 * Math.min(1, z), ry + 26 * sc, P.M5);
+    text(FS, 'HGB', rx, ry, { sc, c: P.HB3, ol: null, n: o.reading * 4 });
+    text(FC, EX.hgb + ' g/dL', rx + 30 * sc, ry - 2, { sc, c: P.INK, ol: null, n: o.reading * 12 });
+  }
+}
+
+// ---- 15_flow.js
+// ============================================================================
+// WHITE CELLS: FLUORESCENCE FLOW CYTOMETRY (world px).
+// A separate aliquot gets a lysis reagent: red cells break up and disperse;
+// white cells survive with small pores in their membranes. A fluorescent dye
+// enters through the pores and binds nucleic acids (DNA, and RNA in the
+// cytoplasm); it stays dim until laser light excites it. In the flow cell,
+// sheath fluid squeezes the sample into a thin core so the cells cross a red
+// semiconductor laser one at a time. At the crossing, light scatters forward
+// (to a forward-scatter photodiode behind a beam stop) and to the side (90°,
+// drawn here on the diagonal toward the viewer); a dichroic mirror sends the
+// side-scattered laser light to the side-scatter detector and lets the green
+// fluorescence through a filter to the fluorescence detector. Each detector
+// outputs one electrical pulse per cell.
+// ============================================================================
+// ---------------------------------------------------------------- the WBC reagent chamber
+const WBC_S = makeSuspension(41, 70, [['rbc', 0.82], ['plt', 0.12], ['wbc', 0.06]], -260, 260, -330, 330);
+// o: { lyse (0..1), follow (x of the followed white cell), pores, dye }
+function wbcChamber(cam, t, o) {
+  o = o || {};
+  const z = cam.z, ly = o.lyse || 0;
+  rect(0, 0, W, H, P.EC0); rect(0, 0, W, H, P.WB0, 0.12 * ly);
+  // red cells: intact, then ghosts that fade and break into fragments
+  for (const c of WBC_S.cells) {
+    const [x, y] = cellPos(c, WBC_S, t, 12), sx = cam.x(x), sy = cam.y(y); if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+    if (c.k === 'rbc') {
+      const k = clamp(ly * 1.4 - hash(c.x | 0) * 0.4, 0, 1);
+      if (k < 0.3) rbc(sx, sy, R_RBC * z, 0.3 + 0.4 * Math.sin(t + c.ph), c.ph);
+      else if (k < 0.9) rbc(sx, sy, R_RBC * z * (1 + 0.2 * k), 0.2, c.ph, { ghost: true, lv: 0.7 * (1 - k) });
+      else for (let f = 0; f < 3; f++) disc(sx + Math.cos(c.ph + f * 2) * (6 + 10 * k) * z, sy + Math.sin(c.ph + f * 2) * (6 + 10 * k) * z, 1.4 * z, P.RB1, 0.6 * (1.4 - k));
+    } else if (c.k === 'plt') platelet(sx, sy, R_PLT * z, c.ph + t, { lv: 1 - 0.5 * ly });
+    else if (o.follow === undefined || Math.hypot(x - o.follow, y) > 80) wbc(sx, sy, R_WBC * z, c.wt, c.ph + t * 0.2, { pores: ly > 0.5 ? 1 : 0, dye: o.dye || 0 });
+  }
+  // the followed white cell
+  if (o.follow !== undefined) {
+    const fx = cam.x(o.follow), fy = cam.y(0);
+    wbc(fx, fy, R_WBC * z * 1.05, 'neut', t * 0.25, { pores: ly > 0.5 ? smooth(clamp((ly - 0.5) * 2, 0, 1)) : 0, dye: o.dye || 0 });
+    if (o.ring > 0) ring(fx, fy, R_WBC * z * 1.5, 1.5, P.YEL, o.ring);
+  }
+}
+// ---------------------------------------------------------------- the stained cell, cut open
+const STAIN_R = 120, STAIN_LOBES = [[-42, 6, 34], [4, -30, 36], [46, 12, 33]];
+function rnaPos(i) { const a = hash(i + 6100) * TAU, d = STAIN_R * (0.55 + 0.35 * hash(i + 6101)); return [Math.cos(a) * d, Math.sin(a) * d]; }
+// dye molecule i at dye progress k: outside the pores until it moves in, then on its DNA / RNA target
+function dyePos(i, k, t) {
+  const R = STAIN_R, a0 = (i % 14) * TAU / 14 + 0.1, sx0 = Math.cos(a0) * (R + 40), sy0 = Math.sin(a0) * (R + 40);
+  const u = smooth(clamp(k * 1.6 - (i / 46) * 0.6, 0, 1));
+  if (u <= 0) return [sx0 + 10 * Math.sin(t + i), sy0 + 10 * Math.cos(t + i), false];
+  const tgt = i % 3 === 0 ? [Math.cos(hash(i + 6200) * TAU) * R * 0.7, Math.sin(hash(i + 6200) * TAU) * R * 0.7] : (() => { const l = STAIN_LOBES[i % 3], a = hash(i + 6201) * TAU, d = Math.sqrt(hash(i + 6202)) * l[2] * 0.8; return [l[0] + Math.cos(a) * d, l[1] + Math.sin(a) * d]; })();
+  return [lerp(sx0, tgt[0], u), lerp(sy0, tgt[1], u), true];
+}
+// k: dye progress 0..1; DNA strands in the lobes, RNA dots in the cytoplasm
+function stainCut(cam, t, k) {
+  const z = cam.z, X = v => cam.x(v), Y = v => cam.y(v);
+  rect(0, 0, W, H, P.EC0);
+  const R = STAIN_R;
+  // membrane ring with pores, cytoplasm (cut face), granules
+  disc(X(0), Y(0), (R + 6) * z, P.WB0); disc(X(0), Y(0), (R + 3) * z, P.WB1); disc(X(0), Y(0), R * z, P.WB2);
+  for (let i = 0; i < 14; i++) { const a = i * TAU / 14 + 0.1; disc(X(Math.cos(a) * (R + 2)), Y(Math.sin(a) * (R + 2)), 3.6 * z, P.EC0); }
+  for (let i = 0; i < 40; i++) { const a = hash(i + 6000) * TAU, d = Math.sqrt(hash(i + 6001)) * R * 0.9; disc(X(Math.cos(a) * d), Y(Math.sin(a) * d), 2 * z, P.WB1); }
+  // RNA in the cytoplasm: short wiggly strands
+  for (let i = 0; i < 10; i++) { const [x, y] = rnaPos(i); let px_ = null, py_ = null; for (let j = 0; j <= 6; j++) { const xx = X(x + j * 3 - 9), yy = Y(y + Math.sin(j * 1.4 + i) * 3); if (px_ !== null) line(px_, py_, xx, yy, P.NU2); px_ = xx; py_ = yy; } }
+  // the segmented nucleus with DNA strands inside
+  const lobes = STAIN_LOBES;
+  for (let i = 0; i + 1 < lobes.length; i++) lineW(X(lobes[i][0]), Y(lobes[i][1]), X(lobes[i + 1][0]), Y(lobes[i + 1][1]), 12 * z, P.NU1);
+  for (const [x, y, r] of lobes) { disc(X(x), Y(y), (r + 2) * z, P.NU0); disc(X(x), Y(y), r * z, P.NU1); }
+  for (const [x, y, r] of lobes) for (let s = 0; s < 4; s++) { let px_ = null, py_ = null; for (let j = 0; j <= 10; j++) { const u = j / 10, xx = X(x - r * 0.7 + u * r * 1.4), yy = Y(y - r * 0.5 + s * r * 0.33 + Math.sin(u * 9 + s) * 4); if (px_ !== null) line(px_, py_, xx, yy, P.NU3); px_ = xx; py_ = yy; } }
+  // dye molecules: drift in through the pores, then sit on DNA / RNA (dim: not excited)
+  for (let i = 0; i < 46; i++) {
+    const [x, y, bound] = dyePos(i, k, t);
+    if (!bound) { disc(X(x), Y(y), 2.6 * z, P.DY1); continue; }
+    disc(X(x), Y(y), 2.8 * z, P.DY0); disc(X(x), Y(y), 2.0 * z, P.DY1);
+  }
+}
+// ---------------------------------------------------------------- the flow cell, the laser and the optics
+// laser from the left; forward scatter to the right past a beam stop; side light (90°, drawn on the diagonal toward
+// the viewer) through a lens to a dichroic mirror: laser-colour side scatter reflects down to the SSC photodiode,
+// green fluorescence passes on through a filter to the SFL photodiode
+const OPTX = { laser: [-150, 0], stop: [62, 0], fsLens: [82, 0], fsPD: [116, 0], sLens: [-48, 48], dich: [-86, 86], ssPD: [-86, 140], flt: [-120, 120], flPD: [-146, 146] };
+const DICH_D = [-0.383, 0.924];      // mirror direction: reflects light travelling along (-1, 1)/√2 into (0, 1)
+// o: { focus (0..1), cellY (laser at y = 0), cellKind, laser (0..1), show {fs, ss, fl}, detect, fluor, light, paths, extra: [{y, kind}] }
+function flowCell(cam, t, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(0, 0, W, H, P.BG);
+  // quartz flow cell and the conical inlet below
+  rect(X(-34), Y(-330), X(34), Y(150), P.TB0); rect(X(-30), Y(-330), X(30), Y(150), P.TB1);
+  poly(cam.pts([-30, 150, 30, 150, 80, 320, -80, 320]), P.TB1);
+  rect(X(-9), Y(-330), X(9), Y(150), P.EC1); poly(cam.pts([-9, 150, 9, 150, 74, 320, -74, 320]), P.EC1);   // sheath fluid
+  // sheath streamlines converging, and the sample core narrowing (hydrodynamic focusing)
+  const fk = o.focus === undefined ? 1 : o.focus;
+  for (const s_ of [-1, 1]) for (let j = 1; j <= 3; j++) { let px_ = null, py_ = null; for (let y = 320; y >= -330; y -= 6) { const w_ = y > 150 ? lerp(9, 74, (y - 150) / 170) : 9, x = s_ * w_ * j / 4, sx = X(x), sy = Y(y); if (px_ !== null && Math.floor((y + t * 120) / 14) % 2 === 0) line(px_, py_, sx, sy, P.EC3, 0.7); px_ = sx; py_ = sy; } }
+  rect(X(-10), Y(262), X(10), Y(330), P.TB0); rect(X(-6), Y(250), X(6), Y(330), P.AM1);                  // sample nozzle
+  const coreW = lerp(14, 2.4, fk);
+  for (let y = 250; y >= -330; y -= 2) { const w_ = y > 150 ? lerp(coreW, 6, (y - 150) / 100) : coreW; rect(X(-w_ / 2), Y(y), X(w_ / 2), Y(y + 2), P.AM2, 0.8); }
+  // laser diode and beam (bright red), beam stop, forward lens and photodiode
+  const lz = o.laser === undefined ? 1 : o.laser, lx = OPTX.laser[0];
+  rect(X(lx - 26), Y(-14), X(lx), Y(14), P.M4); rect(X(lx - 22), Y(-10), X(lx - 4), Y(10), P.M3); disc(X(lx), Y(0), 5 * z, P.LZ1);
+  if (lz > 0) { rect(X(lx), Y(-2.2), X(OPTX.stop[0]), Y(2.2), P.LZ1, lz); rect(X(lx), Y(-1), X(OPTX.stop[0]), Y(1), P.LZ2, lz); glow(X(0), Y(0), 10 * z, P.LZ1, P.LZ2, 0.3 * lz); }
+  rect(X(OPTX.stop[0] - 3), Y(-7), X(OPTX.stop[0] + 3), Y(7), P.M6);                                                                  // beam stop
+  ellipse(X(OPTX.fsLens[0]), Y(0), 5 * z, 22 * z, P.TB3); ellipse(X(OPTX.fsLens[0]), Y(0), 3 * z, 18 * z, P.TB2);
+  const pdBox = (x, y, lit, col) => { rect(X(x - 12), Y(y - 14), X(x + 12), Y(y + 14), P.M5); rect(X(x - 8), Y(y - 9), X(x + 8), Y(y + 9), P.PD1); rect(X(x - 6), Y(y - 7), X(x + 6), Y(y + 7), lit > 0 ? P.PD4 : P.PD3); if (lit > 0) glow(X(x), Y(y), 16 * z, col, P.PD5, 0.5 * lit); };
+  const det = o.detect || 0, sh = o.show || {};
+  pdBox(OPTX.fsPD[0], 0, sh.fs ? det : 0, P.SO1);
+  // side collection: lens (on the diagonal), dichroic mirror (tilted), filter, two photodiodes
+  ellipse(X(OPTX.sLens[0]), Y(OPTX.sLens[1]), 5 * z, 20 * z, P.TB3, undefined, Math.PI / 4); ellipse(X(OPTX.sLens[0]), Y(OPTX.sLens[1]), 3 * z, 16 * z, P.TB2, undefined, Math.PI / 4);
+  const [dx_, dy_] = OPTX.dich; lineW(X(dx_ - DICH_D[0] * 14), Y(dy_ - DICH_D[1] * 14), X(dx_ + DICH_D[0] * 14), Y(dy_ + DICH_D[1] * 14), 3 * z, P.DT2);
+  const [fx_, fy_] = OPTX.flt; poly(cam.pts([fx_ - 9, fy_ - 5, fx_ - 5, fy_ - 9, fx_ + 9, fy_ + 5, fx_ + 5, fy_ + 9]), P.EM1);
+  pdBox(OPTX.ssPD[0], OPTX.ssPD[1], sh.ss ? det : 0, P.DT2);
+  pdBox(OPTX.flPD[0], OPTX.flPD[1], sh.fl ? det : 0, P.EM2);
+  // other white cells in the core (one at a time through the beam)
+  if (o.extra) for (const e of o.extra) { if (e.y < -340 || e.y > 260) continue; const lit = Math.max(0, 1 - Math.abs(e.y) / 14) * lz; wbc(X(0), Y(e.y), R_WBC * (e.s || 0.8) * z, e.kind, t * 0.3 + e.ph, { pores: 1, dye: 1, glow: lit }); if (lit > 0) { flash(X(0), Y(e.y), 6 * z, lit, [P.LZ1, P.SO1, P.EM2, P.C6]); for (const a of [-0.1, 0.1]) dashLine(X(0), Y(0), X(OPTX.fsLens[0] - 6), Y(Math.tan(a) * (OPTX.fsLens[0] - 6)), P.SO2, 4, 2, -t * 60); dashLine(X(2), Y(2), X(OPTX.sLens[0]), Y(OPTX.sLens[1]), P.EM2, 3, 3, -t * 60); } }
+  // the followed white cell in the core
+  const cy = o.cellY === undefined ? 200 : o.cellY, inBeam = Math.max(0, 1 - Math.abs(cy) / 14) * lz;
+  if (cy > -340 && cy < 330) wbc(X(0), Y(cy), R_WBC * 0.9 * z, o.cellKind || 'neut', t * 0.3, { pores: 1, dye: 1, glow: o.fluor !== undefined ? o.fluor : inBeam });
+  // light leaving the cell while it is in the beam
+  const L = o.light === undefined ? inBeam : o.light;
+  if (L > 0) {
+    for (const a of [-0.12, -0.06, 0.06, 0.12]) { const ex = OPTX.fsLens[0] - 5, ey = Math.tan(a) * ex; dashLine(X(0), Y(0), X(ex), Y(ey), P.SO2, 4, 2, -t * 60); }
+    for (const d of [-7, 7]) dashLine(X(4), Y(4), X(OPTX.sLens[0] + d * 0.7), Y(OPTX.sLens[1] - d * 0.7), P.DT3, 3, 3, -t * 60);
+    for (const d of [-3, 3]) dashLine(X(2), Y(2), X(OPTX.sLens[0] + d), Y(OPTX.sLens[1] - d), P.EM2, 3, 3, -t * 60 + 2);
+    if (o.paths) {
+      dashLine(X(OPTX.sLens[0]), Y(OPTX.sLens[1]), X(dx_ + 2), Y(dy_ - 2), P.DT3, 3, 3, -t * 60);
+      dashLine(X(OPTX.sLens[0] - 2), Y(OPTX.sLens[1]), X(dx_), Y(dy_), P.EM2, 3, 3, -t * 60 + 2);
+      dashLine(X(dx_), Y(dy_), X(OPTX.ssPD[0]), Y(OPTX.ssPD[1] - 14), P.DT3, 3, 3, -t * 60);
+      dashLine(X(dx_), Y(dy_), X(fx_), Y(fy_), P.EM2, 3, 3, -t * 60);
+      dashLine(X(fx_), Y(fy_), X(OPTX.flPD[0] + 8), Y(OPTX.flPD[1] - 8), P.EM2, 3, 3, -t * 60);
+      dashLine(X(OPTX.fsLens[0]), Y(0), X(OPTX.fsPD[0] - 12), Y(0), P.SO2, 3, 3, -t * 60);
+    }
+  }
+  return { cell: [X(0), Y(cy)] };
+}
+// an electrical pulse trace for one optical channel: events [[tc, amp], ...] (one pulse per cell), 1.2 s window
+function pulseHUD(x0, y0, x1, y1, t, events, col, label) {
+  rect(x0, y0, x1, y1, P.DS0); frame(x0, y0, x1, y1, P.M5);
+  let px_ = null, py_ = null;
+  for (let x = x0 + 2; x <= x1 - 2; x++) {
+    const tt = t - (x1 - 2 - x) / (x1 - x0) * 1.2;
+    let v = 0; for (const [tc, amp] of events) if (tt > tc - 0.3 && tt < tc + 0.3) v += amp * Math.exp(-((tt - tc) ** 2) / 0.004);
+    const y = y1 - 5 - v * (y1 - y0 - 16);
+    if (px_ !== null) lineW(px_, py_, x, y, 2, P.SG2); px_ = x; py_ = y;
+  }
+  text(FS, label, x0 + 4, y0 + 3, { sc: 2, c: col, ol: null });
+}
+
+// ---- 16_data.js
+// ============================================================================
+// DATA (screen-sized panels). Each optically measured white cell becomes one
+// dot on a scattergram (measured electronic events, not a photograph). On the
+// WDF plot (side scatter across, side fluorescence up) the dots gather into
+// lymphocytes, monocytes, neutrophils (+ basophils) and eosinophils; the WNR
+// plot (fluorescence across, forward scatter up) separates basophils. The
+// colours are software group labels, not cell colours. Then the three data
+// streams (impedance, optical WBC, hemoglobin) merge in the processor.
+// ============================================================================
+// [name, share, centre x, centre y, spread x, spread y, colour, label x, label y] (axes 0..1)
+const WDF_G = [['NEUT', 0.58, 0.58, 0.30, 0.07, 0.06, 'GNE', 0.50, 0.10], ['LYMPH', 0.30, 0.22, 0.48, 0.05, 0.06, 'GLY', 0.03, 0.66], ['MONO', 0.07, 0.34, 0.74, 0.05, 0.05, 'GMO', 0.44, 0.84], ['EO', 0.05, 0.84, 0.26, 0.05, 0.05, 'GEO', 0.80, 0.44]];
+const WNR_G = [['WBC', 0.99, 0.46, 0.34, 0.08, 0.06, 'C4', 0.62, 0.16], ['BASO', 0.01, 0.52, 0.72, 0.04, 0.04, 'GBA', 0.30, 0.86]];
+function gauss2(i, s) { const u1 = Math.max(1e-6, hash(i * 7 + s)), u2 = hash(i * 7 + s + 1); const r = Math.sqrt(-2 * Math.log(u1)); return [r * Math.cos(TAU * u2), r * Math.sin(TAU * u2)]; }
+function groupOf(i, G) { const u = hash(i * 13 + 99); let acc = 0; for (let g = 0; g < G.length; g++) { acc += G[g][1]; if (u < acc) return g; } return 0; }
+// panel with axes; n dots plotted (newest flash); labels 0..1
+function scattergram(x0, y0, x1, y1, kind, n, t, o) {
+  o = o || {};
+  const G = kind === 'WDF' ? WDF_G : WNR_G, ax = kind === 'WDF' ? ['SIDE SCATTER (SSC)', 'SIDE FLUOR. (SFL)'] : ['SIDE FLUOR. (SFL)', 'FORWARD SCATTER'];
+  rect(x0, y0, x1, y1, P.DS0); frame(x0, y0, x1, y1, P.M5);
+  const gx0 = x0 + 14, gy1 = y1 - 8 - 6 * (o.asc || 1), gx1 = x1 - 6, gy0 = y0 + 10 + 6 * (o.asc || 1);
+  rect(gx0, gy0, gx0 + 1, gy1 + 1, P.DG2); rect(gx0, gy1, gx1, gy1 + 1, P.DG2);
+  const as = o.asc || 1;
+  text(FS, ax[0], (gx0 + gx1) / 2, gy1 + 4, { sc: as, c: P.SUB, ol: null, align: 'center' });
+  text(FS, ax[1], gx0 + 2, y0 + 4, { sc: as, c: P.SUB, ol: null });
+  text(FS, kind, gx1 - 2, y0 + 4, { sc: as, c: P.INK, ol: null, align: 'right' });
+  const px = u => lerp(gx0 + 2, gx1 - 2, u), py = v => lerp(gy1 - 2, gy0 + 2, v);
+  for (let i = 0; i < n; i++) {
+    const g = groupOf(i, G), [dx, dy] = gauss2(i, kind === 'WDF' ? 11 : 23), gr = G[g];
+    const x = px(clamp(gr[2] + dx * gr[4], 0.02, 0.98)), y = py(clamp(gr[3] + dy * gr[5], 0.02, 0.98));
+    const col = o.colored ? P[gr[6]] : P.C4;
+    if (i >= n - 3 && o.flash) { disc(x, y, 3, P.C6); } else if (gr[1] < 0.02) rect(x - 1, y - 1, x + 1, y + 1, col); else pset(x, y, col), pset(x + 1, y, col);
+  }
+  const ls = o.lsc || 2;
+  if (o.labels > 0) G.forEach(gr => { text(FS, gr[0], px(gr[7]), py(gr[8]), { sc: ls, c: P[gr[6]], ol: P.SH, n: o.labels * 8 }); });
+  return { px, py };
+}
+// the processor with three incoming streams; k 0..1 merge progress
+function dataMerge(cam, t, k) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  rect(0, 0, W, H, P.BG);
+  const src = [[-112, -226, 'RBC · PLT', 'IMPEDANCE', P.SG2], [0, -262, 'WBC · DIFF', 'LASER', P.EM2], [112, -226, 'HGB', 'LIGHT', P.LG2]];
+  // the chip
+  const cx = 0, cy = 10;
+  for (let i = 0; i < 8; i++) { const u = -48 + i * 13.7; rect(X(cx + u), Y(cy - 58), X(cx + u + 5), Y(cy - 48), P.AL2); rect(X(cx + u), Y(cy + 48), X(cx + u + 5), Y(cy + 58), P.AL2); rect(X(cx - 58), Y(cy + u), X(cx - 48), Y(cy + u + 5), P.AL2); rect(X(cx + 48), Y(cy + u), X(cx + 58), Y(cy + u + 5), P.AL2); }
+  rect(X(cx - 48), Y(cy - 48), X(cx + 48), Y(cy + 48), P.CH1); frame(X(cx - 48), Y(cy - 48), X(cx + 48), Y(cy + 48), k > 0.6 ? P.DT3 : P.CH3);
+  text(FS, 'PROCESSOR', X(cx), Y(cy - 4), { sc: Math.max(1, Math.round(z * 1.5)), c: k > 0.6 ? P.DT3 : P.SUB, ol: null, align: 'center' });
+  src.forEach(([sx, sy, nm_, how, col], i) => {
+    rect(X(sx - 50), Y(sy - 20), X(sx + 50), Y(sy + 20), P.DS1); frame(X(sx - 50), Y(sy - 20), X(sx + 50), Y(sy + 20), col);
+    text(FS, nm_, X(sx), Y(sy - 14), { sc: 2, c: col, ol: null, align: 'center' });
+    text(FS, how, X(sx), Y(sy + 2), { sc: 2, c: P.SUB, ol: null, align: 'center' });
+    const ex = cx + (i - 1) * 30, ey = cy - 58;
+    lineW(X(sx), Y(sy + 20), X(ex), Y(ey), 2 * z, P.DG2);
+    for (let q = 0; q < 6; q++) { const u = ((t * 1.1 + q / 6 + i * 0.13) % 1); if (u > k * 1.2) continue; const b = hash(q + i * 7 + Math.floor(t * 4) * 3) > 0.5; const x = lerp(sx, ex, u), y = lerp(sy + 20, ey, u); text(FS, b ? '1' : '0', X(x), Y(y) - 5, { sc: 2, c: b ? P.DT4 : col, ol: null, align: 'center' }); }
+  });
+  // out to the report
+  lineW(X(cx), Y(cy + 58), X(cx), Y(cy + 120), 2 * z, P.DT2);
+  for (let q = 0; q < 4; q++) { const u = ((t * 1.4 + q / 4) % 1); if (k < 0.7) break; rect(X(cx) - 3, Y(lerp(cy + 58, cy + 120, u)) - 3, X(cx) + 3, Y(lerp(cy + 58, cy + 120, u)) + 3, P.DT4); }
+  // what the processor applies: calibration, the measured volume and dilution, flagging rules and quality control
+  const notes = [['CALIBRATION', -1, 0], ['DILUTION', -1, 1], ['FLAG RULES', 1, 0], ['QC CHECKS', 1, 1]];
+  notes.forEach(([s_, side, row], j) => { const a = clamp((k - 0.55 - j * 0.06) * 6, 0, 1); if (a <= 0) return; text(FS, s_, X(cx + side * 12) + (side < 0 ? -2 : 2), Y(cy + 70 + row * 16), { sc: 2, c: P.SUB, ol: null, align: side < 0 ? 'right' : 'left', n: a * 18 }); });
+}
+// ---------------------------------------------------------------- recap minis (animated, 132 x 96 tiles)
+const TW_ = 132, TH_ = 96;
+function miniTile(x, y, col) { rect(x - TW_ / 2, y - TH_ / 2, x + TW_ / 2, y + TH_ / 2, P.DS1); frame(x - TW_ / 2, y - TH_ / 2, x + TW_ / 2, y + TH_ / 2, col); }
+function miniImp(x, y, t) {
+  miniTile(x, y, P.EC2);
+  rect(x - 60, y - 16, x + 60, y + 18, P.EC0); rect(x - 4, y - 16, x + 4, y - 6, P.M4); rect(x - 4, y + 8, x + 4, y + 18, P.M4);
+  const u = (t * 0.8) % 1, cx = lerp(x - 56, x + 56, u); rbc(cx, y + 1, 5, 0.4, Math.PI / 2);
+  let px_ = null, py_ = null; for (let i = 0; i <= 50; i++) { const uu = u - (50 - i) / 50 * 0.9, xx = lerp(x - 56, x + 56, uu), k = senseK(xx - x, 4, 5), X_ = x - 56 + i * 2.24, Y_ = y - 22 - k * 16; if (px_ !== null) line(px_, py_, X_, Y_, P.SG2); px_ = X_; py_ = Y_; }
+  text(FS, 'RBC → PULSE', x, y + 28, { sc: 2, c: P.INK, ol: null, align: 'center' });
+}
+function miniLaser(x, y, t) {
+  miniTile(x, y, P.LZ2);
+  rect(x - 4, y - 44, x + 4, y + 22, P.EC1); rect(x - 58, y - 12, x - 4, y - 10, P.LZ2); rect(x + 4, y - 12, x + 24, y - 10, P.LZ2);
+  const u = (t * 0.7) % 1, cy = lerp(y + 18, y - 40, u), inB = Math.max(0, 1 - Math.abs(cy - (y - 11)) / 8);
+  wbc(x, cy, 7, 'neut', t, { dye: 1, glow: inB });
+  if (inB > 0) { line(x + 6, y - 11, x + 50, y - 15, P.SO2); line(x + 6, y - 11, x + 50, y - 7, P.SO2); line(x - 4, y - 7, x - 30, y + 18, P.EM2); }
+  text(FS, 'WBC → LASER', x, y + 28, { sc: 2, c: P.INK, ol: null, align: 'center' });
+}
+function miniHgb(x, y, t) {
+  miniTile(x, y, P.LG2);
+  disc(x - 50, y - 10, 6, P.LG2); rect(x - 20, y - 36, x + 20, y + 16, P.TB2); rect(x - 18, y - 24, x + 18, y + 14, P.HB1); rect(x + 42, y - 18, x + 50, y - 2, P.PD3);
+  for (let i = 0; i < 8; i++) { const u = ((t + i / 8) % 1), xx = lerp(x - 44, x + 42, u); if (xx > x && i % 2) continue; disc(xx, y - 10 + (i % 3 - 1) * 4, 1.6, P.LG3); }
+  text(FS, 'HGB → LIGHT', x, y + 28, { sc: 2, c: P.INK, ol: null, align: 'center' });
+}
+function miniReport(x, y, t) {
+  miniTile(x, y, P.DT3);
+  [['RBC', EX.rbc, P.RB3], ['WBC', EX.wbc, P.WB3], ['PLT', EX.plt, P.PL3], ['HGB', EX.hgb, P.HB3]].forEach(([n, v, c], i) => { text(FS, n, x - 52, y - 40 + i * 13, { sc: 2, c, ol: null }); text(FS, v, x - 14, y - 40 + i * 13, { sc: 2, c: P.INK, ol: null }); });
+  checkMark(x + 46, y - 22, 6, P.SG2);
+  text(FS, '→ REPORT', x, y + 28, { sc: 2, c: P.INK, ol: null, align: 'center' });
+}
+const RECAP = [miniImp, miniLaser, miniHgb, miniReport];
+
+// ---- 23_scenes.js
+// ============================================================================
+// SCENE COMPOSITOR: 27 micro-scenes in 7 continuous sequences (SC_T, 118 BPM).
+// One sample from start to finish: the purple-top tube is pierced → the result
+// screen (hook) → one red cell through one aperture (hook preview) → back to the
+// needle → the tubing → whole blood → dilution → three aliquots → impedance
+// (electrolyte, aperture, one red cell and its pulse, a platelet, many cells,
+// the size histogram) → hemoglobin (SLS lysis, photometer) → white cells (lysis,
+// dye, hydrodynamic focusing, laser, scatter + fluorescence, photodiodes, WDF +
+// WNR scattergrams) → processor → report → recap → the tube again (loop).
+// Hard cuts only at 0.8 s, 27 s and 32 s; everything else is camera moves,
+// lens portals and dissolves on the same objects.
+// ============================================================================
+const LENS_R = 420;
+function lensComposite(drawInner, cx, cy, r) {
+  if (r <= 0.5) return;
+  if (r >= LENS_R) { drawInner(); return; }
+  withBuffer(FEEDBUF, drawInner);
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy, h = r * r - dy * dy; if (h < 0) continue;
+    const s = Math.sqrt(h), a = Math.max(0, Math.ceil(cx - s - 0.5)), b = Math.min(W - 1, Math.floor(cx + s - 0.5));
+    for (let x = a; x <= b; x++) buf[y * W + x] = FEEDBUF[y * W + x];
+  }
+  ring(cx, cy, r + 1, 2, P.C4); ring(cx, cy, r + 3, 1, P.SUB, 0.5);
+}
+const lensIn = (t, a, b) => LENS_R * ein(seg(t, a, b));
+const lensOut = (t, a, b) => LENS_R * ein(1 - seg(t, a, b));
+function dissolveWorld(drawB, k) {
+  if (k <= 0) return; if (k >= 1) { drawB(); return; }
+  withBuffer(TMPBUF, drawB);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (bay(x, y) < k) buf[i] = TMPBUF[i]; }
+}
+const ph = (t, a, b, e) => (e || smooth)(seg(t, a, b));
+// index of the element of arr whose position f(el) is nearest (x, y) — picked once, so a tag never jumps
+function nearestIdx(arr, f, x, y) { let bi = 0, bd = Infinity; arr.forEach((e, i) => { const p = f(e, i); if (!p) return; const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; }
+const once = fn => { let v; return () => v === undefined ? (v = fn()) : v; };
+
+// ============================================================================ A: HOOK (0–3)
+const HOOK = [243, 320, 1.8];            // frame 0 = the loop's last frame
+const DISP = [104, 292];                 // the analyzer display
+const T_RBC = bt(2), T_WBC = bt(2.5), T_PLT = bt(3);
+const hookCam = k => new Cam(HOOK[0], HOOK[1], HOOK[2] * (k || 1));
+function s01(t) {
+  const cam = hookCam(1 + 0.03 * ph(t, 0, 0.8, lin));
+  const pierce = eout(seg(t, 0.1, 0.42)), draw = ph(t, 0.42, 0.8);
+  labScene(cam, t, { pierce, draw, busy: 1, screen: (a, b, c, d) => resultUI(a, b, c, d, t, { k: 0, busy: seg(t, 0.1, 0.8) }) });
+  const tp = 0.14; if (t > tp && t < tp + 0.2) flash(cam.x(ANZ.tubeX), cam.y(ANZ.capY + 1), 4 * cam.z, 1 - (t - tp) / 0.2, [P.CP0, P.CP2, P.CP3, P.C6]);
+}
+function dispCam(t) {
+  const z = lerp(1.95, 2.45, backOut(seg(t, 0.8, 0.97), 2.0)) * (1 + 0.04 * ph(t, 0.97, 1.8, lin));
+  const sh = t > T_RBC && t < T_RBC + 0.14 ? (1 - (t - T_RBC) / 0.14) * 1.6 : 0;
+  return new Cam(DISP[0] + sh * Math.sin(t * 90) / z, DISP[1] + sh * Math.cos(t * 77) / z, z);
+}
+function dispUI(t) { const k = t >= T_PLT ? 3 : t >= T_WBC ? 2 : t >= T_RBC ? 1 : 0; return (a, b, c, d) => resultUI(a, b, c, d, t, { k, t1: T_RBC, sc: 3 }); }
+function s02(t) { labScene(dispCam(t), t, { pierce: 1, draw: 1, busy: 1, screen: dispUI(t) }); }
+// the hook preview: one red cell through the aperture; pulse plateau 2.48–2.60 (peak on beat 5), counted at 2.80
+const HOOK_RBC = { k: 'rbc', keys: [[1.8, -110], [2.30, -24], [2.48, -6], [2.60, 6], [2.80, 24], [3.4, 100]], rot: 0.2 };
+const T_HOOKCOUNT = 2.80;
+const hookImpCam = t => new Cam(-4, 4, 2.0 * (1 + 0.06 * ph(t, 1.9, 3.0, lin)), 165, 334);
+function W_hookImp(t) { impWorld(hookImpCam(t), t, { parts: [HOOK_RBC], current: 1, ions: true, sheath: 1, zone: 1 }); }
+function numCentre(cam) { const sc = 3, big = 6; return [cam.x(30) + 6 * sc + textW(FC, EX.rbc, big) / 2, cam.y(232) + 22 * sc + 4.5 * big]; }
+const SCOPE = [20, 92, 290, 166];
+function hookHUD(t, a) {
+  if (a <= 0) return;
+  withDither(a, () => {
+    scope(SCOPE[0], SCOPE[1], SCOPE[2], SCOPE[3], [HOOK_RBC], t, { win: 1.0, max: 1.25, label: true });
+    counter(24, 462, 'RBC', t >= T_HOOKCOUNT ? 1 : 0, P.RB3, 2);
+    if (t > T_HOOKCOUNT && t < T_HOOKCOUNT + 0.25) flash(60, 467, 10, 1 - (t - T_HOOKCOUNT) / 0.25, [P.SG1, P.SG2, P.SG3, P.C6]);
+  });
+}
+function s03(t) {
+  const c0 = dispCam(1.8), f = ph(t, 1.8, 2.25, ein);
+  const [nx, ny] = numCentre(c0), nwx = c0.wx(nx), nwy = c0.wy(ny);
+  const cam = new Cam(lerp(c0.cx, nwx, f), lerp(c0.cy, nwy, f), c0.z * (1 + 0.16 * f));
+  const r = lensIn(t, 1.86, 2.24);
+  if (r < LENS_R) labScene(cam, t, { pierce: 1, draw: 1, busy: 1, screen: dispUI(t) });
+  const [lx, ly] = numCentre(cam);
+  lensComposite(() => W_hookImp(t), lx, ly, r);
+  hookHUD(t, ph(t, 2.2, 2.34) * (1 - ph(t, 2.9, 3.0, lin)));
+}
+
+// ============================================================================ B: THE SAMPLE (3–11)
+const xrayCam4 = t => camTrack([[3.0, 250, 318, 2.3], [3.35, 250, 318, 2.3], [4.35, 214, 240, 2.3, K50], [5.0, 180, 228, 2.3, K50]], t);
+const S4blood = t => 0.62 * ph(t, 3.35, 5.0, lin), S4piston = t => 0.55 * ph(t, 3.35, 5.0, lin);
+function W_xray4(t) {
+  const cam = xrayCam4(t);
+  analyzerXray(cam, t, lerp(0.4, 1, ph(t, 3.0, 3.6)), { pierce: 1, draw: 1, blood: S4blood(t), piston: S4piston(t), screen: (a, b, c, d) => resultUI(a, b, c, d, t, { k: 0, busy: 0.55 }) });
+  return cam;
+}
+function slugHead(t) { const L1 = FLU_P.tube.L, L2 = FLU_P.tube2.L, bp = S4blood(t) * (L1 + L2); return bp <= L1 ? FLU_P.tube.at(bp) : FLU_P.tube2.at(bp - L1); }
+function s04(t) {
+  const cam = W_xray4(t);
+  if (t < 3.3) lensComposite(() => W_hookImp(t), cam.x(ANZ.tubeX), cam.y(needleTip(1) - 6), lensOut(t, 3.0, 3.3));
+  tag('SAMPLING NEEDLE', cam.x(ANZ.tubeX + 1.5), cam.y(needleTip(1) - 24), 190, 300, 3.4, 4.3, t, P.AL3);
+  tag('SYRINGE PUMP', cam.x(FLU.pump[2] + 24), cam.y((FLU.pump[1] + FLU.pump[3]) / 2), 40, 330, 4.4, 4.98, t, P.AL3);
+}
+// inside the tubing: whole blood (camera rides with the flow)
+const TF = { z: 1.45, v: 56 };
+const tfCam = t => new Cam(TF.v * (t - 5.0), 0, TF.z, 165, 330);
+const tfWx = t => TF.v * (t - 5.0) - 8 + 5 * (t - 5.0);
+function W_tube(t) { const cam = tfCam(t); tubeFlow(cam, t, { v: 60, wx: tfWx(t) }); return cam; }
+function s05(t) {
+  if (t < 5.35) { const c4 = W_xray4(t), [hx, hy] = slugHead(t); lensComposite(() => W_tube(t), c4.x(hx), c4.y(hy), lensIn(t, 5.0, 5.35)); }
+  else W_tube(t);
+  const cam = tfCam(t), wx = tfWx(t);
+  tag('RED CELL  ~7.5 µm', cam.x(wx - 70), cam.y(-60 - R_RBC), 22, 168, 5.45, 7.4, t, P.RB3);
+  tag('WHITE CELL  ~12 µm', cam.x(wx + 6), cam.y(-10 - R_WBC), 112, 236, 5.75, 7.4, t, P.WB3);
+  tag('PLATELET  ~2.5 µm', cam.x(wx + 70), cam.y(48 + R_PLT), 112, 440, 6.05, 7.4, t, P.PL3);
+}
+// the mixing chamber: diluent in, cells spread apart
+function W_mix(t) { const cam = new Cam(0, 0, 1.3, 165, 320); mixWorld(cam, t, { dil: ph(t, 7.75, 8.9) }); return cam; }
+function s06(t) {
+  if (t < 7.85) { W_tube(t); dissolveWorld(() => W_mix(t), ph(t, 7.5, 7.85, lin)); } else W_mix(t);
+}
+// three aliquots leave the chamber (pull back), then dive into the RBC/PLT detector
+const intCam7 = t => camTrack([[9.0, 140, 318, 3.4], [9.15, 140, 318, 3.4], [10.15, 258, 360, 1.2, K75]], t);
+function W_int7(t) {
+  const cam = intCam7(t);
+  analyzerXray(cam, t, 1, { pierce: 1, draw: 1, blood: 0, piston: 0.55, mixFill: 1, dil: 1, alq: [ph(t, 9.45, 10.2, lin), ph(t, 9.55, 10.3, lin), ph(t, 9.65, 10.4, lin)], hi: t > 10.35 ? 'A' : null });
+  return cam;
+}
+const detC = d => [(d[0] + d[2]) / 2, (d[1] + d[3]) / 2];
+function s07(t) {
+  const cam = W_int7(t);
+  if (t < 9.35) lensComposite(() => W_mix(t), cam.x(FLU.mix[0]), cam.y(FLU.mix[1]), lensOut(t, 9.0, 9.35));
+  const [ax_, ay_] = detC(FLU.detA), [bx_, by_] = detC(FLU.detB), [cx_, cy_] = detC(FLU.detC);
+  tag('RBC / PLT', cam.x(FLU.detA[2]), cam.y(ay_), 180, 382, 9.75, 10.72, t, P.EC2);
+  tag('HGB', cam.x(bx_), cam.y(FLU.detB[1]), 212, 252, 9.85, 10.72, t, P.LG2);
+  tag('WBC', cam.x(cx_), cam.y(FLU.detC[3]), 100, 462, 9.95, 10.72, t, P.LZ2);
+  if (t > 10.7) lensComposite(() => W_imp(t), cam.x(ax_), cam.y(ay_), lensIn(t, 10.7, 11.0));
+}
+
+// ============================================================================ C: IMPEDANCE (11–27)
+// slowed-down red cell: approach, enter (beats 37–39), inside (39–41), exit (41–43, counted on beat 43)
+const RBC1 = { k: 'rbc', keys: [[15.0, -80], [bt(37), -24], [bt(39), -6], [bt(41), 6], [bt(43), 24], [23.2, 120]], rot: 0.15 };
+const T_RBC1 = bt(43), T_PLTC = 23.5, T_RBC2 = 24.52;
+// a platelet (peak on beat 46), then a red cell (peak on beat 48) at closer-to-real speed
+const PLT1 = { k: 'plt', keys: [[22.7, -100], [23.22, -18], [bt(46) - 0.06, -12], [bt(46) + 0.06, 12], [23.50, 18], [24.0, 100]], rot: 0.4, y: 2 };
+const RBC2 = { k: 'rbc', keys: [[23.5, -120], [24.24, -24], [bt(48) - 0.05, -6], [bt(48) + 0.05, 6], [T_RBC2, 24], [25.2, 120]], rot: -0.2 };
+// then a stream of cells with a spread of volumes (time-lapse)
+const STREAM = (() => {
+  const a = [];
+  for (let i = 0; i < 24; i++) {
+    const e = sizeSample(i + 200), tc = 25.1 + i * 0.085 + hash(i + 7000) * 0.02;
+    const r = e.k === 'rbc' ? 10 * Math.cbrt(e.v / 90) : 3.4 * Math.cbrt(e.v / 9), vol = e.k === 'rbc' ? e.v / 90 : 0.2 * e.v / 9;
+    a.push({ k: e.k, r, vol, y: (hash(i + 7100) - 0.5) * 4, rot: hash(i + 7200) * 3, keys: [[tc - 0.3, -150], [tc, 0], [tc + 0.3, 150]] });
+  }
+  return a;
+})();
+const IMP_PARTS = [RBC1, PLT1, RBC2].concat(STREAM);
+function impCam(t) {
+  if (t < 25.0) return camTrack([[10.7, 0, -8, 0.92], [11.9, 0, -8, 0.95], [13.15, 0, 0, 1.8, K50]], t, 165, 330);
+  const f = K75(seg(t, 25.0, 26.4));
+  return new Cam(0, lerp(0, 40, f), Math.exp(lerp(Math.log(1.8), Math.log(0.95), f)), 165, 330);
+}
+function W_imp(t) {
+  const cam = impCam(t);
+  impWorld(cam, t, { parts: IMP_PARTS, current: 1, ions: true, sheath: ph(t, 12.9, 13.4), zone: t > 13.45 ? 1 : 0 });
+  return cam;
+}
+const impWin = t => lerp(3.0, 1.5, ph(t, 25.0, 25.5));
+const RBC_N = t => (t >= T_RBC1 ? 1 : 0) + (t >= T_RBC2 ? 1 : 0) + Math.floor(9610 * ph(t, 25.1, 26.95, x => x * x));
+const PLT_N = t => (t >= T_PLTC ? 1 : 0) + Math.floor(502 * ph(t, 25.1, 26.95, x => x * x));
+// x on the scope of an event at time te (for tags that point at a pulse)
+const scopeX = (t, te) => SCOPE[2] - 2 - (t - te) / impWin(t) * (SCOPE[2] - SCOPE[0] - 4);
+const scopeY = v => SCOPE[3] - 10 - v * (SCOPE[3] - SCOPE[1] - 20) / 1.25;
+const IONI = once(() => { const c = impCam(12.0); let bi = 0, bd = Infinity; for (let i = 0; i < 30; i += 2) { const [x, y] = ionPos(i, 12.0, []); const d = Math.abs(c.x(x) - 150) + Math.abs(c.y(y) - 300) * 0.6; if (d < bd) { bd = d; bi = i; } } return bi; });
+function impScene(t) {
+  const cam = W_imp(t);
+  // HUD: the voltage trace (scope), the counters, later the size histogram
+  const hud = ph(t, 14.9, 15.25);
+  if (hud > 0) withDither(hud, () => {
+    scope(SCOPE[0], SCOPE[1], SCOPE[2], SCOPE[3], IMP_PARTS, t, { win: impWin(t), max: 1.25, label: true });
+    counter(24, 462, 'RBC', RBC_N(t), P.RB3, 2);
+    if (t >= 23.0) counter(152, 462, 'PLT', PLT_N(t), P.PL3, 2);
+  });
+  for (const [tc, x] of [[T_RBC1, 60], [T_RBC2, 60], [T_PLTC, 188]]) if (t > tc && t < tc + 0.25) flash(x, 467, 10, 1 - (t - tc) / 0.25, [P.SG1, P.SG2, P.SG3, P.C6]);
+  const hh = ph(t, 25.35, 25.6);
+  if (hh > 0) withDither(hh, () => sizeHist(20, 372, 290, 446, Math.floor(700 * ph(t, 25.5, 26.9, lin)), t, { labels: true }));
+  // tags
+  tag('ELECTRODE  +', cam.x(-IMP.ex), cam.y(40), 24, 404, 11.1, 12.15, t, P.AL3);
+  tag('ELECTRODE  -', cam.x(IMP.ex), cam.y(40), 160, 444, 11.25, 12.15, t, P.AL3);
+  { const [x, y] = ionPos(IONI(), t, []); tag('IONS CARRY THE CURRENT', cam.x(x), cam.y(y), 60, 220, 11.55, 12.75, t, P.EC3); }
+  tag('APERTURE', cam.x(0), cam.y(-IMP.ah - 3), 196, 214, 13.35, 14.95, t, P.YEL);
+  tag('SHEATH FLOW', cam.x(-64), cam.y(26), 24, 420, 13.8, 14.95, t, P.EC3);
+  tag('RED CELL', cam.x(trajX(RBC1.keys, t)), cam.y(-R_RBC), 40, 250, 15.35, 17.3, t, P.RB3);
+  tag('NO CELL INSIDE → FLAT', 200, SCOPE[3] - 11, 90, 186, 16.3, 18.6, t, P.SG2);
+  if (t > 19.8 && t < 21.0) tag('VOLTAGE RISES', scopeX(t, Math.min(t, bt(40))), scopeY(1) - 1, 150, 186, 19.85, 20.95, t, P.SG2);
+  tag('COUNT +1', 98, 462, 120, 420, 21.9, 22.95, t, P.RB3);
+  tag('PLATELET: SMALL PULSE', scopeX(t, bt(46)), scopeY(0.2), 24, 186, 23.5, 24.4, t, P.PL3);
+  tag('RED CELL: BIG PULSE', scopeX(t, bt(48)), scopeY(1), 110, 186, 24.5, 25.4, t, P.RB3);
+}
+
+// ============================================================================ D: HEMOGLOBIN (27–32)
+const hgbCam = t => new Cam(0, 0, 1.0 * (1 + 0.1 * ph(t, 27.0, 29.3, lin)), 165, 320);
+const hgbK = t => ph(t, 27.3, 28.8, lin);
+function W_hgb(t) { const cam = hgbCam(t); hgbLysis(cam, t, hgbK(t)); return cam; }
+const SLSI = once(() => nearestIdx(HG_SLS, s => [s.x, s.y], -70, 70));
+function s15(t) {
+  const cam = W_hgb(t), z = cam.z;
+  const s_ = HG_SLS[SLSI()];
+  tag('SLS DETERGENT', cam.x(s_.x + 10 * Math.sin(t * 0.8 + s_.ph)), cam.y(s_.y + 8 * Math.cos(t * 0.7 + s_.ph)), 24, 440, 27.3, 28.3, t, P.LY2);
+  const c = HG_RBC[4], out = smooth(clamp((hgbK(t) - 0.35) / 0.35, 0, 1)), a = c.ph + 0.3, d = (6 + out * 40) * z;
+  tag('HEMOGLOBIN', cam.x(c.x) + Math.cos(a) * d, cam.y(c.y) + Math.sin(a) * d, 170, 250, 27.95, 28.95, t, P.HB3);
+}
+const photCam = t => camTrack([[29.0, -64, -14, 1.9], [29.35, -64, -14, 1.9], [31.3, 72, -14, 1.9, K50]], t, 165, 340);
+function W_phot(t) { const cam = photCam(t); photometer(cam, t, { on: 1, absorb: 1, reading: 0 }); return cam; }
+const T_HGB = bt(61);
+function hgbReadout(t) {
+  const a = ph(t, T_HGB - 0.1, T_HGB + 0.1); if (a <= 0) return;
+  withDither(a, () => {
+    rect(24, 100, 252, 138, P.DS0); frame(24, 100, 252, 138, P.HB2);
+    text(FS, 'HGB', 34, 108, { sc: 2, c: P.HB3, ol: null });
+    text(FC, EX.hgb + ' g/dL', 74, 105, { sc: 2, c: P.INK, ol: null, n: (t - T_HGB) * 30 });
+  });
+  if (t > T_HGB && t < T_HGB + 0.3) flash(230, 119, 8, 1 - (t - T_HGB) / 0.3, [P.HB1, P.HB2, P.HB3, P.C6]);
+}
+function s16(t) {
+  const cam = W_phot(t);
+  if (t < 29.3) lensComposite(() => W_hgb(t), cam.x(0), cam.y(-2), lensOut(t, 29.0, 29.3));
+  tag('LED', cam.x(-120), cam.y(-13), 40, 196, 29.4, 30.4, t, P.LG2);
+  tag('SLS-HB ABSORBS LIGHT', cam.x(-8), cam.y(-40), 40, 170, 29.75, 30.95, t, P.HB3);
+  tag('PHOTOSENSOR', cam.x(128), cam.y(-13), 150, 186, 30.55, 31.95, t, P.PD4);
+  hgbReadout(t);
+}
+
+// ============================================================================ E: WHITE CELLS (32–45)
+const wfx = t => lerp(-40, 70, K50(seg(t, 31.7, 34.4)));
+const wbcCam = t => new Cam(wfx(t) + 4, 0, 1.45, 165, 330);
+function W_wbc(t) { const cam = wbcCam(t); wbcChamber(cam, t, { lyse: ph(t, 34.3, 35.7, lin), follow: wfx(t), ring: ph(t, 32.2, 32.5) * (1 - ph(t, 35.8, 36.0)), dye: 0 }); return cam; }
+function s17(t) {
+  const cam = W_wbc(t);
+  tag('WHITE CELL', cam.x(wfx(t)), cam.y(-R_WBC * 1.55), 40, 186, 32.3, 33.95, t, P.WB3);
+}
+const BURSTI = once(() => nearestIdx(WBC_S.cells, c => c.k === 'rbc' ? cellPos(c, WBC_S, 34.6, 12) : null, 70 + 64, -80));
+function s18(t) {
+  const cam = W_wbc(t);
+  const c = WBC_S.cells[BURSTI()], [x, y] = cellPos(c, WBC_S, t, 12);
+  tag('RED CELLS BURST', cam.x(x), cam.y(y), 150, 170, 34.75, 35.9, t, P.RB3);
+  tag('WHITE CELL STAYS', cam.x(wfx(t)), cam.y(R_WBC * 1.5), 60, 450, 35.05, 35.95, t, P.WB3);
+}
+const stainCam = t => new Cam(8 * ph(t, 36.2, 38.0, lin), 0, 1.0 * (1 + 0.16 * ph(t, 36.2, 38.0, lin)), 165, 320);
+const stainK = t => ph(t, 36.3, 37.9, lin);
+function W_stain(t) { const cam = stainCam(t); stainCut(cam, t, stainK(t)); return cam; }
+function s19(t) {
+  if (t < 36.3) { const c = W_wbc(t); lensComposite(() => W_stain(t), c.x(wfx(t)), c.y(0), lensIn(t, 36.0, 36.3)); } else W_stain(t);
+  const cam = stainCam(t), k = stainK(t);
+  const [dx, dy] = dyePos(4, k, t); tag('DYE', cam.x(dx), cam.y(dy), 200, 470, 36.4, 37.3, t, P.DY1);
+  tag('DNA', cam.x(STAIN_LOBES[1][0]), cam.y(STAIN_LOBES[1][1] - 24), 120, 150, 36.9, 37.95, t, P.NU3);
+  const [rx, ry] = rnaPos(3); tag('RNA', cam.x(rx), cam.y(ry), 40, 470, 37.15, 37.95, t, P.NU2);
+}
+// the flow cell: one path for the followed white cell (slow-motion in the beam from 42.66 to 48.4)
+const T_CROSS = bt(84);
+function cellYF(t) {
+  if (t <= T_CROSS) return 52 * (T_CROSS - t);
+  if (t <= 48.4) return -6 * eout(seg(t, T_CROSS, 45.5)) - 2 * seg(t, 45.5, 48.4);
+  return -8 - 340 * ein(seg(t, 48.4, 49.4));
+}
+const flowCam = t => camTrack([[38.0, 0, 236, 3.0], [38.25, 0, 236, 3.0], [39.8, -12, 30, 0.92, K75], [45.0, -12, 32, 0.95, lin], [48.0, -14, 34, 0.96, lin], [49.6, -66, 100, 1.25, K50]], t, 165, 320);
+const T_P1 = 48.62, T_P2 = 49.75, T_P3 = 50.45;
+const EXTRA = t => [{ y: 150 * (T_P2 - t), kind: 'lymph', ph: 1.3, s: 0.72 }, { y: 150 * (T_P3 - t), kind: 'mono', ph: 2.1, s: 0.85 }];
+function W_flow(t) {
+  const cam = flowCam(t), cy = cellYF(t), held = t > T_CROSS && t < 48.4;
+  const lit = held ? 1 : Math.max(0, 1 - Math.abs(cy) / 14);
+  flowCell(cam, t, { focus: lerp(0.15, 1, ph(t, 38.4, 40.2)), cellY: cy, laser: 1, show: { fs: 1, ss: 1, fl: 1 }, detect: lit, fluor: lit, light: lit, paths: t > 45.0, extra: t > 48.4 ? EXTRA(t) : null });
+  return cam;
+}
+const FL_EV = { FSC: [[T_P1, 0.75], [T_P2, 0.45], [T_P3, 0.6]], SSC: [[T_P1, 0.8], [T_P2, 0.25], [T_P3, 0.4]], SFL: [[T_P1, 0.45], [T_P2, 0.62], [T_P3, 0.85]] };
+const PH_ = [[16, 92, 100, 146, 'FSC', 'SO2'], [104, 92, 188, 146, 'SSC', 'DT3'], [192, 92, 276, 146, 'SFL', 'EM2']];
+function flowScene(t) {
+  let cam;
+  if (t < 38.3) { cam = W_flow(t); lensComposite(() => W_stain(t), cam.x(0), cam.y(cellYF(t)), lensOut(t, 38.0, 38.3)); }
+  else cam = W_flow(t);
+  const cy = cellYF(t);
+  // HUD: one electrical pulse per cell on each detector
+  const hud = ph(t, 48.2, 48.45);
+  if (hud > 0) withDither(hud, () => PH_.forEach(([x0, y0, x1, y1, nm_, col]) => pulseHUD(x0, y0, x1, y1, t, FL_EV[nm_], P[col], nm_)));
+  // tags
+  tag('SHEATH FLUID', cam.x(-36), cam.y(196), 24, 380, 38.9, 40.4, t, P.EC3);
+  tag('SAMPLE CORE', cam.x(1), cam.y(110), 200, 330, 39.4, 40.8, t, P.AM3);
+  tag('RED LASER', cam.x(-100), cam.y(0), 24, 230, 40.1, 41.45, t, P.LZ3);
+  tag('GREEN FLUORESCENCE', cam.x(-12), cam.y(cy - 12), 24, 196, 43.2, 44.95, t, P.EM2);
+  tag('SCATTERED LIGHT', cam.x(52), cam.y(-5), 160, 238, 43.7, 44.95, t, P.SO2);
+  tag('FORWARD SCATTER → SIZE', cam.x(44), cam.y(-5), 120, 222, 45.3, 47.95, t, P.SO2);
+  tag('SIDE SCATTER → GRANULES', cam.x(-86), cam.y(112), 112, 372, 45.8, 47.95, t, P.DT3);
+  tag('FLUORESCENCE → DNA+RNA', cam.x(-133), cam.y(133), 24, 452, 46.3, 47.95, t, P.EM2);
+  tag('PHOTODIODES', cam.x(-86), cam.y(OPTX.ssPD[1] - 14), 140, 300, 48.55, 49.7, t, P.PD4);
+  if (t > 49.85) { const [x0, y0, x1, y1] = PH_[2], px = x1 - 2 - (t - T_P2) / 1.2 * (x1 - x0); tag('ONE PULSE PER CELL', px, y1 - 5 - 0.62 * (y1 - y0 - 16), 96, 170, 49.85, 50.95, t, P.SG2); }
+}
+
+// ============================================================================ F: DATA (51–56)
+function dataBG(t) {
+  rect(0, 0, W, H, P.BG);
+  for (let i = 0; i < 46; i++) { const x = hash(i + 8000) * 360 + 6 * Math.sin(t * 0.7 + i), y = ((hash(i + 8001) * 640 - t * 12 * (1 + hash(i + 8002))) % 640 + 640) % 640; rect(x, y, x + 2, y + 2, i % 3 ? P.DT0 : P.DT1); }
+}
+const wdfRect = t => { const f = ph(t, 51.0, 54.0, lin); return [lerp(26, 18, f), lerp(104, 98, f), lerp(286, 292, f), lerp(440, 450, f)]; };
+const WDF_N = t => Math.floor(900 * ph(t, 51.9, 53.3, x => x * x));
+function W_wdf(t) {
+  dataBG(t);
+  const [x0, y0, x1, y1] = wdfRect(t), g = scattergram(x0, y0, x1, y1, 'WDF', WDF_N(t), t, { colored: t > 53.0, flash: 1, labels: ph(t, 53.15, 53.5, lin), asc: 2 });
+  // the first cell: one dot placed by its side-scatter and fluorescence pulse heights
+  const a = ph(t, 51.3, 51.45) * (1 - ph(t, 52.2, 52.5));
+  if (a > 0) { const px = g.px(0.6), py = g.py(0.31); dashLine(px, g.py(0) + 2, px, py, P.DT3, 3, 2, 0); dashLine(x0 + 14, py, px, py, P.EM2, 3, 2, 0); disc(px, py, 3.5 * a, P.C6); ring(px, py, 7, 1.2, P.YEL, a); }
+  return g;
+}
+function s24(t) {
+  if (t < 51.3) { flowScene(t); dissolveWorld(() => W_wdf(t), ph(t, 51.0, 51.3, lin)); } else W_wdf(t);
+}
+function diffBars(t) {
+  const k = ph(t, 54.95, 55.75); if (k <= 0) return;
+  const cols = [P.GNE, P.GLY, P.GMO, P.GEO, P.GBA];
+  label('WDF + WNR = 5-PART DIFF', 24, 306, 54.9, 56.0, t, P.INK);
+  EX.diff.forEach(([nm_, pct], i) => {
+    const y = 330 + i * 18, kk = clamp(k * 1.6 - i * 0.15, 0, 1); if (kk <= 0) return;
+    text(FS, nm_, 24, y, { sc: 2, c: cols[i], ol: null });
+    rect(84, y + 1, 84 + Math.max(2, 150 * pct / 60 * kk), y + 9, cols[i]);
+    text(FS, (pct * kk).toFixed(1) + '%', 290, y, { sc: 2, c: P.INK, ol: null, align: 'right' });
+  });
+}
+function s25(t) {
+  dataBG(t);
+  const f = ph(t, 54.0, 54.5, K75), R0 = wdfRect(54.0), R1 = [16, 112, 150, 290];
+  scattergram(lerp(R0[0], R1[0], f), lerp(R0[1], R1[1], f), lerp(R0[2], R1[2], f), lerp(R0[3], R1[3], f), 'WDF', 900, t, { colored: true, labels: 1, lsc: f > 0.5 ? 1 : 2, asc: f > 0.5 ? 1 : 2 });
+  const g = ph(t, 54.15, 54.6, K75), ox = (1 - g) * 220;
+  if (g > 0) {
+    const gw = scattergram(158 + ox, 112, 292 + ox, 290, 'WNR', Math.floor(600 * ph(t, 54.5, 55.2, lin)), t, { colored: t > 55.0, flash: 1, labels: ph(t, 55.1, 55.4, lin), lsc: 1 });
+    // the basophils: the group this channel adds, ringed
+    const rk = ph(t, 55.15, 55.35); if (rk > 0) ring(gw.px(0.52), gw.py(0.72), (9 + 2.5 * Math.sin(t * 11)) * rk, 1.5, P.GBA, 0.9);
+  }
+  // acquisition sweep while the WNR events arrive
+  const sw = seg(t, 54.45, 55.25); if (sw > 0 && sw < 1) { const x = lerp(172, 288, sw); rect(x, 116, x + 2, 274, P.DT3, 0.8); rect(x - 10, 116, x, 274, P.DT1, 0.25); }
+  diffBars(t);
+}
+
+// ============================================================================ G: RESULTS AND LOOP (56–65)
+const procCam = t => camTrack([[56.0, 0, 10, 1.6], [56.25, 0, 10, 1.6], [56.95, 0, -40, 0.92, K75], [58.3, 0, -36, 0.96, lin]], t, 160, 310);
+function W_proc(t) { const cam = procCam(t); dataMerge(cam, t, ph(t, 56.3, 57.7, lin)); return cam; }
+const repCam = t => new Cam(105 + 3 * ph(t, 57.95, 60, lin), 292, 2.3);
+const REP0 = bt(114.5), REPD = BEAT / 2;
+const repO = t => ({ rows: clamp((t - REP0) / REPD, 0, 5), checks: ph(t, 59.35, 59.8, lin), qc: ph(t, 59.55, 59.95, lin) });
+function W_report(t) { labScene(repCam(t), t, { pierce: 1, draw: 1, busy: 0, screen: (a, b, c, d) => reportUI(a, b, c, d, t, repO(t)) }); }
+function s26(t) {
+  if (t < 56.3) { s25(t); dissolveWorld(() => W_proc(t), ph(t, 56.0, 56.3, lin)); }
+  else if (t < 57.95) W_proc(t);
+  else { W_report(t); if (t < 58.3) { const c = repCam(t); lensComposite(() => W_proc(t), c.x(DISP[0]), c.y(DISP[1]), lensOut(t, 57.95, 58.3)); } }
+}
+const endCam = t => camTrack([[60.0, 108, 292, 2.3], [60.9, 182, 342, 0.98, K75], [62.9, 182, 342, 0.98], [64.6, HOOK[0], HOOK[1], HOOK[2], K75]], t);
+const T_TILE = i => bt(120 + i);
+function s27(t) {
+  const cam = endCam(t), pierce = 1 - ph(t, 63.1, 63.8), draw = 1 - ph(t, 63.1, 63.4);
+  const scr = t < 63.0 ? (a, b, c, d) => reportUI(a, b, c, d, t, { rows: 5, checks: 1, qc: 1 }) : (a, b, c, d) => resultUI(a, b, c, d, t, { k: 0 });
+  labScene(cam, t, { pierce, draw, busy: 0, screen: scr });
+  const a = ph(t, 60.7, 61.0) * (1 - ph(t, 62.8, 63.1));
+  if (a > 0) {
+    darken(0.55 * a);
+    RECAP.forEach((f, i) => {
+      const k = ph(t, T_TILE(i), T_TILE(i) + 0.2) * (1 - ph(t, 62.8 + i * 0.05, 63.05 + i * 0.05)); if (k <= 0) return;
+      withDither(k, () => f(84 + (i % 2) * 138, 214 + Math.floor(i / 2) * 106 + (1 - k) * 12, t));
+    });
+  }
+}
+
+// ============================================================================ dispatcher
+const SCN_FN = [s01, s02, s03, s04, s05, s06, s07, impScene, impScene, impScene, impScene, impScene, impScene, impScene,
+  s15, s16, s17, s18, s19, flowScene, flowScene, flowScene, flowScene, s24, s25, s26, s27];
+function renderFrame(t) {
+  t = clamp(t, 0, DUR - 1e-6);
+  SCN_FN[sceneIndex(t)](t);
+  overlays(t);
+}
+function engineInit() { }
+
+// ---- 24_overlay.js
+// ============================================================================
+// TEXT LAYER: one typed caption at a time (top left, outlined), short leader-
+// line tags next to the thing they name, one disclaimer chip at a time
+// (bottom left), and the closing title. Everything stays inside the
+// short-video safe area (x 14..292, y 36..506); nothing sits under the
+// right-hand buttons or the bottom description.
+// ============================================================================
+const SAFE = { l: 14, r: 292, t: 36, b: 506 };
+const CAP_X = 16, CAP_Y = 40;
+function caption(s, t0, t1, t) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const lines = wrapBal(FC, s, SAFE.r - CAP_X - 4, 2), cps = 44;
+  let n = (t - t0) * cps;
+  const out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1;
+  n = Math.min(n, s.length * out + 0.01);
+  if (n < 0.6) return;
+  let left = n;
+  lines.forEach((ln, i) => {
+    if (left <= 0) return;
+    const k = Math.min(ln.length, left);
+    text(FC, ln, CAP_X, CAP_Y + i * 20, { sc: 2, n: k, c: P.INK, ol: P.SH, shadow: P.SH, sd: 2 });
+    left -= ln.length + 1;
+  });
+}
+// a leader-line tag: anchor (ax, ay) on the object, label box at (lx, ly) (top-left of the text)
+function tag(s, ax, ay, lx, ly, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t > t1 || ax === null || !isFinite(ax) || !isFinite(ay)) return;
+  col = col === undefined ? P.INK : col;
+  const age = t - t0, out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1, gk = K75(clamp(age / 0.18, 0, 1)) * out;
+  const tw = textW(FS, s, 2), x0 = Math.round(clamp(lx, SAFE.l, SAFE.r - tw)), y0 = Math.round(clamp(ly, SAFE.t + 44, SAFE.b - 12));
+  ax = Math.round(ax); ay = Math.round(ay);
+  const ux = ax < x0 ? x0 - 3 : ax > x0 + tw ? x0 + tw + 2 : ax, uy = ay < y0 ? y0 - 3 : y0 + 12;
+  const ex = lerp(ax, ux, gk), ey = lerp(ay, uy, gk);
+  line(ax + 1, ay, ex + 1, ey, P.SH); line(ax, ay + 1, ex, ey + 1, P.SH); line(ax, ay, ex, ey, col);
+  rect(ax - 1, ay - 1, ax + 2, ay + 2, col);
+  if (gk < 1) return;
+  const n = clamp((age - 0.16) * 52, 0, s.length) * out;
+  if (n <= 0) return;
+  const pw = textW(FS, s.slice(0, Math.ceil(n)), 2);
+  rect(x0 - 3, y0 - 3, x0 + pw + 3, y0 + 12, P.K0); rect(x0 - 3, y0 + 12, x0 + pw + 3, y0 + 13, col);
+  text(FS, s, x0, y0, { sc: 2, c: P.INK, ol: null, n });
+}
+// a plain label (no leader), typed in; align 'center' supported
+function label(s, x, y, t0, t1, t, col, align, f, sc) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  f = f || FS; sc = sc || 2;
+  const out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1, n = clamp((t - t0) * 50, 0, s.length) * out;
+  if (n <= 0) return;
+  text(f, s, x, y, { sc, c: col === undefined ? P.INK : col, ol: P.SH, n, align });
+}
+function chip(s, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const k = K75(clamp((t - t0) / 0.22, 0, 1)) * (t1 - t < 0.15 ? (t1 - t) / 0.15 : 1), tw = textW(FS, s, 2), y = 488;
+  const x = Math.round(lerp(-tw - 30, SAFE.l, k));
+  rect(x - 4, y - 4, x + tw + 4, y + 13, P.K0); frame(x - 4, y - 4, x + tw + 4, y + 13, col === undefined ? P.N5 : col);
+  text(FS, s, x, y, { sc: 2, c: P.SUB, ol: null });
+}
+// ---------------------------------------------------------------- the scene captions (the brief's labels)
+const CAPS = [
+  [2.2, 3.1, 'ONE CELL → ONE PULSE'], [3.2, 6.0, 'FOLLOW THE BLOOD'], [7.6, 9.1, 'CONTROLLED DILUTION'], [9.2, 10.9, 'THREE MEASUREMENTS'],
+  [11.15, 13.0, 'CONDUCTIVE ELECTROLYTE'], [13.15, 15.0, 'APERTURE SENSOR'], [19.0, 21.0, 'CELL RAISES RESISTANCE'], [21.9, 23.0, 'ONE CELL = ONE PULSE'],
+  [23.1, 25.0, 'SIZE → PULSE HEIGHT'], [25.15, 27.0, 'CELL COUNT + SIZE'], [27.1, 29.0, 'RELEASE THE HEMOGLOBIN'], [29.35, 32.0, 'MORE HEMOGLOBIN → LESS LIGHT'],
+  [32.1, 34.0, 'WHITE CELL CHANNEL'], [34.15, 36.0, 'RED CELLS REMOVED'], [36.15, 38.0, 'FLUORESCENT DYE'], [38.4, 41.0, 'HYDRODYNAMIC FOCUSING'],
+  [42.75, 45.0, 'LASER HITS THE CELL'], [45.1, 48.0, 'THREE OPTICAL SIGNALS'], [48.15, 51.0, 'LIGHT → ELECTRICAL PULSES'], [51.2, 54.0, 'EACH DOT = ONE CELL'],
+  [54.2, 56.0, 'WNR ADDS BASOPHILS'], [56.2, 58.0, 'ALL DATA → ONE REPORT'],
+];
+const CHIPS = [
+  [1.05, 2.95, 'RESULT PREVIEW'], [5.5, 8.5, 'RELATIVE SIZES TO SCALE'], [9.6, 12.6, 'SEPARATE ALIQUOTS'], [13.4, 15.1, 'APERTURE NOT TO SCALE'], [15.2, 18.2, 'SLOWED DOWN'],
+  [25.3, 27.0, 'THOUSANDS OF CELLS / SECOND'], [27.2, 30.2, 'SEPARATE ALIQUOT'], [32.2, 35.2, 'ANOTHER ALIQUOT'], [36.4, 39.4, 'DIM UNTIL THE LASER HITS'],
+  [42.8, 45.8, 'SLOWED DOWN'], [46.0, 49.0, 'SIMPLIFIED OPTICS'], [53.0, 56.0, 'COLOURS = SOFTWARE GROUPS'], [58.2, 61.2, 'EXAMPLE VALUES'],
+];
+function titleCard(t) {
+  const t0 = 63.2, t1 = 64.9;
+  if (!UI_ON || t < t0 || t > t1) return;
+  const out = t > t1 - 0.12 ? (t1 - t) / 0.12 : 1;
+  const lines = [[['HOW ', P.INK], ['BLOOD TEST', P.YEL]], [['MACHINES WORK', P.INK]]];
+  let left = (t - t0) * 34;
+  lines.forEach((segs, li) => {
+    const y = 40 + li * 24, total = textW(FT, segs.map(s => s[0]).join(''), 2, true);
+    let x = CX - total / 2;
+    for (const [s, c] of segs) {
+      if (left <= 0) break;
+      const k = Math.min(s.length, left);
+      if (out >= 1 || bay(0, y) < out) text(FT, s, x, y, { sc: 2, bold: true, c, ol: P.SH, n: k, shadow: P.SH, sd: 2 });
+      x += textW(FT, s, 2, true) + 2; left -= s.length;
+    }
+  });
+}
+function overlays(t) {
+  if (!UI_ON) return;
+  for (const [a, b, s] of CAPS) caption(s, a, Math.min(b, a + 3.2), t);      // type in, hold ~3 s, erase (no fixed header)
+  for (const [a, b, s] of CHIPS) chip(s, a, Math.min(b, a + 3.0), t);       // each note ~3 s, then gone (no lower-third frame)
+  titleCard(t);
+}
+
+// ---- 30_audio.js
+// ============================================================================
+// AUDIO — an original lo-fi hip-hop score plus event-synced SFX, synthesised
+// sample by sample in plain JS (no samples, no Web Audio graph). The grid is
+// 118.15 BPM (32 bars = 65.000 s) played half-time, so the groove sits at a
+// laid-back 59 BPM: swung boom-bap drums, a warm saturated bass, FM electric
+// piano with tremolo on jazzy ii–V–I–vi changes in F major (Gm9 – C13 – Fmaj9 –
+// Dm9, two bars each), a kalimba riff that keeps coming back (the hook), vinyl
+// crackle and tape wobble (wow and flutter that repeat exactly every 65 s).
+// Arc: hook groove from frame 0 → lighter sample journey → impedance groove
+// with rim clicks (room for the pulse bips) → time-lapse lift → the music goes
+// "underwater" (low-pass) exactly on the cut to hemoglobin (27 s) and surfaces
+// on the cut to the white cells (32 s) → a short fill into the laser hit (bar
+// 22, 42.66 s) → floating, drumless slow-motion → the groove returns as time
+// resumes (48.75 s) → data and report → recap on the tonic → a tape stop that
+// falls back into bar 1. Every note and tail wraps at 65 s (seamless loop).
+// The impedance "bip" is the voltage itself: its loudness is computed from the
+// same particle positions that draw the scope trace. Cells, light and current
+// make no sound: all effects are sonifications.
+// ============================================================================
+const SR = 48000, NS = Math.round(DUR * SR);
+const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const nm = (n, o) => 12 * (o + 1) + NOTE[n];
+const fq = (n, o) => mtof(nm(n, o));
+// ---------------------------------------------------------------- harmony (two bars per chord)
+const PROG = ['Gm9', 'C13', 'Fmaj9', 'Dm9'];
+const CH = {
+  Gm9: { rh: [['F', 3], ['A', 3], ['Bb', 3], ['D', 4]], root: ['G', 2], fifth: ['D', 3] },
+  C13: { rh: [['E', 3], ['A', 3], ['Bb', 3], ['D', 4]], root: ['C', 2], fifth: ['G', 2] },
+  Fmaj9: { rh: [['E', 3], ['G', 3], ['A', 3], ['C', 4]], root: ['F', 2], fifth: ['C', 3] },
+  Dm9: { rh: [['F', 3], ['A', 3], ['C', 4], ['E', 4]], root: ['D', 2], fifth: ['A', 2] },
+};
+const chordOf = b => PROG[Math.floor((b - 1) / 2) % 4];
+// the kalimba riff (8th-note steps over two bars, swung): A C D – C A G – F
+const RIFF_A = [[0, 'A', 5, 2], [3, 'C', 6, 2], [6, 'D', 6, 2], [8, 'C', 6, 1], [10, 'A', 5, 1], [11, 'G', 5, 3], [14, 'F', 5, 2]];
+const RIFF_A_V = [[0, 'A', 5, 2], [3, 'C', 6, 2], [6, 'D', 6, 2], [8, 'C', 6, 1], [10, 'A', 5, 1], [11, 'G', 5, 3], [14, 'E', 5, 2]];
+const RIFF_B = [[0, 'C', 6, 2], [3, 'D', 6, 2], [6, 'F', 6, 2], [8, 'E', 6, 1], [10, 'D', 6, 1], [11, 'C', 6, 3], [14, 'A', 5, 2]];
+const RIFF_B_V = [[0, 'C', 6, 2], [3, 'D', 6, 2], [6, 'E', 6, 2], [8, 'D', 6, 1], [10, 'C', 6, 1], [11, 'A', 5, 3], [14, 'G', 5, 2]];
+const SCALE = ['F', 'G', 'A', 'Bb', 'C', 'D', 'E'];
+function thirdBelow(n, o) { const i = SCALE.indexOf(n), j = i - 2; return j >= 0 ? [SCALE[j], o] : [SCALE[j + 7], o - (NOTE[SCALE[j + 7]] > NOTE[n] ? 1 : 0)]; }
+const SWING = 0.09;                                   // off-beat 8ths late by 9 % of a beat
+const st8 = (t0, s) => t0 + s * E8 + (s % 2 ? SWING * BEAT : 0);
+// sections (bars, 1-based): what plays where
+const BREAK = [27.0, 32.0];                           // "underwater" low-pass, on the two hard cuts
+const SUSP = [bt(84), barT(25)];                      // drumless slow-motion: the laser hit to "time resumes"
+const TAPE = 64.55;                                   // tape stop into the loop
+// ---------------------------------------------------------------- score → events
+function musicEvents() {
+  const ev = [];
+  const E = (o) => ev.push(o);
+  for (let b = 1; b <= NBARS; b += 2) {
+    const t0 = barT(b), name = chordOf(b), c = CH[name], at = beat => t0 + beat * BEAT;
+    const susp = at(0) >= SUSP[0] - 0.01 && at(0) < SUSP[1] - 0.01, suspNext = b + 1 === 22;
+    // ---- Rhodes comping (strummed, swung): long chord, anticipation, push, top-note pickup
+    const rh = c.rh.map(([n, o]) => nm(n, o));
+    const hit = (beat, dur, v, notes) => (notes || rh).forEach((m, j) => E({ t: at(beat) + (beat % 1 ? SWING * BEAT : 0) + j * 0.012, d: dur * BEAT, k: 'rhodes', m, v: v * (0.9 + 0.2 * hash(b * 17 + j + beat * 5)) }));
+    if (susp) { hit(0, 7.6, 0.3); rh.slice(2).forEach((m, j) => E({ t: at(2) + j * 0.03, d: 5.5 * BEAT, k: 'rhodes', m: m + 12, v: 0.16 })); }
+    else if (suspNext) { hit(0, 2.6, 0.34); hit(3.5, 0.5, 0.26, rh.slice(2)); hit(4, 3.8, 0.34); }
+    else { hit(0, 2.6, 0.34); hit(3.5, 1.2, 0.26, rh.slice(1)); hit(5, 1.4, 0.3); hit(7, 0.8, 0.22, rh.slice(2)); }
+    // ---- bass: root, octave pickup, fifth, root, glide into the next chord
+    const R0 = nm(...c.root), F0 = nm(...c.fifth), next = nm(...CH[chordOf(b + 2 > NBARS ? 1 : b + 2)].root);
+    const B = (beat, dur, m, v, glide) => E({ t: at(beat) + (beat % 1 ? SWING * BEAT * 0.5 : 0), d: dur * BEAT, k: 'bass', m, v, glide });
+    if (susp) { B(0, 3.8, R0, 0.5); B(4, 3.8, R0, 0.45); }
+    else if (suspNext) { B(0, 2.4, R0, 0.55); B(3.5, 0.4, R0 + 12, 0.35); B(4, 3.8, R0, 0.5); }
+    else { B(0, 2.4, R0, 0.55); B(3.5, 0.4, R0 + 12, 0.35); B(5, 0.9, F0, 0.45); B(6, 1.3, R0, 0.5, next); }
+    // ---- pad (white-cell chapter, the slow-motion, the ending)
+    if ((b >= 17 && b <= 23) || b >= 29) E({ t: at(0), d: 8 * BEAT, k: 'pad', ms: rh.map(m => m + 12), v: susp ? 0.2 : 0.12 });
+  }
+  // ---- drums (half-time boom-bap, per two-bar unit; 'rim' replaces the snare while the pulses play)
+  for (let b = 1; b <= NBARS; b++) {
+    const t0 = barT(b), u = (b - 1) % 2, at = beat => t0 + beat * BEAT;
+    const inBreak = tt => tt >= BREAK[0] && tt < barT(17), inSusp = tt => tt >= SUSP[0] && tt < SUSP[1], late = tt => tt >= TAPE;
+    const ok = tt => !inSusp(tt) && !late(tt);
+    const K = (beat, v) => { const tt = at(beat) + (beat % 1 ? SWING * BEAT * 0.6 : 0); if (ok(tt)) E({ t: tt, d: 0.4, k: 'kick', v }); };
+    const S = (beat, v) => { const tt = at(beat); if (ok(tt) && !inBreak(tt)) E({ t: tt, d: 0.3, k: (b >= 7 && b <= 12) ? 'rim' : 'snare', v }); };
+    const Hh = (beat, v, open) => { const tt = at(beat) + (beat % 1 ? SWING * BEAT : 0); if (ok(tt) && !inBreak(tt)) E({ t: tt, d: open ? 0.3 : 0.06, k: 'hat', v, open, p: beat % 1 ? 0.25 : -0.2 }); };
+    // the 59-BPM pattern across two of our bars: kick 1, 2-a, 3-and; snare 2 and 4; swung 16th hats
+    if (u === 0) { K(0, 0.95); K(3.5, 0.7); S(2, 0.8); }
+    else { K(1, 0.85); if (b % 4 === 0) K(3.75, 0.45); S(2, 0.8); if (b % 4 === 0) S(3.5, 0.22); }
+    for (let i = 0; i < 8; i++) Hh(i / 2, (i % 2 ? 0.5 : 0.85) * (i % 4 === 0 ? 1 : 0.85), u === 1 && i === 7 && b % 4 === 0);
+    if ((b >= 13 && b <= 14) || (b >= 25 && b <= 28)) for (let i = 0; i < 16; i++) { const tt = at(i / 4) + (i % 2 ? SWING * BEAT * 0.5 : 0); if (ok(tt) && !inBreak(tt)) E({ t: tt, d: 0.08, k: 'shaker', v: i % 2 ? 0.5 : 0.3, p: 0.3 }); }
+  }
+  // the fill into the laser hit, the breath before the groove returns, soft crashes on section starts
+  for (let i = 0; i < 6; i++) ev.push({ t: bt(84) - 1.5 * BEAT + i * BEAT / 4, d: 0.3, k: 'snare', v: 0.25 + 0.1 * i });
+  ev.push({ t: SUSP[1] - 1.0, d: 1.0, k: 'revcym', v: 0.55 });
+  for (const tt of [0, barT(17), SUSP[1], barT(31)]) ev.push({ t: tt, d: 1.6, k: 'crash', v: 0.45 });
+  ev.push({ t: bt(84), d: 2.5, k: 'crash', v: 0.55 });
+  // ---- kalimba riff (the earworm), with a third below when the data pours in
+  const riff = (p, set, v, o) => {
+    o = o || {}; const t0 = o.t0 !== undefined ? o.t0 : barT(2 * p + 1);
+    set.forEach(([s, n, oc, l]) => {
+      if (o.only && !o.only(s)) return;
+      const tt = st8(t0, s); E({ t: tt, d: l * E8, k: 'kal', m: nm(n, oc), v });
+      if (o.third) { const [n2, o2] = thirdBelow(n, oc); E({ t: tt + 0.012, d: l * E8, k: 'kal', m: nm(n2, o2), v: o.third }); }
+    });
+  };
+  riff(0, RIFF_A, 0.36); riff(1, RIFF_A_V, 0.32); riff(2, RIFF_B, 0.22); riff(4, RIFF_A, 0.2, { only: s => s < 8 });
+  riff(6, RIFF_A, 0.3); riff(7, RIFF_B, 0.2, { only: s => s === 0 || s === 6 || s === 11 });
+  riff(8, RIFF_A, 0.34); riff(9, RIFF_B_V, 0.28); riff(10, RIFF_A, 0.28, { only: s => s < 8 });
+  [[44.69, 'A', 5], [45.7, 'E', 5], [46.72, 'F', 5], [47.73, 'C', 6]].forEach(([tt, n, o]) => E({ t: tt, d: 0.9, k: 'kal', m: nm(n, o), v: 0.24 }));
+  riff(12, RIFF_A, 0.34, { third: 0.18 }); riff(13, RIFF_B_V, 0.3, { third: 0.16 }); riff(14, RIFF_A, 0.3);
+  riff(15, RIFF_A, 0.3, { t0: barT(32), only: s => s <= 6 });           // the title: the riff's first three notes, then the tape stops
+  return ev.filter(e => e.t < TAPE);
+}
+// ---------------------------------------------------------------- SFX map (every cue belongs to a visible event)
+function sfxEvents() {
+  const ev = [];
+  const S = (t, k, v, x) => ev.push(Object.assign({ t, k, v: v === undefined ? 1 : v, p: 0, f: 440, d: 0.2 }, x || {}));
+  // A: hook
+  S(0.14, 'pierce', 0.8); S(0.42, 'suck', 0.5, { d: 0.36 }); S(0.8, 'slam', 0.7, { d: 0.3 });
+  S(T_RBC, 'ding', 0.75, { f: fq('A', 5) }); S(T_WBC, 'tick', 0.45, { f: fq('E', 6) }); S(T_PLT, 'tick', 0.45, { f: fq('G', 6) });
+  S(1.86, 'dive', 0.5, { d: 0.38 }); S(HOOK_RBC.keys[1][0] - 0.06, 'bip', 0.8, { part: HOOK_RBC, f: fq('A', 4), d: 0.6 }); S(T_HOOKCOUNT, 'count', 0.6, { f: fq('D', 6) });
+  S(3.0, 'undive', 0.45, { d: 0.3 });
+  // B: the sample
+  S(3.35, 'pump', 0.5, { d: 1.65 }); S(5.0, 'dive', 0.45, { d: 0.35 }); S(7.5, 'swish', 0.35, { d: 0.35 }); S(7.75, 'pour', 0.55, { d: 1.15 });
+  S(9.0, 'undive', 0.4, { d: 0.35 }); [10.2, 10.3, 10.4].forEach((tt, i) => S(tt, 'tick', 0.4, { f: fq(['A', 'C', 'E'][i], 6) })); S(10.35, 'select', 0.4); S(10.7, 'dive', 0.45, { d: 0.3 });
+  // C: impedance (the current hums; each cell's pulse is heard as its voltage)
+  S(11.0, 'hum', 0.45, { d: 16.0 }); S(13.35, 'ping', 0.35, { f: fq('C', 6) }); S(14.9, 'scope', 0.4);
+  S(RBC1.keys[1][0] - 0.1, 'bip', 0.9, { part: RBC1, f: fq('A', 4), d: RBC1.keys[4][0] - RBC1.keys[1][0] + 0.2 }); S(T_RBC1, 'count', 0.7, { f: fq('D', 6) });
+  S(PLT1.keys[1][0] - 0.06, 'bip', 0.8, { part: PLT1, f: fq('E', 6), d: 0.4 }); S(T_PLTC, 'count', 0.55, { f: fq('A', 6) });
+  S(RBC2.keys[1][0] - 0.06, 'bip', 0.8, { part: RBC2, f: fq('A', 4), d: 0.4 }); S(T_RBC2, 'count', 0.6, { f: fq('D', 6) });
+  STREAM.forEach(p => S(p.keys[1][0] - 0.12, 'bip', 0.32, { part: p, f: p.k === 'rbc' ? fq('A', 4) : fq('E', 6), d: 0.24 }));
+  S(25.4, 'build', 0.4, { d: 1.4 });
+  // D: hemoglobin
+  S(27.0, 'cut', 0.5); HG_RBC.forEach((c, i) => S(27.72 + 0.05 * i + 0.04 * hash(i + 31), 'burst', 0.35, { f: fq(['C', 'D', 'F', 'G', 'A'][i % 5], 5) }));
+  S(28.5, 'bind', 0.4, { d: 0.5 }); S(29.0, 'undive', 0.4, { d: 0.3 }); S(29.38, 'led', 0.6); S(29.45, 'beam', 0.4, { d: 2.5 }); S(T_HGB, 'result', 0.75);
+  // E: white cells
+  S(32.0, 'swish', 0.4, { d: 0.3 }); for (let k = 0; k < 12; k++) S(34.35 + k * 0.11 + 0.04 * hash(k + 51), 'burst', 0.24, { f: fq(['D', 'F', 'G', 'A', 'C'][k % 5], 6) });
+  S(36.0, 'dive', 0.45, { d: 0.3 }); for (let k = 0; k < 6; k++) S(36.5 + k * 0.24, 'dye', 0.35, { f: fq(['C', 'D', 'F', 'G', 'A', 'C'][k], k < 5 ? 6 : 7) });
+  S(38.0, 'undive', 0.4, { d: 0.3 }); S(38.4, 'flow', 0.4, { d: 2.6 }); S(40.0, 'laser', 0.35, { d: 8.4 });
+  S(T_CROSS, 'hit', 0.85); S(T_CROSS + 0.05, 'slowmo', 0.45, { d: 0.9 }); S(43.2, 'glow', 0.5, { d: 1.2 });
+  [[45.3, 'A', 5], [45.8, 'C', 6], [46.3, 'E', 6]].forEach(([tt, n, o]) => S(tt, 'scatter', 0.45, { f: fq(n, o) }));
+  // F: detection and data
+  S(48.4, 'resume', 0.45, { d: 0.4 }); [T_P1, T_P2, T_P3].forEach(tt => S(tt, 'detect', 0.5));
+  S(51.0, 'swish', 0.35, { d: 0.3 }); S(51.35, 'plot', 0.55, { f: fq('A', 6) });
+  for (let k = 0; k < 26; k++) { const u = k / 25, tt = 51.9 + 1.4 * Math.sqrt(u); S(tt, 'tick', 0.16 + 0.1 * u, { f: fq(['F', 'G', 'A', 'C', 'D'][k % 5], 6) }); }
+  S(53.0, 'shimmer', 0.45, { d: 0.8 }); S(54.0, 'swish', 0.35, { d: 0.35 });
+  ['F', 'G', 'A', 'C', 'D'].forEach((n, i) => S(55.0 + i * 0.12, 'tick', 0.42, { f: fq(n, 5) }));
+  // G: results and loop
+  S(56.0, 'swish', 0.35, { d: 0.3 }); S(56.3, 'data', 0.4, { d: 1.4 }); S(57.95, 'undive', 0.4, { d: 0.35 });
+  for (let i = 0; i < 5; i++) S(REP0 + i * REPD, 'tick', 0.4, { f: fq(['C', 'D', 'F', 'G', 'A'][i], 6) });
+  for (let i = 0; i < 4; i++) S(59.35 + i * 0.11, 'check', 0.4, { f: fq(['A', 'C', 'D', 'F'][i], 6) });
+  S(59.6, 'result', 0.7); S(60.0, 'swish', 0.3, { d: 0.6 });
+  ['A', 'C', 'D', 'F'].forEach((n, i) => S(T_TILE(i), 'recap', 0.5, { f: fq(n, i < 3 ? 5 : 6) }));
+  S(62.8, 'swish', 0.3, { d: 0.35 }); S(63.1, 'retract', 0.4, { d: 0.6 }); S(63.2, 'title', 0.55, { d: 1.2 });
+  return ev;
+}
+const DUCK = { ding: 0.3, result: 0.3, hit: 0.4, slam: 0.25, count: 0.12 };
+// ---------------------------------------------------------------- synthesis helpers
+let SND_L = null, SND_R = null;                      // reverb send bus (set while rendering)
+const WOW = ta => 1 + 0.0022 * fsin(LOOPW(39) * ta) + 0.0007 * fsin(LOOPW(338) * ta + 1.3);
+const nz = i => hash(i) * 2 - 1;
+// write one voice into (L, R) (and the reverb send); wraps at 65 s; optional tremolo (stereo autopan)
+function voice(L, R, t0, dur, pan, gain, fn, o) {
+  o = o || {};
+  const i0 = Math.round(t0 * SR), n = Math.max(1, Math.round(dur * SR)), snd = o.send || 0, tr = o.trem || 0;
+  const pl = Math.cos((pan + 1) * Math.PI / 4) * gain, pr = Math.sin((pan + 1) * Math.PI / 4) * gain;
+  for (let k = 0; k < n; k++) {
+    const s = fn(k / SR, k); if (s === 0) continue;
+    let i = (i0 + k) % NS; if (i < 0) i += NS;
+    let l = s * pl, r = s * pr;
+    if (tr) { const m = tr * fsin(TAU * 4.3 * (t0 + k / SR)); l *= 1 + m; r *= 1 - m; }
+    L[i] += l; R[i] += r;
+    if (snd) { SND_L[i] += l * snd; SND_R[i] += r * snd; }
+  }
+}
+const dec = r => t => Math.exp(-t * r);
+// electric piano: 1:1 FM pair (index falls after the strike) + a short high tine ping
+function rhodesFn(f, t0, d, vel) {
+  let pc = 0, pt = 0; const I0 = 1.2 + 1.6 * vel;
+  return t => {
+    const inc = f * WOW(t0 + t) / SR; pc += inc; pt += inc * 14; pc -= Math.floor(pc); pt -= Math.floor(pt);
+    const I = I0 * Math.exp(-t * 5) + 0.35;
+    const s = fsin(TAU * pc + I * fsin(TAU * pc)) + 0.14 * Math.exp(-t * 40) * fsin(TAU * pt);
+    return s * (t < 0.004 ? t / 0.004 : 1) * Math.exp(-t * 0.85) * (t > d ? Math.exp(-(t - d) * 14) : 1);
+  };
+}
+function kalFn(f, t0) {
+  let p1 = 0, p2 = 0;
+  return t => {
+    const inc = f * WOW(t0 + t) / SR; p1 += inc; p2 += inc * 5.95; p1 -= Math.floor(p1); p2 -= Math.floor(p2);
+    return (t < 0.002 ? t / 0.002 : 1) * (fsin(TAU * p1) * Math.exp(-t * 4.0) + 0.3 * fsin(TAU * p2) * Math.exp(-t * 24));
+  };
+}
+function bassFn(f0, f1, d) {
+  let p = 0; const tg = d - 0.09;
+  return t => {
+    const f = f1 && t > tg ? f0 * Math.pow(f1 / f0, Math.min(1, (t - tg) / 0.09)) : f0;
+    p += f / SR; p -= Math.floor(p);
+    const s = Math.tanh(2.8 * fsin(TAU * p)) * 0.85 + 0.15 * fsin(2 * TAU * p);
+    return s * (t < 0.008 ? t / 0.008 : 1) * (0.8 + 0.2 * Math.exp(-t * 7)) * (t > d ? Math.max(0, 1 - (t - d) / 0.06) : 1);
+  };
+}
+function padFn(fs, t0, d) {
+  const ph = new Float64Array(fs.length * 2); let lp = 0;
+  return t => {
+    const w = WOW(t0 + t); let s = 0;
+    for (let j = 0; j < fs.length; j++) for (let q = 0; q < 2; q++) { const idx = j * 2 + q; let p = ph[idx] + fs[j] * w * (q ? 1.0045 : 0.9955) / SR; p -= Math.floor(p); ph[idx] = p; s += p < 0.5 ? 4 * p - 1 : 3 - 4 * p; }
+    lp += 0.06 * (s - lp);
+    return lp / (fs.length * 2) * Math.min(1, t / 0.7) * (t > d ? Math.max(0, 1 - (t - d) / 0.9) : 1);
+  };
+}
+function kickFn(seed) { let p = 0, q = 0; return (t, k) => { p += (54 + 90 * Math.exp(-t * 30)) / SR; q += 1700 / SR; return fsin(TAU * p) * Math.exp(-t * 7) * (t < 0.002 ? t / 0.002 : 1) + fsin(TAU * q) * 0.22 * Math.exp(-t * 90) + (t < 0.005 ? nz(k * 7 + seed) * 0.35 * (1 - t / 0.005) : 0); }; }
+function snareFn(seed) { let lp = 0, p = 0; return (t, k) => { lp += 0.32 * (nz(k * 3 + seed) - lp); p += 182 / SR; return lp * Math.exp(-t * 15) * 1.1 + fsin(TAU * p) * Math.exp(-t * 26) * 0.5; }; }
+function rimFn(seed) { let p = 0; return (t, k) => { p += 1650 / SR; return fsin(TAU * p) * Math.exp(-t * 70) * 0.6 + nz(k * 11 + seed) * Math.exp(-t * 120) * 0.5; }; }
+function hatFn(seed, open) { let hp = 0, prev = 0; return (t, k) => { const x = nz(k * 5 + seed); hp = 0.55 * (hp + x - prev); prev = x; return hp * Math.exp(-t * (open ? 10 : 52)); }; }
+function shakerFn(seed) { let hp = 0, prev = 0, lp = 0; return (t, k) => { const x = nz(k * 13 + seed); hp = 0.7 * (hp + x - prev); prev = x; lp += 0.5 * (hp - lp); return lp * (t < 0.012 ? t / 0.012 : Math.exp(-(t - 0.012) * 30)); }; }
+function crashFn(seed, d) { let lp = 0; return (t, k) => { lp += 0.45 * (nz(k * 17 + seed) - lp); return lp * Math.exp(-t * 2.2) * (t < 0.003 ? t / 0.003 : 1); }; }
+function playMusic(e, L, R, EL, ER) {
+  const k = e.k;
+  if (k === 'rhodes') voice(L, R, e.t, e.d + 0.3, (e.m % 7 - 3) * 0.06, 0.3 * e.v, rhodesFn(mtof(e.m), e.t, e.d, e.v), { send: 0.28, trem: 0.32 });
+  else if (k === 'kal') voice(EL, ER, e.t, 1.3, 0.1, 0.78 * e.v, kalFn(mtof(e.m), e.t), { send: 0.3 });
+  else if (k === 'bass') voice(L, R, e.t, e.d + 0.08, 0, 0.27 * e.v, bassFn(mtof(e.m), e.glide ? mtof(e.glide) : 0, e.d));
+  else if (k === 'pad') voice(L, R, e.t, e.d + 1.0, 0, 0.65 * e.v, padFn(e.ms.map(mtof), e.t, e.d), { send: 0.5, trem: 0.15 });
+  else if (k === 'kick') voice(L, R, e.t, 0.45, 0, 0.6 * e.v, kickFn(Math.round(e.t * 100)));
+  else if (k === 'snare') voice(L, R, e.t, 0.35, 0.06, 0.5 * e.v, snareFn(Math.round(e.t * 100)), { send: 0.18 });
+  else if (k === 'rim') voice(L, R, e.t, 0.12, 0.1, 0.28 * e.v, rimFn(Math.round(e.t * 100)), { send: 0.15 });
+  else if (k === 'hat') voice(L, R, e.t, e.open ? 0.35 : 0.08, e.p, 0.3 * e.v, hatFn(Math.round(e.t * 100), e.open));
+  else if (k === 'shaker') voice(L, R, e.t, 0.1, e.p, 0.16 * e.v, shakerFn(Math.round(e.t * 100)));
+  else if (k === 'crash') voice(L, R, e.t, e.d, 0, 0.16 * e.v, crashFn(Math.round(e.t * 100), e.d), { send: 0.3 });
+  else if (k === 'revcym') { const d = e.d; voice(L, R, e.t, d, 0, 0.16 * e.v, (t, kk) => nz(kk * 19 + 5) * Math.pow(t / d, 2.2) * (t > d - 0.02 ? (d - t) / 0.02 : 1), { send: 0.4 }); }
+}
+// ---------------------------------------------------------------- SFX: soft, rounded, tuned to F major
+function playSfx(e, L, R) {
+  const k = e.k, v = e.v, f = e.f || 440, p = e.p || 0, d = e.d || 0.2;
+  const V = (t0, dur, g, fn, snd) => voice(L, R, t0, dur, p, g * v, fn, { send: snd === undefined ? 0.2 : snd });
+  const sine = (fAt, envFn) => { let ph = 0; return t => { ph += fAt(t) / SR; ph -= Math.floor(ph); return fsin(TAU * ph) * envFn(t); }; };
+  const bell = (f0, r, idx) => { let pc = 0, pm = 0; return t => { pc += f0 / SR; pm += f0 * 3.5 / SR; pc -= Math.floor(pc); pm -= Math.floor(pm); return fsin(TAU * pc + idx * Math.exp(-t * 8) * fsin(TAU * pm)) * Math.exp(-t * r) * (t < 0.002 ? t / 0.002 : 1); }; };
+  const noiseLP = (cutAt, envFn, seed) => { let lp = 0, lp2 = 0; return (t, kk) => { const a = 1 - Math.exp(-TAU * cutAt(t) / SR); lp += a * (nz(kk * 7 + seed) - lp); lp2 += a * (lp - lp2); return lp2 * envFn(t); }; };
+  const swell = dd => t => Math.sin(Math.PI * clamp(t / dd, 0, 1));
+  switch (k) {
+    case 'pierce': V(e.t, 0.02, 0.75, noiseLP(() => 6000, dec(250), 3)); V(e.t, 0.08, 0.75, sine(t => 190 - 900 * t, dec(45))); V(e.t, 0.05, 0.25, sine(() => 2600, dec(120))); break;
+    case 'suck': V(e.t, d, 0.35, noiseLP(t => 3500 - 2800 * t / d, swell(d), 5)); break;
+    case 'slam': V(e.t, 0.3, 0.7, sine(t => 40 + 60 * Math.exp(-t * 20), dec(10)), 0.1); V(e.t, 0.12, 0.25, noiseLP(() => 2200, dec(30), 7)); break;
+    case 'ding': V(e.t, 1.2, 0.36, bell(f, 3.2, 1.4), 0.35); V(e.t + 0.002, 1.0, 0.18, bell(f * 2, 4.5, 0.6), 0.35); break;
+    case 'tick': V(e.t, 0.12, 0.4, sine(() => f, dec(45))); break;
+    case 'count': V(e.t, 0.1, 0.34, sine(() => f, dec(35))); V(e.t + 0.06, 0.25, 0.3, sine(() => f * 1.5, dec(16)), 0.3); break;
+    case 'dive': V(e.t, d, 0.3, noiseLP(t => 600 + 7000 * (t / d) ** 2, swell(d), 9), 0.25); V(e.t, d, 0.12, sine(t => 300 + 700 * t / d, swell(d))); break;
+    case 'undive': V(e.t, d, 0.28, noiseLP(t => 6000 - 5200 * t / d, swell(d), 11), 0.25); break;
+    case 'swish': V(e.t, d, 0.22, noiseLP(t => 1500 + 3000 * Math.sin(Math.PI * t / d), swell(d), 13), 0.3); break;
+    case 'pump': { let ph = 0; V(e.t, d, 0.3, (t) => { ph += (52 + 6 * t) / SR; ph -= Math.floor(ph); return (ph * 2 - 1) * 0.5 * (0.6 + 0.4 * fsin(TAU * 11 * t)) * Math.min(1, t / 0.15) * Math.min(1, (d - t) / 0.2); }, 0.05); V(e.t, d, 0.12, noiseLP(() => 900, t => Math.min(1, t / 0.2) * Math.min(1, (d - t) / 0.2), 15)); break; }
+    case 'pour': V(e.t, d, 0.4, noiseLP(t => 1400 + 900 * fsin(TAU * 7 * t), swell(d), 17), 0.3); for (let i = 0; i < 9; i++) { const t1 = e.t + 0.1 + i * 0.11 + 0.05 * hash(i + 3); V(t1, 0.07, 0.3, sine(t => (320 + 150 * hash(i + 9)) * (1 + 6 * t), dec(40))); } break;
+    case 'select': V(e.t, 0.18, 0.3, sine(t => t < 0.06 ? fq('C', 6) : fq('F', 6), dec(18))); break;
+    case 'hum': { const h = fq('F', 2); V(e.t, d, 0.2, (t) => { const a = Math.min(1, t / 0.6) * Math.min(1, (d - t) / 0.4) * (0.85 + 0.15 * fsin(TAU * 0.7 * t)); return a * (fsin(TAU * h * t) * 0.6 + fsin(TAU * 2 * h * t) * 0.35 + fsin(TAU * 3 * h * t) * 0.22); }, 0.05); break; }
+    case 'ping': V(e.t, 0.6, 0.3, bell(f, 6, 0.8), 0.35); break;
+    case 'scope': V(e.t, 0.2, 0.28, sine(t => fq('A', 5) * (1 + 1.2 * t / 0.2), dec(10))); break;
+    case 'bip': { // the voltage, made audible: loudness = the same sensing-zone response that draws the scope
+      const prt = e.part, vn = prt.vol || VOL[prt.k]; let ph = 0;
+      V(e.t, d, 0.33, (t) => { const s = impSignal([prt], e.t + t) / vn; if (s <= 0.001) return 0; ph += f / SR; ph -= Math.floor(ph); return s * (fsin(TAU * ph) + 0.22 * fsin(2 * TAU * ph)); }, 0.12); break;
+    }
+    case 'build': for (let i = 0; i < 10; i++) V(e.t + i * d / 10, 0.12, 0.12 + 0.012 * i, sine(() => fq(['F', 'G', 'A', 'C', 'D'][i % 5], 5 + Math.floor(i / 5)), dec(30))); break;
+    case 'cut': V(e.t, 0.25, 0.45, sine(t => 60 + 40 * Math.exp(-t * 25), dec(14)), 0.05); break;
+    case 'burst': V(e.t, 0.06, 0.32, sine(t => f * (1.8 - 14 * t), dec(55))); V(e.t, 0.015, 0.12, noiseLP(() => 5000, dec(300), 21)); break;
+    case 'bind': for (let i = 0; i < 6; i++) V(e.t + i * d / 6, 0.4, 0.1, bell(fq(['C', 'D', 'F', 'G', 'A', 'C'][i], i < 5 ? 6 : 7), 9, 0.5), 0.4); break;
+    case 'led': V(e.t, 0.03, 0.4, noiseLP(() => 5000, dec(300), 23)); V(e.t, 0.05, 0.25, sine(() => 2093, dec(90))); break;
+    case 'beam': V(e.t, d, 0.07, sine(() => fq('A', 6), t => Math.min(1, t / 0.3) * Math.min(1, (d - t) / 0.3) * (0.8 + 0.2 * fsin(TAU * 3 * t))), 0.3); break;
+    case 'result': V(e.t, 0.6, 0.3, bell(fq('C', 6), 4, 1.0), 0.35); V(e.t + 0.12, 1.2, 0.34, bell(fq('F', 6), 3, 1.0), 0.35); break;
+    case 'dye': V(e.t, 0.5, 0.22, bell(f, 7, 1.2), 0.45); break;
+    case 'flow': V(e.t, d, 0.2, noiseLP(t => 700 + 300 * fsin(TAU * 1.3 * t), t => Math.min(1, t / 0.4) * Math.min(1, (d - t) / 0.4), 25), 0.2); break;
+    case 'laser': V(e.t, d, 0.07, (t) => { const a = Math.min(1, t / 0.5) * Math.min(1, (d - t) / 0.3); return a * (fsin(TAU * fq('E', 6) * t) + 0.3 * fsin(TAU * fq('E', 6) * 1.003 * t)); }, 0.2); break;
+    case 'hit': V(e.t, 0.5, 0.5, sine(t => 45 + 50 * Math.exp(-t * 18), dec(8)), 0.1); [['F', 6], ['A', 6], ['C', 7], ['E', 7]].forEach(([n, o], i) => V(e.t + i * 0.018, 1.6, 0.13, bell(fq(n, o), 2.4, 1.2), 0.6)); break;
+    case 'slowmo': V(e.t, d, 0.22, noiseLP(t => 5000 * Math.pow(0.08, t / d), swell(d), 27), 0.4); break;
+    case 'glow': for (let i = 0; i < 7; i++) V(e.t + i * 0.09, 1.0, 0.09, bell(fq(['F', 'A', 'C', 'E', 'G', 'A', 'C'][i], i < 2 ? 6 : 7), 3.5, 0.5), 0.6); break;
+    case 'scatter': V(e.t, 0.8, 0.26, bell(f, 4, 1.1), 0.4); break;
+    case 'resume': V(e.t, d, 0.26, noiseLP(t => 500 + 6000 * (t / d) ** 2, swell(d), 29), 0.3); break;
+    case 'detect': [['F', 6], ['A', 6], ['C', 7]].forEach(([n, o], i) => V(e.t + i * 0.035, 0.1, 0.38, sine(() => fq(n, o), dec(45)))); break;
+    case 'plot': V(e.t, 0.2, 0.36, sine(t => f * (1 + 0.5 * Math.exp(-t * 60)), dec(20)), 0.3); break;
+    case 'shimmer': for (let i = 0; i < 10; i++) V(e.t + i * d / 10, 0.4, 0.11, bell(fq(['A', 'C', 'D', 'F', 'G'][i % 5], 6 + (i > 6 ? 1 : 0)), 8, 0.6), 0.5); break;
+    case 'data': for (let i = 0; i < 18; i++) if (hash(i + 400) > 0.3) V(e.t + i * d / 18, 0.05, 0.17, sine(() => fq(['F', 'G', 'A', 'C', 'D'][Math.floor(hash(i + 401) * 5)], 6), dec(80))); break;
+    case 'check': V(e.t, 0.08, 0.26, sine(() => f, dec(35))); V(e.t + 0.05, 0.16, 0.24, sine(() => f * 1.5, dec(24))); break;
+    case 'recap': V(e.t, 0.9, 0.34, bell(f, 3.6, 1.1), 0.4); V(e.t, 0.12, 0.2, sine(t => f * 0.5 * (1 + 3 * t), dec(30))); break;
+    case 'retract': { let ph = 0; V(e.t, d, 0.18, (t) => { ph += (70 - 20 * t / d) / SR; ph -= Math.floor(ph); return (ph * 2 - 1) * swell(d)(t); }, 0.05); break; }
+    case 'title': [['F', 4], ['A', 4], ['C', 5], ['E', 5], ['G', 5]].forEach(([n, o], i) => V(e.t + i * 0.03, d + 0.8, 0.12, bell(fq(n, o), 1.6, 0.9), 0.5)); break;
+  }
+}
+// ---------------------------------------------------------------- effects
+// plate-like Schroeder reverb (4 damped combs + 2 allpasses per side), run twice round the loop so the tail wraps
+function reverb(inL, inR, outL, outR, wet) {
+  const C = [1116, 1188, 1277, 1356].map(n => Math.round(n * SR / 44100)), A = [556, 441].map(n => Math.round(n * SR / 44100));
+  [[inL, outL, 0], [inR, outR, 23]].forEach(([inp, out, sp]) => {
+    const c0 = new Float32Array(C[0] + sp), c1 = new Float32Array(C[1] + sp), c2 = new Float32Array(C[2] + sp), c3 = new Float32Array(C[3] + sp);
+    const a0 = new Float32Array(A[0] + sp), a1 = new Float32Array(A[1] + sp);
+    let i0 = 0, i1 = 0, i2 = 0, i3 = 0, j0 = 0, j1 = 0, f0 = 0, f1 = 0, f2 = 0, f3 = 0;
+    const fb = 0.86, dm = 0.32, dm1 = 1 - dm;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = inp[i] * 0.2; let o, y = 0;
+      o = c0[i0]; f0 = o * dm1 + f0 * dm; c0[i0] = x + f0 * fb; if (++i0 >= c0.length) i0 = 0; y += o;
+      o = c1[i1]; f1 = o * dm1 + f1 * dm; c1[i1] = x + f1 * fb; if (++i1 >= c1.length) i1 = 0; y += o;
+      o = c2[i2]; f2 = o * dm1 + f2 * dm; c2[i2] = x + f2 * fb; if (++i2 >= c2.length) i2 = 0; y += o;
+      o = c3[i3]; f3 = o * dm1 + f3 * dm; c3[i3] = x + f3 * fb; if (++i3 >= c3.length) i3 = 0; y += o;
+      o = a0[j0]; a0[j0] = y + o * 0.5; y = o - y; if (++j0 >= a0.length) j0 = 0;
+      o = a1[j1]; a1[j1] = y + o * 0.5; y = o - y; if (++j1 >= a1.length) j1 = 0;
+      if (pass === 1) out[i] += y * wet;
+    }
+  });
+}
+// two cascaded one-pole low-passes whose cutoff follows cutAt(t), over [ta, tb]
+function sweepLP(ch, ta, tb, cutAt) {
+  const i0 = Math.round(ta * SR), i1 = Math.min(NS, Math.round(tb * SR)); let y1 = ch[i0], y2 = ch[i0];
+  for (let i = i0; i < i1; i++) { const a = 1 - Math.exp(-TAU * cutAt(i / SR) / SR); y1 += a * (ch[i] - y1); y2 += a * (y1 - y2); ch[i] = y2; }
+}
+// tape stop: the last stretch slows to a halt (pitch and speed fall together) and fades
+function tapeStop(ch, ta) {
+  const i0 = Math.round(ta * SR), n = NS - i0, src = ch.slice(i0, NS); let pos = 0;
+  for (let k = 0; k < n; k++) {
+    const u = k / n, sp = Math.pow(1 - u, 1.5), j = Math.floor(pos), fr = pos - j;
+    ch[i0 + k] = ((src[j] || 0) * (1 - fr) + (src[j + 1] || 0) * fr) * Math.pow(1 - u, 0.5);
+    pos += sp;
+  }
+}
+// ---------------------------------------------------------------- render: opts.bus 'm' (music only) / 's' (SFX only) / both
+function renderAudio(opts) {
+  opts = opts || {};
+  const L = new Float32Array(NS), R = new Float32Array(NS);
+  SND_L = new Float32Array(NS); SND_R = new Float32Array(NS);
+  const sfx = sfxEvents();
+  if (opts.bus !== 's') {
+    const mus = musicEvents();
+    // tonal parts; the kalimba goes through a dotted-eighth ping-pong echo
+    let EL = new Float32Array(NS), ER = new Float32Array(NS);
+    for (const e of mus) if (!/^(kick|snare|rim|hat|shaker|crash|revcym)$/.test(e.k)) playMusic(e, L, R, EL, ER);
+    const D = Math.round(0.75 * BEAT * SR), fb = 0.4;
+    for (let i = 0; i < NS; i++) {
+      let el = 0, er = 0, w = 1;
+      for (let k = 1; k <= 5; k++) { w *= fb; const j = (i - k * D + NS * 5) % NS; if (k % 2) { el += w * ER[j]; er += w * EL[j]; } else { el += w * EL[j]; er += w * ER[j]; } }
+      L[i] += EL[i] + el * 0.55; R[i] += ER[i] + er * 0.55; SND_L[i] += el * 0.25; SND_R[i] += er * 0.25;
+    }
+    EL = null; ER = null;
+    // gentle sidechain: the tonal bed breathes with the kick
+    for (const e of mus) if (e.k === 'kick') {
+      const i0 = Math.round(e.t * SR), n = Math.round(0.32 * SR), att = Math.round(0.006 * SR);
+      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k - att) / SR * 10), g = 1 - 0.26 * e.v * a; L[i] *= g; R[i] *= g; }
+    }
+    for (const e of mus) if (/^(kick|snare|rim|hat|shaker|crash|revcym)$/.test(e.k)) playMusic(e, L, R);
+    // vinyl: a quiet hiss and sparse crackle, all the way round the loop
+    let lpL = 0, lpR = 0;
+    for (let i = 0; i < NS; i++) { lpL += 0.18 * (nz(i * 3 + 1) - lpL); lpR += 0.18 * (nz(i * 3 + 2) - lpR); L[i] += lpL * 0.016; R[i] += lpR * 0.016; }
+    for (let c = 0; c < 420; c++) {
+      const i0 = Math.floor(hash(c + 9100) * NS), a = 0.04 + 0.22 * Math.pow(hash(c + 9101), 3), n = 24 + Math.floor(hash(c + 9102) * 80), side = hash(c + 9103);
+      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, s = nz(c * 977 + k) * a * Math.exp(-k / (n * 0.25)); L[i] += s * (side < 0.7 ? 1 : 0.3); R[i] += s * (side > 0.3 ? 1 : 0.3); }
+    }
+    // the music dips a little under the big hits
+    for (const e of sfx) {
+      const dk = DUCK[e.k]; if (!dk) continue;
+      const i0 = Math.round(e.t * SR), n = Math.round(0.5 * SR), att = Math.round(0.01 * SR);
+      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k - att) / SR * 6), g = 1 - dk * a; L[i] *= g; R[i] *= g; }
+    }
+    // underwater on the hemoglobin cut, surfacing on the white-cell cut
+    const cut = t => t < BREAK[0] ? 18000 : t < BREAK[0] + 0.06 ? lerp(18000, 650, (t - BREAK[0]) / 0.06) : t < BREAK[1] ? 650 : t < BREAK[1] + 0.12 ? lerp(650, 18000, (t - BREAK[1]) / 0.12) : 18000;
+    for (const ch of [L, R, SND_L, SND_R]) sweepLP(ch, BREAK[0] - 0.05, BREAK[1] + 0.2, cut);
+    for (const ch of [L, R, SND_L, SND_R]) tapeStop(ch, TAPE);
+  }
+  if (opts.bus !== 'm') for (const e of sfx) playSfx(e, L, R);
+  reverb(SND_L, SND_R, L, R, 0.9);
+  SND_L = null; SND_R = null;
+  // master: lo-fi top end (~9 kHz), DC blocking, soft saturation; circular, in place
+  const a = Math.exp(-TAU * 9000 / SR);
+  for (const ch of [L, R]) {
+    let y = 0, x1 = 0, hp = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = ch[i];
+      y = a * y + (1 - a) * x;
+      hp = 0.9993 * (hp + y - x1); x1 = y;
+      if (pass === 1) ch[i] = Math.tanh(hp * 1.1) / 1.1;
+    }
+  }
+  return { L, R };
+}
+// ---------------------------------------------------------------- player playback (one buffer, the audio clock drives the picture)
+const LIVE = { ctx: null, buf: null, src: null, gain: null, muted: false, startAt: 0, offset: 0, ready: false };
+function liveInit() {
+  if (LIVE.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  LIVE.ctx = new AC({ sampleRate: SR });
+  LIVE.gain = LIVE.ctx.createGain(); LIVE.gain.gain.value = 0.9; LIVE.gain.connect(LIVE.ctx.destination);
+}
+function liveBuild() {
+  if (LIVE.buf) return;
+  liveInit();
+  const a = renderAudio();
+  const b = LIVE.ctx.createBuffer(2, NS, SR); b.getChannelData(0).set(a.L); b.getChannelData(1).set(a.R);
+  LIVE.buf = b; LIVE.ready = true;
+}
+function livePlay(t) {
+  liveBuild();
+  if (LIVE.ctx.state === 'suspended') LIVE.ctx.resume();
+  const s = LIVE.ctx.createBufferSource(); s.buffer = LIVE.buf; s.connect(LIVE.gain);
+  LIVE.startAt = LIVE.ctx.currentTime + 0.03; LIVE.offset = t; s.start(LIVE.startAt, t); LIVE.src = s;
+}
+function livePause() { if (LIVE.src) { try { LIVE.src.stop(); } catch (e) { } LIVE.src = null; } }
+function liveNow() { return LIVE.offset + Math.max(0, LIVE.ctx.currentTime - LIVE.startAt); }
+function liveMute(m) { LIVE.muted = m; if (LIVE.gain) LIVE.gain.gain.value = m ? 0 : 0.9; }
+
+// ---- 40_player.js
+// ============================================================================
+// PLAYER: 360x640 canvas shown with nearest-neighbour scaling, controls
+// outside the composition. Audio starts on the first user gesture; the audio
+// clock drives the picture, so pause / resume / seek never duplicate sounds.
+// ============================================================================
+const PL = { t: 0, playing: false, wallT0: 0, pos0: 0, audioOK: true, scrubbing: false, img: null, cx: null };
+function plClock() {
+  if (!PL.playing) return PL.t;
+  if (PL.audioOK && LIVE.ctx) return liveNow();
+  return PL.pos0 + (performance.now() - PL.wallT0) / 1000;
+}
+function plDraw(t) {
+  renderFrame(t);
+  const d = PL.img.data, u = new Uint32Array(d.buffer); u.set(buf);
+  PL.cx.putImageData(PL.img, 0, 0);
+}
+function plFmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+function plUI() {
+  const el = PL.el;
+  el.play.innerHTML = PL.playing ? ICON.pause : ICON.play;
+  el.play.setAttribute('aria-label', PL.playing ? 'Pause' : 'Play');
+  el.mute.innerHTML = LIVE.muted ? ICON.muted : ICON.sound;
+  el.mute.setAttribute('aria-label', LIVE.muted ? 'Unmute' : 'Mute');
+  if (!PL.scrubbing) el.scrub.value = String(Math.round(PL.t * FPS));
+  el.time.textContent = plFmt(PL.t) + ' / ' + plFmt(DUR);
+  const i = sceneIndex(PL.t);
+  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / ' + SCENE_NAMES.length + '  ' + SCENE_NAMES[i];
+  el.scrub.style.setProperty('--p', (PL.t / DUR * 100).toFixed(2) + '%');
+}
+function plPlay() {
+  if (PL.t >= DUR - 1 / FPS) PL.t = 0;
+  PL.playing = true; PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  try { livePlay(PL.t); if (LIVE.muted) liveMute(true); } catch (e) { PL.audioOK = false; }
+  PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  plUI();
+}
+function plPause() {
+  PL.t = plClock(); PL.playing = false;
+  try { livePause(); } catch (e) { }
+  plUI();
+}
+function plSeek(t, keepPlaying) {
+  t = clamp(t, 0, DUR - 1 / FPS);
+  const was = PL.playing;
+  if (was) { try { livePause(); } catch (e) { } PL.playing = false; }
+  PL.t = t; plDraw(t);
+  if (was && keepPlaying !== false) plPlay(); else plUI();
+}
+function plLoop() {
+  if (PL.playing) {
+    let t = plClock();
+    if (t >= DUR - 1 / FPS) { t = DUR - 1 / FPS; PL.t = t; plDraw(t); plPause(); }
+    else { PL.t = t; plDraw(t); plUI(); }
+  }
+  requestAnimationFrame(plLoop);
+}
+const ICON = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/></svg>',
+  replay: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1.5L7 6l5 4.5V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15 8.6a4.6 4.6 0 0 1 0 6.8l-1.3-1.3a2.8 2.8 0 0 0 0-4.2zM17.6 6a8.3 8.3 0 0 1 0 12l-1.3-1.3a6.5 6.5 0 0 0 0-9.4z"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15.2 9.3l1.3-1.3 2.2 2.2 2.2-2.2 1.3 1.3-2.2 2.2 2.2 2.2-1.3 1.3-2.2-2.2-2.2 2.2-1.3-1.3 2.2-2.2z"/></svg>',
+};
+function plStart() {
+  const cv = document.getElementById('screen');
+  PL.cx = cv.getContext('2d', { alpha: false });
+  PL.img = PL.cx.createImageData(W, H);
+  PL.el = { play: document.getElementById('play'), replay: document.getElementById('replay'), mute: document.getElementById('mute'), scrub: document.getElementById('scrub'), time: document.getElementById('time'), scene: document.getElementById('scene') };
+  PL.el.replay.innerHTML = ICON.replay;
+  PL.el.scrub.max = String(NF - 1);
+  const fit = () => {
+    const stage = document.getElementById('stage');
+    const aw = stage.clientWidth, ah = stage.clientHeight;
+    let s = Math.min(aw / W, ah / H);
+    if (s >= 2) s = Math.floor(s);                       // integer scale when there is room
+    cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
+  };
+  addEventListener('resize', fit); fit();
+  PL.el.play.onclick = () => (PL.playing ? plPause() : plPlay());
+  PL.el.replay.onclick = () => { plSeek(0, false); plPlay(); };
+  PL.el.mute.onclick = () => { try { liveInit(); liveMute(!LIVE.muted); } catch (e) { LIVE.muted = !LIVE.muted; } plUI(); };
+  const sc = PL.el.scrub;
+  sc.addEventListener('input', () => { PL.scrubbing = true; const t = (+sc.value) / FPS; if (PL.playing) { try { livePause(); } catch (e) { } PL.playing = false; PL.resumeAfter = true; } PL.t = t; plDraw(t); plUI(); });
+  sc.addEventListener('change', () => { PL.scrubbing = false; if (PL.resumeAfter) { PL.resumeAfter = false; plPlay(); } else plUI(); });
+  cv.addEventListener('click', () => (PL.playing ? plPause() : plPlay()));
+  addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); PL.playing ? plPause() : plPlay(); }
+    else if (e.key === 'ArrowRight') plSeek(PL.t + (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'ArrowLeft') plSeek(PL.t - (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'm') PL.el.mute.click();
+    else if (e.key === 'r') PL.el.replay.click();
+  });
+  document.getElementById('loading').remove();
+  plDraw(0); plUI(); requestAnimationFrame(plLoop);
+  // synthesise the soundtrack once (a couple of seconds) right after the first frame is on screen
+  PL.el.scene.textContent = 'preparing audio…';
+  setTimeout(() => { try { liveBuild(); } catch (e) { PL.audioOK = false; } plUI(); }, 60);
+}
+// public API (used by the MP4 export through Playwright)
+if (typeof window !== 'undefined') {
+  window.CBC = { W, H, FPS, DUR, NF, renderFrame, getBuf: () => buf, renderAudio, sceneIndex, seek: t => plSeek(t, false) };
+  const boot = () => setTimeout(() => { engineInit(); if (!/[?&]headless/.test(location.search)) plStart(); window.CBC.ready = true; }, 30);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+}
+
+})();
+</script>
+</body>
+</html>
