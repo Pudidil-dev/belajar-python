@@ -31,7 +31,7 @@ body { display: flex; flex-direction: column; min-height: 100%; }
 </head>
 <body>
 <div id="stage">
-  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a laser handpiece fires four pulses on a black star tattoo on a forearm, which frosts white; weeks later the star is a little lighter; the camera enters the skin, where near-infrared light is absorbed by an ink aggregate in the dermis, which heats, expands and cracks into smaller fragments; a macrophage engulfs some fragments, some ink travels through a lymphatic vessel to a lymph node; over weeks and several sessions the star fades until it is no longer visible"></canvas>
+  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a laser handpiece fires four pulses on a black dragon tattoo on a forearm, which frosts white; weeks later the star is a little lighter; the camera enters the skin, where near-infrared light is absorbed by an ink aggregate in the dermis, which heats, expands and cracks into smaller fragments; a macrophage engulfs some fragments, some ink travels through a lymphatic vessel to a lymph node; over weeks and several sessions the dragon fades until it is no longer visible"></canvas>
   <div id="loading">LOADING…</div>
 </div>
 <div id="bar">
@@ -694,9 +694,9 @@ function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[
 const T = i => SC_T[i];
 const range = (a, b, step) => { const o = []; for (let x = a; x <= b + 1e-9; x += step) o.push(Math.round(x * 1000) / 1000); return o; };
 const EV = {
-  // A — the hook: four pulses along the top point of the star (4 Hz, a real Q-switched repetition rate)
+  // A — the hook: four pulses along the dragon's neck (4 Hz, a real Q-switched repetition rate)
   hook: [0.25, 0.5, 0.75, 1.0],
-  weeks1: 2.0,                                   // WEEKS LATER: the frosting is gone, the star a little lighter
+  weeks1: 2.0,                                   // WEEKS LATER: the frosting is gone, the dragon a little lighter
   tilt: 3.0,                                     // the skin lifts into a cut-away block
   dive: 3.5,                                     // and the camera dives into its front face
   ambient: 4.25,                                 // arrival in the dermis
@@ -723,13 +723,13 @@ const EV = {
   steps4: [38.0, 38.5, 39.0, 39.5],              // REMAINING PIGMENT → ENERGY ABSORPTION → SMALLER FRAGMENTS → IMMUNE CLEARANCE
   // E — the payoff time-lapse and the loop
   labels: [[40.0, 'SESSION 1'], [40.75, 'WEEKS LATER'], [41.5, 'SESSION 2'], [42.25, 'WEEKS LATER'], [43.0, 'ADDITIONAL SESSIONS'], [44.0, 'FINAL RESULT']],
-  stages: [40.0, 40.75, 42.25, 43.5, 44.0],      // the five states of the star (five ascending ticks)
-  stageFade: [0, 0.2, 0.5, 0.8, 1.0],            // how far the star has faded at each
+  stages: [40.0, 40.75, 42.25, 43.5, 44.0],      // the five states of the tattoo (five ascending ticks)
+  stageFade: [0, 0.2, 0.5, 0.8, 1.0],            // how far the tattoo has faded at each
   pulses3: [40.25, 40.5, 41.75, 42.0, 43.0, 43.25],
   done: 45.0, recap: [45.25, 45.5, 45.75, 46.0], title: 46.5, rewind: 47.5,
 };
-// the star's fade (0 = as tattooed, 1 = no longer visible) at the surface, over the whole film
-function starFade(t) {
+// the tattoo's fade (0 = as tattooed, 1 = no longer visible) at the surface, over the whole film
+function inkFade(t) {
   if (t < EV.weeks1) return 0;
   if (t < 33.0) return 0.15 * smooth(seg(t, EV.weeks1, EV.weeks1 + 0.5));
   if (t < 40.0) return lerp(0.15, 0.38, smooth(seg(t, EV.weeks2, EV.weeks2 + 0.5)));
@@ -773,31 +773,141 @@ function arrowHead(x, y, ang, s, col) { const ca = Math.cos(ang), sa = Math.sin(
 function crossMark(x, y, s, col) { for (const d of [-1, 0, 1]) { line(x - s + d, y - s, x + s + d, y + s, col); line(x + s + d, y - s, x - s + d, y + s, col); } }
 function checkMark(x, y, s, col) { const pts = [x - s, y, x - s * 0.3, y + s * 0.7, x + s, y - s * 0.8]; for (const d of [-1, 0, 1]) { line(pts[0], pts[1] + d, pts[2], pts[3] + d, col); line(pts[2], pts[3] + d, pts[4], pts[5] + d, col); } }
 
+// ---- 09_dragon.js
+// ============================================================================
+// THE TATTOO: a black Eastern-style dragon in tattoo linework (arm-world px,
+// 40 px ≈ 1 cm). One serpentine body winding down the forearm in an S, outlined
+// by two edges, with scales across it and spines along its back; a horned head
+// with an open mouth, teeth, an eye, whiskers and a flame-like mane; two clawed
+// legs; a flame-tipped tail. It is built once into an ink raster at twice the
+// resolution; everything that shows the tattoo (the arm, the top of the skin
+// block, the ink under the cut) samples this one raster, so the design is
+// identical in every shot.
+// ============================================================================
+const DRG = { x0: 30, y0: 110, w: 300, h: 340, k: 2 };                 // raster window (arm px) and supersampling
+const DRG_RW = DRG.w * DRG.k, DRG_RH = DRG.h * DRG.k;
+const INK = new Float32Array(DRG_RW * DRG_RH);
+// the body's centreline, head end first: right along the top, down the right side, back left, down, and the tail rising on the right
+const DRG_CTRL = [136, 188, 176, 200, 214, 226, 240, 264, 240, 304, 214, 334, 166, 348, 122, 360, 98, 382, 108, 406, 154, 416, 212, 408, 252, 388, 276, 358, 286, 326];
+const DRG_C = (() => {
+  const d = spline(DRG_CTRL, 16, false), pts = []; let s = 0;
+  for (let i = 0; i < d.length; i += 2) { if (i) s += Math.hypot(d[i] - d[i - 2], d[i + 1] - d[i - 1]); pts.push([d[i], d[i + 1], s]); }
+  pts.forEach(p => p[2] /= s); return pts;
+})();
+// a point on the body at arc fraction u: position, unit tangent (toward the tail) and normal (the back is on the +n side)
+function drgAt(u) {
+  u = clamp(u, 0, 1); let i = 1; while (i < DRG_C.length - 1 && DRG_C[i][2] < u) i++;
+  const a = DRG_C[i - 1], b = DRG_C[i], k = (u - a[2]) / Math.max(1e-9, b[2] - a[2]), x = lerp(a[0], b[0], k), y = lerp(a[1], b[1], k);
+  let tx = b[0] - a[0], ty = b[1] - a[1]; const L = Math.hypot(tx, ty) || 1; tx /= L; ty /= L;
+  return { x, y, tx, ty, nx: ty, ny: -tx };
+}
+const DRG_W = [[0, 13], [0.12, 16], [0.45, 15.5], [0.75, 11], [1, 2]];
+function drgW(u) { let i = 1; while (i < DRG_W.length - 1 && DRG_W[i][0] < u) i++; const a = DRG_W[i - 1], b = DRG_W[i]; return lerp(a[1], b[1], clamp((u - a[0]) / (b[0] - a[0]), 0, 1)); }
+const drgEdge = (u, side) => { const p = drgAt(u), w = drgW(u); return [p.x + p.nx * w * side, p.y + p.ny * w * side]; };
+// ---------------------------------------------------------------- rasterising: tapered strokes and filled shapes (max-blended)
+function inkSeg(ax, ay, bx, by, w0, w1) {
+  const K = DRG.k, wm = Math.max(w0, w1) + 1;
+  const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - wm - DRG.x0) * K)), i1 = Math.min(DRG_RW - 1, Math.ceil((Math.max(ax, bx) + wm - DRG.x0) * K));
+  const j0 = Math.max(0, Math.floor((Math.min(ay, by) - wm - DRG.y0) * K)), j1 = Math.min(DRG_RH - 1, Math.ceil((Math.max(ay, by) + wm - DRG.y0) * K));
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+  for (let j = j0; j <= j1; j++) {
+    const y = DRG.y0 + (j + 0.5) / K;
+    for (let i = i0; i <= i1; i++) {
+      const x = DRG.x0 + (i + 0.5) / K, u = clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1), d = Math.hypot(x - ax - u * dx, y - ay - u * dy);
+      const a = clamp((lerp(w0, w1, u) - d) * K + 0.5, 0, 1), k = j * DRG_RW + i; if (a > INK[k]) INK[k] = a;
+    }
+  }
+}
+function inkPath(pts, w0, w1) {
+  let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  let s = 0; for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); inkSeg(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], lerp(w0, w1, s / L), lerp(w0, w1, (s + l) / L)); s += l; }
+}
+const inkCurve = (ctrl, w0, w1) => { const d = spline(ctrl.flat(), 8, false), pts = []; for (let i = 0; i < d.length; i += 2) pts.push([d[i], d[i + 1]]); inkPath(pts, w0, w1); };
+function inkPoly(pts) {
+  const K = DRG.k, xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const i0 = Math.max(0, Math.floor((Math.min(...xs) - DRG.x0) * K)), i1 = Math.min(DRG_RW - 1, Math.ceil((Math.max(...xs) - DRG.x0) * K));
+  const j0 = Math.max(0, Math.floor((Math.min(...ys) - DRG.y0) * K)), j1 = Math.min(DRG_RH - 1, Math.ceil((Math.max(...ys) - DRG.y0) * K));
+  for (let j = j0; j <= j1; j++) {
+    const y = DRG.y0 + (j + 0.5) / K;
+    for (let i = i0; i <= i1; i++) {
+      const x = DRG.x0 + (i + 0.5) / K; let inside = false;
+      for (let a = 0, b = pts.length - 1; a < pts.length; b = a++) { const [xa, ya] = pts[a], [xb, yb] = pts[b]; if ((ya > y) !== (yb > y) && x < (xb - xa) * (y - ya) / (yb - ya) + xa) inside = !inside; }
+      if (inside) INK[j * DRG_RW + i] = 1;
+    }
+  }
+}
+// ---------------------------------------------------------------- the dragon
+(function drawDragon() {
+  const N = 220, edgeL = [], edgeR = [];
+  for (let k = 0; k <= N; k++) { const u = k / N; edgeL.push(drgEdge(u, 1)); edgeR.push(drgEdge(u, -1)); }
+  inkPath(edgeL, 2.1, 1.1); inkPath(edgeR, 2.1, 1.1);
+  // scales: two staggered rows of small crescents, each bulging toward the tail
+  let row = 0;
+  for (let u = 0.035; u < 0.93; u += 0.021, row++) {
+    const p = drgAt(u), w = drgW(u), o = (row % 2 ? 0.42 : -0.42) * w, rs = 0.34 * w, cx = p.x + p.nx * o, cy = p.y + p.ny * o, pts = [];
+    for (let k = 0; k <= 8; k++) { const th = -Math.PI / 2 + Math.PI * k / 8; pts.push([cx + rs * (Math.cos(th) * p.tx + Math.sin(th) * p.nx), cy + rs * (Math.cos(th) * p.ty + Math.sin(th) * p.ny)]); }
+    inkPath(pts, 1.0, 1.0);
+  }
+  // a crest of spikes along the back, leaning toward the tail
+  for (let u = 0.05; u < 0.9; u += 0.045) {
+    const p = drgAt(u), w = drgW(u), h = 7 + 4 * (1 - u), b0 = drgEdge(u - 0.012, 1), b1 = drgEdge(u + 0.012, 1);
+    inkPoly([b0, b1, [p.x + p.nx * (w + h) + p.tx * 5, p.y + p.ny * (w + h) + p.ty * 5]]);
+  }
+  // the head at the body's front end, in its own frame: f forward (out of the body), d "down" on screen
+  const h0 = drgAt(0), f = [-h0.tx, -h0.ty]; let D = [-f[1], f[0]]; if (D[1] < 0) D = [f[1], -f[0]];
+  const HS = 1.45, H = (lx, ly) => [h0.x + (f[0] * lx + D[0] * ly) * HS, h0.y + (f[1] * lx + D[1] * ly) * HS];
+  const path = (arr, w0, w1) => inkCurve(arr.map(([a, b]) => H(a, b)), w0 * 1.2, (w1 === undefined ? w0 : w1) * 1.2);
+  const poly = arr => inkPoly(arr.map(([a, b]) => H(a, b)));
+  path([[-4, -12], [8, -15], [22, -12], [34, -7], [42, -3], [41, 1], [30, 2], [17, 1]], 1.9);         // brow, snout, upper lip
+  path([[17, 1], [28, 6], [37, 9], [33, 12], [18, 11], [4, 12], [-4, 12]], 1.9);                     // lower jaw (the mouth is open)
+  for (const x of [22, 28, 34]) poly([[x - 1.6, 2], [x + 1.6, 2], [x, 5.2]]);                         // teeth
+  for (const x of [24, 31]) poly([[x - 1.5, 7], [x + 1.5, 7.4], [x, 4]]);
+  poly([[11, -8], [13, -10], [17, -9.5], [18, -7], [15, -5.6], [12, -6]]);                            // eye
+  path([[6, -12], [14, -11.5], [23, -9]], 1.5);                                                        // brow ridge
+  poly([[36, -5.2], [38.4, -4.6], [37.4, -3]]);                                                        // nostril
+  path([[2, -13], [-8, -22], [-20, -29], [-33, -31]], 2.4, 0.7); path([[-11, -24], [-13, -34]], 1.5, 0.5);   // horns
+  path([[-2, -9], [-14, -16], [-28, -19]], 2.0, 0.6);
+  for (const [a, b, c] of [[[-3, -10], [-3, -4], [-21, -14]], [[-3, -4], [-3, 2], [-23, -3]], [[-3, 2], [-3, 8], [-21, 9]], [[-2, 8], [-2, 12], [-16, 19]]]) poly([a, b, c]);   // mane
+  path([[40, 0], [52, 4], [60, 14], [58, 26], [50, 34]], 1.25, 0.45);                                // whiskers
+  path([[32, -5], [44, -14], [56, -16], [64, -12]], 1.15, 0.45);
+  // two clawed legs on the belly side
+  for (const u of [0.17, 0.6]) {
+    const p = drgAt(u), w = drgW(u), base = [p.x - p.nx * (w - 2), p.y - p.ny * (w - 2)], c35 = Math.cos(0.6), s35 = Math.sin(0.6);
+    const dir = [-p.nx * c35 + p.tx * s35, -p.ny * c35 + p.ty * s35], knee = [base[0] + dir[0] * 15, base[1] + dir[1] * 15];
+    const d2 = [dir[0] * 0.77 - p.tx * 0.64, dir[1] * 0.77 - p.ty * 0.64], foot = [knee[0] + d2[0] * 12, knee[1] + d2[1] * 12];
+    inkPath([base, knee], 3.8, 3.0); inkPath([knee, foot], 3.0, 2.2);
+    for (const a of [-0.9, -0.15, 0.6]) { const ca = Math.cos(a), sa = Math.sin(a), cd = [d2[0] * ca - d2[1] * sa, d2[0] * sa + d2[1] * ca]; inkPath([foot, [foot[0] + cd[0] * 8, foot[1] + cd[1] * 8]], 1.6, 0.4); }
+  }
+  // the flame at the tip of the tail
+  const e = drgAt(1), T = (a, b) => [e.x + e.tx * a + e.nx * b, e.y + e.ty * a + e.ny * b];
+  inkCurve([T(0, 0), T(6, 4), T(12, 2), T(17, 7)], 2.2, 0.5); inkCurve([T(0, 0), T(8, -2), T(14, -6), T(21, -4)], 2.2, 0.5); inkCurve([T(0, 0), T(5, 0), T(10, 1), T(13, -1)], 1.8, 0.5);
+})();
+// the ink of the design at an arm-world point (bilinear on the 2× raster)
+function dragonInk(wx, wy) {
+  const fx = (wx - DRG.x0) * DRG.k - 0.5, fy = (wy - DRG.y0) * DRG.k - 0.5;
+  if (fx < 0 || fy < 0 || fx >= DRG_RW - 1 || fy >= DRG_RH - 1) return 0;
+  const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k = j * DRG_RW + i;
+  return (INK[k] * (1 - u) + INK[k + 1] * u) * (1 - v) + (INK[k + DRG_RW] * (1 - u) + INK[k + DRG_RW + 1] * u) * v;
+}
+
 // ---- 10_arm.js
 // ============================================================================
 // THE FOREARM (arm world: screen pixels of the opening close-up, camera (180, 320, 1);
-// 40 px ≈ 1 cm). One forearm on a dark treatment pad, one small black five-pointed
-// star outline, a Q-switched Nd:YAG handpiece in a gloved hand on an articulated
+// 40 px ≈ 1 cm). One forearm on a dark treatment pad, one black dragon tattoo
+// (09_dragon.js), a Q-switched Nd:YAG handpiece in a gloved hand on an articulated
 // arm, and the laser console (seen when the camera pulls back).
-// The star's ink fades in patches (per-pixel noise) as treatment goes on; the
+// The tattoo's ink fades in patches (per-pixel noise) as treatment goes on; the
 // frosting appears where each pulse lands and is gone by the next time jump.
 // ============================================================================
-const STAR = { cx: 180, cy: 330, R: 100, r: 40, w: 4.8 };             // centre, outer / inner radius, half stroke width
-const STAR_PTS = (() => { const p = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? STAR.r : STAR.R; p.push([STAR.cx + rr * Math.cos(a), STAR.cy + rr * Math.sin(a)]); } return p; })();
-const STAR_SEG = STAR_PTS.map((p, i) => { const q = STAR_PTS[(i + 1) % 10]; return [p[0], p[1], q[0] - p[0], q[1] - p[1], (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2]; });
-function starDist(x, y) {
-  let best = 1e9;
-  for (const [ax, ay, dx, dy, l2] of STAR_SEG) { const u = clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1), ex = x - ax - u * dx, ey = y - ay - u * dy, d2 = ex * ex + ey * ey; if (d2 < best) best = d2; }
-  return Math.sqrt(best);
-}
 // the arm runs top (elbow) to bottom (wrist), a little narrower toward the wrist
 const armL = y => 22 + 0.03 * y, armR = y => 338 - 0.03 * y;
-// pulse spots: the hook arches over the top point of the star; later sessions treat the other points
+// pulse spots along the dragon's body: the hook treats its neck; later sessions treat the rest of the body
 const SPOT_R = 13;
-const edgePt = (i, u) => { const a = STAR_PTS[i % 10], b = STAR_PTS[(i + 1) % 10]; return [lerp(a[0], b[0], u), lerp(a[1], b[1], u)]; };
-const SPOTS_HOOK = [edgePt(9, 0.3), edgePt(9, 0.72), edgePt(0, 0.28), edgePt(0, 0.7)];          // up the left edge of the top point, down its right edge
-const SPOTS_S2 = [edgePt(7, 0.62), edgePt(8, 0.38), edgePt(1, 0.62), edgePt(2, 0.38)];          // the left and right points
-const SPOTS_S3 = [edgePt(3, 0.62), edgePt(4, 0.38), edgePt(5, 0.62), edgePt(6, 0.38), edgePt(9, 0.6), edgePt(0, 0.4)];
+const bodyPt = u => { const p = drgAt(u); return [p.x, p.y]; };
+const SPOTS_HOOK = [0.06, 0.11, 0.16, 0.21].map(bodyPt);
+const SPOTS_S2 = [0.4, 0.46, 0.7, 0.76].map(bodyPt);
+const SPOTS_S3 = [0.3, 0.35, 0.55, 0.6, 0.86, 0.92].map(bodyPt);
+const HOOK_C = [SPOTS_HOOK.reduce((a, p) => a + p[0], 0) / 4, SPOTS_HOOK.reduce((a, p) => a + p[1], 0) / 4];
 // every frosted spot: [x, y, time of its pulse, time its frosting starts to fade]
 const FROST = [
   ...SPOTS_HOOK.map((p, i) => [p[0], p[1], EV.hook[i], EV.weeks1]),
@@ -852,11 +962,9 @@ function baseAt(wx, wy) {
   const i = Math.floor(wx - ATX.x0), j = Math.floor(wy - ATX.y0);
   return i < 0 || j < 0 || i >= ATX.w || j >= ATX.h ? P.BG : ARMTEX[j * ATX.w + i];
 }
-// ink alpha of the star at (wx, wy) for a given fade (0 = as tattooed, 1 = gone): patchy, like real fading
+// ink alpha of the tattoo at (wx, wy) for a given fade (0 = as tattooed, 1 = gone): patchy, like real fading
 function inkAlpha(wx, wy, fade) {
-  if (Math.abs(wx - STAR.cx) > STAR.R + 6 || Math.abs(wy - STAR.cy) > STAR.R + 6) return 0;
-  const d = starDist(wx, wy); if (d > STAR.w + 1) return 0;
-  const edge = d < STAR.w - 0.5 ? 1 : clamp(STAR.w + 0.5 - d, 0, 1);
+  const edge = dragonInk(wx, wy); if (edge <= 0.01) return 0;
   if (fade <= 0) return edge * (0.92 + 0.08 * vn2(wx / 2.2, wy / 2.2, 17));
   const nv = 0.7 * vn2(wx / 9, wy / 9, 7) + 0.3 * vn2(wx / 3.5, wy / 3.5, 9);
   return edge * clamp(1 - fade * (1 + 0.9 * nv), 0, 1);
@@ -875,7 +983,7 @@ function frostAt(wx, wy, fl) {
 // one arm-world point as a colour (used by the arm view and by the top face of the skin block)
 function skinPixel(wx, wy, fl, fade, erythema) {
   let c = baseAt(wx, wy);
-  if (erythema > 0) { const d = Math.hypot(wx - STAR.cx, wy - (STAR.cy - STAR.R * 0.62)); if (d < 56) c = mixc(c, P.ER, erythema * 0.32 * smooth(1 - d / 56)); }
+  if (erythema > 0) { const d = Math.hypot(wx - HOOK_C[0], wy - HOOK_C[1]); if (d < 60) c = mixc(c, P.ER, erythema * 0.32 * smooth(1 - d / 60)); }
   const ia = inkAlpha(wx, wy, fade);
   if (ia > 0) c = mixc(c, mixc(P.IK1, P.IK2, fade * 0.6), ia * 0.95);
   const fr = fl.length ? frostAt(wx, wy, fl) : 0;
@@ -886,9 +994,9 @@ const erythemaAt = t => (smooth(seg(t, 1.1, 1.8)) * (1 - smooth(seg(t, EV.weeks1
 // ---------------------------------------------------------------- the pad, the arm, the hairs
 function armWorld(cam, t, o) {
   o = o || {};
-  const fade = o.fade === undefined ? starFade(t) : o.fade, ery = erythemaAt(t), fl = frostList(t);
+  const fade = o.fade === undefined ? inkFade(t) : o.fade, ery = erythemaAt(t), fl = frostList(t);
   if (!ARMTEX) buildArmTex();
-  const ex0 = STAR.cx - STAR.R - 60, ex1 = STAR.cx + STAR.R + 60, ey0 = STAR.cy - STAR.R - 60, ey1 = STAR.cy + STAR.R + 60;
+  const ex0 = DRG.x0 - 40, ex1 = DRG.x0 + DRG.w + 40, ey0 = DRG.y0 - 40, ey1 = DRG.y0 + DRG.h + 40;
   for (let sy = 0; sy < H; sy++) {
     const wy = cam.wy(sy + 0.5), xl = armL(wy), xr = armR(wy), row = sy * W, j = Math.floor(wy - ATX.y0), inY = j >= 0 && j < ATX.h, nearY = wy > ey0 && wy < ey1;
     for (let sx = 0; sx < W; sx++) {
@@ -971,18 +1079,19 @@ function drawConsole(cam, t) {
 // ---- 11_block.js
 // ============================================================================
 // THE SKIN BLOCK (diagram space = screen pixels at rest): the textbook cut-away of
-// the same skin, lifted out around the star's top point. The top face shows the
-// skin and the star exactly as on the arm; the front face is the cut at arm
-// y = 280, where the two edges of the star's top point cross it: the ink sits in
-// the dermis under them. Layers are drawn thicker than life (NOT TO SCALE).
+// the same skin, lifted out around the treated neck of the dragon. The top face
+// shows the skin and the tattoo exactly as on the arm; the front face is the cut
+// along the patch's near edge: wherever the tattoo's lines cross that edge, the
+// ink sits in the dermis under them. Layers are drawn thicker than life
+// (NOT TO SCALE).
 // ============================================================================
-const BLK = { ax0: 120, ax1: 240, ay0: 218, ay1: 280,                // the patch of arm it is cut from
+const BLK = { ax0: 130, ax1: 250, ay0: 178, ay1: 240,                // the patch of arm it is cut from
   fx0: 50, fx1: 290, fy0: 262, fy1: 560, dx: 46, dy: -80 };           // front face and the oblique depth offset
-const BLK_INK = (() => {                                              // ink under the two crossings of the cut with the star outline
-  const out = [], cuts = [], y = BLK.ay1;
-  for (const [ax, ay, dx, dy] of STAR_SEG) { if ((ay - y) * (ay + dy - y) < 0) { const u = (y - ay) / dy, x = ax + u * dx; if (x > BLK.ax0 && x < BLK.ax1) cuts.push((x - BLK.ax0) / (BLK.ax1 - BLK.ax0)); } }
-  cuts.forEach((u0, k) => { for (let i = 0; i < 46; i++) { const h = hash(i * 7 + k * 300 + 11); out.push({ u: u0 + (hash(i * 7 + k * 300 + 12) - 0.5) * 0.08, w: 0.2 + 0.24 * Math.pow(h, 0.8), r: 1.6 + 2.4 * hash(i * 7 + k * 300 + 13) }); } });
-  return { cuts, dots: out };
+const BLK_INK = (() => {                                              // ink under each line of the tattoo that crosses the cut
+  const cuts = [], out = []; let run = -1;
+  for (let x = BLK.ax0; x <= BLK.ax1; x += 0.25) { const on = dragonInk(x, BLK.ay1) > 0.5; if (on && run < 0) run = x; if ((!on || x >= BLK.ax1) && run >= 0) { cuts.push([(run + x) / 2, x - run]); run = -1; } }
+  cuts.forEach(([cx, w], k) => { const u0 = (cx - BLK.ax0) / (BLK.ax1 - BLK.ax0), n = Math.round(10 + w * 4); for (let i = 0; i < n; i++) { const h = hash(i * 7 + k * 300 + 11); out.push({ u: u0 + (hash(i * 7 + k * 300 + 12) - 0.5) * (w + 3) / (BLK.ax1 - BLK.ax0), w: 0.2 + 0.24 * Math.pow(h, 0.8), r: 1.4 + 2.2 * hash(i * 7 + k * 300 + 13) }); } });
+  return { cuts: cuts.map(c => (c[0] - BLK.ax0) / (BLK.ax1 - BLK.ax0)), dots: out };
 })();
 const BLK_FAT = Array.from({ length: 22 }, (_, i) => ({ u: (i % 6) / 5 + (hash(i + 70) - 0.5) * 0.08, w: 0.8 + Math.floor(i / 6) * 0.06 + hash(i + 71) * 0.03 }));
 // the layer colour at a point of a face: u across (0..1), w down (0..1)
@@ -1000,7 +1109,7 @@ function blockLayer(u, w, side) {
 // o: { fade, t, cam (diagram camera) }
 function blockView(cam, t, o) {
   o = o || {};
-  const fade = o.fade === undefined ? starFade(t) : o.fade, fl = frostList(t), B = BLK, fw = B.fx1 - B.fx0, fh = B.fy1 - B.fy0;
+  const fade = o.fade === undefined ? inkFade(t) : o.fade, fl = frostList(t), B = BLK, fw = B.fx1 - B.fx0, fh = B.fy1 - B.fy0;
   for (let sy = 0; sy < H; sy++) {
     const dy_ = cam.wy(sy + 0.5), row = sy * W;
     for (let sx = 0; sx < W; sx++) {
@@ -1026,7 +1135,7 @@ function blockView(cam, t, o) {
       buf[row + sx] = c === null ? P.BG : c;
     }
   }
-  // the ink under the star line, and the edges of the block
+  // the ink under the tattoo's lines, and the edges of the block
   const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
   for (const d of BLK_INK.dots) { const x = X(B.fx0 + d.u * fw), y = Y(B.fy0 + d.w * fh); disc(x, y, Math.max(1, d.r * z * 0.8), P.PG0); if (z > 1.5) disc(x - d.r * z * 0.25, y - d.r * z * 0.25, Math.max(0.6, d.r * z * 0.25), P.PG2); }
   const ol = mixc(P.SK0, P.K0, 0.4);
@@ -1421,6 +1530,11 @@ function drawLysosomes(cam, t, pp) {
 // the lymph-node inset, the "ink in view" meter and the closing recap icons.
 // All drawn in screen space inside the short-video safe area.
 // ============================================================================
+// a tiny dragon glyph (an S-shaped body with a head dot) for the insets and the recap
+function miniDragon(x, y, r, c) {
+  let q = null; for (let k = 0; k <= 16; k++) { const u = k / 16, px = x + r * 0.9 * Math.sin(u * TAU * 0.95), py = y - r + 2 * r * u; if (q) lineW(q[0], q[1], px, py, 1.4, c); q = [px, py]; }
+  disc(x, y - r - 1, 1.8, c);
+}
 // a small clock that spins while time jumps
 function clockIcon(x, y, r, spin) {
   disc(x, y, r + 1, P.K0); disc(x, y, r, P.INK); disc(x, y, r - 1.5, P.N2);
@@ -1507,9 +1621,9 @@ function lymphInset(t) {
   const k = K75(clamp((t - EV.node) / 0.2, 0, 1)) * (t > 30.95 ? (31.2 - t) / 0.25 : 1); if (k <= 0) return;
   withDither(k, () => {
     const x0 = 170, y0 = 92, x1 = 300, y1 = 300, m = maskRR(x0, y0, x1, y1, 10); mFill(m, P.K0); mOutline(m, P.LY2);
-    // the whole arm: hand at the bottom, forearm with the star, elbow, upper arm up to the armpit
+    // the whole arm: hand at the bottom, forearm with the tattoo, elbow, upper arm up to the armpit
     const arm = maskPoly([214, 290, 236, 290, 246, 236, 254, 196, 266, 160, 270, 106, 246, 106, 240, 158, 226, 196, 216, 238]); shade(arm, P.SK3, P.SK4, P.SK2, P.SK1, {});
-    const sx = 231, sy = 244; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU / 5, b = -Math.PI / 2 + (i + 2) * TAU / 5; line(sx + Math.cos(a) * 6, sy + Math.sin(a) * 6, sx + Math.cos(b) * 6, sy + Math.sin(b) * 6, P.IK1); }
+    const sx = 231, sy = 244; miniDragon(sx, sy, 7, P.IK1);
     // the lymphatic path drawn up the arm to the node at the elbow, then on toward the armpit
     const pts = [sx, sy - 8, 236, 222, 242, 202, 248, 186, 254, 160, 258, 124], u = clamp((t - EV.node) / 0.5, 0, 1), nseg = pts.length / 2 - 1;
     for (let i = 0; i < nseg; i++) { const v = clamp(u * nseg - i, 0, 1); if (v <= 0) break; lineW(pts[2 * i], pts[2 * i + 1], lerp(pts[2 * i], pts[2 * i + 2], v), lerp(pts[2 * i + 1], pts[2 * i + 3], v), 2.4, P.LY2); }
@@ -1536,7 +1650,7 @@ function recapIcon(i, cx, cy, k) {
   if (i === 0) { lineW(cx + 18, cy - 24, cx + 2, cy - 2, 6, P.HP3); lineW(cx + 18, cy - 24, cx + 2, cy - 2, 3, P.HP4); for (let s = 0; s < 6; s++) disc(lerp(cx + 2, cx - 10, s / 5), lerp(cy - 2, cy + 16, s / 5), 1.2, P.LZ2); disc(cx - 12, cy + 18, 4, P.PG0); }
   if (i === 1) for (let s = 0; s < 7; s++) { const a = s * 0.9, d = 6 + 10 * hash(s + 40); disc(cx + Math.cos(a) * d * (0.5 + 0.5 * k), cy + Math.sin(a) * d * (0.5 + 0.5 * k), 2.4, P.PG0); }
   if (i === 2) { const mm = maskEll(cx, cy, 22, 17, 0.2); shade(mm, P.MC3, P.MC4, P.MC2, P.MC0, {}); disc(cx - 8, cy - 3, 6, P.NU2); disc(cx + 8, cy + 3, 6, P.MC4); ring(cx + 8, cy + 3, 6, 1, P.VS); for (let s = 0; s < 4; s++) disc(cx + 6 + (s % 2) * 4, cy + 1 + (s >> 1) * 4, 1.2, P.PG0); }
-  if (i === 3) for (let s = 0; s < 3; s++) { const x = cx - 20 + s * 20, c = mixc(P.IK1, P.SK3, s / 2.4); for (let j = 0; j < 5; j++) { const a = -Math.PI / 2 + j * TAU / 5, b = -Math.PI / 2 + (j + 2) * TAU / 5; line(x + Math.cos(a) * 8, cy + Math.sin(a) * 8, x + Math.cos(b) * 8, cy + Math.sin(b) * 8, c); } }
+  if (i === 3) for (let s = 0; s < 3; s++) miniDragon(cx - 20 + s * 20, cy + 2, 12, mixc(P.IK1, P.SK3, s / 2.4));
 }
 function recapPanel(t) {
   if (!UI_ON || t < EV.recap[0] - 0.05 || t > 46.6) return;
@@ -1557,11 +1671,11 @@ function recapPanel(t) {
 // ---- 23_scenes.js
 // ============================================================================
 // SCENE COMPOSITOR: 20 micro-scenes in 5 continuous sequences (SC_T, 120 BPM).
-// One forearm, one black star, one handpiece; one ink aggregate followed from
+// One forearm, one black dragon tattoo, one handpiece; one ink aggregate followed from
 // the dermis through absorption, expansion and fragmentation; some of its
 // fragments followed into one macrophage, some ink into one lymphatic vessel;
 // back out to the same forearm, the next session, and the whole treatment
-// course until the star is no longer visible; the course rewinds to frame one.
+// course until the tattoo is no longer visible; the course rewinds to frame one.
 // Scales join with calm zoom crossfades (arm → skin block → dermis and back).
 // Passes: visual (worlds and crossfades, by time), hud (time labels, timeline,
 // step bars, insets, recap), tags (leader labels), overlays (captions, chips,
@@ -1663,7 +1777,7 @@ function hud(t) {
 }
 // ============================================================================ pass 3: leader-line tags on the things themselves
 function tags(t) {
-  if (t < 3.0) { tag('TEMPORARY FROSTING', STAR.cx, STAR.cy - STAR.R + 32, 22, 190, 1.25, 1.95, t, P.FR1, 2); return; }
+  if (t < 3.0) { tag('TEMPORARY FROSTING', HOOK_C[0], HOOK_C[1] - 6, 40, 100, 1.25, 1.95, t, P.FR1, 2); return; }
   if (t < 4.3) {
     const c = blockCam(t), A_ = (u, w) => { const p = blkPt(u, w); return [c.x(p[0]), c.y(p[1])]; };
     let a = A_(0.1, 0.05); tag('EPIDERMIS', a[0], a[1], 24, 112, 3.5, 4.15, t, P.EP2, 2);
@@ -1821,16 +1935,15 @@ function overlays(t) {
 // ============================================================================
 // AUDIO — an original electronic science score plus SFX locked to the picture,
 // synthesised sample by sample in plain JS (no samples, no Web Audio graph).
-// 120 BPM, 24 bars = 48.000 s, D major. The theme is the tattoo itself: a
-// five-note "star" motif that walks the D-major pentatonic the way a pentagram
-// joins the points of a star (D–F#–B–E–A, every second note, rising, on dotted
-// eighths). It changes instrument with the story and gets lighter as the star
-// fades: bright lead in the hook · glass bell for the time jumps · marimba in
-// the dermis · a saw lead on the first climax (the fragmentation, 14.0 s) ·
-// warm plucks on the second (the phagocytosis click, 24.0 s) · the band
-// low-passed inside the cell · liquid arpeggios down the lymphatic vessel ·
-// chip pulses climbing an octave through the treatment course · bells on the
-// final result (44.0 s) · a riser back into bar 1 (seamless loop).
+// 120 BPM, 24 bars = 48.000 s, D major. One five-note motif climbs the
+// D-major pentatonic in leaps (D–F#–B–E–A, every second note, on dotted
+// eighths). It changes instrument with the story and gets lighter as the
+// tattoo fades: bright lead in the hook · glass bell for the time jumps ·
+// marimba in the dermis · a saw lead on the first climax (the fragmentation,
+// 14.0 s) · warm plucks on the second (the phagocytosis click, 24.0 s) · the
+// band low-passed inside the cell · liquid arpeggios down the lymphatic
+// vessel · chip pulses climbing an octave through the treatment course · bells
+// on the final result (44.0 s) · a riser back into bar 1 (seamless loop).
 // SFX: every cue is read from the same event table (EV, 03_clock.js) that
 // draws the picture, so each sound starts on the frame its event is drawn
 // (all event times sit on the eighth-note grid = 15 frames). Each physical
@@ -1849,18 +1962,18 @@ const nm = (n, o) => 12 * (o + 1) + NOTE[n];
 const fq = (n, o) => mtof(nm(n, o));
 const PENT_OFF = [0, 2, 4, 7, 9];
 const pent = (i, o) => mtof(nm('D', o) + PENT_OFF[((i % 5) + 5) % 5] + 12 * Math.floor(i / 5));   // i-th step up the D pentatonic from D(o)
-// ---------------------------------------------------------------- harmony and the star motif
+// ---------------------------------------------------------------- harmony and the motif
 const CHORDS = ['D', 'A', 'Bm', 'G', 'Bm', 'G', 'A', 'D', 'A', 'Bm', 'G', 'A', 'D', 'Bm', 'G', 'A', 'Bm', 'G', 'D', 'A', 'Bm', 'G', 'D', 'A'];
 const CROOT = { D: 'D', A: 'A', Bm: 'B', G: 'G' }, CMIN = { Bm: 1 };
 function rootM(ch, oct) { return nm(CROOT[ch], oct); }
 function triad(ch, oct) { const r = rootM(ch, oct); return [r, r + (CMIN[ch] ? 3 : 4), r + 7]; }
-const STAR_NOTES = [nm('D', 4), nm('F#', 4), nm('B', 4), nm('E', 5), nm('A', 5)];   // the pentagram path through the pentatonic
-const STAR_RH = [[0, 2], [3, 2], [6, 2], [9, 2], [12, 4]];                          // dotted eighths: [16th step, length]
+const MOTIF_NOTES = [nm('D', 4), nm('F#', 4), nm('B', 4), nm('E', 5), nm('A', 5)];  // every second note of the pentatonic, rising
+const MOTIF_RH = [[0, 2], [3, 2], [6, 2], [9, 2], [12, 4]];                          // dotted eighths: [16th step, length]
 const GATES = [[13.875, 14.0], [23.875, 24.0]];                                      // a breath before each climax
 function musicEvents() {
   const ev = [], E = o => ev.push(o);
   const at = (b, beat) => barT(b) + beat * BEAT, ch = b => CHORDS[b - 1];
-  const star = (b, k, v, o) => { o = o || {}; const lift = 12 * (o.lift || 0), t0 = barT(b) + (o.shift || 0) * BEAT; STAR_RH.forEach(([st, l], i) => { if (!o.only || o.only(i)) E({ t: t0 + st * S16, d: l * S16, k, m: STAR_NOTES[i] + lift, v: v * (i === 4 ? 1.1 : 1), cut: o.cut, post: o.post }); }); };
+  const motif = (b, k, v, o) => { o = o || {}; const lift = 12 * (o.lift || 0), t0 = barT(b) + (o.shift || 0) * BEAT; MOTIF_RH.forEach(([st, l], i) => { if (!o.only || o.only(i)) E({ t: t0 + st * S16, d: l * S16, k, m: MOTIF_NOTES[i] + lift, v: v * (i === 4 ? 1.1 : 1), cut: o.cut, post: o.post }); }); };
   const D = (b, beat, k, v, x) => E(Object.assign({ t: at(b, beat), d: 0.5, k, v }, x || {}));
   const kick4 = (b, v, from) => { for (let i = from || 0; i < 4; i++) D(b, i, 'kick', v); };
   const claps = (b, v) => { D(b, 1, 'clap', v); D(b, 3, 'clap', v); };
@@ -1876,15 +1989,15 @@ function musicEvents() {
   const stab = (b, beat, v) => E({ t: at(b, beat), d: 0.3 * BEAT, k: 'stab', ms: triad(ch(b), 4), v });
   const arp = (b, k, v, oct, up) => { const tr = triad(ch(b), oct), seq = up ? [0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6] : [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 2, 3]; for (let i = 0; i < 16; i++) { const s_ = seq[i], m = tr[s_ % 3] + 12 * Math.floor(s_ / 3); E({ t: at(b, i / 4), d: 0.22 * BEAT, k, m, v: v * (i % 4 === 0 ? 1 : 0.7), p: i % 2 ? 0.3 : -0.3 }); } };
   const halfTime = (b, v) => { D(b, 0, 'kick', 0.75 * v); D(b, 2.5, 'kick', 0.55 * v); D(b, 2, 'snap', 0.5 * v); shaker(b, 0.4 * v); };
-  // ---- A: the hook (bar 1) — kick, sub and pad leave room for the laser's four snaps; the star motif on a bright lead
+  // ---- A: the hook (bar 1) — kick, sub and pad leave room for the laser's four snaps; the motif on a bright lead
   E({ t: 0, d: 1.4, k: 'crash', v: 0.45 }); D(1, 0, 'kick', 0.9); D(1, 1.5, 'kick', 0.7); D(1, 2, 'kick', 0.85); D(1, 3, 'clap', 0.5); hats(1, 0.4, true);
-  sub(1, 0.7); pad(1, 0.4, 1500); star(1, 'starlead', 0.75);
+  sub(1, 0.7); pad(1, 0.4, 1500); motif(1, 'starlead', 0.75);
   // bar 2: weeks pass (the motif on a glass bell), then the lift into the skin (a downlifter and the dive)
-  D(2, 0, 'kick', 0.8); hats(2, 0.3); pad(2, 0.42, 1100); sub(2, 0.55, [0]); star(2, 'glass', 0.55, { only: i => i < 3 });
+  D(2, 0, 'kick', 0.8); hats(2, 0.3); pad(2, 0.42, 1100); sub(2, 0.55, [0]); motif(2, 'glass', 0.55, { only: i => i < 3 });
   E({ t: 3.0, d: 0.9, k: 'down', v: 0.45 });
   // ---- B: the ink in the dermis and the pulse inside it (bars 3–7)
   for (const b of [3, 4]) { halfTime(b, 0.85); pad(b, 0.36, 1000); bassBounce(b, 0.55); }
-  star(3, 'marimba', 0.8); arp(4, 'sqarp', 0.32, 5, true);                                           // bar 4: light shimmer as the photons cross the skin
+  motif(3, 'marimba', 0.8); arp(4, 'sqarp', 0.32, 5, true);                                           // bar 4: light shimmer as the photons cross the skin
   // bars 5–6: the absorption builds (pulsing bass, an opening pad, a riser), the expansion lands at 11.0 s
   for (const b of [5, 6]) { kick4(b, 0.85); hats(b, 0.35, true); for (let i = 0; i < 8; i++) E({ t: at(b, i * 0.5), d: 0.4 * BEAT, k: 'bass', m: root(b, 2) + (i % 2 ? 12 : 0), v: 0.5 + 0.03 * i + (b - 5) * 0.1 }); sub(b, 0.55); }
   E({ t: at(5, 0), d: 4 * BAR / 2, k: 'pad', ms: triad('Bm', 3).concat([nm('F#', 4)]), v: 0.4, cut: 700, cutTo: 2600 });
@@ -1896,41 +2009,41 @@ function musicEvents() {
   E({ t: 14.0, d: 2.2, k: 'impact', v: 0.8 }); E({ t: 14.0, d: 1.8, k: 'crash', v: 0.7 });
   kick4(8, 1.0); claps(8, 0.7); hats(8, 0.5, false, true); bassRoll(8, 0.8);
   E({ t: at(8, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('D', 5)]), v: 0.65 });
-  star(8, 'laser', 0.8, { cut: 5200 }); star(8, 'pluck', 0.35, { lift: 1 });
+  motif(8, 'laser', 0.8, { cut: 5200 }); motif(8, 'pluck', 0.35, { lift: 1 });
   // bar 9: before / after — lighter
-  D(9, 0, 'kick', 0.85); D(9, 2, 'kick', 0.75); D(9, 3, 'clap', 0.5); hats(9, 0.4); pad(9, 0.4, 1500); sub(9, 0.6); star(9, 'pluck', 0.6);
+  D(9, 0, 'kick', 0.85); D(9, 2, 'kick', 0.75); D(9, 3, 'clap', 0.5); hats(9, 0.4); pad(9, 0.4, 1500); sub(9, 0.6); motif(9, 'pluck', 0.6);
   // ---- C: the macrophage (bars 10–12): an organic, bouncing groove, then the build to the closure
   for (const b of [10, 11]) { D(b, 0, 'kick', 0.85); D(b, 1.75, 'kick', 0.55); D(b, 2.5, 'kick', 0.7); D(b, 1, 'snap', 0.5); D(b, 3, 'snap', 0.5); shaker(b, 0.45); bassBounce(b, 0.65); pad(b, 0.34, 1200); }
-  star(10, 'marimba', 0.75); star(11, 'marimba', 0.6, { only: i => i !== 2 });
+  motif(10, 'marimba', 0.75); motif(11, 'marimba', 0.6, { only: i => i !== 2 });
   kick4(12, 0.9); hats(12, 0.45, true); bassRoll(12, 0.7); pad(12, 0.38, 1800); roll(12, 0, 3.5, 0.25, 0.15, 0.6); roll(12, 3, 3.75, 0.125, 0.6, 0.85);
   E({ t: at(12, 0), d: 3.75 * BEAT, k: 'riser', v: 0.7 });
   // ---- second climax (bar 13): the uptake click — warm and satisfying
   E({ t: 24.0, d: 2.0, k: 'impact', v: 0.7 }); E({ t: 24.0, d: 1.6, k: 'crash', v: 0.6 });
   kick4(13, 1.0); claps(13, 0.65); hats(13, 0.5, true); bassOff(13, 0.8);
   E({ t: at(13, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('A', 4)]), v: 0.55 });
-  star(13, 'pluck', 0.85); star(13, 'glass', 0.35, { lift: 1 });
+  motif(13, 'pluck', 0.85); motif(13, 'glass', 0.35, { lift: 1 });
   // bar 14: inside the cell (the whole band is low-passed: see bandFilter)
-  halfTime(14, 0.8); pad(14, 0.5, 1400); sub(14, 0.6); star(14, 'glass', 0.5, { only: i => i % 2 === 0 });
+  halfTime(14, 0.8); pad(14, 0.5, 1400); sub(14, 0.6); motif(14, 'glass', 0.5, { only: i => i % 2 === 0 });
   // ---- the lymphatic vessel (bars 15–16): liquid arpeggios on a steady beat
   for (const b of [15, 16]) { kick4(b, 0.85); D(b, 1, 'clap', 0.4); D(b, 3, 'clap', 0.4); hats(b, 0.35); bassOff(b, 0.65); arp(b, 'sqarp', 0.4, 5, b === 16); pad(b, 0.3, 1300); }
-  star(15, 'glass', 0.55);
+  motif(15, 'glass', 0.55);
   // bar 17: weeks of clearance — a ticking clock, sparse motif
-  D(17, 0, 'kick', 0.7); D(17, 2, 'kick', 0.6); hats(17, 0.3, true); pad(17, 0.45, 1000); sub(17, 0.5); star(17, 'marimba', 0.55, { only: i => i % 2 === 0 });
+  D(17, 0, 'kick', 0.7); D(17, 2, 'kick', 0.6); hats(17, 0.3, true); pad(17, 0.45, 1000); sub(17, 0.5); motif(17, 'marimba', 0.55, { only: i => i % 2 === 0 });
   // bar 18: back to the surface; a riser into the next session
   D(18, 0, 'kick', 0.8); D(18, 2, 'kick', 0.7); pad(18, 0.4, 1600); sub(18, 0.55); E({ t: at(18, 1), d: 3 * BEAT, k: 'riser', v: 0.55 });
   // ---- D: the next session (bars 19–20): the groove returns; four stabs land with the four steps
-  kick4(19, 0.95); claps(19, 0.6); hats(19, 0.45, true); bassOff(19, 0.75); pad(19, 0.35, 1800); star(19, 'pluck', 0.75);
+  kick4(19, 0.95); claps(19, 0.6); hats(19, 0.45, true); bassOff(19, 0.75); pad(19, 0.35, 1800); motif(19, 'pluck', 0.75);
   kick4(20, 0.95); hats(20, 0.4, true); bassOff(20, 0.7); for (let i = 0; i < 4; i++) stab(20, i, 0.45);
-  // ---- E: the treatment course (bars 21–22): building as the star fades; the motif climbs an octave
+  // ---- E: the treatment course (bars 21–22): building as the tattoo fades; the motif climbs an octave
   for (const b of [21, 22]) { kick4(b, 1.0); claps(b, 0.65); hats(b, 0.5, true); shaker(b, 0.35); bassRoll(b, 0.75); arp(b, 'chiparp', 0.4, 5, b === 22); }
-  star(21, 'chip', 0.75); star(22, 'chip', 0.75, { lift: 1 }); roll(22, 2, 4, 0.25, 0.2, 0.7); E({ t: at(22, 0), d: 4 * BEAT, k: 'riser', v: 0.65 });
-  // ---- the final result (bar 23): the star is gone — a big, clean D-major chord, the motif on bells
+  motif(21, 'chip', 0.75); motif(22, 'chip', 0.75, { lift: 1 }); roll(22, 2, 4, 0.25, 0.2, 0.7); E({ t: at(22, 0), d: 4 * BEAT, k: 'riser', v: 0.65 });
+  // ---- the final result (bar 23): the tattoo is gone — a big, clean D-major chord, the motif on bells
   E({ t: 44.0, d: 2.2, k: 'impact', v: 0.7 }); E({ t: 44.0, d: 2.0, k: 'crash', v: 0.7 });
   kick4(23, 1.0); claps(23, 0.6); hats(23, 0.45, false, true); bassOff(23, 0.8);
   E({ t: at(23, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('F#', 5), nm('A', 5)]), v: 0.6 });
-  star(23, 'glass', 0.7, { lift: 1 }); star(23, 'pluck', 0.5);
+  motif(23, 'glass', 0.7, { lift: 1 }); motif(23, 'pluck', 0.5);
   // bar 24: the title, the rewind, a riser into bar 1
-  D(24, 0, 'kick', 0.8); D(24, 2, 'kick', 0.6); pad(24, 0.5, 2000); sub(24, 0.6); star(24, 'glass', 0.45, { only: i => i < 4 });
+  D(24, 0, 'kick', 0.8); D(24, 2, 'kick', 0.6); pad(24, 0.5, 2000); sub(24, 0.6); motif(24, 'glass', 0.45, { only: i => i < 4 });
   roll(24, 3, 4, 0.125, 0.25, 0.7); E({ t: at(24, 1), d: 3 * BEAT, k: 'riser', v: 0.6 });
   return ev;
 }
@@ -2143,7 +2256,7 @@ function playSfx(e, L, R) {
     case 'cue2': { let ph = 0; V(e.t, 0.16, 0.3, t => { ph += 300 * Math.pow(5, Math.min(1, t / 0.1)) / SR; ph -= Math.floor(ph); return (2 * ph - 1) * 0.5 * (t < 0.1 ? 1 : Math.max(0, 1 - (t - 0.1) / 0.06)); }, 0.2); break; }
     case 'cue3': for (let i = 0; i < 4; i++) V(e.t + i * 0.025, 0.05, 0.28, noiseBP(() => 2800 + 400 * i, 0.2, dec(60), sd + i), 0.15, -0.3 + 0.2 * i); break;
     case 'cue4': V(e.t, 0.25, 0.36, sine(t => 160 * (1 + 1.2 * Math.exp(-t * 16)), att(0.004, 12)), 0.2); V(e.t + 0.06, 0.4, 0.22, bell(fq('A', 5), 8, 0.8), 0.4); break;
-    // the treatment course: ascending clock ticks over a tone that fades as the star does
+    // the treatment course: ascending clock ticks over a tone that fades as the tattoo does
     case 'stage': V(e.t, 0.025, 0.3, sine(() => 2400, dec(180)), 0.1); V(e.t, 0.5, 0.3, bell(f, 6, 0.8), 0.45); break;
     case 'fadetone': V(e.t, d, 0.07, (t) => (fsin(TAU * fq('A', 4) * t) + 0.4 * fsin(TAU * fq('E', 5) * t)) * Math.min(1, t / 0.3) * Math.pow(1 - clamp(t / d, 0, 1), 1.5), 0.5); break;
     case 'complete': [['D', 5], ['F#', 5], ['A', 5], ['D', 6], ['E', 6]].forEach(([n, o], i) => V(e.t + i * 0.03, 1.6, 0.13, bell(fq(n, o), 2.2, 0.9), 0.55, -0.4 + 0.2 * i)); V(e.t, 0.6, 0.12, sine(() => fq('D', 3), att(0.01, 4)), 0.3); break;

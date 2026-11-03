@@ -5,8 +5,10 @@ grouped in 5 continuous sequences, 9:16, original 16-bit pixel art in a Kurzgesa
 travel: forearm → skin block → dermis → one ink aggregate → one macrophage → one lymphatic vessel → back to the same
 forearm), rendered entirely in code (HTML5 Canvas 2D and JavaScript), with an original electronic soundtrack and SFX
 synthesised sample by sample in the same JavaScript. No narration, no subtitles, only short English labels. The model
-is a Q-switched Nd:YAG laser at 1064 nm on one small black five-pointed star outline on a forearm. It is an
-educational model: the final clear skin is an illustrative outcome, and results vary.
+is a Q-switched Nd:YAG laser at 1064 nm on one black dragon tattoo on a forearm (Eastern-style line work: a
+serpentine scaled body with a spiked crest, a horned head with an open mouth and whiskers, two clawed legs and a
+flame-tipped tail; the brief's star was changed to a dragon at the user's request). It is an educational model: the
+final clear skin is an illustrative outcome, and results vary.
 
 - `index.html` is a self-contained player: open it in a browser (click to play, arrows to seek, M to mute). It
   synthesises the soundtrack in a few seconds after the first frame appears.
@@ -31,7 +33,7 @@ cd tattoo_8bit
 node tools/export.js                  # full MP4 -> output/tattoo_8bit.mp4
 node tools/export.js --video-only     # picture only -> build/video.mp4
 node tools/export.js --audio-only     # soundtrack only -> build/audio.wav
-node tools/stills.js out.png 0 0.52 13.6 24.0 44.5 47.7 --scale 2   # check any frames
+node tools/stills.js out.png 0 1.6 13.6 24.0 42.6 47.7 --scale 2   # check any frames
 ```
 
 No browser is needed for the export: the picture (about 40 ms per frame in Node) and the soundtrack (about 4 s) are
@@ -50,17 +52,17 @@ proxy for the skill's `film_gate.py`).
 ## The hook (0–4 s)
 
 No title, no fade-in: the device, the tattoo, the pulse and the response are all on screen within two seconds.
-- **0.0 s** a forearm with a small black star tattoo; a gloved hand holds the laser handpiece over the star's top
-  point (red aiming dot).
+- **0.0 s** a forearm with a black dragon tattoo winding down it; a gloved hand holds the laser handpiece over the
+  dragon's neck (red aiming dot).
 - **0.25 / 0.5 / 0.75 / 1.0 s** four pulses (4 Hz, a real Q-switched repetition rate), each with a sharp snap; each
   spot turns chalk white (frosting) with a fizz. **TEMPORARY FROSTING**.
-- **2.0 s** **WEEKS LATER**: the white is gone, the star is a little lighter (still clearly visible).
-- **3.0–4.3 s** the patch around the treated point lifts out as a cut-away block (EPIDERMIS, DERMIS, TATTOO
+- **2.0 s** **WEEKS LATER**: the white is gone, the dragon is a little lighter (still clearly visible).
+- **3.0–4.3 s** the patch around the treated neck lifts out as a cut-away block (EPIDERMIS, DERMIS, TATTOO
   PIGMENT) and the camera dives into the ink: **INSIDE THE SKIN**.
 
 ## One example, followed through
 
-**One forearm, one star, one handpiece; one ink aggregate followed from the dermis through absorption, expansion and
+**One forearm, one dragon tattoo, one handpiece; one ink aggregate followed from the dermis through absorption, expansion and
 fragmentation; three of its fragments followed into one macrophage; some ink followed into one lymphatic vessel; back
 to the same forearm.** The pulse itself lasts nanoseconds and is shown in slow motion (chip SLOW MOTION ·
 NANOSECONDS); clearance takes weeks (WEEKS LATER, OVER WEEKS, the treatment timeline).
@@ -68,10 +70,10 @@ NANOSECONDS); clearance takes weeks (WEEKS LATER, OVER WEEKS, the treatment time
 | # | Time (s) | Caption / labels | What happens |
 |---|---|---|---|
 | **A** | **0–4** | **Hook** | |
-| 01 | 0–1 | — | Four pulses along the star's top point. |
+| 01 | 0–1 | — | Four pulses along the dragon's neck. |
 | 02 | 1–2 | TEMPORARY FROSTING | The treated spots frost white; a faint redness around them. |
-| 03 | 2–3 | WEEKS LATER | Same arm, same framing: the frost is gone, the star slightly lighter. |
-| 04 | 3–4 | INSIDE THE SKIN · EPIDERMIS · TATTOO PIGMENT · DERMIS | The patch lifts into a cut-away block (the ink sits in the dermis under the star line); the camera dives in. |
+| 03 | 2–3 | WEEKS LATER | Same arm, same framing: the frost is gone, the dragon slightly lighter. |
+| 04 | 3–4 | INSIDE THE SKIN · EPIDERMIS · TATTOO PIGMENT · DERMIS | The patch lifts into a cut-away block (the ink sits in the dermis under the dragon's lines); the camera dives in. |
 | **B** | **4–19** | **How the laser breaks the ink** | |
 | 05 | 4–6 | INK IN THE DERMIS · EPIDERMIS · DERMIS · INK INSIDE A MACROPHAGE · LARGE INK AGGREGATE | The dermis in cross-section: ink clusters, resident macrophages already holding ink, capillary loops, a lymphatic vessel; one large aggregate is ringed. |
 | 06 | 6–8 | 1064 nm LASER · SCATTERED LIGHT · TATTOO INK | The next pulse inside the skin: photons (drawn as faint violet-red wave packets) cross the epidermis; three scatter; most reach the ink. Chip INVISIBLE IN REALITY. |
@@ -87,10 +89,10 @@ NANOSECONDS); clearance takes weeks (WEEKS LATER, OVER WEEKS, the treatment time
 | 15 | 28–31 | LYMPHATIC TRANSPORT · LYMPHATIC VESSEL · INK-LADEN MACROPHAGE · LYMPH NODE | Small fragments slip through gaps between the vessel wall's overlapping cells, an ink-laden macrophage squeezes in, the flow carries them; an inset traces the path up the arm to a lymph node. Chip SOME INK, NOT ALL. |
 | 16 | 31–33 | GRADUAL CLEARANCE · INK IN THIS AREA | Back to the whole dermis: over weeks the clusters thin out in seven steps (a meter falls); some ink ends up inside macrophages. Chip OVER WEEKS. |
 | **D** | **33–40** | **Tattoo fading over time** | |
-| 17 | 33–36 | WEEKS LATER | Out through the block to the same forearm: the star is noticeably lighter, the skin healed. |
+| 17 | 33–36 | WEEKS LATER | Out through the block to the same forearm: the dragon is noticeably lighter, the skin healed. |
 | 18 | 36–40 | NEXT SESSION · LASER HANDPIECE · 1 REMAINING PIGMENT · 2 ENERGY ABSORPTION · 3 SMALLER FRAGMENTS · 4 IMMUNE CLEARANCE | Pull back to the treatment setting (console: Nd:YAG, 1064 nm, Q-SWITCHED): four more pulses, then four numbered mini-panels light up on the beat. |
 | **E** | **40–48** | **Final time-lapse** | |
-| 19 | 40–45 | THE TREATMENT COURSE · SESSION 1 · WEEKS LATER · SESSION 2 · WEEKS LATER · ADDITIONAL SESSIONS · FINAL RESULT | The same close-up, perfectly aligned, with a timeline: the star goes dark → slightly lighter → patchy → faint → no longer visible, with frost at each session and a clear time jump between. Chip RESULTS VARY. |
+| 19 | 40–45 | THE TREATMENT COURSE · SESSION 1 · WEEKS LATER · SESSION 2 · WEEKS LATER · ADDITIONAL SESSIONS · FINAL RESULT | The same close-up, perfectly aligned, with a timeline: the dragon goes dark → slightly lighter → patchy → faint → no longer visible, with frost at each session and a clear time jump between. Chip RESULTS VARY. |
 | 20 | 45–48 | LASER → FRAGMENTS → MACROPHAGE → FADING · HOW LASERS REMOVE TATTOOS · BACK TO THE START | The clear forearm, a four-icon recap, the title; the timeline rewinds to the opening frame. |
 
 ## Colour code (fixed for the whole film; colours are educational)
@@ -109,9 +111,8 @@ NANOSECONDS); clearance takes weeks (WEEKS LATER, OVER WEEKS, the treatment time
 ## Sound design
 
 An original electronic score, synthesised in plain JavaScript (no samples): 120 BPM in D major, one chord per bar.
-**The theme is the tattoo itself**: a five-note "star" motif that walks the D-major pentatonic the way a pentagram
-joins the points of a star (D–F#–B–E–A, every second note, rising, on dotted eighths). It changes instrument with the
-story and grows lighter as the star fades:
+One five-note motif climbs the D-major pentatonic in leaps (D–F#–B–E–A, every second note, on dotted eighths). It
+changes instrument with the story and grows lighter as the tattoo fades:
 
 | Bars (time) | Chapter | Music |
 |---|---|---|
@@ -125,7 +126,7 @@ story and grows lighter as the star fades:
 | 14 (26–28 s) | Inside the cell | The whole band is heard muffled (low-passed) and opens as the camera leaves |
 | 15–17 (28–34 s) | Lymph flow, clearance | Liquid arpeggios on a steady beat, then a ticking clock and a sparse motif |
 | 18–20 (34–40 s) | Back out, the next session | A riser, the groove returns; four stabs land with the four steps |
-| 21–22 (40–44 s) | The treatment course | Chip lead and arpeggios building; the motif climbs an octave as the star fades |
+| 21–22 (40–44 s) | The treatment course | Chip lead and arpeggios building; the motif climbs an octave as the tattoo fades |
 | 23 (44–46 s) | **Final result** | A big, clean D-major chord, the motif on bells |
 | 24 (46–48 s) | Title, rewind | Soft bells and a riser back into bar 1 |
 
@@ -140,7 +141,7 @@ split with fragments tinkling apart, a liquid drift, a squishy living texture fo
 reaches, the membrane stretching, **the closure's gloop and the uptake click**, the vesicle popping in, a muffled
 interior, three lysosome plops, the lymph flow with three slips and a squeeze, the node's chime, **seven diminishing
 tones** of clearance, the snaps and fizz of the next session, four distinct step cues, **five ascending time-lapse
-ticks** over a tone that fades as the star does, a clean completion chord, recap pops, the title chord and a tape
+ticks** over a tone that fades as the tattoo does, a clean completion chord, recap pops, the title chord and a tape
 rewind into the loop. The band ducks under the important ones. Microscopic processes are not audible in reality:
 this is educational sound design.
 
@@ -154,12 +155,12 @@ this is educational sound design.
   pulse); on the rendered SFX-only stem the measured onsets of 77 percussive cues are a median 0.44 ms and at most
   3.8 ms from their event time (one frame is 16.7 ms).
 - **Skill film gate** (`film_gate.py`, on a 720×1280 QA proxy rendered at 30 fps from the same engine; the proxy is
-  not a deliverable): passed. Fast-motion frames 0.213 (worst 24 s window 0.184), no blank stretch, blue-purple
-  frames under 1 %, still frames 7.7 % with the longest still stretch 0.5 s, 5.8 visual events per 10 s, dead
-  background 0.15. Two yellows, both by design: (1) the fixed-frame share 0.385 comes from the locked close-up of the
+  not a deliverable): passed. Fast-motion frames 0.220 (worst 24 s window 0.193), no blank stretch, blue-purple
+  frames under 1 %, still frames 7.0 % with the longest still stretch 0.42 s, 5.4 visual events per 10 s, dead
+  background 0.16. Two yellows, both by design: (1) the fixed-frame share 0.385 comes from the locked close-up of the
   forearm, which the brief requires (same forearm, same tattoo position, same camera angle for the hook and the
   whole time-lapse), plus the treatment timeline; (2) 10 push-ins per minute: this is a scale-travel film
-  (forearm → block → dermis → aggregate → cell), and the push-ins are answered by pull-backs (push-ins are 36 % of all
+  (forearm → block → dermis → aggregate → cell), and the push-ins are answered by pull-backs (push-ins are 42 % of all
   push and pull events): aggregate → tissue → macrophage, cell → vessel → whole dermis, dermis → block → forearm, the
   close-up → the treatment setting.
 - **Motion scan** (`tools/qa_motion.js`, 30 fps): no window of 0.5 s or more with under 0.3 % of the pixels moving,
@@ -231,8 +232,9 @@ Sciences, *Immune Response in Laser Tattoo Removal: A Systematic Review*.
 |---|---|
 | `src/00_core.js` | the pixel engine: buffers, primitives, masks, shading, camera, smooth blends, the palette |
 | `src/01_font.js`, `src/02_pal.js`, `src/05_fx.js` | pixel fonts, noise and periodic motion, small shapes |
-| `src/03_clock.js` | the 120 BPM grid, the scene table and **the event table (EV)** that drives both picture and sound; the star's fade over the film |
-| `src/10_arm.js` | the forearm: skin, the star tattoo with patchy fading, frosting, the handpiece, glove, articulated arm, console |
+| `src/03_clock.js` | the 120 BPM grid, the scene table and **the event table (EV)** that drives both picture and sound; the tattoo's fade over the film |
+| `src/09_dragon.js` | the dragon tattoo: its body curve, scales, crest, head, legs and tail, built once into an ink raster that every shot samples |
+| `src/10_arm.js` | the forearm: skin, the tattoo with patchy fading, frosting, the handpiece, glove, articulated arm, console |
 | `src/11_block.js` | the cut-away skin block |
 | `src/12_micro.js` | the micro world: dermis layers, vessels, cells, scattered ink, the hero aggregate (particles, cracks, fragments), photons, pressure wave, bubbles, lymph fragments |
 | `src/13_cell.js` | macrophages: resident cells with ink, the hero macrophage (crawl, reach, phagocytic cup, vesicle, lysosomes), the one that enters the lymph |

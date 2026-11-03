@@ -41,7 +41,7 @@ body { display: flex; flex-direction: column; min-height: 100%; }
 </head>
 <body>
 <div id="stage">
-  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a laser handpiece fires four pulses on a black star tattoo on a forearm, which frosts white; weeks later the star is a little lighter; the camera enters the skin, where near-infrared light is absorbed by an ink aggregate in the dermis, which heats, expands and cracks into smaller fragments; a macrophage engulfs some fragments, some ink travels through a lymphatic vessel to a lymph node; over weeks and several sessions the star fades until it is no longer visible"></canvas>
+  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a laser handpiece fires four pulses on a black dragon tattoo on a forearm, which frosts white; weeks later the star is a little lighter; the camera enters the skin, where near-infrared light is absorbed by an ink aggregate in the dermis, which heats, expands and cracks into smaller fragments; a macrophage engulfs some fragments, some ink travels through a lymphatic vessel to a lymph node; over weeks and several sessions the dragon fades until it is no longer visible"></canvas>
   <div id="loading">LOADING…</div>
 </div>
 <div id="bar">

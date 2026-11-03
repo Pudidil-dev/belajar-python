@@ -18,9 +18,9 @@ function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[
 const T = i => SC_T[i];
 const range = (a, b, step) => { const o = []; for (let x = a; x <= b + 1e-9; x += step) o.push(Math.round(x * 1000) / 1000); return o; };
 const EV = {
-  // A — the hook: four pulses along the top point of the star (4 Hz, a real Q-switched repetition rate)
+  // A — the hook: four pulses along the dragon's neck (4 Hz, a real Q-switched repetition rate)
   hook: [0.25, 0.5, 0.75, 1.0],
-  weeks1: 2.0,                                   // WEEKS LATER: the frosting is gone, the star a little lighter
+  weeks1: 2.0,                                   // WEEKS LATER: the frosting is gone, the dragon a little lighter
   tilt: 3.0,                                     // the skin lifts into a cut-away block
   dive: 3.5,                                     // and the camera dives into its front face
   ambient: 4.25,                                 // arrival in the dermis
@@ -47,13 +47,13 @@ const EV = {
   steps4: [38.0, 38.5, 39.0, 39.5],              // REMAINING PIGMENT → ENERGY ABSORPTION → SMALLER FRAGMENTS → IMMUNE CLEARANCE
   // E — the payoff time-lapse and the loop
   labels: [[40.0, 'SESSION 1'], [40.75, 'WEEKS LATER'], [41.5, 'SESSION 2'], [42.25, 'WEEKS LATER'], [43.0, 'ADDITIONAL SESSIONS'], [44.0, 'FINAL RESULT']],
-  stages: [40.0, 40.75, 42.25, 43.5, 44.0],      // the five states of the star (five ascending ticks)
-  stageFade: [0, 0.2, 0.5, 0.8, 1.0],            // how far the star has faded at each
+  stages: [40.0, 40.75, 42.25, 43.5, 44.0],      // the five states of the tattoo (five ascending ticks)
+  stageFade: [0, 0.2, 0.5, 0.8, 1.0],            // how far the tattoo has faded at each
   pulses3: [40.25, 40.5, 41.75, 42.0, 43.0, 43.25],
   done: 45.0, recap: [45.25, 45.5, 45.75, 46.0], title: 46.5, rewind: 47.5,
 };
-// the star's fade (0 = as tattooed, 1 = no longer visible) at the surface, over the whole film
-function starFade(t) {
+// the tattoo's fade (0 = as tattooed, 1 = no longer visible) at the surface, over the whole film
+function inkFade(t) {
   if (t < EV.weeks1) return 0;
   if (t < 33.0) return 0.15 * smooth(seg(t, EV.weeks1, EV.weeks1 + 0.5));
   if (t < 40.0) return lerp(0.15, 0.38, smooth(seg(t, EV.weeks2, EV.weeks2 + 0.5)));

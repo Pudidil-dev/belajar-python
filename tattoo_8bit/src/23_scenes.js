@@ -1,11 +1,11 @@
 'use strict';
 // ============================================================================
 // SCENE COMPOSITOR: 20 micro-scenes in 5 continuous sequences (SC_T, 120 BPM).
-// One forearm, one black star, one handpiece; one ink aggregate followed from
+// One forearm, one black dragon tattoo, one handpiece; one ink aggregate followed from
 // the dermis through absorption, expansion and fragmentation; some of its
 // fragments followed into one macrophage, some ink into one lymphatic vessel;
 // back out to the same forearm, the next session, and the whole treatment
-// course until the star is no longer visible; the course rewinds to frame one.
+// course until the tattoo is no longer visible; the course rewinds to frame one.
 // Scales join with calm zoom crossfades (arm → skin block → dermis and back).
 // Passes: visual (worlds and crossfades, by time), hud (time labels, timeline,
 // step bars, insets, recap), tags (leader labels), overlays (captions, chips,
@@ -107,7 +107,7 @@ function hud(t) {
 }
 // ============================================================================ pass 3: leader-line tags on the things themselves
 function tags(t) {
-  if (t < 3.0) { tag('TEMPORARY FROSTING', STAR.cx, STAR.cy - STAR.R + 32, 22, 190, 1.25, 1.95, t, P.FR1, 2); return; }
+  if (t < 3.0) { tag('TEMPORARY FROSTING', HOOK_C[0], HOOK_C[1] - 6, 40, 100, 1.25, 1.95, t, P.FR1, 2); return; }
   if (t < 4.3) {
     const c = blockCam(t), A_ = (u, w) => { const p = blkPt(u, w); return [c.x(p[0]), c.y(p[1])]; };
     let a = A_(0.1, 0.05); tag('EPIDERMIS', a[0], a[1], 24, 112, 3.5, 4.15, t, P.EP2, 2);

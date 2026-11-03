@@ -5,6 +5,11 @@
 // the lymph-node inset, the "ink in view" meter and the closing recap icons.
 // All drawn in screen space inside the short-video safe area.
 // ============================================================================
+// a tiny dragon glyph (an S-shaped body with a head dot) for the insets and the recap
+function miniDragon(x, y, r, c) {
+  let q = null; for (let k = 0; k <= 16; k++) { const u = k / 16, px = x + r * 0.9 * Math.sin(u * TAU * 0.95), py = y - r + 2 * r * u; if (q) lineW(q[0], q[1], px, py, 1.4, c); q = [px, py]; }
+  disc(x, y - r - 1, 1.8, c);
+}
 // a small clock that spins while time jumps
 function clockIcon(x, y, r, spin) {
   disc(x, y, r + 1, P.K0); disc(x, y, r, P.INK); disc(x, y, r - 1.5, P.N2);
@@ -91,9 +96,9 @@ function lymphInset(t) {
   const k = K75(clamp((t - EV.node) / 0.2, 0, 1)) * (t > 30.95 ? (31.2 - t) / 0.25 : 1); if (k <= 0) return;
   withDither(k, () => {
     const x0 = 170, y0 = 92, x1 = 300, y1 = 300, m = maskRR(x0, y0, x1, y1, 10); mFill(m, P.K0); mOutline(m, P.LY2);
-    // the whole arm: hand at the bottom, forearm with the star, elbow, upper arm up to the armpit
+    // the whole arm: hand at the bottom, forearm with the tattoo, elbow, upper arm up to the armpit
     const arm = maskPoly([214, 290, 236, 290, 246, 236, 254, 196, 266, 160, 270, 106, 246, 106, 240, 158, 226, 196, 216, 238]); shade(arm, P.SK3, P.SK4, P.SK2, P.SK1, {});
-    const sx = 231, sy = 244; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU / 5, b = -Math.PI / 2 + (i + 2) * TAU / 5; line(sx + Math.cos(a) * 6, sy + Math.sin(a) * 6, sx + Math.cos(b) * 6, sy + Math.sin(b) * 6, P.IK1); }
+    const sx = 231, sy = 244; miniDragon(sx, sy, 7, P.IK1);
     // the lymphatic path drawn up the arm to the node at the elbow, then on toward the armpit
     const pts = [sx, sy - 8, 236, 222, 242, 202, 248, 186, 254, 160, 258, 124], u = clamp((t - EV.node) / 0.5, 0, 1), nseg = pts.length / 2 - 1;
     for (let i = 0; i < nseg; i++) { const v = clamp(u * nseg - i, 0, 1); if (v <= 0) break; lineW(pts[2 * i], pts[2 * i + 1], lerp(pts[2 * i], pts[2 * i + 2], v), lerp(pts[2 * i + 1], pts[2 * i + 3], v), 2.4, P.LY2); }
@@ -120,7 +125,7 @@ function recapIcon(i, cx, cy, k) {
   if (i === 0) { lineW(cx + 18, cy - 24, cx + 2, cy - 2, 6, P.HP3); lineW(cx + 18, cy - 24, cx + 2, cy - 2, 3, P.HP4); for (let s = 0; s < 6; s++) disc(lerp(cx + 2, cx - 10, s / 5), lerp(cy - 2, cy + 16, s / 5), 1.2, P.LZ2); disc(cx - 12, cy + 18, 4, P.PG0); }
   if (i === 1) for (let s = 0; s < 7; s++) { const a = s * 0.9, d = 6 + 10 * hash(s + 40); disc(cx + Math.cos(a) * d * (0.5 + 0.5 * k), cy + Math.sin(a) * d * (0.5 + 0.5 * k), 2.4, P.PG0); }
   if (i === 2) { const mm = maskEll(cx, cy, 22, 17, 0.2); shade(mm, P.MC3, P.MC4, P.MC2, P.MC0, {}); disc(cx - 8, cy - 3, 6, P.NU2); disc(cx + 8, cy + 3, 6, P.MC4); ring(cx + 8, cy + 3, 6, 1, P.VS); for (let s = 0; s < 4; s++) disc(cx + 6 + (s % 2) * 4, cy + 1 + (s >> 1) * 4, 1.2, P.PG0); }
-  if (i === 3) for (let s = 0; s < 3; s++) { const x = cx - 20 + s * 20, c = mixc(P.IK1, P.SK3, s / 2.4); for (let j = 0; j < 5; j++) { const a = -Math.PI / 2 + j * TAU / 5, b = -Math.PI / 2 + (j + 2) * TAU / 5; line(x + Math.cos(a) * 8, cy + Math.sin(a) * 8, x + Math.cos(b) * 8, cy + Math.sin(b) * 8, c); } }
+  if (i === 3) for (let s = 0; s < 3; s++) miniDragon(cx - 20 + s * 20, cy + 2, 12, mixc(P.IK1, P.SK3, s / 2.4));
 }
 function recapPanel(t) {
   if (!UI_ON || t < EV.recap[0] - 0.05 || t > 46.6) return;

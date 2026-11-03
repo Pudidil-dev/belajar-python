@@ -1,18 +1,19 @@
 'use strict';
 // ============================================================================
 // THE SKIN BLOCK (diagram space = screen pixels at rest): the textbook cut-away of
-// the same skin, lifted out around the star's top point. The top face shows the
-// skin and the star exactly as on the arm; the front face is the cut at arm
-// y = 280, where the two edges of the star's top point cross it: the ink sits in
-// the dermis under them. Layers are drawn thicker than life (NOT TO SCALE).
+// the same skin, lifted out around the treated neck of the dragon. The top face
+// shows the skin and the tattoo exactly as on the arm; the front face is the cut
+// along the patch's near edge: wherever the tattoo's lines cross that edge, the
+// ink sits in the dermis under them. Layers are drawn thicker than life
+// (NOT TO SCALE).
 // ============================================================================
-const BLK = { ax0: 120, ax1: 240, ay0: 218, ay1: 280,                // the patch of arm it is cut from
+const BLK = { ax0: 130, ax1: 250, ay0: 178, ay1: 240,                // the patch of arm it is cut from
   fx0: 50, fx1: 290, fy0: 262, fy1: 560, dx: 46, dy: -80 };           // front face and the oblique depth offset
-const BLK_INK = (() => {                                              // ink under the two crossings of the cut with the star outline
-  const out = [], cuts = [], y = BLK.ay1;
-  for (const [ax, ay, dx, dy] of STAR_SEG) { if ((ay - y) * (ay + dy - y) < 0) { const u = (y - ay) / dy, x = ax + u * dx; if (x > BLK.ax0 && x < BLK.ax1) cuts.push((x - BLK.ax0) / (BLK.ax1 - BLK.ax0)); } }
-  cuts.forEach((u0, k) => { for (let i = 0; i < 46; i++) { const h = hash(i * 7 + k * 300 + 11); out.push({ u: u0 + (hash(i * 7 + k * 300 + 12) - 0.5) * 0.08, w: 0.2 + 0.24 * Math.pow(h, 0.8), r: 1.6 + 2.4 * hash(i * 7 + k * 300 + 13) }); } });
-  return { cuts, dots: out };
+const BLK_INK = (() => {                                              // ink under each line of the tattoo that crosses the cut
+  const cuts = [], out = []; let run = -1;
+  for (let x = BLK.ax0; x <= BLK.ax1; x += 0.25) { const on = dragonInk(x, BLK.ay1) > 0.5; if (on && run < 0) run = x; if ((!on || x >= BLK.ax1) && run >= 0) { cuts.push([(run + x) / 2, x - run]); run = -1; } }
+  cuts.forEach(([cx, w], k) => { const u0 = (cx - BLK.ax0) / (BLK.ax1 - BLK.ax0), n = Math.round(10 + w * 4); for (let i = 0; i < n; i++) { const h = hash(i * 7 + k * 300 + 11); out.push({ u: u0 + (hash(i * 7 + k * 300 + 12) - 0.5) * (w + 3) / (BLK.ax1 - BLK.ax0), w: 0.2 + 0.24 * Math.pow(h, 0.8), r: 1.4 + 2.2 * hash(i * 7 + k * 300 + 13) }); } });
+  return { cuts: cuts.map(c => (c[0] - BLK.ax0) / (BLK.ax1 - BLK.ax0)), dots: out };
 })();
 const BLK_FAT = Array.from({ length: 22 }, (_, i) => ({ u: (i % 6) / 5 + (hash(i + 70) - 0.5) * 0.08, w: 0.8 + Math.floor(i / 6) * 0.06 + hash(i + 71) * 0.03 }));
 // the layer colour at a point of a face: u across (0..1), w down (0..1)
@@ -30,7 +31,7 @@ function blockLayer(u, w, side) {
 // o: { fade, t, cam (diagram camera) }
 function blockView(cam, t, o) {
   o = o || {};
-  const fade = o.fade === undefined ? starFade(t) : o.fade, fl = frostList(t), B = BLK, fw = B.fx1 - B.fx0, fh = B.fy1 - B.fy0;
+  const fade = o.fade === undefined ? inkFade(t) : o.fade, fl = frostList(t), B = BLK, fw = B.fx1 - B.fx0, fh = B.fy1 - B.fy0;
   for (let sy = 0; sy < H; sy++) {
     const dy_ = cam.wy(sy + 0.5), row = sy * W;
     for (let sx = 0; sx < W; sx++) {
@@ -56,7 +57,7 @@ function blockView(cam, t, o) {
       buf[row + sx] = c === null ? P.BG : c;
     }
   }
-  // the ink under the star line, and the edges of the block
+  // the ink under the tattoo's lines, and the edges of the block
   const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
   for (const d of BLK_INK.dots) { const x = X(B.fx0 + d.u * fw), y = Y(B.fy0 + d.w * fh); disc(x, y, Math.max(1, d.r * z * 0.8), P.PG0); if (z > 1.5) disc(x - d.r * z * 0.25, y - d.r * z * 0.25, Math.max(0.6, d.r * z * 0.25), P.PG2); }
   const ol = mixc(P.SK0, P.K0, 0.4);

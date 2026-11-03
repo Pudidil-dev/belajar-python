@@ -1,28 +1,21 @@
 'use strict';
 // ============================================================================
 // THE FOREARM (arm world: screen pixels of the opening close-up, camera (180, 320, 1);
-// 40 px ≈ 1 cm). One forearm on a dark treatment pad, one small black five-pointed
-// star outline, a Q-switched Nd:YAG handpiece in a gloved hand on an articulated
+// 40 px ≈ 1 cm). One forearm on a dark treatment pad, one black dragon tattoo
+// (09_dragon.js), a Q-switched Nd:YAG handpiece in a gloved hand on an articulated
 // arm, and the laser console (seen when the camera pulls back).
-// The star's ink fades in patches (per-pixel noise) as treatment goes on; the
+// The tattoo's ink fades in patches (per-pixel noise) as treatment goes on; the
 // frosting appears where each pulse lands and is gone by the next time jump.
 // ============================================================================
-const STAR = { cx: 180, cy: 330, R: 100, r: 40, w: 4.8 };             // centre, outer / inner radius, half stroke width
-const STAR_PTS = (() => { const p = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? STAR.r : STAR.R; p.push([STAR.cx + rr * Math.cos(a), STAR.cy + rr * Math.sin(a)]); } return p; })();
-const STAR_SEG = STAR_PTS.map((p, i) => { const q = STAR_PTS[(i + 1) % 10]; return [p[0], p[1], q[0] - p[0], q[1] - p[1], (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2]; });
-function starDist(x, y) {
-  let best = 1e9;
-  for (const [ax, ay, dx, dy, l2] of STAR_SEG) { const u = clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1), ex = x - ax - u * dx, ey = y - ay - u * dy, d2 = ex * ex + ey * ey; if (d2 < best) best = d2; }
-  return Math.sqrt(best);
-}
 // the arm runs top (elbow) to bottom (wrist), a little narrower toward the wrist
 const armL = y => 22 + 0.03 * y, armR = y => 338 - 0.03 * y;
-// pulse spots: the hook arches over the top point of the star; later sessions treat the other points
+// pulse spots along the dragon's body: the hook treats its neck; later sessions treat the rest of the body
 const SPOT_R = 13;
-const edgePt = (i, u) => { const a = STAR_PTS[i % 10], b = STAR_PTS[(i + 1) % 10]; return [lerp(a[0], b[0], u), lerp(a[1], b[1], u)]; };
-const SPOTS_HOOK = [edgePt(9, 0.3), edgePt(9, 0.72), edgePt(0, 0.28), edgePt(0, 0.7)];          // up the left edge of the top point, down its right edge
-const SPOTS_S2 = [edgePt(7, 0.62), edgePt(8, 0.38), edgePt(1, 0.62), edgePt(2, 0.38)];          // the left and right points
-const SPOTS_S3 = [edgePt(3, 0.62), edgePt(4, 0.38), edgePt(5, 0.62), edgePt(6, 0.38), edgePt(9, 0.6), edgePt(0, 0.4)];
+const bodyPt = u => { const p = drgAt(u); return [p.x, p.y]; };
+const SPOTS_HOOK = [0.06, 0.11, 0.16, 0.21].map(bodyPt);
+const SPOTS_S2 = [0.4, 0.46, 0.7, 0.76].map(bodyPt);
+const SPOTS_S3 = [0.3, 0.35, 0.55, 0.6, 0.86, 0.92].map(bodyPt);
+const HOOK_C = [SPOTS_HOOK.reduce((a, p) => a + p[0], 0) / 4, SPOTS_HOOK.reduce((a, p) => a + p[1], 0) / 4];
 // every frosted spot: [x, y, time of its pulse, time its frosting starts to fade]
 const FROST = [
   ...SPOTS_HOOK.map((p, i) => [p[0], p[1], EV.hook[i], EV.weeks1]),
@@ -77,11 +70,9 @@ function baseAt(wx, wy) {
   const i = Math.floor(wx - ATX.x0), j = Math.floor(wy - ATX.y0);
   return i < 0 || j < 0 || i >= ATX.w || j >= ATX.h ? P.BG : ARMTEX[j * ATX.w + i];
 }
-// ink alpha of the star at (wx, wy) for a given fade (0 = as tattooed, 1 = gone): patchy, like real fading
+// ink alpha of the tattoo at (wx, wy) for a given fade (0 = as tattooed, 1 = gone): patchy, like real fading
 function inkAlpha(wx, wy, fade) {
-  if (Math.abs(wx - STAR.cx) > STAR.R + 6 || Math.abs(wy - STAR.cy) > STAR.R + 6) return 0;
-  const d = starDist(wx, wy); if (d > STAR.w + 1) return 0;
-  const edge = d < STAR.w - 0.5 ? 1 : clamp(STAR.w + 0.5 - d, 0, 1);
+  const edge = dragonInk(wx, wy); if (edge <= 0.01) return 0;
   if (fade <= 0) return edge * (0.92 + 0.08 * vn2(wx / 2.2, wy / 2.2, 17));
   const nv = 0.7 * vn2(wx / 9, wy / 9, 7) + 0.3 * vn2(wx / 3.5, wy / 3.5, 9);
   return edge * clamp(1 - fade * (1 + 0.9 * nv), 0, 1);
@@ -100,7 +91,7 @@ function frostAt(wx, wy, fl) {
 // one arm-world point as a colour (used by the arm view and by the top face of the skin block)
 function skinPixel(wx, wy, fl, fade, erythema) {
   let c = baseAt(wx, wy);
-  if (erythema > 0) { const d = Math.hypot(wx - STAR.cx, wy - (STAR.cy - STAR.R * 0.62)); if (d < 56) c = mixc(c, P.ER, erythema * 0.32 * smooth(1 - d / 56)); }
+  if (erythema > 0) { const d = Math.hypot(wx - HOOK_C[0], wy - HOOK_C[1]); if (d < 60) c = mixc(c, P.ER, erythema * 0.32 * smooth(1 - d / 60)); }
   const ia = inkAlpha(wx, wy, fade);
   if (ia > 0) c = mixc(c, mixc(P.IK1, P.IK2, fade * 0.6), ia * 0.95);
   const fr = fl.length ? frostAt(wx, wy, fl) : 0;
@@ -111,9 +102,9 @@ const erythemaAt = t => (smooth(seg(t, 1.1, 1.8)) * (1 - smooth(seg(t, EV.weeks1
 // ---------------------------------------------------------------- the pad, the arm, the hairs
 function armWorld(cam, t, o) {
   o = o || {};
-  const fade = o.fade === undefined ? starFade(t) : o.fade, ery = erythemaAt(t), fl = frostList(t);
+  const fade = o.fade === undefined ? inkFade(t) : o.fade, ery = erythemaAt(t), fl = frostList(t);
   if (!ARMTEX) buildArmTex();
-  const ex0 = STAR.cx - STAR.R - 60, ex1 = STAR.cx + STAR.R + 60, ey0 = STAR.cy - STAR.R - 60, ey1 = STAR.cy + STAR.R + 60;
+  const ex0 = DRG.x0 - 40, ex1 = DRG.x0 + DRG.w + 40, ey0 = DRG.y0 - 40, ey1 = DRG.y0 + DRG.h + 40;
   for (let sy = 0; sy < H; sy++) {
     const wy = cam.wy(sy + 0.5), xl = armL(wy), xr = armR(wy), row = sy * W, j = Math.floor(wy - ATX.y0), inY = j >= 0 && j < ATX.h, nearY = wy > ey0 && wy < ey1;
     for (let sx = 0; sx < W; sx++) {

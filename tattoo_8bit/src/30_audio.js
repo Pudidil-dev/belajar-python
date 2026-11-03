@@ -2,16 +2,15 @@
 // ============================================================================
 // AUDIO — an original electronic science score plus SFX locked to the picture,
 // synthesised sample by sample in plain JS (no samples, no Web Audio graph).
-// 120 BPM, 24 bars = 48.000 s, D major. The theme is the tattoo itself: a
-// five-note "star" motif that walks the D-major pentatonic the way a pentagram
-// joins the points of a star (D–F#–B–E–A, every second note, rising, on dotted
-// eighths). It changes instrument with the story and gets lighter as the star
-// fades: bright lead in the hook · glass bell for the time jumps · marimba in
-// the dermis · a saw lead on the first climax (the fragmentation, 14.0 s) ·
-// warm plucks on the second (the phagocytosis click, 24.0 s) · the band
-// low-passed inside the cell · liquid arpeggios down the lymphatic vessel ·
-// chip pulses climbing an octave through the treatment course · bells on the
-// final result (44.0 s) · a riser back into bar 1 (seamless loop).
+// 120 BPM, 24 bars = 48.000 s, D major. One five-note motif climbs the
+// D-major pentatonic in leaps (D–F#–B–E–A, every second note, on dotted
+// eighths). It changes instrument with the story and gets lighter as the
+// tattoo fades: bright lead in the hook · glass bell for the time jumps ·
+// marimba in the dermis · a saw lead on the first climax (the fragmentation,
+// 14.0 s) · warm plucks on the second (the phagocytosis click, 24.0 s) · the
+// band low-passed inside the cell · liquid arpeggios down the lymphatic
+// vessel · chip pulses climbing an octave through the treatment course · bells
+// on the final result (44.0 s) · a riser back into bar 1 (seamless loop).
 // SFX: every cue is read from the same event table (EV, 03_clock.js) that
 // draws the picture, so each sound starts on the frame its event is drawn
 // (all event times sit on the eighth-note grid = 15 frames). Each physical
@@ -30,18 +29,18 @@ const nm = (n, o) => 12 * (o + 1) + NOTE[n];
 const fq = (n, o) => mtof(nm(n, o));
 const PENT_OFF = [0, 2, 4, 7, 9];
 const pent = (i, o) => mtof(nm('D', o) + PENT_OFF[((i % 5) + 5) % 5] + 12 * Math.floor(i / 5));   // i-th step up the D pentatonic from D(o)
-// ---------------------------------------------------------------- harmony and the star motif
+// ---------------------------------------------------------------- harmony and the motif
 const CHORDS = ['D', 'A', 'Bm', 'G', 'Bm', 'G', 'A', 'D', 'A', 'Bm', 'G', 'A', 'D', 'Bm', 'G', 'A', 'Bm', 'G', 'D', 'A', 'Bm', 'G', 'D', 'A'];
 const CROOT = { D: 'D', A: 'A', Bm: 'B', G: 'G' }, CMIN = { Bm: 1 };
 function rootM(ch, oct) { return nm(CROOT[ch], oct); }
 function triad(ch, oct) { const r = rootM(ch, oct); return [r, r + (CMIN[ch] ? 3 : 4), r + 7]; }
-const STAR_NOTES = [nm('D', 4), nm('F#', 4), nm('B', 4), nm('E', 5), nm('A', 5)];   // the pentagram path through the pentatonic
-const STAR_RH = [[0, 2], [3, 2], [6, 2], [9, 2], [12, 4]];                          // dotted eighths: [16th step, length]
+const MOTIF_NOTES = [nm('D', 4), nm('F#', 4), nm('B', 4), nm('E', 5), nm('A', 5)];  // every second note of the pentatonic, rising
+const MOTIF_RH = [[0, 2], [3, 2], [6, 2], [9, 2], [12, 4]];                          // dotted eighths: [16th step, length]
 const GATES = [[13.875, 14.0], [23.875, 24.0]];                                      // a breath before each climax
 function musicEvents() {
   const ev = [], E = o => ev.push(o);
   const at = (b, beat) => barT(b) + beat * BEAT, ch = b => CHORDS[b - 1];
-  const star = (b, k, v, o) => { o = o || {}; const lift = 12 * (o.lift || 0), t0 = barT(b) + (o.shift || 0) * BEAT; STAR_RH.forEach(([st, l], i) => { if (!o.only || o.only(i)) E({ t: t0 + st * S16, d: l * S16, k, m: STAR_NOTES[i] + lift, v: v * (i === 4 ? 1.1 : 1), cut: o.cut, post: o.post }); }); };
+  const motif = (b, k, v, o) => { o = o || {}; const lift = 12 * (o.lift || 0), t0 = barT(b) + (o.shift || 0) * BEAT; MOTIF_RH.forEach(([st, l], i) => { if (!o.only || o.only(i)) E({ t: t0 + st * S16, d: l * S16, k, m: MOTIF_NOTES[i] + lift, v: v * (i === 4 ? 1.1 : 1), cut: o.cut, post: o.post }); }); };
   const D = (b, beat, k, v, x) => E(Object.assign({ t: at(b, beat), d: 0.5, k, v }, x || {}));
   const kick4 = (b, v, from) => { for (let i = from || 0; i < 4; i++) D(b, i, 'kick', v); };
   const claps = (b, v) => { D(b, 1, 'clap', v); D(b, 3, 'clap', v); };
@@ -57,15 +56,15 @@ function musicEvents() {
   const stab = (b, beat, v) => E({ t: at(b, beat), d: 0.3 * BEAT, k: 'stab', ms: triad(ch(b), 4), v });
   const arp = (b, k, v, oct, up) => { const tr = triad(ch(b), oct), seq = up ? [0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6] : [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 2, 3]; for (let i = 0; i < 16; i++) { const s_ = seq[i], m = tr[s_ % 3] + 12 * Math.floor(s_ / 3); E({ t: at(b, i / 4), d: 0.22 * BEAT, k, m, v: v * (i % 4 === 0 ? 1 : 0.7), p: i % 2 ? 0.3 : -0.3 }); } };
   const halfTime = (b, v) => { D(b, 0, 'kick', 0.75 * v); D(b, 2.5, 'kick', 0.55 * v); D(b, 2, 'snap', 0.5 * v); shaker(b, 0.4 * v); };
-  // ---- A: the hook (bar 1) — kick, sub and pad leave room for the laser's four snaps; the star motif on a bright lead
+  // ---- A: the hook (bar 1) — kick, sub and pad leave room for the laser's four snaps; the motif on a bright lead
   E({ t: 0, d: 1.4, k: 'crash', v: 0.45 }); D(1, 0, 'kick', 0.9); D(1, 1.5, 'kick', 0.7); D(1, 2, 'kick', 0.85); D(1, 3, 'clap', 0.5); hats(1, 0.4, true);
-  sub(1, 0.7); pad(1, 0.4, 1500); star(1, 'starlead', 0.75);
+  sub(1, 0.7); pad(1, 0.4, 1500); motif(1, 'starlead', 0.75);
   // bar 2: weeks pass (the motif on a glass bell), then the lift into the skin (a downlifter and the dive)
-  D(2, 0, 'kick', 0.8); hats(2, 0.3); pad(2, 0.42, 1100); sub(2, 0.55, [0]); star(2, 'glass', 0.55, { only: i => i < 3 });
+  D(2, 0, 'kick', 0.8); hats(2, 0.3); pad(2, 0.42, 1100); sub(2, 0.55, [0]); motif(2, 'glass', 0.55, { only: i => i < 3 });
   E({ t: 3.0, d: 0.9, k: 'down', v: 0.45 });
   // ---- B: the ink in the dermis and the pulse inside it (bars 3–7)
   for (const b of [3, 4]) { halfTime(b, 0.85); pad(b, 0.36, 1000); bassBounce(b, 0.55); }
-  star(3, 'marimba', 0.8); arp(4, 'sqarp', 0.32, 5, true);                                           // bar 4: light shimmer as the photons cross the skin
+  motif(3, 'marimba', 0.8); arp(4, 'sqarp', 0.32, 5, true);                                           // bar 4: light shimmer as the photons cross the skin
   // bars 5–6: the absorption builds (pulsing bass, an opening pad, a riser), the expansion lands at 11.0 s
   for (const b of [5, 6]) { kick4(b, 0.85); hats(b, 0.35, true); for (let i = 0; i < 8; i++) E({ t: at(b, i * 0.5), d: 0.4 * BEAT, k: 'bass', m: root(b, 2) + (i % 2 ? 12 : 0), v: 0.5 + 0.03 * i + (b - 5) * 0.1 }); sub(b, 0.55); }
   E({ t: at(5, 0), d: 4 * BAR / 2, k: 'pad', ms: triad('Bm', 3).concat([nm('F#', 4)]), v: 0.4, cut: 700, cutTo: 2600 });
@@ -77,41 +76,41 @@ function musicEvents() {
   E({ t: 14.0, d: 2.2, k: 'impact', v: 0.8 }); E({ t: 14.0, d: 1.8, k: 'crash', v: 0.7 });
   kick4(8, 1.0); claps(8, 0.7); hats(8, 0.5, false, true); bassRoll(8, 0.8);
   E({ t: at(8, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('D', 5)]), v: 0.65 });
-  star(8, 'laser', 0.8, { cut: 5200 }); star(8, 'pluck', 0.35, { lift: 1 });
+  motif(8, 'laser', 0.8, { cut: 5200 }); motif(8, 'pluck', 0.35, { lift: 1 });
   // bar 9: before / after — lighter
-  D(9, 0, 'kick', 0.85); D(9, 2, 'kick', 0.75); D(9, 3, 'clap', 0.5); hats(9, 0.4); pad(9, 0.4, 1500); sub(9, 0.6); star(9, 'pluck', 0.6);
+  D(9, 0, 'kick', 0.85); D(9, 2, 'kick', 0.75); D(9, 3, 'clap', 0.5); hats(9, 0.4); pad(9, 0.4, 1500); sub(9, 0.6); motif(9, 'pluck', 0.6);
   // ---- C: the macrophage (bars 10–12): an organic, bouncing groove, then the build to the closure
   for (const b of [10, 11]) { D(b, 0, 'kick', 0.85); D(b, 1.75, 'kick', 0.55); D(b, 2.5, 'kick', 0.7); D(b, 1, 'snap', 0.5); D(b, 3, 'snap', 0.5); shaker(b, 0.45); bassBounce(b, 0.65); pad(b, 0.34, 1200); }
-  star(10, 'marimba', 0.75); star(11, 'marimba', 0.6, { only: i => i !== 2 });
+  motif(10, 'marimba', 0.75); motif(11, 'marimba', 0.6, { only: i => i !== 2 });
   kick4(12, 0.9); hats(12, 0.45, true); bassRoll(12, 0.7); pad(12, 0.38, 1800); roll(12, 0, 3.5, 0.25, 0.15, 0.6); roll(12, 3, 3.75, 0.125, 0.6, 0.85);
   E({ t: at(12, 0), d: 3.75 * BEAT, k: 'riser', v: 0.7 });
   // ---- second climax (bar 13): the uptake click — warm and satisfying
   E({ t: 24.0, d: 2.0, k: 'impact', v: 0.7 }); E({ t: 24.0, d: 1.6, k: 'crash', v: 0.6 });
   kick4(13, 1.0); claps(13, 0.65); hats(13, 0.5, true); bassOff(13, 0.8);
   E({ t: at(13, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('A', 4)]), v: 0.55 });
-  star(13, 'pluck', 0.85); star(13, 'glass', 0.35, { lift: 1 });
+  motif(13, 'pluck', 0.85); motif(13, 'glass', 0.35, { lift: 1 });
   // bar 14: inside the cell (the whole band is low-passed: see bandFilter)
-  halfTime(14, 0.8); pad(14, 0.5, 1400); sub(14, 0.6); star(14, 'glass', 0.5, { only: i => i % 2 === 0 });
+  halfTime(14, 0.8); pad(14, 0.5, 1400); sub(14, 0.6); motif(14, 'glass', 0.5, { only: i => i % 2 === 0 });
   // ---- the lymphatic vessel (bars 15–16): liquid arpeggios on a steady beat
   for (const b of [15, 16]) { kick4(b, 0.85); D(b, 1, 'clap', 0.4); D(b, 3, 'clap', 0.4); hats(b, 0.35); bassOff(b, 0.65); arp(b, 'sqarp', 0.4, 5, b === 16); pad(b, 0.3, 1300); }
-  star(15, 'glass', 0.55);
+  motif(15, 'glass', 0.55);
   // bar 17: weeks of clearance — a ticking clock, sparse motif
-  D(17, 0, 'kick', 0.7); D(17, 2, 'kick', 0.6); hats(17, 0.3, true); pad(17, 0.45, 1000); sub(17, 0.5); star(17, 'marimba', 0.55, { only: i => i % 2 === 0 });
+  D(17, 0, 'kick', 0.7); D(17, 2, 'kick', 0.6); hats(17, 0.3, true); pad(17, 0.45, 1000); sub(17, 0.5); motif(17, 'marimba', 0.55, { only: i => i % 2 === 0 });
   // bar 18: back to the surface; a riser into the next session
   D(18, 0, 'kick', 0.8); D(18, 2, 'kick', 0.7); pad(18, 0.4, 1600); sub(18, 0.55); E({ t: at(18, 1), d: 3 * BEAT, k: 'riser', v: 0.55 });
   // ---- D: the next session (bars 19–20): the groove returns; four stabs land with the four steps
-  kick4(19, 0.95); claps(19, 0.6); hats(19, 0.45, true); bassOff(19, 0.75); pad(19, 0.35, 1800); star(19, 'pluck', 0.75);
+  kick4(19, 0.95); claps(19, 0.6); hats(19, 0.45, true); bassOff(19, 0.75); pad(19, 0.35, 1800); motif(19, 'pluck', 0.75);
   kick4(20, 0.95); hats(20, 0.4, true); bassOff(20, 0.7); for (let i = 0; i < 4; i++) stab(20, i, 0.45);
-  // ---- E: the treatment course (bars 21–22): building as the star fades; the motif climbs an octave
+  // ---- E: the treatment course (bars 21–22): building as the tattoo fades; the motif climbs an octave
   for (const b of [21, 22]) { kick4(b, 1.0); claps(b, 0.65); hats(b, 0.5, true); shaker(b, 0.35); bassRoll(b, 0.75); arp(b, 'chiparp', 0.4, 5, b === 22); }
-  star(21, 'chip', 0.75); star(22, 'chip', 0.75, { lift: 1 }); roll(22, 2, 4, 0.25, 0.2, 0.7); E({ t: at(22, 0), d: 4 * BEAT, k: 'riser', v: 0.65 });
-  // ---- the final result (bar 23): the star is gone — a big, clean D-major chord, the motif on bells
+  motif(21, 'chip', 0.75); motif(22, 'chip', 0.75, { lift: 1 }); roll(22, 2, 4, 0.25, 0.2, 0.7); E({ t: at(22, 0), d: 4 * BEAT, k: 'riser', v: 0.65 });
+  // ---- the final result (bar 23): the tattoo is gone — a big, clean D-major chord, the motif on bells
   E({ t: 44.0, d: 2.2, k: 'impact', v: 0.7 }); E({ t: 44.0, d: 2.0, k: 'crash', v: 0.7 });
   kick4(23, 1.0); claps(23, 0.6); hats(23, 0.45, false, true); bassOff(23, 0.8);
   E({ t: at(23, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('F#', 5), nm('A', 5)]), v: 0.6 });
-  star(23, 'glass', 0.7, { lift: 1 }); star(23, 'pluck', 0.5);
+  motif(23, 'glass', 0.7, { lift: 1 }); motif(23, 'pluck', 0.5);
   // bar 24: the title, the rewind, a riser into bar 1
-  D(24, 0, 'kick', 0.8); D(24, 2, 'kick', 0.6); pad(24, 0.5, 2000); sub(24, 0.6); star(24, 'glass', 0.45, { only: i => i < 4 });
+  D(24, 0, 'kick', 0.8); D(24, 2, 'kick', 0.6); pad(24, 0.5, 2000); sub(24, 0.6); motif(24, 'glass', 0.45, { only: i => i < 4 });
   roll(24, 3, 4, 0.125, 0.25, 0.7); E({ t: at(24, 1), d: 3 * BEAT, k: 'riser', v: 0.6 });
   return ev;
 }
@@ -324,7 +323,7 @@ function playSfx(e, L, R) {
     case 'cue2': { let ph = 0; V(e.t, 0.16, 0.3, t => { ph += 300 * Math.pow(5, Math.min(1, t / 0.1)) / SR; ph -= Math.floor(ph); return (2 * ph - 1) * 0.5 * (t < 0.1 ? 1 : Math.max(0, 1 - (t - 0.1) / 0.06)); }, 0.2); break; }
     case 'cue3': for (let i = 0; i < 4; i++) V(e.t + i * 0.025, 0.05, 0.28, noiseBP(() => 2800 + 400 * i, 0.2, dec(60), sd + i), 0.15, -0.3 + 0.2 * i); break;
     case 'cue4': V(e.t, 0.25, 0.36, sine(t => 160 * (1 + 1.2 * Math.exp(-t * 16)), att(0.004, 12)), 0.2); V(e.t + 0.06, 0.4, 0.22, bell(fq('A', 5), 8, 0.8), 0.4); break;
-    // the treatment course: ascending clock ticks over a tone that fades as the star does
+    // the treatment course: ascending clock ticks over a tone that fades as the tattoo does
     case 'stage': V(e.t, 0.025, 0.3, sine(() => 2400, dec(180)), 0.1); V(e.t, 0.5, 0.3, bell(f, 6, 0.8), 0.45); break;
     case 'fadetone': V(e.t, d, 0.07, (t) => (fsin(TAU * fq('A', 4) * t) + 0.4 * fsin(TAU * fq('E', 5) * t)) * Math.min(1, t / 0.3) * Math.pow(1 - clamp(t / d, 0, 1), 1.5), 0.5); break;
     case 'complete': [['D', 5], ['F#', 5], ['A', 5], ['D', 6], ['E', 6]].forEach(([n, o], i) => V(e.t + i * 0.03, 1.6, 0.13, bell(fq(n, o), 2.2, 0.9), 0.55, -0.4 + 0.2 * i)); V(e.t, 0.6, 0.12, sine(() => fq('D', 3), att(0.01, 4)), 0.3); break;
