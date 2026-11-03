@@ -1,0 +1,2377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>How Lasers Remove Tattoos</title>
+<meta name="description" content="How laser energy breaks tattoo pigment and how immune cells help clear it: a 48-second pixel-art scientific animation of Q-switched Nd:YAG 1064 nm tattoo removal (frosting, photon absorption, thermoelastic expansion, pigment fragmentation, macrophage phagocytosis, lymphatic transport, gradual fading over sessions), with an electronic soundtrack synthesised in JavaScript.">
+<style>
+:root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #8fe9f5; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 500 14px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { display: flex; flex-direction: column; min-height: 100%; }
+#stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px 16px 6px; position: relative; }
+#screen { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #0b1020; box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0,0,0,.55); cursor: pointer; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); letter-spacing: .08em; }
+#bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 16px 6px; max-width: 720px; width: 100%; margin: 0 auto; }
+.btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.btn:hover { border-color: #3a4b7c; }
+.btn:focus-visible, #scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+#scrub { flex: 1 1 auto; min-width: 60px; height: 40px; background: transparent; -webkit-appearance: none; appearance: none; margin: 0; --p: 0%; }
+#scrub::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+#scrub::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+#scrub::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+#scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--ink); border: 0; }
+#scrub::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 0; }
+#time { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--sub); min-width: 104px; text-align: right; }
+#scene { text-align: center; color: var(--sub); font-size: 12px; letter-spacing: .06em; padding: 0 16px 12px; min-height: 28px; }
+@media (max-width: 420px) { #time { min-width: 0; font-size: 12px; } .btn { width: 36px; height: 36px; } #bar { gap: 6px; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="360" height="640" role="img" aria-label="Animation: a laser handpiece fires four pulses on a black star tattoo on a forearm, which frosts white; weeks later the star is a little lighter; the camera enters the skin, where near-infrared light is absorbed by an ink aggregate in the dermis, which heats, expands and cracks into smaller fragments; a macrophage engulfs some fragments, some ink travels through a lymphatic vessel to a lymph node; over weeks and several sessions the star fades until it is no longer visible"></canvas>
+  <div id="loading">LOADING…</div>
+</div>
+<div id="bar">
+  <button id="play" class="btn" aria-label="Play"></button>
+  <button id="replay" class="btn" aria-label="Replay"></button>
+  <input id="scrub" type="range" min="0" max="2879" step="1" value="0" aria-label="Seek">
+  <span id="time">0:00.0 / 0:48.0</span>
+  <button id="mute" class="btn" aria-label="Mute"></button>
+</div>
+<div id="scene" aria-live="polite"></div>
+<script>
+(function(){
+// ---- 00_core.js
+// ============================================================================
+// TATTOO 8-bit — core: pixel buffer, palette, rasterisers, masks, easing, camera.
+// Everything draws into one 360x640 Uint32 buffer (crisp pixels, no AA),
+// shown 3x nearest-neighbour (1080x1920) by the player / export.
+// W, H and buf can be swapped temporarily (withCanvas) to draw a world into a
+// larger square buffer, e.g. for a camera roll.
+// ============================================================================
+const FPS = 60, DUR = 48, NF = 2880;
+let W = 360, H = 640, CX = 180, CY = 320;
+const MAXPIX = 640 * 640;
+let buf = new Uint32Array(W * H);
+const SPARE = [new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX)];
+const FEEDBUF = SPARE[1].subarray(0, 360 * 640), TMPBUF = SPARE[3].subarray(0, 360 * 640), TMP2 = SPARE[4].subarray(0, 360 * 640);
+// draw into a w x h buffer (taken from SPARE[0]) and return it
+function withCanvas(w, h, fn) {
+  const oW = W, oH = H, oCX = CX, oCY = CY, oBuf = buf;
+  W = w; H = h; CX = w / 2; CY = h / 2; buf = SPARE[0].subarray(0, w * h);
+  try { fn(); } finally { const out = buf; W = oW; H = oH; CX = oCX; CY = oCY; buf = oBuf; withCanvas.last = out; }
+  return withCanvas.last;
+}
+function hexc(h) {
+  const n = parseInt(h.slice(1), 16);
+  return (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255)) >>> 0;
+}
+const P = {};
+const PAL_HEX = {
+  // ground: dark navy (hue <= 218, kept out of the blue-purple band)
+  K0: '#030812', BG: '#0B1A33', N1: '#0E2140', N2: '#132A4C', N3: '#1A355C', N4: '#23436F', N5: '#305788', N6: '#4470A3',
+  // treatment pad under the arm (dark slate)
+  PD0: '#0C1620', PD1: '#132232', PD2: '#1C3246', PD3: '#29445E', PD4: '#3A5A78',
+  // skin of the forearm (warm medium tone), hair, a faint vein, redness after treatment
+  SK0: '#4A2A20', SK1: '#8A5640', SK2: '#B47A5C', SK3: '#C98A6A', SK4: '#DEA383', SK5: '#EDBB9C', HR: '#6A4632', VN: '#A88070', ER: '#D67A68',
+  // frosting (temporary whitening) and tattoo ink at the surface (blue-black, greying as it fades)
+  FR0: '#C9D2D8', FR1: '#E6ECEF', FR2: '#FAFCFD', IK0: '#111216', IK1: '#1D2130', IK2: '#4C5466',
+  // the educational laser colour (1064 nm is invisible): faint violet-red; the red aiming dot
+  LZ0: '#3A0E26', LZ1: '#7A1C46', LZ2: '#C23A6A', LZ3: '#F07AA0', LZ4: '#FFC4D6', AIM: '#FF4A3A',
+  // handpiece and articulated arm (white and steel), nitrile glove (teal-blue)
+  HP0: '#22272F', HP1: '#4A5465', HP2: '#8C97A7', HP3: '#C9D1DB', HP4: '#F3F6F9',
+  GV0: '#0E3352', GV1: '#1A5683', GV2: '#2E7DB6', GV3: '#58A8DA', GV4: '#98D2F2',
+  // laser console: white cabinet, dark screen, cyan electronics
+  CN0: '#6E7A8A', CN1: '#A9B4C2', CN2: '#D3DAE3', CN3: '#EEF2F6', SCR0: '#04121A', SCR1: '#0A2430', DT1: '#0E5A6A', DT2: '#22A8C0', DT3: '#7CE8F8', DT4: '#E8FCFF',
+  // skin layers in cross-section: stratum corneum, epidermis (warm peach), melanin in the basal layer
+  SC0: '#D8B49A', SC1: '#F4D9C4', EP0: '#B4765A', EP1: '#DDA184', EP2: '#F2C3A6', EP3: '#F9D9C4', ML: '#6A3A26',
+  // dermis (soft pink) and collagen fibres
+  DM0: '#6E3442', DM1: '#B05A6A', DM2: '#D48089', DM3: '#E7A0A8', DM4: '#F1B9BF', DM5: '#F8D2D6', CL0: '#C27482', CL1: '#DE98A2', CL2: '#F4C8CD',
+  // blood vessels, lymphatic vessels (soft green), fat of the hypodermis, fibroblasts
+  BL0: '#5E0E1C', BL1: '#A21E32', BL2: '#D84456', LY0: '#1C5638', LY1: '#3A9460', LY2: '#74C68E', LY3: '#B4E6C0', LY4: '#DCF6E2',
+  FT0: '#B88E44', FT1: '#E2C67E', FT2: '#F4E4B4', FB0: '#8C4A5C', FB1: '#BE7686',
+  // ink particles in the dermis (black with a cool rim so they read on pink), heat rim, pressure wave, gas bubbles
+  PG0: '#08080A', PG1: '#18181E', PG2: '#34343E', PG3: '#5C5C6A', HT1: '#6A2416', HT2: '#B4482A', HT3: '#E88448',
+  PR: '#FFF2EA', BB0: '#B8C6CE', BB1: '#E8F2F6', BB2: '#FFFFFF',
+  // macrophages (pale white-blue), nuclei (deep purple), lysosomes, vesicle membrane
+  MC0: '#46607C', MC1: '#93AFC9', MC2: '#C2D6E8', MC3: '#E0ECF6', MC4: '#F5F9FD', NU0: '#26103C', NU1: '#44206A', NU2: '#683896', NU3: '#9564C0',
+  LS0: '#4E2660', LS1: '#8E52A8', LS2: '#C08ED6', VS: '#6F8AA8',
+  // UI
+  INK: '#F4F8FF', SUB: '#9CC0E4', LBL: '#86E6FF', YEL: '#FFD84A', RED: '#FF6A6A', SH: '#02050C', C4: '#C8D4E6', C6: '#FFFFFF',
+};
+for (const k in PAL_HEX) P[k] = hexc(PAL_HEX[k]);
+
+// ---------------------------------------------------------------- math/ease
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const smooth = t => t * t * (3 - 2 * t);
+const eio = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eout = t => 1 - Math.pow(1 - t, 3);
+const ein = t => t * t * t;
+function bezierEase(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  return function (x) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const fx = ((ax * t + bx) * t + cx) * t - x;
+      const d = (3 * ax * t + 2 * bx) * t + cx;
+      if (Math.abs(fx) < 1e-6) break;
+      t -= fx / (d || 1e-6);
+      t = clamp(t, 0, 1);
+    }
+    return ((ay * t + by) * t + cy) * t;
+  };
+}
+const K75 = bezierEase(0.75, 0, 0.25, 1);      // Kurzgesagt camera ease
+const K50 = bezierEase(0.5, 0, 0.2, 1);
+function backOut(t, s) { s = s === undefined ? 1.70158 : s; t = clamp(t, 0, 1) - 1; return t * t * ((s + 1) * t + s) + 1; }
+const TAU = Math.PI * 2;
+
+// stateless hash -> [0,1)
+function hash(n) {
+  n = (n | 0) ^ 0x9e3779b9;
+  n = Math.imul(n ^ (n >>> 16), 0x21f0aaad);
+  n = Math.imul(n ^ (n >>> 15), 0x735a2d97);
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663));
+const hash3 = (a, b, c) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663) ^ Math.imul(c | 0, 83492791));
+function vnoise(x, s) { // 1-D value noise, smooth
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(hash2(i, s), hash2(i + 1, s), u);
+}
+
+// ---------------------------------------------------------------- dithering
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bay = (x, y) => (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+
+// ---------------------------------------------------------------- primitives
+function clear(c) { buf.fill(c); }
+function pset(x, y, c) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c; }
+function psetD(x, y, c, lv) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H && bay(x, y) < lv) buf[y * W + x] = c; }
+function rect(x0, y0, x1, y1, c, lv) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1));
+  const p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  if (a >= b || p >= q) return;
+  if (lv === undefined || lv >= 1) { for (let y = p; y < q; y++) buf.fill(c, y * W + a, y * W + b); return; }
+  if (lv <= 0) return;
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+}
+function frame(x0, y0, x1, y1, c) { rect(x0, y0, x1, y0 + 1, c); rect(x0, y1 - 1, x1, y1, c); rect(x0, y0, x0 + 1, y1, c); rect(x1 - 1, y0, x1, y1, c); }
+function disc(cx, cy, r, c, lv) {
+  if (r <= 0) return;
+  if (lv !== undefined && lv <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy, h = r * r - dy * dy;
+    if (h < 0) continue;
+    const s = Math.sqrt(h);
+    const a = Math.max(0, Math.ceil(cx - s - 0.5)), b = Math.min(W - 1, Math.floor(cx + s - 0.5));
+    if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+    else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+  }
+}
+function ring(cx, cy, r, w, c, lv) {
+  const ro = r + w / 2, ri = Math.max(0, r - w / 2);
+  const y0 = Math.max(0, Math.floor(cy - ro)), y1 = Math.min(H - 1, Math.ceil(cy + ro));
+  const x0 = Math.max(0, Math.floor(cx - ro)), x1 = Math.min(W - 1, Math.ceil(cx + ro));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+      if (d2 <= ro * ro && d2 >= ri * ri && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function ellipse(cx, cy, rx, ry, c, lv, rot) {
+  const R = Math.max(rx, ry);
+  const cs = Math.cos(rot || 0), sn = Math.sin(rot || 0);
+  const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
+  const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx;
+      const u = (dx * cs + dy * sn) / rx, v = (-dx * sn + dy * cs) / ry;
+      if (u * u + v * v <= 1 && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+// scanline polygon fill (even-odd) on pixel centres; pts = [x0,y0,x1,y1,...]
+const _xs = [];
+function poly(pts, c, lv) {
+  const n = pts.length >> 1; if (n < 3) return;
+  let ymin = Infinity, ymax = -Infinity;
+  for (let i = 0; i < n; i++) { const y = pts[2 * i + 1]; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+  const y0 = Math.max(0, Math.floor(ymin)), y1 = Math.min(H - 1, Math.ceil(ymax));
+  for (let y = y0; y <= y1; y++) {
+    const sy = y + 0.5; _xs.length = 0;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const yi = pts[2 * i + 1], yj = pts[2 * j + 1];
+      if ((yi > sy) !== (yj > sy)) { const xi = pts[2 * i], xj = pts[2 * j]; _xs.push(xi + (sy - yi) * (xj - xi) / (yj - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < _xs.length; k += 2) {
+      const a = Math.max(0, Math.ceil(_xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(_xs[k + 1] - 0.5));
+      if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+      else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// clip a segment to the screen (Liang-Barsky); returns null if outside
+function clipSeg(x0, y0, x1, y1, m) {
+  m = m || 2;
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  const p = [-dx, dx, -dy, dy], q = [x0 + m, W + m - 1 - x0, y0 + m, H + m - 1 - y0];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; }
+    else { const r = q[i] / p[i]; if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; } }
+  }
+  return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
+}
+function line(x0, y0, x1, y1, c, lv) {
+  const s = clipSeg(x0, y0, x1, y1); if (!s) return;
+  x0 = Math.floor(s[0]); y0 = Math.floor(s[1]); x1 = Math.floor(s[2]); y1 = Math.floor(s[3]);
+  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1, err = dx + dy;
+  for (let guard = 0; guard < 4000; guard++) {
+    if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H && (lv === undefined || bay(x0, y0) < lv)) buf[y0 * W + x0] = c;
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function lineW(x0, y0, x1, y1, w, c, lv) {
+  if (w <= 1.2) { line(x0, y0, x1, y1, c, lv); return; }
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1e-6;
+  const nx = -dy / L * w / 2, ny = dx / L * w / 2;
+  poly([x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny], c, lv);
+}
+function polyline(pts, c, lv) { for (let i = 0; i + 3 < pts.length; i += 2) line(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], c, lv); }
+function dashLine(x0, y0, x1, y1, c, on, off, phase) {
+  const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) return;
+  const per = on + off; let s = -((phase || 0) % per);
+  for (; s < L; s += per) {
+    const a = Math.max(0, s), b = Math.min(L, s + on); if (b <= a) continue;
+    line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
+  }
+}
+// soft glow: a smooth radial blend toward c1 (and c2 in the core), no dither sparkle
+function mixc(a, b, k) { // blend two packed colours, k in 0..1
+  const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  return (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+}
+function glow(cx, cy, r, c1, c2, lv) {
+  lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r)), x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / r; if (d >= 1) continue;
+    const i = y * W + x, u = 1 - d;
+    let c = mixc(buf[i], c1, 0.55 * lv * u * u);
+    if (c2 !== undefined && c2 !== null && d < 0.35) c = mixc(c, c2, 0.5 * lv * (1 - d / 0.35));
+    buf[i] = c;
+  }
+}
+// blend a whole buffer into buf (k = weight of src) — smooth crossfades
+function mixInto(dst, src, k) {
+  if (k <= 0) return; const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  for (let i = 0; i < dst.length; i++) {
+    const a = dst[i], b = src[i]; if (a === b) continue;
+    dst[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
+}
+// tint the whole frame toward colour c by k (a calm dim, no dither)
+function tintAll(c, k) { if (k <= 0) return; for (let i = 0; i < buf.length; i++) buf[i] = mixc(buf[i], c, k); }
+function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
+  rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
+}
+
+// ---------------------------------------------------------------- masks
+// Bounding-box masks for 16-bit style shading (outline, rim light, shadow)
+class Mask {
+  constructor(x0, y0, x1, y1) {
+    this.x0 = Math.max(-2, Math.floor(x0) - 2); this.y0 = Math.max(-2, Math.floor(y0) - 2);
+    this.x1 = Math.min(W + 2, Math.ceil(x1) + 2); this.y1 = Math.min(H + 2, Math.ceil(y1) + 2);
+    this.w = Math.max(0, this.x1 - this.x0); this.h = Math.max(0, this.y1 - this.y0);
+    this.d = new Uint8Array(this.w * this.h);
+  }
+  get(x, y) { x -= this.x0; y -= this.y0; return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; }
+  empty() { return this.w === 0 || this.h === 0; }
+}
+function maskFn(x0, y0, x1, y1, fn) { // fn(px+0.5, py+0.5) -> bool
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) if (fn(m.x0 + i + 0.5, m.y0 + j + 0.5)) m.d[j * m.w + i] = 1;
+  return m;
+}
+function maskPoly(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+  const m = new Mask(x0, y0, x1, y1); if (m.empty()) return m;
+  const n = pts.length >> 1;
+  for (let j = 0; j < m.h; j++) {
+    const sy = m.y0 + j + 0.5; _xs.length = 0;
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const yi = pts[2 * i + 1], yk = pts[2 * k + 1];
+      if ((yi > sy) !== (yk > sy)) { const xi = pts[2 * i], xk = pts[2 * k]; _xs.push(xi + (sy - yi) * (xk - xi) / (yk - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < _xs.length; q += 2) {
+      const a = Math.max(0, Math.ceil(_xs[q] - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(_xs[q + 1] - 0.5 - m.x0));
+      for (let i = a; i <= b; i++) m.d[j * m.w + i] = 1;
+    }
+  }
+  return m;
+}
+function _span(m, j, xa, xb) { // fill pixels whose centres lie in [xa, xb] on mask row j
+  const a = Math.max(0, Math.ceil(xa - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(xb - 0.5 - m.x0));
+  if (a <= b) m.d.fill(1, j * m.w + a, j * m.w + b + 1);
+}
+function maskDisc(cx, cy, r) {
+  const m = new Mask(cx - r, cy - r, cx + r, cy + r);
+  for (let j = 0; j < m.h; j++) { const dy = m.y0 + j + 0.5 - cy, h = r * r - dy * dy; if (h < 0) continue; const s = Math.sqrt(h); _span(m, j, cx - s, cx + s); }
+  return m;
+}
+function maskEll(cx, cy, rx, ry, rot) {
+  const R = Math.max(rx, ry), c = Math.cos(rot || 0), s = Math.sin(rot || 0);
+  const m = new Mask(cx - R, cy - R, cx + R, cy + R);
+  const A = c * c / (rx * rx) + s * s / (ry * ry), Bk = 2 * (c * s / (rx * rx) - s * c / (ry * ry)), Ck = s * s / (rx * rx) + c * c / (ry * ry);
+  for (let j = 0; j < m.h; j++) {
+    const dy = m.y0 + j + 0.5 - cy, B = Bk * dy, C = Ck * dy * dy - 1, disc_ = B * B - 4 * A * C;
+    if (disc_ < 0) continue; const q = Math.sqrt(disc_);
+    _span(m, j, cx + (-B - q) / (2 * A), cx + (-B + q) / (2 * A));
+  }
+  return m;
+}
+function maskRR(x0, y0, x1, y1, r) { // rounded rect
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j + 0.5; if (y < y0 || y > y1) continue;
+    const qy = Math.max(y0 + r - y, 0, y - (y1 - r));
+    if (qy > r) continue;
+    const dx = r - Math.sqrt(Math.max(0, r * r - qy * qy));
+    _span(m, j, x0 + dx, x1 - dx);
+  }
+  return m;
+}
+function mFill(m, c, lv, clip) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      if (clip && !clip(x, y)) continue;
+      if (lv === undefined || lv >= 1 || bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// pixels of m whose neighbour at (x-dx, y-dy) is outside m (the edge facing -dx,-dy)
+function mRim(m, c, dx, dy, lv) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const ii = i - dx, jj = j - dy;
+      const inside = ii >= 0 && jj >= 0 && ii < m.w && jj < m.h && m.d[jj * m.w + ii];
+      if (!inside && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function mOutline(m, c) { // inner 4-neighbour outline
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i === 0 || !m.d[j * m.w + i - 1]) || (i === m.w - 1 || !m.d[j * m.w + i + 1]) || (j === 0 || !m.d[(j - 1) * m.w + i]) || (j === m.h - 1 || !m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+function mOuter(m, c) { // outer 4-neighbour outline (1 px outside the shape)
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i > 0 && m.d[j * m.w + i - 1]) || (i < m.w - 1 && m.d[j * m.w + i + 1]) || (j > 0 && m.d[(j - 1) * m.w + i]) || (j < m.h - 1 && m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+// standard 16-bit shading: base, light rim top-left, shadow rim bottom-right, outline
+function shade(m, base, hi, lo, ol, opt) {
+  opt = opt || {};
+  mFill(m, base, opt.lv, opt.clip);
+  const k = opt.k || 1;
+  if (lo !== null && lo !== undefined) for (let s = 1; s <= k; s++) mRim(m, lo, -s, -s);
+  if (hi !== null && hi !== undefined) for (let s = 1; s <= (opt.kh || k); s++) mRim(m, hi, s, s);
+  if (ol !== null && ol !== undefined) { if (opt.outer) mOuter(m, ol); else mOutline(m, ol); }
+}
+
+// ---------------------------------------------------------------- camera
+class Cam {
+  constructor(cx, cy, z, ax, ay) { this.cx = cx; this.cy = cy; this.z = z; this.ax = ax === undefined ? CX : ax; this.ay = ay === undefined ? CY : ay; }
+  x(wx) { return (wx - this.cx) * this.z + this.ax; }
+  y(wy) { return (wy - this.cy) * this.z + this.ay; }
+  s(v) { return v * this.z; }
+  wx(sx) { return (sx - this.ax) / this.z + this.cx; }
+  wy(sy) { return (sy - this.ay) / this.z + this.cy; }
+  pts(arr) { const o = new Array(arr.length); for (let i = 0; i < arr.length; i += 2) { o[i] = this.x(arr[i]); o[i + 1] = this.y(arr[i + 1]); } return o; }
+}
+// keyframe track: [[t, cx, cy, z, easeFn?], ...] with log-zoom interpolation
+function camTrack(keys, t, ax, ay) {
+  if (t <= keys[0][0]) { const k = keys[0]; return new Cam(k[1], k[2], k[3], ax, ay); }
+  for (let i = 0; i + 1 < keys.length; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t <= b[0]) {
+      const e = b[4] || K75; const f = e(seg(t, a[0], b[0]));
+      const z = Math.exp(lerp(Math.log(a[3]), Math.log(b[3]), f));
+      // zoom-aware centre blend: keep motion even across big zoom changes
+      let g = f;
+      if (Math.abs(Math.log(b[3] / a[3])) > 0.2) { const za = a[3], zb = b[3]; g = (1 / za - 1 / z) / (1 / za - 1 / zb); g = clamp(g, 0, 1); }
+      return new Cam(lerp(a[1], b[1], g), lerp(a[2], b[2], g), z, ax, ay);
+    }
+  }
+  const k = keys[keys.length - 1]; return new Cam(k[1], k[2], k[3], ax, ay);
+}
+
+// ---------------------------------------------------------------- buffers
+function withBuffer(target, fn) { const old = buf; buf = target; try { fn(); } finally { buf = old; } }
+function copyBuf(dst, src) { dst.set(src); }
+// dithered dissolve: show b where bayer < k
+function dissolve(a, b, k, out) {
+  out = out || buf;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; out[i] = bay(x, y) < k ? b[i] : a[i]; }
+}
+
+
+// draw fn at opacity lv (a smooth see-through / fade); TMP2 keeps the pixels underneath
+function withDither(lv, fn) {
+  if (lv >= 1) { fn(); return; }
+  if (lv <= 0) return;
+  TMP2.set(buf);
+  fn();
+  const ki = Math.round(lv * 256), kj = 256 - ki;
+  for (let i = 0; i < buf.length; i++) {
+    const a = TMP2[i], b = buf[i]; if (a === b) continue;
+    buf[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
+}
+// a translucent box (for labels over busy pictures)
+function tintRect(x0, y0, x1, y1, c, k) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1)), p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) { const i = y * W + x; buf[i] = mixc(buf[i], c, k); }
+}
+
+// ---- 01_font.js
+// ============================================================================
+// Pixel fonts. FC: mixed-case caption/label font (cap height 7, descenders 2).
+// FS: micro font for axes and tags (5-row caps, row 6 = descender). FT: 9-row bold title.
+// ============================================================================
+function mkFont(h, defs, spaceW, base) {
+  const g = {};
+  for (const ch in defs) {
+    const rows = defs[ch].split('/');
+    const w = rows[0].length, off = (base && base[ch]) || 0;
+    const bits = new Array(h).fill(0);
+    rows.forEach((r, i) => { let v = 0; for (let k = 0; k < r.length; k++) if (r[k] === '#') v |= 1 << k; if (i + off < h) bits[i + off] = v; });
+    g[ch] = { w, bits };
+  }
+  g[' '] = { w: spaceW, bits: new Array(h).fill(0) };
+  return { h, g };
+}
+// FC: rows 0..6 = cap height, 7..8 = descenders. Lowercase x-height rows 2..6.
+const FC_DEF = {
+  A: '.###./#...#/#...#/#####/#...#/#...#/#...#', B: '####./#...#/#...#/####./#...#/#...#/####.', C: '.###./#...#/#..../#..../#..../#...#/.###.',
+  D: '####./#...#/#...#/#...#/#...#/#...#/####.', E: '#####/#..../#..../####./#..../#..../#####', F: '#####/#..../#..../####./#..../#..../#....',
+  G: '.###./#...#/#..../#.###/#...#/#...#/.####', H: '#...#/#...#/#...#/#####/#...#/#...#/#...#', I: '###/.#./.#./.#./.#./.#./###',
+  J: '..###/...#./...#./...#./#..#./#..#./.##..', K: '#...#/#..#./#.#../##.../#.#../#..#./#...#', L: '#..../#..../#..../#..../#..../#..../#####',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#', N: '#...#/##..#/#.#.#/#.#.#/#..##/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/.###.',
+  P: '####./#...#/#...#/####./#..../#..../#....', Q: '.###./#...#/#...#/#...#/#.#.#/#..#./.##.#', R: '####./#...#/#...#/####./#.#../#..#./#...#',
+  S: '.####/#..../#..../.###./....#/....#/####.', T: '#####/..#../..#../..#../..#../..#../..#..', U: '#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  V: '#...#/#...#/#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#', X: '#...#/#...#/.#.#./..#../.#.#./#...#/#...#',
+  Y: '#...#/#...#/.#.#./..#../..#../..#../..#..', Z: '#####/....#/...#./..#../.#.../#..../#####',
+  a: '..../..../.##./...#/.###/#..#/.###', b: '#.../#.../###./#..#/#..#/#..#/###.', c: '..../..../.##./#..#/#.../#..#/.##.',
+  d: '...#/...#/.###/#..#/#..#/#..#/.###', e: '..../..../.##./#..#/####/#.../.###', f: '..##/.#../####/.#../.#../.#../.#..',
+  g: '..../..../.###/#..#/#..#/.###/...#/#..#/.##.', h: '#.../#.../###./#..#/#..#/#..#/#..#', i: '.#./.../##./.#./.#./.#./###',
+  j: '..#/.../.##/..#/..#/..#/..#/#.#/.#.', k: '#.../#.../#..#/#.#./##../#.#./#..#', l: '##./.#./.#./.#./.#./.#./###',
+  m: '...../...../##.#./#.#.#/#.#.#/#.#.#/#.#.#', n: '..../..../###./#..#/#..#/#..#/#..#', o: '..../..../.##./#..#/#..#/#..#/.##.',
+  p: '..../..../###./#..#/#..#/#..#/###./#.../#...', q: '..../..../.###/#..#/#..#/#..#/.###/...#/...#', r: '..../..../#.##/##../#.../#.../#...',
+  s: '..../..../.###/#.../.##./...#/###.', t: '.#../.#../####/.#../.#../.#../..##', u: '..../..../#..#/#..#/#..#/#..#/.###',
+  v: '...../...../#...#/#...#/.#.#./.#.#./..#..', w: '...../...../#...#/#...#/#.#.#/#.#.#/.#.#.', x: '..../..../#..#/#..#/.##./#..#/#..#',
+  y: '..../..../#..#/#..#/#..#/#..#/.###/...#/.##.', z: '..../..../####/...#/.##./#.../####',
+  0: '.###./#...#/#..##/#.#.#/##..#/#...#/.###.', 1: '..#../.##../..#../..#../..#../..#../.###.', 2: '.###./#...#/....#/...#./..#../.#.../#####',
+  3: '####./....#/....#/.###./....#/....#/####.', 4: '...#./..##./.#.#./#..#./#####/...#./...#.', 5: '#####/#..../####./....#/....#/#...#/.###.',
+  6: '.###./#..../#..../####./#...#/#...#/.###.', 7: '#####/....#/...#./..#../.#.../.#.../.#...', 8: '.###./#...#/#...#/.###./#...#/#...#/.###.',
+  9: '.###./#...#/#...#/.####/....#/....#/.###.',
+  '.': '././././././#', ',': '././././././#/#/#.', ':': './#/./././#/.', '-': '..../..../..../####/..../..../....',
+  '+': '...../..#../..#../#####/..#../..#../.....', '=': '...../...../#####/...../#####/...../.....', '(': '.#/#./#./#./#./#./.#', ')': '#./.#/.#/.#/.#/.#/#.',
+  '/': '....#/...#./...#./..#../.#.../.#.../#....', '~': '...../...../.#..#/#.##./...../...../.....', '&': '.##../#..#./#.#../.#.../#.#.#/#..#./.##.#',
+  '!': '#/#/#/#/#/./#', '?': '.###./#...#/....#/...#./..#../...../..#..', "'": '#/#/./././././', '%': '##..#/##.#./...#./..#../.#.../.#.##/#..##',
+  '→': '......./....#../.....#./#######/.....#./....#../.......', '←': '......./..#..../.#...../#######/.#...../..#..../.......',
+  '↓': '..#../..#../..#../..#../#.#.#/.###./..#..', 'γ': '...../...../#...#/#...#/.#.#./.#.#./..#../.#.#./..#..',
+  '×': '...../...../#...#/.#.#./..#../.#.#./#...#', '^': '..#../.#.#./#...#/...../...../...../.....', '•': '...../...../.##../.##../...../...../.....',
+  '±': '..#../..#../#####/..#../..#../...../#####', '#': '.#.#./#####/.#.#./.#.#./#####/.#.#./.....', '_': '...../...../...../...../...../...../#####',
+  '°': '.##./#..#/.##./..../..../..../....', '⁻': '.../###/.../.../.../.../...', '⁺': '.#./###/.#./.../.../.../...', '⁶': '.##/#../##./#.#/.#./.../...', '·': '../../../##/##/../..', '≈': '...../.#..#/#.##./...../.#..#/#.##./.....', '≠': '...#./#####/..#../#####/.#.../...../.....',
+  '²': '.##./#..#/..#./.#../####/..../....', '³': '###./..#./.##./..#./###./..../....', 'µ': '..../..../#..#/#..#/#..#/#..#/###./#.../#...', '↔': '......./..#.#../.#...#./#######/.#...#./..#.#../.......', '≠': '...../....#/#####/..#../#####/#..../.....',
+  'α': '...../...../.##.#/#..#./#..#./#..#./.##.#', 'β': '.##../#..#./#.#../#..#./#..#./###../#..../#....', '◀': '...#/..##/.###/####/.###/..##/...#',
+  '₂': '..../..../..../..../.##./#..#/..#./.#../####', '÷': '...../..#../...../#####/...../..#../.....', 'λ': '#..../.#.../.#.../..#../.#.#./#...#/#...#',
+};
+const FC = mkFont(9, FC_DEF, 3);
+FC.g['–'] = FC.g['-'];
+// FS: 5-row micro font (caps, digits, a few lowercase for units)
+const FS = mkFont(6, {
+  A: '.##./#..#/####/#..#/#..#', B: '###./#..#/###./#..#/###.', C: '.###/#.../#.../#.../.###', D: '###./#..#/#..#/#..#/###.',
+  E: '####/#.../###./#.../####', F: '####/#.../###./#.../#...', G: '.###/#.../#.##/#..#/.###', H: '#..#/#..#/####/#..#/#..#',
+  I: '###/.#./.#./.#./###', J: '...#/...#/...#/#..#/.##.', K: '#..#/#.#./##../#.#./#..#', L: '#.../#.../#.../#.../####',
+  M: '#...#/##.##/#.#.#/#...#/#...#', N: '#..#/##.#/#.##/#..#/#..#', O: '.##./#..#/#..#/#..#/.##.', P: '###./#..#/###./#.../#...',
+  Q: '.##./#..#/#..#/#.#./.#.#', R: '###./#..#/###./#.#./#..#', S: '.###/#.../.##./...#/###.', T: '###/.#./.#./.#./.#.',
+  U: '#..#/#..#/#..#/#..#/.##.', V: '#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#.#.#/##.##/#...#', X: '#.#/#.#/.#./#.#/#.#',
+  Y: '#.#/#.#/.#./.#./.#.', Z: '####/...#/.##./#.../####',
+  0: '.##./#..#/#..#/#..#/.##.', 1: '.#./##./.#./.#./###', 2: '##./..#/.#./#../###', 3: '##./..#/.#./..#/##.', 4: '#.#/#.#/###/..#/..#',
+  5: '###/#../##./..#/##.', 6: '.##/#../###/#.#/###', 7: '###/..#/.#./.#./.#.', 8: '###/#.#/###/#.#/###', 9: '###/#.#/###/..#/##.',
+  a: '..../.##./..##/#.#./.###', c: '.../.##/#../#../.##', e: '..../.##./####/#.../.##.', k: '#.../#.#./##../#.#./#..#', l: '#/#/#/#/#',
+  m: '...../##.#./#.#.#/#.#.#/#.#.#', n: '.../##./#.#/#.#/#.#', o: '.../.#./#.#/#.#/.#.', s: '.../.##/##./..#/##.', t: '.#./###/.#./.#./..#',
+  i: '#/./#/#/#', h: '#../#../##./#.#/#.#', r: '.../#.#/##./#../#..', u: '.../#.#/#.#/#.#/.##', q: '.../.##/#.#/.##/..#', g: '.../.##/#.#/.##/##.',
+  ',': './././#/#', ':': './#/./#/.', '-': '.../.../###/.../...', '+': '.../.#./###/.#./...',
+  '(': '.#/#./#./#./.#', ')': '#./.#/.#/.#/#.', '/': '..#/.#./.#./.#./#..', '~': '..../.#.#/#.#./..../....', '%': '#..#/..#./.#../#.../#..#',
+  '→': '...#./....#/#####/....#/...#.', '↓': '.#./.#./.#./###/.#.', '×': '.../#.#/.#./#.#/...', '=': '.../###/.../###/...', "'": '#/#/./././',
+  '^': '.#./#.#/.../.../...', '!': '#/#/#/./#', '?': '##./..#/.#./.../.#.', 'γ': '#.#/#.#/.#./.#./#.#', '°': '##/##/../../..', '·': '../##/##/../..', '⁻': '###/.../.../.../...', '⁺': '.#./###/.#./.../...', '⁶': '.#/#./##/../..', '≈': '.#.#/#.#./.#.#/#.#./....', '≠': '..#/###/.#./###/#..',
+  p: '.../##./#.#/##./#../#..', b: '#../#../##./#.#/##.', d: '..#/..#/.##/#.#/.##', f: '.#/#./##/#./#.', v: '.../#.#/#.#/#.#/.#.',
+  w: '...../#...#/#.#.#/#.#.#/.#.#.', x: '.../#.#/.#./.#./#.#', y: '.../#.#/#.#/.##/..#/##.', z: '.../###/..#/.#./###',
+  '²': '##./..#/.#./###/...', 'µ': '.../#.#/#.#/#.#/###/#..', '³': '##./.#./##./.../...', '⁶': '.#./#../##./.../...', '↔': '......./.#...#./#######/.#...#./.......', '≠': '..#/###/.#./###/#..', 'α': '..../.#.#/#.#./#.#./.#.#', 'β': '.##./#..#/###./#..#/###./#...', 'j': '.#/../.#/.#/.#/#.',
+  '₂': '.../.../##./..#/.#./###', '÷': '.#./.../###/.../.#.', '[': '##/#./#./#./##', ']': '##/.#/.#/.#/##', '>': '#../.#./..#/.#./#..', '<': '..#/.#./#../.#./..#',
+}, 2);
+FS.g['.'] = { w: 1, bits: [0, 0, 0, 0, 1] };
+FS.g['–'] = FS.g['-'];
+// FT: 9-row title capitals (drawn bold)
+const FT = mkFont(9, {
+  H: '#...#/#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  W: '#.....#/#.....#/#.....#/#.....#/#..#..#/#..#..#/#.#.#.#/##...##/#.....#', S: '.###./#...#/#..../#..../.###./....#/....#/#...#/.###.',
+  P: '####./#...#/#...#/#...#/####./#..../#..../#..../#....', E: '####/#.../#.../#.../###./#.../#.../#.../####',
+  C: '.###./#...#/#..../#..../#..../#..../#..../#...#/.###.', T: '#####/..#../..#../..#../..#../..#../..#../..#../..#..',
+  A: '.###./#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', N: '#...#/##..#/##..#/#.#.#/#.#.#/#.#.#/#..##/#..##/#...#',
+  R: '####./#...#/#...#/#...#/####./#.#../#..#./#...#/#...#', K: '#...#/#..#./#.#../##.../##.../#.#../#..#./#...#/#...#',
+  U: '#...#/#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.', L: '#.../#.../#.../#.../#.../#.../#.../#.../####',
+  X: '#...#/#...#/.#.#./.#.#./..#../.#.#./.#.#./#...#/#...#', I: '###/.#./.#./.#./.#./.#./.#./.#./###',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#/#...#/#...#',
+  D: '####./#...#/#...#/#...#/#...#/#...#/#...#/#...#/####.', B: '####./#...#/#...#/#...#/####./#...#/#...#/#...#/####.', G: '.###./#...#/#..../#..../#.###/#...#/#...#/#...#/.###.', Y: '#...#/#...#/.#.#./.#.#./..#../..#../..#../..#../..#..', V: '#...#/#...#/#...#/#...#/#...#/.#.#./.#.#./.#.#./..#..',
+}, 3);
+function glyphOf(f, ch) { return f.g[ch] || f.g[ch.toUpperCase()] || f.g[ch.toLowerCase()] || f.g['?'] || f.g[' ']; }
+function textW(f, s, sc, bold) {
+  sc = sc || 2; let w = 0;
+  for (let i = 0; i < s.length; i++) { w += glyphOf(f, s[i]).w; if (i < s.length - 1) w += 1; }
+  return w * sc + (bold ? 1 : 0);
+}
+// draw text; returns width. opt: {sc, c, ol (outline colour or null), n (chars shown), bold, align, shadow, sd}
+function text(f, s, x, y, opt) {
+  opt = opt || {};
+  const sc = opt.sc || 2, c = opt.c === undefined ? P.INK : opt.c, ol = opt.ol === undefined ? P.SH : opt.ol;
+  const bold = opt.bold ? 1 : 0, n = opt.n === undefined ? s.length : Math.floor(opt.n);
+  const tw = textW(f, s, sc, bold);
+  if (opt.align === 'center') x -= tw / 2; else if (opt.align === 'right') x -= tw;
+  x = Math.round(x); y = Math.round(y);
+  const passes = [];
+  if (opt.shadow !== undefined && opt.shadow !== null) passes.push([opt.shadow, 0, 1, opt.sd || 1]);
+  if (ol !== null) passes.push([ol, 1, 0, 0]);
+  passes.push([c, 0, 0, 0]);
+  for (const [col, grow, isSh, sd] of passes) {
+    let cx = x;
+    for (let i = 0; i < s.length && i < n; i++) {
+      const g = glyphOf(f, s[i]);
+      for (let r = 0; r < f.h; r++) {
+        const bits = g.bits[r]; if (!bits) continue;
+        for (let k = 0; k < g.w; k++) if (bits & (1 << k)) {
+          const px = cx + k * sc, py = y + r * sc;
+          if (isSh) rect(px + sd, py + sd, px + sc + bold + sd, py + sc + sd, col);
+          else if (grow) rect(px - 1, py - 1, px + sc + bold + 1, py + sc + 1, col);
+          else rect(px, py, px + sc + bold, py + sc, col);
+        }
+      }
+      cx += (g.w + 1) * sc;
+    }
+  }
+  return tw;
+}
+function wrap(f, s, maxW, sc) {
+  const words = s.split(' '); const lines = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (textW(f, t, sc) <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur); return lines;
+}
+function wrapBal(f, s, maxW, sc) {
+  let best = wrap(f, s, maxW, sc); const n = best.length; if (n < 2) return best;
+  for (let w = maxW - 2; w > 24; w -= 2) { const L = wrap(f, s, w, sc); if (L.length > n) break; best = L; }
+  return best;
+}
+
+// ---- 02_pal.js
+// ============================================================================
+// Shared helpers: noise, splines, periodic wobble, pops, IK, vectors.
+// Colour code (fixed for the whole film; colours are educational): dark navy
+// ground; skin warm tones, epidermis peach, dermis soft pink; tattoo ink deep
+// black; the laser a faint violet-red (1064 nm is invisible); macrophages pale
+// white-blue with deep purple nuclei; lymphatic vessels soft green; the laser
+// console's electronics cyan.
+// ============================================================================
+// 2-D value noise in [0,1)
+function vn2(x, y, s) {
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash3(i, j, s), b = hash3(i + 1, j, s), c = hash3(i, j + 1, s), d = hash3(i + 1, j + 1, s);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// Catmull-Rom spline through control points -> dense flat polyline (open or closed)
+function spline(pts, n, closed) {
+  const m = pts.length / 2, out = [];
+  const P_ = i => closed ? ((i % m) + m) % m : clamp(i, 0, m - 1);
+  const segs = closed ? m : m - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = P_(i - 1), b = P_(i), c = P_(i + 1), d = P_(i + 2);
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      for (let q = 0; q < 2; q++) {
+        const p0 = pts[2 * a + q], p1 = pts[2 * b + q], p2 = pts[2 * c + q], p3 = pts[2 * d + q];
+        out.push(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3));
+      }
+    }
+  }
+  if (!closed) out.push(pts[2 * (m - 1)], pts[2 * (m - 1) + 1]);
+  return out;
+}
+// periodic wobble: every environmental motion repeats exactly every 48 s (seamless loop)
+const LOOPW = k => TAU * k / DUR;
+function wob(t, k, ph) { return Math.sin(LOOPW(k) * t + ph); }
+// UI switch (renders a scene without its captions)
+let UI_ON = true;
+// Kurzgesagt pop: ~90% at 0.25 s, ~108% overshoot, settles by 0.5 s
+const pop = (t, t0, d) => t < t0 ? 0 : backOut(clamp((t - t0) / (d || 0.5), 0, 1), 1.1);
+function pulse(t, t0, d) { return t < t0 ? 0 : Math.max(0, 1 - (t - t0) / d); }
+// 2-bone IK: knee position for a limb from (bx,by) to (tx,ty) with segment lengths L1, L2; side = +1/-1 bends the knee
+function ik(bx, by, tx, ty, L1, L2, side) {
+  let dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1e-6;
+  const dm = Math.min(d, L1 + L2 - 1e-3), dn = Math.max(dm, Math.abs(L1 - L2) + 1e-3);
+  const a = (L1 * L1 - L2 * L2 + dn * dn) / (2 * dn), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+  const ux = dx / d, uy = dy / d;
+  return [bx + ux * a - uy * h * side, by + uy * a + ux * h * side];
+}
+// small 3-vector helpers
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add3 = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+// seeded RNG (deterministic paths)
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gaussR(r) { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+// fast sine table (big per-pixel loops)
+const SIN_N = 4096, SIN_T = new Float32Array(SIN_N + 1);
+for (let i = 0; i <= SIN_N; i++) SIN_T[i] = Math.sin(i / SIN_N * TAU);
+function fsin(x) { const u = x / TAU; return SIN_T[Math.floor((u - Math.floor(u)) * SIN_N)]; }
+
+// ---- 03_clock.js
+// ============================================================================
+// TIME: the 120 BPM grid, the scene table, and the EVENT TABLE.
+// The event table is the single list of physical events that both the picture
+// and the sound read: a crack is drawn on the frame its crack sound starts, a
+// pulse frosts the skin on the frame its snap is heard. Every event time sits
+// on the eighth-note grid (0.25 s = 15 frames), so it is frame-exact at 60 fps.
+// ============================================================================
+const NBARS = 24, BEAT = DUR / (NBARS * 4), BPM = 60 / BEAT, BAR = 4 * BEAT, E8 = BEAT / 2, S16 = BEAT / 4;
+const lin = x => x; const bt = n => n * BEAT; const barT = b => (b - 1) * BAR;
+const SC_T = [0, 1, 2, 3, 4, 6, 8, 11, 13, 16, 19, 21, 23, 26, 28, 31, 33, 36, 40, 45, 48];
+const SEQ = { A: [0, 4], B: [4, 19], C: [19, 33], D: [33, 40], E: [40, 48] };
+const SCENE_NAMES = ['LASER ON THE TATTOO', 'THE TATTOO REACTS', 'THE TATTOO BEGINS TO FADE', 'ZOOM INSIDE THE SKIN', 'WHERE TATTOO INK LIVES',
+  'LASER PHOTONS ENTER', 'THE PIGMENT ABSORBS ENERGY', 'RAPID EXPANSION', 'PIGMENT FRAGMENTATION', 'LARGE VS SMALL PARTICLES', 'REVEAL THE MACROPHAGE',
+  'MACROPHAGE APPROACHES THE INK', 'PHAGOCYTOSIS', 'INSIDE THE MACROPHAGE', 'LYMPHATIC CLEARANCE', 'LESS PIGMENT REMAINS', 'BACK TO THE SKIN SURFACE',
+  'THE NEXT LASER SESSION', 'MULTIPLE TREATMENT TIMELINES', 'THE FINAL REVEAL'];
+function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[i + 1]) i++; return i; }
+const T = i => SC_T[i];
+const range = (a, b, step) => { const o = []; for (let x = a; x <= b + 1e-9; x += step) o.push(Math.round(x * 1000) / 1000); return o; };
+const EV = {
+  // A — the hook: four pulses along the top point of the star (4 Hz, a real Q-switched repetition rate)
+  hook: [0.25, 0.5, 0.75, 1.0],
+  weeks1: 2.0,                                   // WEEKS LATER: the frosting is gone, the star a little lighter
+  tilt: 3.0,                                     // the skin lifts into a cut-away block
+  dive: 3.5,                                     // and the camera dives into its front face
+  ambient: 4.25,                                 // arrival in the dermis
+  // B — how the laser breaks the ink
+  agg: 5.0,                                      // one large aggregate is singled out
+  micro: 6.0,                                    // the next pulse, seen inside the skin: photons enter
+  scatter: [6.5, 7.0, 7.5],                      // a few photons scatter in the tissue
+  hits: range(8.0, 10.75, 0.25),                 // twelve photons absorbed by the aggregate
+  expand: 11.0,                                  // thermoelastic expansion: the pressure wave
+  bubbles: [11.25, 11.5, 11.75, 12.0, 12.25],    // gas bubbles form around it (the frosting, at the scale of the ink)
+  cracks: [13.0, 13.25, 13.5, 13.75],            // four cracks run through the aggregate
+  split: 14.0,                                   // it breaks into fragments (the downbeat of bar 8)
+  compare: 16.0, disperse: 16.25, merge: 18.0,   // before / after (the fragments drift apart), merged back into the tissue
+  // C — immune cells remove pigment
+  macro: 19.0,                                   // the macrophage comes into view
+  reach: [21.0, 21.5, 22.0, 22.5],               // it stretches toward the fragments
+  wrap: 23.0, close: 24.0, vesicle: 25.0,        // the membrane extends, closes (downbeat of bar 13), the vesicle forms
+  inside: 26.0, lyso: [26.75, 27.25, 27.75],     // inside the cell: three lysosomes merge with the vesicle
+  lymph: 28.0, enter: [28.5, 29.0, 29.5], cellIn: 29.75, node: 30.25,
+  clear: range(31.25, 32.75, 0.25),              // weeks pass: the ink clusters thin out (seven steps)
+  // D — fading over time
+  surface: 33.0, out: 33.25, weeks2: 34.5,      // the camera rises back out through the skin
+  session: 36.0, pulses2: [36.75, 37.0, 37.25, 37.5],
+  steps4: [38.0, 38.5, 39.0, 39.5],              // REMAINING PIGMENT → ENERGY ABSORPTION → SMALLER FRAGMENTS → IMMUNE CLEARANCE
+  // E — the payoff time-lapse and the loop
+  labels: [[40.0, 'SESSION 1'], [40.75, 'WEEKS LATER'], [41.5, 'SESSION 2'], [42.25, 'WEEKS LATER'], [43.0, 'ADDITIONAL SESSIONS'], [44.0, 'FINAL RESULT']],
+  stages: [40.0, 40.75, 42.25, 43.5, 44.0],      // the five states of the star (five ascending ticks)
+  stageFade: [0, 0.2, 0.5, 0.8, 1.0],            // how far the star has faded at each
+  pulses3: [40.25, 40.5, 41.75, 42.0, 43.0, 43.25],
+  done: 45.0, recap: [45.25, 45.5, 45.75, 46.0], title: 46.5, rewind: 47.5,
+};
+// the star's fade (0 = as tattooed, 1 = no longer visible) at the surface, over the whole film
+function starFade(t) {
+  if (t < EV.weeks1) return 0;
+  if (t < 33.0) return 0.15 * smooth(seg(t, EV.weeks1, EV.weeks1 + 0.5));
+  if (t < 40.0) return lerp(0.15, 0.38, smooth(seg(t, EV.weeks2, EV.weeks2 + 0.5)));
+  if (t < EV.rewind) { let f = 0; for (let i = 1; i < EV.stages.length; i++) f = lerp(f, EV.stageFade[i], smooth(seg(t, EV.stages[i], EV.stages[i] + 0.5))); return f; }
+  return lerp(1, 0, smooth(seg(t, EV.rewind, DUR - 0.05)));
+}
+
+// ---- 05_fx.js
+// ============================================================================
+// Paths (arc-length parameterised polylines) and small geometric helpers.
+// ============================================================================
+class Path {
+  constructor(pts) { // flat [x0,y0,x1,y1,...]
+    this.p = pts; this.n = pts.length >> 1; this.c = [0];
+    for (let i = 1; i < this.n; i++) this.c.push(this.c[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]));
+    this.L = this.c[this.n - 1];
+  }
+  _seg(s) { s = clamp(s, 0, this.L); let lo = 0, hi = this.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (this.c[m] <= s) lo = m; else hi = m; } return [lo, s]; }
+  at(s) { const [i, ss] = this._seg(s); const l = this.c[i + 1] - this.c[i] || 1e-9, f = (ss - this.c[i]) / l; return [lerp(this.p[2 * i], this.p[2 * i + 2], f), lerp(this.p[2 * i + 1], this.p[2 * i + 3], f)]; }
+  tan(s) { const [i] = this._seg(s); const dx = this.p[2 * i + 2] - this.p[2 * i], dy = this.p[2 * i + 3] - this.p[2 * i + 1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+  sub(s0, s1, step) { // flat points of the sub-path
+    step = step || 2; const out = []; s0 = clamp(s0, 0, this.L); s1 = clamp(s1, 0, this.L);
+    for (let s = s0; s < s1; s += step) { const q = this.at(s); out.push(q[0], q[1]); }
+    const q = this.at(s1); out.push(q[0], q[1]); return out;
+  }
+}
+// rotate (x,y) by angle a about the origin
+function rot(x, y, a) { const c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; }
+// is a screen rect visible (with margin)
+const onScreen = (x0, y0, x1, y1, m) => { m = m || 0; return x1 >= -m && x0 <= W + m && y1 >= -m && y0 <= H + m; };
+// ---------------------------------------------------------------- particles shared by every world
+// starburst flash (detections, interactions)
+function flash(x, y, r, k, cols) {
+  cols = cols || [P.DT1, P.DT2, P.DT3, P.C6];
+  if (k <= 0) return;
+  disc(x, y, r * 1.6, cols[0], 0.3 * k); disc(x, y, r, cols[1], 0.6 * k); disc(x, y, r * 0.55, cols[2]); disc(x, y, r * 0.28, cols[3]);
+  for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + 0.2, L = r * (i % 2 ? 1.5 : 2.4) * k; line(x + Math.cos(a) * r * 0.4, y + Math.sin(a) * r * 0.4, x + Math.cos(a) * L, y + Math.sin(a) * L, i % 2 ? cols[1] : cols[2]); }
+}
+// arrows and marks used by labels
+function arrowHead(x, y, ang, s, col) { const ca = Math.cos(ang), sa = Math.sin(ang); poly([x + ca * s, y + sa * s, x - ca * s * 0.7 - sa * s * 0.7, y - sa * s * 0.7 + ca * s * 0.7, x - ca * s * 0.7 + sa * s * 0.7, y - sa * s * 0.7 - ca * s * 0.7], col); }
+function crossMark(x, y, s, col) { for (const d of [-1, 0, 1]) { line(x - s + d, y - s, x + s + d, y + s, col); line(x + s + d, y - s, x - s + d, y + s, col); } }
+function checkMark(x, y, s, col) { const pts = [x - s, y, x - s * 0.3, y + s * 0.7, x + s, y - s * 0.8]; for (const d of [-1, 0, 1]) { line(pts[0], pts[1] + d, pts[2], pts[3] + d, col); line(pts[2], pts[3] + d, pts[4], pts[5] + d, col); } }
+
+// ---- 10_arm.js
+// ============================================================================
+// THE FOREARM (arm world: screen pixels of the opening close-up, camera (180, 320, 1);
+// 40 px ≈ 1 cm). One forearm on a dark treatment pad, one small black five-pointed
+// star outline, a Q-switched Nd:YAG handpiece in a gloved hand on an articulated
+// arm, and the laser console (seen when the camera pulls back).
+// The star's ink fades in patches (per-pixel noise) as treatment goes on; the
+// frosting appears where each pulse lands and is gone by the next time jump.
+// ============================================================================
+const STAR = { cx: 180, cy: 330, R: 100, r: 40, w: 4.8 };             // centre, outer / inner radius, half stroke width
+const STAR_PTS = (() => { const p = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? STAR.r : STAR.R; p.push([STAR.cx + rr * Math.cos(a), STAR.cy + rr * Math.sin(a)]); } return p; })();
+const STAR_SEG = STAR_PTS.map((p, i) => { const q = STAR_PTS[(i + 1) % 10]; return [p[0], p[1], q[0] - p[0], q[1] - p[1], (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2]; });
+function starDist(x, y) {
+  let best = 1e9;
+  for (const [ax, ay, dx, dy, l2] of STAR_SEG) { const u = clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1), ex = x - ax - u * dx, ey = y - ay - u * dy, d2 = ex * ex + ey * ey; if (d2 < best) best = d2; }
+  return Math.sqrt(best);
+}
+// the arm runs top (elbow) to bottom (wrist), a little narrower toward the wrist
+const armL = y => 22 + 0.03 * y, armR = y => 338 - 0.03 * y;
+// pulse spots: the hook arches over the top point of the star; later sessions treat the other points
+const SPOT_R = 13;
+const edgePt = (i, u) => { const a = STAR_PTS[i % 10], b = STAR_PTS[(i + 1) % 10]; return [lerp(a[0], b[0], u), lerp(a[1], b[1], u)]; };
+const SPOTS_HOOK = [edgePt(9, 0.3), edgePt(9, 0.72), edgePt(0, 0.28), edgePt(0, 0.7)];          // up the left edge of the top point, down its right edge
+const SPOTS_S2 = [edgePt(7, 0.62), edgePt(8, 0.38), edgePt(1, 0.62), edgePt(2, 0.38)];          // the left and right points
+const SPOTS_S3 = [edgePt(3, 0.62), edgePt(4, 0.38), edgePt(5, 0.62), edgePt(6, 0.38), edgePt(9, 0.6), edgePt(0, 0.4)];
+// every frosted spot: [x, y, time of its pulse, time its frosting starts to fade]
+const FROST = [
+  ...SPOTS_HOOK.map((p, i) => [p[0], p[1], EV.hook[i], EV.weeks1]),
+  ...SPOTS_S2.map((p, i) => [p[0], p[1], EV.pulses2[i], 39.75]),
+  ...SPOTS_S3.map((p, i) => [p[0], p[1], EV.pulses3[i], [40.75, 40.75, 42.25, 42.25, 43.5, 43.5][i]]),
+];
+// the handpiece's aim over time: the spot it is above, and how far it is pulled away (0 = in place)
+const AIM_KEYS = [
+  [0.0, SPOTS_HOOK[0], 0], [0.25, SPOTS_HOOK[0], 0], [0.5, SPOTS_HOOK[1], 0], [0.75, SPOTS_HOOK[2], 0], [1.0, SPOTS_HOOK[3], 0], [1.6, SPOTS_HOOK[3], 0], [2.1, SPOTS_HOOK[3], 1],
+  [36.1, SPOTS_S2[0], 1], [36.75, SPOTS_S2[0], 0], [37.0, SPOTS_S2[1], 0], [37.25, SPOTS_S2[2], 0], [37.5, SPOTS_S2[3], 0], [38.0, SPOTS_S2[3], 0], [39.6, SPOTS_S2[3], 1],
+  [40.0, SPOTS_S3[0], 1], [40.25, SPOTS_S3[0], 0], [40.5, SPOTS_S3[1], 0], [40.75, SPOTS_S3[1], 1],
+  [41.5, SPOTS_S3[2], 1], [41.75, SPOTS_S3[2], 0], [42.0, SPOTS_S3[3], 0], [42.25, SPOTS_S3[3], 1],
+  [42.75, SPOTS_S3[4], 1], [43.0, SPOTS_S3[4], 0], [43.25, SPOTS_S3[5], 0], [43.5, SPOTS_S3[5], 1],
+  [47.5, SPOTS_HOOK[0], 1], [DUR, SPOTS_HOOK[0], 0],
+];
+function aimAt(t) {
+  let i = 0; while (i + 1 < AIM_KEYS.length && t >= AIM_KEYS[i + 1][0]) i++;
+  const a = AIM_KEYS[i], b = AIM_KEYS[Math.min(i + 1, AIM_KEYS.length - 1)];
+  if (a === b) return { x: a[1][0], y: a[1][1], away: a[2] };
+  // hop between spots quickly (a third of the gap) and hold still for the pulse
+  const span = b[0] - a[0], u = K75(clamp((t - a[0]) / Math.min(span, Math.max(0.12, span * 0.6)), 0, 1));
+  return { x: lerp(a[1][0], b[1][0], u), y: lerp(a[1][1], b[1][1], u), away: lerp(a[2], b[2], u) };
+}
+// ---------------------------------------------------------------- skin and ink, as a colour for any arm-world point
+const HAIRS = Array.from({ length: 70 }, (_, i) => ({ x: 30 + hash(i + 500) * 300, y: -300 + hash(i + 501) * 1300, a: 1.32 + 0.25 * (hash(i + 502) - 0.5), l: 7 + 7 * hash(i + 503) }));
+const FRECKLES = Array.from({ length: 14 }, (_, i) => ({ x: 50 + hash(i + 560) * 260, y: -200 + hash(i + 561) * 1100, r: 0.8 + 1.1 * hash(i + 562) }));
+function skinTone(wx, wy) {
+  const xl = armL(wy), xr = armR(wy), u = (wx - xl) / (xr - xl), n = 2 * u - 1;
+  const b = Math.sqrt(Math.max(0, 1 - n * n)) * 0.78 - n * 0.22 + 0.08 * (vn2(wx / 26, wy / 26, 3) - 0.5);
+  let c = b < 0.2 ? mixc(P.SK1, P.SK2, b / 0.2) : b < 0.55 ? mixc(P.SK2, P.SK3, (b - 0.2) / 0.35) : mixc(P.SK3, P.SK4, clamp((b - 0.55) / 0.35, 0, 1));
+  const edge = Math.min(wx - xl, xr - wx); if (edge < 2) c = mixc(P.SK0, c, clamp(edge / 2, 0, 1));
+  return c;
+}
+// the base picture (skin tone, the pad) is cached once in arm-world pixels; ink, frost and redness are added live
+const ATX = { x0: -200, y0: -700, w: 760, h: 2000 };
+let ARMTEX = null;
+function padColor(wx, wy, xl, xr) {
+  const fold = Math.sin((wx * 0.6 + wy) / 38 + 2 * Math.sin(wy / 90)), padIn = wx > -90 && wx < 450;
+  let c = padIn ? (fold > 0.82 ? P.PD3 : fold > 0.35 ? P.PD2 : P.PD1) : P.BG;
+  const sh = Math.min(Math.abs(wx - xl), Math.abs(wx - xr)); if (padIn && sh < 14) c = mixc(P.PD0, c, sh / 14);
+  return c;
+}
+function buildArmTex() {
+  ARMTEX = new Uint32Array(ATX.w * ATX.h);
+  for (let j = 0; j < ATX.h; j++) {
+    const wy = ATX.y0 + j + 0.5, xl = armL(wy), xr = armR(wy);
+    for (let i = 0; i < ATX.w; i++) { const wx = ATX.x0 + i + 0.5; ARMTEX[j * ATX.w + i] = wx < xl - 0.5 || wx > xr + 0.5 ? padColor(wx, wy, xl, xr) : skinTone(wx, wy); }
+  }
+}
+function baseAt(wx, wy) {
+  if (!ARMTEX) buildArmTex();
+  const i = Math.floor(wx - ATX.x0), j = Math.floor(wy - ATX.y0);
+  return i < 0 || j < 0 || i >= ATX.w || j >= ATX.h ? P.BG : ARMTEX[j * ATX.w + i];
+}
+// ink alpha of the star at (wx, wy) for a given fade (0 = as tattooed, 1 = gone): patchy, like real fading
+function inkAlpha(wx, wy, fade) {
+  if (Math.abs(wx - STAR.cx) > STAR.R + 6 || Math.abs(wy - STAR.cy) > STAR.R + 6) return 0;
+  const d = starDist(wx, wy); if (d > STAR.w + 1) return 0;
+  const edge = d < STAR.w - 0.5 ? 1 : clamp(STAR.w + 0.5 - d, 0, 1);
+  if (fade <= 0) return edge * (0.92 + 0.08 * vn2(wx / 2.2, wy / 2.2, 17));
+  const nv = 0.7 * vn2(wx / 9, wy / 9, 7) + 0.3 * vn2(wx / 3.5, wy / 3.5, 9);
+  return edge * clamp(1 - fade * (1 + 0.9 * nv), 0, 1);
+}
+// the frosted spots that show at time t: [x, y, strength]
+const frostList = t => FROST.filter(([, , t0, tf]) => t >= t0 && t <= tf + 0.5).map(([x, y, t0, tf]) => [x, y, smooth(seg(t, t0, t0 + 0.1)) * (1 - smooth(seg(t, tf, tf + 0.5)))]);
+function frostAt(wx, wy, fl) {
+  let a = 0;
+  for (const [x, y, g] of fl) {
+    const dx = wx - x, dy = wy - y; if (dx * dx + dy * dy > (SPOT_R + 2) ** 2) continue;
+    const d = Math.sqrt(dx * dx + dy * dy), r = SPOT_R * (1 + 0.18 * (vn2(wx / 3, wy / 3, 11) - 0.5));
+    a = Math.max(a, g * clamp(r + 0.5 - d, 0, 1));
+  }
+  return a;
+}
+// one arm-world point as a colour (used by the arm view and by the top face of the skin block)
+function skinPixel(wx, wy, fl, fade, erythema) {
+  let c = baseAt(wx, wy);
+  if (erythema > 0) { const d = Math.hypot(wx - STAR.cx, wy - (STAR.cy - STAR.R * 0.62)); if (d < 56) c = mixc(c, P.ER, erythema * 0.32 * smooth(1 - d / 56)); }
+  const ia = inkAlpha(wx, wy, fade);
+  if (ia > 0) c = mixc(c, mixc(P.IK1, P.IK2, fade * 0.6), ia * 0.95);
+  const fr = fl.length ? frostAt(wx, wy, fl) : 0;
+  if (fr > 0) { const s = vn2(wx / 1.7, wy / 1.7, 13); c = mixc(c, s > 0.62 ? P.FR0 : s > 0.3 ? P.FR1 : P.FR2, fr * (ia > 0.2 ? 0.92 : 0.45)); }
+  return c;
+}
+const erythemaAt = t => (smooth(seg(t, 1.1, 1.8)) * (1 - smooth(seg(t, EV.weeks1, EV.weeks1 + 0.5)))) + 0.7 * smooth(seg(t, 37.2, 37.9)) * (1 - smooth(seg(t, 39.6, 40.1)));
+// ---------------------------------------------------------------- the pad, the arm, the hairs
+function armWorld(cam, t, o) {
+  o = o || {};
+  const fade = o.fade === undefined ? starFade(t) : o.fade, ery = erythemaAt(t), fl = frostList(t);
+  if (!ARMTEX) buildArmTex();
+  const ex0 = STAR.cx - STAR.R - 60, ex1 = STAR.cx + STAR.R + 60, ey0 = STAR.cy - STAR.R - 60, ey1 = STAR.cy + STAR.R + 60;
+  for (let sy = 0; sy < H; sy++) {
+    const wy = cam.wy(sy + 0.5), xl = armL(wy), xr = armR(wy), row = sy * W, j = Math.floor(wy - ATX.y0), inY = j >= 0 && j < ATX.h, nearY = wy > ey0 && wy < ey1;
+    for (let sx = 0; sx < W; sx++) {
+      const wx = cam.wx(sx + 0.5), i = Math.floor(wx - ATX.x0);
+      const c = inY && i >= 0 && i < ATX.w ? ARMTEX[j * ATX.w + i] : P.BG;
+      buf[row + sx] = nearY && wx > ex0 && wx < ex1 && wx > xl && wx < xr ? skinPixel(wx, wy, fl, fade, ery) : c;
+    }
+  }
+  if (cam.z > 0.7) {
+    const hc = mixc(P.SK3, P.HR, 0.42);
+    for (const h of HAIRS) { const x0 = cam.x(h.x), y0 = cam.y(h.y); if (x0 < -20 || x0 > W + 20 || y0 < -20 || y0 > H + 20 || h.x < armL(h.y) + 6 || h.x > armR(h.y) - 6) continue; const x1 = cam.x(h.x + Math.cos(h.a) * h.l * 0.3), y1 = cam.y(h.y + Math.sin(h.a) * h.l); line(x0, y0, x1, y1, hc); }
+    for (const f of FRECKLES) disc(cam.x(f.x), cam.y(f.y), Math.max(0.6, f.r * cam.z), mixc(P.SK2, P.SK1, 0.6));
+  }
+}
+// ---------------------------------------------------------------- the laser: handpiece, glove, articulated arm, console
+const HP_DIR = [0.56, -0.83];                     // from the tip back along the body (up and to the right)
+function capsule(cam, ax, ay, bx, by, r, cBase, cHi, cLo, cOl) {
+  const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux, pts = [], k = 8;
+  for (let i = 0; i <= k; i++) { const th = -Math.PI / 2 + i * Math.PI / k, c = Math.cos(th), s = Math.sin(th); pts.push(cam.x(bx + r * (c * ux + s * nx)), cam.y(by + r * (c * uy + s * ny))); }
+  for (let i = 0; i <= k; i++) { const th = Math.PI / 2 + i * Math.PI / k, c = Math.cos(th), s = Math.sin(th); pts.push(cam.x(ax + r * (c * ux + s * nx)), cam.y(ay + r * (c * uy + s * ny))); }
+  shade(maskPoly(pts), cBase, cHi, cLo, cOl, { k: Math.max(1, Math.round(cam.z)) });
+}
+function drawHandpiece(cam, t, o) {
+  o = o || {};
+  const aim = aimAt(t), away = o.away === undefined ? aim.away : o.away;
+  if (away >= 0.999) return;
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  // pulled away = slid back along its own axis and lifted out of frame
+  const off = 260 * K75(away), sx = aim.x + HP_DIR[0] * off, sy = aim.y + HP_DIR[1] * off;
+  const tipX = sx + 5, tipY = sy - 8, at = s => [tipX + HP_DIR[0] * s, tipY + HP_DIR[1] * s];
+  // its soft shadow on the skin
+  withDither(0.28 * (1 - away), () => { const m = maskEll(X(sx - 12 + HP_DIR[0] * 60), Y(sy + 12 + HP_DIR[1] * 60), 16 * z, 60 * z, Math.atan2(HP_DIR[1], HP_DIR[0]) + Math.PI / 2); mFill(m, P.SK0); });
+  // the aiming dot and the spacer prong that rests on the skin
+  if (away < 0.3) { disc(X(aim.x), Y(aim.y), 1.8 * z, P.AIM); }
+  const nX = -HP_DIR[1], nY = HP_DIR[0], hp = (s_, n_) => [tipX + HP_DIR[0] * s_ + nX * n_, tipY + HP_DIR[1] * s_ + nY * n_];
+  const cap = (s0, n0, s1, n1, r, a, b_, c, d) => { const [ax, ay] = hp(s0, n0), [bx, by] = hp(s1, n1); capsule(cam, ax, ay, bx, by, r, a, b_, c, d); };
+  { const [p0x, p0y] = hp(10, -10); lineW(X(p0x), Y(p0y), X(sx - 11), Y(sy + 5), 2 * z, P.HP2); }
+  // articulated arm going off toward the console
+  { const [e0x, e0y] = hp(232, 0), e1x = e0x + 120, e1y = e0y - 104, e2x = e1x + 40, e2y = e1y - 200;
+    capsule(cam, e0x, e0y, e1x, e1y, 8, P.HP2, P.HP3, P.HP1, P.HP0); disc(X(e1x), Y(e1y), 12 * z, P.HP1); disc(X(e1x), Y(e1y), 8 * z, P.HP2);
+    capsule(cam, e1x, e1y, e2x, e2y, 8, P.HP2, P.HP3, P.HP1, P.HP0); }
+  if (o.console) drawConsole(cam, t);
+  // the clinician's gloved hand (cuff and back of the hand), the fingers under the body
+  cap(196, 40, 330, 72, 34, P.GV2, P.GV3, P.GV1, P.GV0);
+  { const [hx, hy] = hp(150, 30), m = maskEll(X(hx), Y(hy), 56 * z, 42 * z, Math.atan2(HP_DIR[1], HP_DIR[0])); shade(m, P.GV2, P.GV3, P.GV1, P.GV0, { k: Math.max(1, Math.round(z)) }); }
+  cap(128, 32, 92, 22, 9.5, P.GV1, P.GV2, P.GV0, P.GV0);
+  cap(138, 40, 108, 34, 9, P.GV1, P.GV2, P.GV0, P.GV0);
+  // the handpiece: nozzle, grip ring, white body, a steady status light
+  cap(28, 0, 232, 0, 15, P.HP4, P.HP4, P.HP3, P.HP1);
+  cap(62, 0, 74, 0, 15.5, P.HP1, P.HP2, P.HP0, P.HP0);
+  cap(0, 0, 28, 0, 9, P.HP1, P.HP2, P.HP0, P.HP0);
+  { const [lx, ly] = hp(206, -6); disc(X(lx), Y(ly), 2.4 * z, P.DT2); }
+  const [n0x, n0y] = hp(0, 0);
+  // index finger along the top of the body, thumb on the other side
+  cap(136, 14, 80, 7, 9.5, P.GV2, P.GV4, P.GV1, P.GV0);
+  cap(150, -16, 100, -13, 10, P.GV2, P.GV4, P.GV1, P.GV0);
+  // the pulse: a faint violet-red cone for three frames and a soft glow on the spot (1064 nm is invisible: educational colour)
+  if (o.pulses) for (const tp of o.pulses) {
+    const age = t - tp; if (age < 0 || age > 0.16) continue;
+    const k = age < 0.05 ? 1 : 1 - (age - 0.05) / 0.11;
+    if (age < 0.05) withDither(0.38, () => poly([X(n0x) - 2 * z, Y(n0y), X(n0x) + 2 * z, Y(n0y), X(aim.x) + 8 * z, Y(aim.y), X(aim.x) - 8 * z, Y(aim.y)], P.LZ2));
+    glow(X(aim.x), Y(aim.y), 13 * z, P.LZ3, P.LZ4, 0.5 * k);
+  }
+}
+// the laser console (seen when the camera pulls back): a white cabinet with its screen
+const CONSOLE = { x0: 352, y0: -268, x1: 486, y1: -96 };
+function drawConsole(cam, t) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z, { x0, y0, x1, y1 } = CONSOLE;
+  if (X(x0) > W || Y(y1) < 0) return;
+  const m = maskRR(X(x0), Y(y0), X(x1), Y(y1), 10 * z); shade(m, P.CN3, P.CN3, P.CN1, P.CN0, { k: Math.max(1, Math.round(z)) });
+  const s0 = [x0 + 12, y0 + 14, x1 - 12, y0 + 92]; rect(X(s0[0]), Y(s0[1]), X(s0[2]), Y(s0[3]), P.SCR0); frame(X(s0[0]), Y(s0[1]), X(s0[2]), Y(s0[3]), P.CN0);
+  const sc = Math.max(1, Math.round(z * 2.6));
+  text(FS, 'Nd:YAG', X(s0[0] + 6), Y(s0[1] + 6), { sc: Math.max(1, sc - 1), c: P.DT2, ol: null });
+  text(FS, '1064 nm', X(s0[0] + 6), Y(s0[1] + 24), { sc, c: P.DT3, ol: null });
+  text(FS, 'Q-SWITCHED', X(s0[0] + 6), Y(s0[1] + 54), { sc: Math.max(1, sc - 1), c: P.DT2, ol: null });
+  for (let k = 0; k < 3; k++) { const bx = x0 + 16 + k * 36; const mb = maskRR(X(bx), Y(y0 + 104), X(bx + 26), Y(y0 + 120), 4 * z); shade(mb, P.CN2, P.CN3, P.CN1, P.CN0, {}); }
+  disc(X(x1 - 26), Y(y0 + 146), 11 * z, P.CN1); disc(X(x1 - 26), Y(y0 + 146), 8 * z, P.CN2);
+}
+
+// ---- 11_block.js
+// ============================================================================
+// THE SKIN BLOCK (diagram space = screen pixels at rest): the textbook cut-away of
+// the same skin, lifted out around the star's top point. The top face shows the
+// skin and the star exactly as on the arm; the front face is the cut at arm
+// y = 280, where the two edges of the star's top point cross it: the ink sits in
+// the dermis under them. Layers are drawn thicker than life (NOT TO SCALE).
+// ============================================================================
+const BLK = { ax0: 120, ax1: 240, ay0: 218, ay1: 280,                // the patch of arm it is cut from
+  fx0: 50, fx1: 290, fy0: 262, fy1: 560, dx: 46, dy: -80 };           // front face and the oblique depth offset
+const BLK_INK = (() => {                                              // ink under the two crossings of the cut with the star outline
+  const out = [], cuts = [], y = BLK.ay1;
+  for (const [ax, ay, dx, dy] of STAR_SEG) { if ((ay - y) * (ay + dy - y) < 0) { const u = (y - ay) / dy, x = ax + u * dx; if (x > BLK.ax0 && x < BLK.ax1) cuts.push((x - BLK.ax0) / (BLK.ax1 - BLK.ax0)); } }
+  cuts.forEach((u0, k) => { for (let i = 0; i < 46; i++) { const h = hash(i * 7 + k * 300 + 11); out.push({ u: u0 + (hash(i * 7 + k * 300 + 12) - 0.5) * 0.08, w: 0.2 + 0.24 * Math.pow(h, 0.8), r: 1.6 + 2.4 * hash(i * 7 + k * 300 + 13) }); } });
+  return { cuts, dots: out };
+})();
+const BLK_FAT = Array.from({ length: 22 }, (_, i) => ({ u: (i % 6) / 5 + (hash(i + 70) - 0.5) * 0.08, w: 0.8 + Math.floor(i / 6) * 0.06 + hash(i + 71) * 0.03 }));
+// the layer colour at a point of a face: u across (0..1), w down (0..1)
+function blockLayer(u, w, side) {
+  const dej = 0.085 + 0.014 * Math.sin(u * 48 + 0.7);
+  let c;
+  if (w < 0.018) c = P.SC1;
+  else if (w < dej) c = (Math.sin(u * 160) * Math.sin(w * 300) > 0.55) ? P.EP1 : P.EP2;
+  else if (w < 0.2) c = Math.sin((w * 260 + 3 * Math.sin(u * 40)) ) > 0.7 ? P.CL2 : P.DM4;
+  else if (w < 0.78) c = Math.sin((w * 120 + 2.2 * Math.sin(u * 22 + w * 9)) * 1.6) > 0.55 ? P.CL1 : P.DM3;
+  else c = P.FT1;
+  if (w >= 0.78) for (const f of BLK_FAT) { const d = Math.hypot((u - f.u) * 2.4, (w - f.w) * 4.2); if (d < 0.07) { c = d > 0.058 ? P.FT0 : P.FT2; break; } }
+  return side ? mixc(c, P.K0, 0.32) : c;
+}
+// o: { fade, t, cam (diagram camera) }
+function blockView(cam, t, o) {
+  o = o || {};
+  const fade = o.fade === undefined ? starFade(t) : o.fade, fl = frostList(t), B = BLK, fw = B.fx1 - B.fx0, fh = B.fy1 - B.fy0;
+  for (let sy = 0; sy < H; sy++) {
+    const dy_ = cam.wy(sy + 0.5), row = sy * W;
+    for (let sx = 0; sx < W; sx++) {
+      const dx_ = cam.wx(sx + 0.5);
+      let c = null;
+      // front face
+      if (dx_ >= B.fx0 && dx_ < B.fx1 && dy_ >= B.fy0 && dy_ < B.fy1) c = blockLayer((dx_ - B.fx0) / fw, (dy_ - B.fy0) / fh, false);
+      else {
+        // top face: v from the front edge (0) to the back edge (1)
+        const v = (dy_ - B.fy0) / B.dy;
+        if (v >= 0 && v < 1) {
+          const u = (dx_ - B.fx0 - v * B.dx) / fw;
+          if (u >= 0 && u < 1) c = skinPixel(lerp(B.ax0, B.ax1, u), lerp(B.ay1, B.ay0, v), fl, fade, 0);
+          else if (u >= 1) { // right side face
+            const vs = (dx_ - B.fx1) / B.dx, ws = (dy_ - B.fy0 - vs * B.dy) / fh;
+            if (vs >= 0 && vs < 1 && ws >= 0 && ws < 1) c = blockLayer(1 - vs * 0.2, ws, true);
+          }
+        } else if (dx_ >= B.fx1) {
+          const vs = (dx_ - B.fx1) / B.dx, ws = (dy_ - B.fy0 - vs * B.dy) / fh;
+          if (vs >= 0 && vs < 1 && ws >= 0 && ws < 1) c = blockLayer(1 - vs * 0.2, ws, true);
+        }
+      }
+      buf[row + sx] = c === null ? P.BG : c;
+    }
+  }
+  // the ink under the star line, and the edges of the block
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  for (const d of BLK_INK.dots) { const x = X(B.fx0 + d.u * fw), y = Y(B.fy0 + d.w * fh); disc(x, y, Math.max(1, d.r * z * 0.8), P.PG0); if (z > 1.5) disc(x - d.r * z * 0.25, y - d.r * z * 0.25, Math.max(0.6, d.r * z * 0.25), P.PG2); }
+  const ol = mixc(P.SK0, P.K0, 0.4);
+  const fx0 = X(B.fx0), fx1 = X(B.fx1), fy0 = Y(B.fy0), fy1 = Y(B.fy1), ox = B.dx * z, oy = B.dy * z;
+  lineW(fx0, fy0, fx1, fy0, 1.5, ol); lineW(fx1, fy0, fx1, fy1, 1.5, ol); lineW(fx0, fy0, fx0 + ox, fy0 + oy, 1.2, ol); lineW(fx1, fy0, fx1 + ox, fy0 + oy, 1.2, ol);
+  lineW(fx0 + ox, fy0 + oy, fx1 + ox, fy0 + oy, 1.2, ol); lineW(fx1 + ox, fy0 + oy, fx1 + ox, fy1 + oy, 1.2, ol); lineW(fx1, fy1, fx1 + ox, fy1 + oy, 1.2, ol);
+}
+// where a front-face point (u, w) is in diagram space
+const blkPt = (u, w) => [BLK.fx0 + u * (BLK.fx1 - BLK.fx0), BLK.fy0 + w * (BLK.fy1 - BLK.fy0)];
+
+// ---- 12_micro.js
+// ============================================================================
+// THE MICRO WORLD (units: µm; x across, y down from the skin surface).
+// One coordinate system for every microscopic shot, so the camera can travel
+// continuously from the whole dermis (~0.6 px/µm) to one ink aggregate
+// (~26 px/µm): stratum corneum, epidermis (keratinocytes, melanin in the basal
+// layer), the wavy dermal–epidermal junction, papillary dermis with capillary
+// loops, reticular dermis with collagen bundles, fibroblasts, a small blood
+// vessel, a lymphatic vessel (soft green), resident macrophages that already
+// hold ink, scattered ink clusters, and the hero aggregate A at (0, 380).
+// The pulse is shown in slow motion (it lasts nanoseconds): photons → absorbed
+// (particles jitter) → expansion and a pressure wave, gas bubbles → four cracks
+// → fragments. Fragments are defined by the cracks themselves (which side of
+// each crack a particle is on), so the break-up always matches the cracks drawn.
+// ============================================================================
+const MW = { sc: 12, pap: 250 };
+const EP_LINE = mixc(P.EP2, P.EP0, 0.42);
+const dejY = x => 92 + 15 * Math.sin(x / 34 + 0.6) + 6 * Math.sin(x / 13 + 1.7);
+const AGG = { x: 0, y: 380 };
+const LYV = { y: 452, r: 15, wall: 3.2 };
+const BVS = { y: 300, r: 6 };
+// ---------------------------------------------------------------- the tissue, per pixel
+function tissue(x, y, z) {
+  if (y < 0) return P.BG;
+  if (y < MW.sc) return z > 1.6 && ((y | 0) % 3 === 0) ? P.SC0 : P.SC1;
+  const d = dejY(x);
+  if (y < d) {
+    if (d - y < 7) return ((x * 0.7 + y) % 9 < 1.2 && z > 0.8) ? P.ML : P.EP1;                       // basal layer with melanin
+    if (z < 0.8) return P.EP2;
+    const row = Math.floor(y / 9), xx = x + row * 6 + 2 * Math.sin(y / 5), lw = 1.1 / z;
+    if (y - row * 9 < lw || ((xx % 12) + 12) % 12 < lw) return EP_LINE;
+    const cx = Math.floor(xx / 12) * 12 + 6, cy = row * 9 + 4.5; if ((xx - cx) ** 2 + ((y - cy) * 1.3) ** 2 < 4.2) return P.EP1;
+    return P.EP2;
+  }
+  if (y < MW.pap) return z > 1.4 && Math.sin((y + 5 * Math.sin(x / 11)) * 0.9) > 0.88 ? P.CL2 : P.DM4;
+  const v = Math.sin((y + 9 * Math.sin(x / 27) + 4 * Math.sin(x / 9 + y / 40)) * 0.39);
+  if (v > 0.5) return z > 8 && Math.sin((y + 9 * Math.sin(x / 27)) * 3.1 + x * 0.05) > 0.7 ? P.CL2 : P.CL1;
+  return v < -0.8 ? P.DM2 : P.DM3;
+}
+// ---------------------------------------------------------------- vessels, fibroblasts, resident cells, scattered ink
+const PAPILLAE = (() => { const o = []; for (let x = -420; x <= 420; x += 68) o.push(x + 20); return o; })();
+const FIBRO = (() => { const r = mulberry(77), o = []; for (let i = 0; i < 36; i++) o.push({ x: (r() - 0.5) * 760, y: 150 + r() * 560, a: (r() - 0.5) * 0.5, l: 20 + 9 * r() }); return o.filter(f => Math.hypot(f.x - AGG.x, f.y - AGG.y) > 40 && Math.abs(f.y - LYV.y) > 26); })();
+const RBC = Array.from({ length: 30 }, (_, i) => ({ x0: -420 + i * 29 + 10 * hash(i + 90), dy: (hash(i + 91) - 0.5) * 4 }));
+const RES = [[-128, 352], [96, 405], [-62, 470], [148, 520], [-205, 420], [210, 365], [40, 330]].map(([x, y], i) => ({ x, y, r: 7.5 + 1.5 * hash(i + 40), ink: 5 + Math.floor(hash(i + 41) * 4), seed: i * 13 + 5 }));
+const BULK = (() => {
+  const r = mulberry(4242), o = [];
+  while (o.length < 150) {
+    const x = (r() - 0.5) * 700, y = clamp(392 + gaussR(r) * 72, 240, 600);
+    if (Math.hypot(x - AGG.x, y - AGG.y) < 44 || Math.hypot(x - (AGG.x - 30), y - (AGG.y + 18)) < 30 || Math.abs(y - LYV.y) < LYV.r + 8 || RES.some(c => Math.hypot(x - c.x, y - c.y) < c.r + 8)) continue;
+    const n = 4 + Math.floor(r() * 7), dots = [];
+    for (let k = 0; k < n; k++) dots.push({ dx: (r() - 0.5) * 8, dy: (r() - 0.5) * 7, r: 1.1 + r() * 1.6, sx: r() - 0.5, sy: r() - 0.5 });
+    o.push({ x, y, dots, gone: r() < 0.5 ? EV.clear[Math.floor(r() * EV.clear.length)] : 99, toCell: r() < 0.35 });
+  }
+  return o;
+})();
+// how much of a scattered cluster is left after the weeks of clearance (1 = all)
+const bulkLeft = (b, t) => 1 - smooth(seg(t, b.gone, b.gone + 0.25));
+const fragK = t => smooth(seg(t, EV.split, EV.split + 1.0));                  // scattered clusters are fragmented by the same pulse
+function drawVessels(cam, t) {
+  const X = v => cam.x(v), Y = v => cam.y(v), z = cam.z;
+  // capillary loops in the papillae
+  if (z < 4) for (const px of PAPILLAE) { const top = dejY(px) + 12; if (X(px) < -20 || X(px) > W + 20) continue; const pts = [px - 4, MW.pap, px - 5, top + 20, px - 3, top + 4, px, top, px + 3, top + 4, px + 5, top + 20, px + 4, MW.pap]; let q = null; for (let i = 0; i < pts.length; i += 2) { const a = X(pts[i]), b = Y(pts[i + 1]); if (q) lineW(q[0], q[1], a, b, Math.max(1, 2.6 * z), P.BL1); q = [a, b]; } }
+  // a small blood vessel
+  { const y0 = Y(BVS.y - BVS.r), y1 = Y(BVS.y + BVS.r); if (y1 > 0 && y0 < H) { rect(0, y0, W, y1, P.BL2); rect(0, y0, W, y0 + Math.max(1, 1.4 * z), P.BL1); rect(0, y1 - Math.max(1, 1.4 * z), W, y1, P.BL1);
+    if (z > 1.5) for (const c of RBC) { const x = ((c.x0 + 26 * t + 420) % 840 + 840) % 840 - 420; ellipse(X(x), Y(BVS.y + c.dy), 3.4 * z, 2.2 * z, P.BL1); } } }
+  // the lymphatic vessel: green walls of overlapping endothelial cells, pale lumen
+  const ly0 = Y(LYV.y - LYV.r - LYV.wall), ly1 = Y(LYV.y + LYV.r + LYV.wall);
+  if (ly1 > 0 && ly0 < H) {
+    rect(0, ly0, W, ly1, P.LY1); rect(0, Y(LYV.y - LYV.r), W, Y(LYV.y + LYV.r), P.LY4);
+    if (z > 1.2) for (let x = -440; x <= 440; x += 14) { const sx = X(x); if (sx < -30 || sx > W + 30) continue; line(sx, Y(LYV.y - LYV.r - LYV.wall), X(x + 9), Y(LYV.y - LYV.r), P.LY0); line(sx, Y(LYV.y + LYV.r), X(x + 9), Y(LYV.y + LYV.r + LYV.wall), P.LY0); }
+    rect(0, ly0, W, ly0 + 1, P.LY0); rect(0, ly1 - 1, W, ly1, P.LY0);
+  }
+}
+function drawFibro(cam) {
+  const z = cam.z; if (z < 0.5) return;
+  for (const f of FIBRO) { const x = cam.x(f.x), y = cam.y(f.y); if (x < -60 * z || x > W + 60 * z || y < -20 * z || y > H + 20 * z) continue; ellipse(x, y, f.l / 2 * z, 1.9 * z, P.FB1, undefined, f.a); ellipse(x, y, 3.6 * z, 1.2 * z, P.FB0, undefined, f.a); }
+}
+function inkDot(x, y, r, z) { disc(x, y, Math.max(0.7, r), P.PG0); if (r > 2.2) { disc(x - r * 0.3, y - r * 0.3, r * 0.32, P.PG2); } }
+function drawBulk(cam, t, o) {
+  const z = cam.z, fk = (o && o.noFrag) ? 0 : fragK(t);
+  for (const b of BULK) {
+    const left = bulkLeft(b, t); if (left <= 0) continue;
+    const bx = cam.x(b.x), by = cam.y(b.y); if (bx < -20 * z - 10 || bx > W + 20 * z + 10 || by < -20 * z - 10 || by > H + 20 * z + 10) continue;
+    const fade = left < 1 ? left : 1;
+    for (const d of b.dots) {
+      if (fade < 1 && hash(d.dx * 100 + d.dy) > fade) continue;
+      if (fk <= 0) inkDot(bx + d.dx * z, by + d.dy * z, d.r * z, z);
+      else for (let k = 0; k < 3; k++) { const a = k * 2.1 + d.sx * 3, s = fk * (1.2 + d.r * 0.6); inkDot(bx + (d.dx + Math.cos(a) * s) * z, by + (d.dy + Math.sin(a) * s) * z, d.r * (1 - 0.45 * fk) * z, z); }
+    }
+  }
+}
+// ---------------------------------------------------------------- the hero aggregate: particles, cracks, fragments
+const AGP = (() => {
+  const r = mulberry(1234), pts = []; let tries = 0;
+  while (pts.length < 86 && tries < 9000) {
+    tries++; const a = r() * TAU, d = 3.15 * Math.sqrt(r()), x = d * Math.cos(a) * 1.08, y = d * Math.sin(a) * 0.92, rad = 0.26 + 0.17 * r();
+    if (pts.every(p => Math.hypot(p.x - x, p.y - y) > (p.r + rad) * 0.84)) pts.push({ x, y, r: rad, rot: r() * TAU, nv: 5 + Math.floor(r() * 3), sh: [r(), r(), r(), r(), r(), r(), r()], jp: r() * TAU });
+  }
+  return pts;
+})();
+const CRACKS = EV.cracks.map((tc, k) => { const a = 0.45 + k * 0.8 + 0.18 * Math.sin(k * 7.1), c = [0.45 * Math.cos(k * 2.3), 0.35 * Math.sin(k * 1.7)]; return { t: tc, a, c, d: [Math.cos(a), Math.sin(a)], n: [-Math.sin(a), Math.cos(a)], ph: k * 1.9 }; });
+const crackOff = (cr, s) => 0.22 * Math.sin(s * 2.9 + cr.ph) + 0.1 * Math.sin(s * 6.7 + 2 * cr.ph);
+const crackSide = (cr, x, y) => { const px = x - cr.c[0], py = y - cr.c[1], s = px * cr.d[0] + py * cr.d[1], q = px * cr.n[0] + py * cr.n[1]; return q - crackOff(cr, s) > 0 ? 1 : -1; };
+AGP.forEach(p => { p.side = CRACKS.map(cr => crackSide(cr, p.x, p.y)); p.frag = p.side.reduce((a, s, k) => a + (s > 0 ? 1 << k : 0), 0); });
+// which photon (if any) each particle absorbs
+const HIT_OF = AGP.map((p, i) => EV.hits.findIndex((h, k) => (k * 7) % AGP.length === i));
+// the macrophage's path (relative to A) and the point where it will catch some fragments
+const MAC_KEYS = [[EV.macro, -38, 23], [21.0, -29, 18.5], [22.5, -19, 13], [23.0, -17, 12], [48, -17, 12]];
+const TP = [-7.4, 4.9];
+const FRAGS = (() => {
+  const ids = [...new Set(AGP.map(p => p.frag))], out = [];
+  for (const id of ids) {
+    const ps = AGP.filter(p => p.frag === id), cx = ps.reduce((a, p) => a + p.x, 0) / ps.length, cy = ps.reduce((a, p) => a + p.y, 0) / ps.length, L = Math.hypot(cx, cy);
+    const dir = L > 0.35 ? [cx / L, cy / L] : [Math.cos(id * 2.4), Math.sin(id * 2.4)];
+    out.push({ id, n: ps.length, cx, cy, dir, dist: 2.6 + 3.0 * hash(id + 300), rot: (hash(id + 301) - 0.5) * 1.3, target: false });
+  }
+  // the three fragments heading down-left are the ones the macrophage will take up
+  const tdir = [-0.83, 0.55];
+  out.filter(f => f.n >= 3).sort((a, b) => (b.dir[0] * tdir[0] + b.dir[1] * tdir[1]) - (a.dir[0] * tdir[0] + a.dir[1] * tdir[1])).slice(0, 3).forEach((f, k) => { f.target = true; f.tgt = [TP[0] + [-0.9, 0.9, 0.1][k], TP[1] + [0.5, 0.3, -0.9][k]]; });
+  return out;
+})();
+const FRAG_BY_ID = {}; FRAGS.forEach(f => FRAG_BY_ID[f.id] = f);
+// the macrophage centre (world) at time t
+function macPos(t) { let i = 0; while (i + 1 < MAC_KEYS.length && t >= MAC_KEYS[i + 1][0]) i++; const a = MAC_KEYS[i], b = MAC_KEYS[Math.min(i + 1, MAC_KEYS.length - 1)]; const u = a === b ? 0 : smooth(clamp((t - a[0]) / (b[0] - a[0]), 0, 1)); return [AGG.x + lerp(a[1], b[1], u), AGG.y + lerp(a[2], b[2], u)]; }
+// where the phagosome is (world) once the membrane has closed: it moves a little into the cell
+function phagoPos(t) { const m = macPos(t), tp = [AGG.x + TP[0], AGG.y + TP[1]], k = 0.42 * smooth(seg(t, EV.close, EV.vesicle + 0.5)); return [lerp(tp[0], m[0], k), lerp(tp[1], m[1], k)]; }
+// one fragment's transform at time t: offset (µm, relative to A) and rotation
+function fragXform(f, t) {
+  if (t < EV.split) return [0, 0, 0];
+  const u = eout(clamp((t - EV.split) / 1.4, 0, 1)), drift = Math.max(0, Math.min(t, 28) - EV.split - 1.4) * 0.12;
+  if (f.target) {
+    const go = smooth(seg(t, EV.split, EV.split + 1.4)), base = [lerp(0, f.tgt[0] - f.cx, go), lerp(0, f.tgt[1] - f.cy, go)];
+    if (t < EV.close) return [base[0], base[1], f.rot * u];
+    // inside the vesicle: packed a little closer and carried with it
+    const pp = phagoPos(t), tp = [AGG.x + TP[0], AGG.y + TP[1]], sq = 0.75;
+    return [pp[0] - tp[0] + (f.tgt[0] - TP[0]) * sq + TP[0] - f.cx, pp[1] - tp[1] + (f.tgt[1] - TP[1]) * sq + TP[1] - f.cy, f.rot];
+  }
+  return [f.dir[0] * (f.dist * u + drift), f.dir[1] * (f.dist * u + drift), f.rot * u];
+}
+// the aggregate's absorbed energy (0..1): it rises with each photon and cools after the expansion
+function aggEnergy(t) { let e = 0; for (const h of EV.hits) e += smooth(seg(t, h, h + 0.1)); e /= EV.hits.length; return e * (1 - 0.55 * smooth(seg(t, EV.expand + 0.2, EV.cracks[0]))) * (1 - smooth(seg(t, EV.split, EV.split + 2))); }
+const aggScale = t => 1 + 0.1 * eout(seg(t, EV.expand, EV.expand + 0.08)) - 0.05 * smooth(seg(t, EV.expand + 0.08, EV.expand + 0.6));
+// o: { pigT (time used for the pigment's own state), detail }
+function drawAggregate(cam, t, o) {
+  o = o || {};
+  const pt = o.pigT === undefined ? t : o.pigT, z = cam.z, E = aggEnergy(pt), sc = aggScale(pt), X = v => cam.x(v), Y = v => cam.y(v);
+  const ax = X(AGG.x), ay = Y(AGG.y); if (ax < -60 * z - 20 || ax > W + 60 * z + 20 || ay < -60 * z - 20 || ay > H + 60 * z + 20) return;
+  if (E > 0.02 && pt < EV.split + 1) glow(ax, ay, 5.2 * z, P.HT2, null, 0.22 * E);
+  const hitNow = EV.hits.map(h => pulse(pt, h, 0.18));
+  AGP.forEach((p, i) => {
+    const f = FRAG_BY_ID[p.frag], [fx, fy, fr] = fragXform(f, pt);
+    if (f.target && pt >= EV.close && o.noInside) return;
+    // before the split, each crack opens a small gap between the two sides
+    let gx = 0, gy = 0;
+    if (pt < EV.split + 0.01) CRACKS.forEach((cr, k) => { if (pt >= cr.t) { const g = 0.075 * smooth(seg(pt, cr.t, cr.t + 0.08)); gx += cr.n[0] * p.side[k] * g; gy += cr.n[1] * p.side[k] * g; } });
+    const ca = Math.cos(fr), sa = Math.sin(fr), lx = (p.x - f.cx) * ca - (p.y - f.cy) * sa + f.cx, ly = (p.x - f.cx) * sa + (p.y - f.cy) * ca + f.cy;
+    const jit = 0.085 * E, jx = jit * Math.sin(pt * 47 + p.jp), jy = jit * Math.cos(pt * 53 + p.jp * 1.7);
+    const wx = AGG.x + (lx * sc + gx + fx + jx), wy = AGG.y + (ly * sc + gy + fy + jy), sx = X(wx), sy = Y(wy), rr = p.r * z;
+    if (rr < 1.6) { disc(sx, sy, Math.max(0.8, rr * 1.15), P.PG0); return; }
+    const pts = []; for (let k = 0; k < p.nv; k++) { const a = p.rot + fr + k * TAU / p.nv, q = p.r * (0.8 + 0.32 * p.sh[k]); pts.push(X(wx + Math.cos(a) * q), Y(wy + Math.sin(a) * q)); }
+    const m = maskPoly(pts); mFill(m, P.PG1);
+    const warm = Math.min(1, (HIT_OF[i] >= 0 ? hitNow[HIT_OF[i]] : 0) + E * 0.45);
+    mRim(m, warm > 0.15 ? mixc(P.PG3, P.HT3, warm) : P.PG3, -1, -1); mOutline(m, P.PG0);
+  });
+  // a crack shows bright for a few frames as it runs through
+  if (pt < EV.split + 0.1) for (const cr of CRACKS) {
+    const age = pt - cr.t; if (age < 0 || age > 0.16) continue;
+    const L = 3.6 * sc, u = Math.min(1, age / 0.05); let q = null;
+    for (let s = -L; s <= -L + 2 * L * u + 1e-6; s += 0.12) { const off = crackOff(cr, s), wx = AGG.x + cr.c[0] + cr.d[0] * s + cr.n[0] * off, wy = AGG.y + cr.c[1] + cr.d[1] * s + cr.n[1] * off; const a = [X(wx), Y(wy)]; if (q) lineW(q[0], q[1], a[0], a[1], Math.max(1, 0.09 * z), age < 0.08 ? P.PR : P.DM5); q = a; }
+  }
+}
+// gas bubbles around the aggregate (the frosting, at the scale of the ink)
+const BUBBLES = EV.bubbles.flatMap((tb, e) => [0, 1].map(k => { const a = e * 2.3 + k * 3.1 + 0.4 * hash(e * 3 + k), d = 3.8 + 0.7 * hash(e * 3 + k + 50); return { t: tb, x: Math.cos(a) * d, y: Math.sin(a) * d * 0.9, r: 0.22 + 0.26 * hash(e * 3 + k + 60) }; }));
+function drawBubbles(cam, t) {
+  const z = cam.z; if (t < EV.bubbles[0] || t > 19.5 || z < 2) return;
+  for (const b of BUBBLES) {
+    const g = smooth(seg(t, b.t, b.t + 0.16)) * (1 - smooth(seg(t, 17.0, 19.0))); if (g <= 0) continue;
+    const out = 1 + 0.35 * smooth(seg(t, EV.split, EV.split + 1.5)), x = cam.x(AGG.x + b.x * out), y = cam.y(AGG.y + b.y * out), r = b.r * g * z;
+    disc(x, y, r + 1, P.BB0); disc(x, y, r, P.BB1); disc(x - r * 0.35, y - r * 0.35, Math.max(0.6, r * 0.25), P.BB2);
+  }
+}
+// the pressure wave from the expansion (and the tissue ripple it causes: see microWorld)
+const pressR = t => 3.4 + 14 * Math.pow(seg(t, EV.expand, EV.expand + 1.4), 0.7);
+const pressA = t => t < EV.expand ? 0 : 1 - seg(t, EV.expand, EV.expand + 1.4);
+// photons (educational colour): S06 crossing the skin, S07 arriving at the aggregate
+const SCAT_I = [2, 7, 12];
+const PH6 = Array.from({ length: 16 }, (_, i) => ({ x: -66 + (i % 8) * 18 + 6 * hash(i + 700), t0: EV.micro + 0.06 * i, sc: SCAT_I.indexOf(i) >= 0 ? EV.scatter[SCAT_I.indexOf(i)] : 0, ang: (i % 2 ? 1 : -1) * (0.9 + 0.5 * hash(i + 701)) }));
+// one photon as a short wave packet (length L, amplitude amp, in µm), head bright
+function photonShape(cam, x, y, dx, dy, L, amp, a) {
+  const n = 18; let q = null;
+  for (let k = 0; k <= n; k++) { const s = -L + L * k / n, env = Math.sin(Math.PI * k / n), wv = amp * env * Math.sin(k / n * TAU * 2.5 - a * 14), px = x + dx * s - dy * wv, py = y + dy * s + dx * wv; const sp = [cam.x(px), cam.y(py)]; if (q) lineW(q[0], q[1], sp[0], sp[1], 1.6, k > n - 5 ? P.LZ3 : P.LZ2); q = sp; }
+}
+function drawPhotons(cam, t) {
+  const z = cam.z;
+  if (t >= EV.micro && t < 8.3) {
+    // the faint beam column
+    const k = smooth(seg(t, EV.micro, EV.micro + 0.15)) * (1 - smooth(seg(t, 7.9, 8.3)));
+    tintRect(cam.x(-74), cam.y(-30), cam.x(74), cam.y(AGG.y + 6), P.LZ1, 0.13 * k);
+    for (const p of PH6) {
+      const age = t - p.t0; if (age < 0) continue;
+      let x = p.x * (1 - Math.min(1, age * 0.25)), y = -30 + 240 * age, dx = 0, dy = 1;
+      if (p.sc && t > p.sc) { const as = t - p.sc, ys = -30 + 240 * (p.sc - p.t0); dx = Math.sin(p.ang); dy = Math.cos(p.ang); x = p.x * (1 - Math.min(1, (p.sc - p.t0) * 0.25)) + dx * 240 * as; y = ys + dy * 240 * as; if (as > 0.45) continue; }
+      if (y > AGG.y - 4) continue;
+      photonShape(cam, x, y, dx, dy, 16, 2.4, t);
+    }
+  }
+  if (t >= EV.hits[0] - 0.4 && t < EV.hits[EV.hits.length - 1] + 0.05) {
+    // each absorbed photon flies in to one particle and is gone on its hit frame
+    EV.hits.forEach((h, k) => {
+      const age = t - (h - 0.36); if (age < 0 || t >= h) return;
+      const p = AGP[(k * 7) % AGP.length], tx = AGG.x + p.x, ty = AGG.y + p.y, sx = tx + (k % 2 ? 1 : -1) * 3, sy = ty - 16, u = age / 0.36;
+      const x = lerp(sx, tx, u), y = lerp(sy, ty, u), L = Math.hypot(tx - sx, ty - sy);
+      photonShape(cam, x, y, (tx - sx) / L, (ty - sy) / L, 2.4, 0.4, t);
+    });
+  }
+}
+// ---------------------------------------------------------------- small fragments near the lymphatic vessel
+// three slip in through gaps between the wall's overlapping cells (one per event) and are carried along; the rest stay
+const LFR = [[-24, 424, 0], [4, 427, 1], [52, 422, 2], [-52, 430, -1], [80, 431, -1], [28, 418, -1]].map(([x, y, e], i) => ({ x, y, e, gx: [-16, 10, 46][e] || 0, seed: i * 17 + 3 }));
+function lfrPos(f, t) {
+  if (f.e < 0) return [f.x + 1.2 * Math.sin(t * 0.8 + f.seed), f.y + 0.8 * Math.cos(t + f.seed), 1];
+  const te = EV.enter[f.e], gy = LYV.y - LYV.r - LYV.wall / 2;
+  if (t < te - 0.5) return [f.x + 1.2 * Math.sin(t * 0.8 + f.seed), f.y, 1];
+  if (t < te) { const u = smooth(seg(t, te - 0.5, te)); return [lerp(f.x, f.gx, u), lerp(f.y, gy, u), 1]; }
+  if (t < te + 0.25) { const u = smooth(seg(t, te, te + 0.25)); return [f.gx, lerp(gy, LYV.y - 4 + f.e * 3, u), 1]; }
+  return [f.gx + 15 * (t - te - 0.25), LYV.y - 4 + f.e * 3, 1];
+}
+function drawLymphFrags(cam, t) {
+  const z = cam.z; if (t < 24 || t > 33.5) return;
+  for (const f of LFR) {
+    const [x, y] = lfrPos(f, t), sx = cam.x(x), sy = cam.y(y); if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) continue;
+    for (let k = 0; k < 5; k++) { const a = k * 1.3 + f.seed, d = 0.6 + 0.5 * hash(f.seed + k); inkDot(sx + Math.cos(a) * d * z, sy + Math.sin(a) * d * z, (0.32 + 0.2 * hash(f.seed + k + 5)) * z, z); }
+  }
+  // the flap of the wall swings open for each entry
+  for (const f of LFR) {
+    if (f.e < 0) continue; const te = EV.enter[f.e], g = Math.sin(Math.PI * clamp((t - te + 0.35) / 0.8, 0, 1)); if (g <= 0) continue;
+    const x0 = cam.x(f.gx - 2.2 * g), x1 = cam.x(f.gx + 2.2 * g); rect(x0, cam.y(LYV.y - LYV.r - LYV.wall), x1, cam.y(LYV.y - LYV.r), P.LY3);
+  }
+}
+// ---------------------------------------------------------------- the whole micro picture
+// o: { pigT, noFx, noFrag }
+function microWorld(cam, t, o) {
+  o = o || {};
+  const z = cam.z, pr = pressA(t), R = pressR(t);
+  for (let sy = 0; sy < H; sy++) {
+    const wy0 = cam.wy(sy + 0.5), row = sy * W;
+    for (let sx = 0; sx < W; sx++) {
+      let wx = cam.wx(sx + 0.5), wy = wy0;
+      if (pr > 0 && !o.noFx) { const dx = wx - AGG.x, dy = wy - AGG.y, r = Math.hypot(dx, dy) || 1, dd = 0.9 * Math.exp(-(((r - R) / 1.6) ** 2)) * pr; wx -= dx / r * dd; wy -= dy / r * dd; }
+      buf[row + sx] = tissue(wx, wy, z);
+    }
+  }
+  drawVessels(cam, t);
+  drawLymphFrags(cam, t);
+  drawFibro(cam);
+  drawResident(cam, t);
+  drawBulk(cam, t, o);
+  if (o.cells !== false) drawMacrophages(cam, t, o);
+  drawAggregate(cam, t, o);
+  if (!o.noFx) {
+    drawBubbles(cam, t);
+    if (pr > 0) { const rr = R * z; ring(cam.x(AGG.x), cam.y(AGG.y), rr, Math.max(1.2, 0.35 * z), mixc(P.DM4, P.PR, pr)); }
+    drawPhotons(cam, t);
+  }
+}
+
+// ---- 13_cell.js
+// ============================================================================
+// MACROPHAGES (micro-world units, µm). Pale white-blue cells with a deep purple,
+// bean-shaped nucleus and small vesicles. Resident macrophages already hold ink.
+// The hero macrophage M crawls in (its leading edge bulging), reaches toward the
+// fragments, wraps two membrane arms around three of them, the arms meet and
+// close (24.0 s), and the enclosed vesicle (phagosome) is carried inward; inside
+// the cell, lysosomes merge with it and the ink stays recognisable. A second,
+// ink-laden macrophage M2 squeezes into the lymphatic vessel and is carried away.
+// ============================================================================
+// a cell outline as screen points: base radius R (µm) with a slow living wobble and optional bulges
+function cellPts(cam, cx, cy, R, t, seed, bulges, sxk, syk) {
+  const pts = [], n = 56; sxk = sxk || 1; syk = syk || 1;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU; let r = R * (1 + 0.055 * Math.sin(3 * a + 0.9 * t + seed) + 0.04 * Math.sin(5 * a - 1.3 * t + seed * 2) + 0.03 * Math.sin(2 * a + 0.5 * t + seed * 3));
+    if (bulges) for (const b of bulges) { const d = Math.atan2(Math.sin(a - b.a), Math.cos(a - b.a)); r += b.h * Math.exp(-(d * d) / (2 * b.w * b.w)); }
+    pts.push(cam.x(cx + Math.cos(a) * r * sxk), cam.y(cy + Math.sin(a) * r * syk));
+  }
+  return pts;
+}
+function cellBody(cam, pts) { const m = maskPoly(pts); shade(m, P.MC3, P.MC4, P.MC2, P.MC0, { k: Math.max(1, Math.round(cam.z * 0.45)) }); return m; }
+function nucleus(cam, cx, cy, a, s) {
+  const z = cam.z, X = v => cam.x(v), Y = v => cam.y(v), ca = Math.cos(a), sa = Math.sin(a);
+  const m = maskEll(X(cx), Y(cy), 2.6 * s * z, 1.8 * s * z, a); shade(m, P.NU2, P.NU3, P.NU1, P.NU0, { k: Math.max(1, Math.round(z * 0.3)) });
+  // the bean's notch
+  disc(X(cx - sa * 1.6 * s), Y(cy + ca * 1.6 * s), 0.9 * s * z, P.MC3);
+  if (z > 4) for (let k = 0; k < 5; k++) disc(X(cx + Math.cos(k * 2.3) * 1.2 * s), Y(cy + Math.sin(k * 1.7) * 0.8 * s), Math.max(0.8, 0.18 * s * z), P.NU1);
+}
+function vesicles(cam, cx, cy, R, seed, n) {
+  const z = cam.z; if (z < 2) return;
+  for (let k = 0; k < n; k++) { const a = hash(seed + k) * TAU, d = R * (0.35 + 0.45 * hash(seed + k + 9)), r = 0.35 + 0.3 * hash(seed + k + 17); disc(cam.x(cx + Math.cos(a) * d), cam.y(cy + Math.sin(a) * d), r * z, P.MC1); disc(cam.x(cx + Math.cos(a) * d), cam.y(cy + Math.sin(a) * d), Math.max(0.6, (r - 0.12) * z), P.MC2); }
+}
+function inkGranules(cam, cx, cy, R, seed, n) {
+  for (let k = 0; k < n; k++) { const a = hash(seed + k + 30) * TAU, d = R * (0.2 + 0.55 * hash(seed + k + 31)), r = 0.55 + 0.5 * hash(seed + k + 32); inkDot(cam.x(cx + Math.cos(a) * d), cam.y(cy + Math.sin(a) * d), r * cam.z, cam.z); }
+}
+// resident macrophages that already hold ink (some gain more as the weeks pass)
+function drawResident(cam, t) {
+  const z = cam.z;
+  RES.forEach((c, i) => {
+    const x = cam.x(c.x), y = cam.y(c.y); if (x < -14 * z - 10 || x > W + 14 * z + 10 || y < -14 * z - 10 || y > H + 14 * z + 10) return;
+    cellBody(cam, cellPts(cam, c.x, c.y, c.r, t, c.seed));
+    nucleus(cam, c.x + 1.5, c.y - 1.2, 0.6 + i, c.r / 9);
+    const extra = EV.clear.filter(tc => t >= tc && hash(i * 31 + tc * 4) < 0.5).length;
+    inkGranules(cam, c.x - 1, c.y + 1.5, c.r, c.seed, c.ink + extra);
+  });
+}
+// ---------------------------------------------------------------- the hero macrophage M and the ink-laden M2
+const M_R = 10;
+const cupP = t => smooth(seg(t, EV.wrap, EV.close));                     // 0..1: the arms sweep around the fragments
+function drawMacrophages(cam, t, o) {
+  const z = cam.z;
+  // ---- M
+  const [mx, my] = macPos(t), tp = [AGG.x + TP[0], AGG.y + TP[1]], aT = Math.atan2(tp[1] - my, tp[0] - mx);
+  const vis = cam.x(mx) > -20 * z - 10 && cam.x(mx) < W + 20 * z + 10 && cam.y(my) > -20 * z - 10 && cam.y(my) < H + 20 * z + 10;
+  if (vis) {
+    const bul = [];
+    // crawling: the leading edge bulges in the direction of travel
+    const [px, py] = macPos(t - 0.2), mv = Math.hypot(mx - px, my - py);
+    if (mv > 0.05) bul.push({ a: Math.atan2(my - py, mx - px), h: Math.min(3.2, mv * 3.5), w: 0.5 });
+    // reaching: four small pseudopods stretch toward the fragments, one per event
+    EV.reach.forEach((tr, k) => { const g = Math.sin(Math.PI * clamp((t - tr) / 0.9, 0, 1)); if (g > 0) bul.push({ a: aT + (k % 2 ? 0.35 : -0.35) * (1 - k / 4), h: 2.4 * g + k * 0.3, w: 0.16 }); });
+    // after closure the cell bulges over the new vesicle, then smooths as it is carried in
+    if (t >= EV.close) { const pp = phagoPos(t), d = Math.hypot(pp[0] - mx, pp[1] - my), reach = d + 2.7 - M_R; if (reach > 0) bul.push({ a: Math.atan2(pp[1] - my, pp[0] - mx), h: reach, w: 0.32 }); }
+    else if (t >= EV.wrap) bul.push({ a: aT, h: 1.2 * cupP(t), w: 0.45 });
+    // the two membrane arms of the phagocytic cup (outline first, then the body, then the arm fill)
+    const armOn = t >= EV.wrap - 0.05 && t < EV.close + 0.02, p = cupP(t), rc = 2.25, back = aT + Math.PI;
+    const armArc = sgn => { const pts = [], a0 = back + sgn * 0.85, a1 = back + sgn * (0.85 + (Math.PI - 0.85) * Math.max(0.02, p)); for (let k = 0; k <= 16; k++) { const a = lerp(a0, a1, k / 16); pts.push([cam.x(tp[0] + Math.cos(a) * rc), cam.y(tp[1] + Math.sin(a) * rc)]); } return pts; };
+    const strokeArc = (pts, w, c) => { for (let k = 1; k < pts.length; k++) lineW(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1], w, c); };
+    if (armOn) for (const s of [-1, 1]) { const a = armArc(s); strokeArc(a, 1.5 * z + 2, P.MC0); disc(a[a.length - 1][0], a[a.length - 1][1], 0.75 * z + 1, P.MC0); }
+    cellBody(cam, cellPts(cam, mx, my, M_R, t, 1.7, bul));
+    if (armOn) for (const s of [-1, 1]) { const a = armArc(s); strokeArc(a, 1.5 * z, P.MC3); disc(a[a.length - 1][0], a[a.length - 1][1], 0.75 * z, P.MC3); strokeArc(a.slice(0, -1), Math.max(1, 0.35 * z), P.MC4); }
+    nucleus(cam, mx - Math.cos(aT) * 3.6, my - Math.sin(aT) * 3.6, aT + 1.2, 1.25);
+    vesicles(cam, mx, my, M_R, 51, 9);
+    // the vesicle (phagosome) around the enclosed ink
+    if (t >= EV.close) {
+      const pp = phagoPos(t), g = smooth(seg(t, EV.close, EV.close + 0.12)), lk = lysoK(t);
+      disc(cam.x(pp[0]), cam.y(pp[1]), 2.25 * z, mixc(P.MC4, P.LS2, 0.45 * lk));
+      if (g > 0) ring(cam.x(pp[0]), cam.y(pp[1]), 2.25 * z, Math.max(1, 0.22 * z), mixc(P.VS, P.LS1, lk));
+      drawLysosomes(cam, t, pp);
+    }
+  }
+  // ---- M2: an ink-laden macrophage near the lymphatic vessel; it squeezes in and is carried away
+  if (t >= 26.5 && t < 33.5) {
+    const [x2, y2, sxk, syk] = m2Pos(t);
+    if (cam.x(x2) > -20 * z && cam.x(x2) < W + 20 * z) {
+      cellBody(cam, cellPts(cam, x2, y2, 7.5, t, 4.1, null, sxk, syk));
+      nucleus(cam, x2 + 1.2, y2 - 0.6, 2.2, 0.85 * Math.min(sxk, syk) + 0.15);
+      inkGranules(cam, x2 - 0.8, y2 + 0.8, 6.5 * Math.min(sxk, syk), 222, 9);
+    }
+  }
+}
+function m2Pos(t) {
+  const a = [34, 425], b = [27, LYV.y - LYV.r - 1], c = [24, LYV.y];
+  if (t < EV.lymph + 1.2) return [a[0], a[1] + 1.5 * Math.sin(t * 1.3), 1, 1];
+  if (t < EV.cellIn) { const u = smooth(seg(t, EV.lymph + 1.2, EV.cellIn)); return [lerp(a[0], b[0], u), lerp(a[1], b[1], u), 1 + 0.25 * u, 1 - 0.4 * u]; }
+  if (t < EV.cellIn + 0.4) { const u = smooth(seg(t, EV.cellIn, EV.cellIn + 0.4)); return [lerp(b[0], c[0], u), lerp(b[1], c[1], u), 1.25 - 0.15 * u, 0.6 + 0.25 * u]; }
+  return [c[0] + 15 * (t - EV.cellIn - 0.4), c[1], 1.1, 0.85];
+}
+// ---------------------------------------------------------------- inside the cell: lysosomes merging with the vesicle
+const LYSO = EV.lyso.map((tl, k) => ({ t: tl, a: 2.2 + k * 1.9, d: 6.5 }));
+const lysoK = t => LYSO.reduce((a, l) => a + smooth(seg(t, l.t, l.t + 0.15)), 0) / LYSO.length;
+function drawLysosomes(cam, t, pp) {
+  const z = cam.z; if (z < 3) return;
+  for (const l of LYSO) {
+    const start = l.t - 0.75; if (t < start - 0.5 || t > l.t + 0.15) continue;
+    const u = smooth(seg(t, start, l.t)), d = lerp(l.d, 2.25, u), x = cam.x(pp[0] + Math.cos(l.a) * d), y = cam.y(pp[1] + Math.sin(l.a) * d);
+    const r = 0.55 * (t > l.t ? 1 - seg(t, l.t, l.t + 0.15) : 1) * z;
+    if (r > 0.5) { disc(x, y, r + 1, P.LS0); disc(x, y, r, P.LS1); disc(x - r * 0.3, y - r * 0.3, Math.max(0.5, r * 0.3), P.LS2); }
+  }
+}
+
+// ---- 14_ui.js
+// ============================================================================
+// IN-PICTURE INSTRUMENTS: the time-jump pill, the treatment timeline of the
+// payoff, the phagocytosis step bar, the four quick steps of the next session,
+// the lymph-node inset, the "ink in view" meter and the closing recap icons.
+// All drawn in screen space inside the short-video safe area.
+// ============================================================================
+// a small clock that spins while time jumps
+function clockIcon(x, y, r, spin) {
+  disc(x, y, r + 1, P.K0); disc(x, y, r, P.INK); disc(x, y, r - 1.5, P.N2);
+  const a = spin * TAU * 3, b = spin * TAU * 0.25;
+  lineW(x, y, x + Math.cos(a - Math.PI / 2) * (r - 3), y + Math.sin(a - Math.PI / 2) * (r - 3), 1.6, P.YEL);
+  lineW(x, y, x + Math.cos(b - Math.PI / 2) * (r - 5), y + Math.sin(b - Math.PI / 2) * (r - 5), 1.8, P.INK);
+}
+// a time-jump label: a pill with a clock (top centre unless y is given)
+function timePill(s, t0, t1, t, y, spinD) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const k = K75(clamp((t - t0) / 0.18, 0, 1)) * (t1 - t < 0.18 ? (t1 - t) / 0.18 : 1); if (k <= 0) return;
+  const tw = textW(FS, s, 2), w = tw + 44, x0 = Math.round(CX - w / 2), yy = y === undefined ? 92 : y;
+  withDither(k, () => {
+    const m = maskRR(x0, yy, x0 + w, yy + 26, 12); mFill(m, P.K0); mOutline(m, P.YEL);
+    clockIcon(x0 + 16, yy + 13, 8, clamp((t - t0) / (spinD || 0.6), 0, 1));
+    text(FS, s, x0 + 30, yy + 7, { sc: 2, c: P.INK, ol: null });
+  });
+}
+// ---------------------------------------------------------------- the treatment timeline (payoff)
+const TL = { x0: 30, x1: 330, y: 446 };
+function timelineBar(t, a) {
+  if (!UI_ON || a <= 0) return;
+  const L = EV.labels, n = L.length, xs = L.map((_, i) => lerp(TL.x0, TL.x1, i / (n - 1)));
+  // the playhead walks to each label as it appears (and runs back on the rewind)
+  let ph = 0; for (let i = 1; i < n; i++) ph = lerp(ph, i, smooth(seg(t, L[i][0] - 0.15, L[i][0] + 0.1)));
+  if (t >= EV.rewind) ph = lerp(n - 1, 0, smooth(seg(t, EV.rewind, EV.rewind + 0.38)));
+  const hx = lerp(TL.x0, TL.x1, ph / (n - 1));
+  withDither(a, () => {
+    tintRect(TL.x0 - 16, TL.y - 12, TL.x1 + 16, TL.y + 12, P.K0, 0.75);
+    lineW(TL.x0, TL.y, TL.x1, TL.y, 3, P.N4); lineW(TL.x0, TL.y, hx, TL.y, 3, P.YEL);
+    xs.forEach((x, i) => { const on = ph >= i - 0.02; disc(x, TL.y, 5, P.K0); disc(x, TL.y, 4, on ? P.YEL : P.N5); if (L[i][1] !== 'WEEKS LATER') disc(x, TL.y, 1.6, P.K0); });
+    disc(hx, TL.y, 6.5, P.INK); disc(hx, TL.y, 4, P.YEL);
+  });
+  // the current label, big, above the bar
+  if (t < EV.rewind) { let cur = 0; for (let i = 0; i < n; i++) if (t >= L[i][0]) cur = i; const nx = cur + 1 < n ? L[cur + 1][0] : 45.0; timePill(L[cur][1], L[cur][0], nx - 0.02, t, TL.y - 50, 0.5); }
+  else if (a > 0.05) timePill('BACK TO THE START', EV.rewind, DUR - 0.08, t, TL.y - 50, 0.4);
+}
+// ---------------------------------------------------------------- phagocytosis: three steps
+const STEPS3 = [[EV.wrap, 'MEMBRANE EXTENDS'], [EV.close, 'PIGMENT ENCLOSED'], [EV.vesicle, 'INTERNAL VESICLE FORMED']];
+function stepBar(t) {
+  if (!UI_ON || t < EV.wrap || t > 26.0) return;
+  const out = t > 25.75 ? (26.0 - t) / 0.25 : 1;
+  STEPS3.forEach(([ts, s], i) => {
+    const k = K75(clamp((t - ts) / 0.2, 0, 1)) * out; if (k <= 0) return;
+    const y = 384 + i * 34, tw = textW(FS, s, 2), cur = i === STEPS3.length - 1 || t < STEPS3[i + 1][0];
+    withDither(k, () => {
+      const m = maskRR(20, y, 40 + tw + 16, y + 24, 6); mFill(m, P.K0); mOutline(m, cur ? P.YEL : P.N5);
+      disc(32, y + 12, 5, cur ? P.YEL : P.N5); text(FS, String(i + 1), 30, y + 9, { sc: 1, c: P.K0, ol: null });
+      text(FS, s, 44, y + 6, { sc: 2, c: cur ? P.INK : P.SUB, ol: null });
+    });
+  });
+}
+// ---------------------------------------------------------------- the four quick steps of the next session
+const STEPS4 = ['REMAINING|PIGMENT', 'ENERGY|ABSORPTION', 'SMALLER|FRAGMENTS', 'IMMUNE|CLEARANCE'];
+function miniPanel(i, x0, y0, w, h, age) {
+  const m = maskRR(x0, y0, x0 + w, y0 + h, 8); mFill(m, P.DM3); mOutline(m, P.YEL);
+  const cx = x0 + w / 2, cy = y0 + h / 2 - 2, a = clamp(age, 0, 2);
+  for (let k = 0; k < 3; k++) { const yy = y0 + 10 + k * 14; line(x0 + 6, yy, x0 + w - 6, yy + 3 * Math.sin(k), P.DM2); }
+  const blob = (x, y, r, n, seed, spread) => { for (let k = 0; k < n; k++) { const an = hash(seed + k) * TAU, d = spread * Math.sqrt(hash(seed + k + 50)); disc(x + Math.cos(an) * d, y + Math.sin(an) * d, r, P.PG0); } };
+  if (i === 0) { blob(cx - 12, cy, 3, 9, 11, 8); blob(cx + 14, cy + 4, 2.5, 6, 31, 6); }
+  if (i === 1) { blob(cx + 6, cy + 4, 3, 10, 41, 9); const u = clamp(a / 0.35, 0, 1); for (let k = 0; k < 14; k++) { const s = k / 13, x = lerp(x0 + 6, cx + 2, u) - 26 * (1 - s) * 0.5, y = lerp(y0 + 6, cy + 2, u) - 18 * (1 - s) * 0.5 + 3 * Math.sin(s * 14 - age * 30); disc(x, y, 1.2, s > 0.7 ? P.LZ3 : P.LZ2); } if (u >= 1) ring(cx + 6, cy + 4, 13, 1.5, P.HT3); }
+  if (i === 2) { const u = eout(clamp(a / 0.5, 0, 1)); for (let k = 0; k < 6; k++) { const an = k * 1.05 + 0.3; blob(cx + Math.cos(an) * 16 * u, cy + Math.sin(an) * 12 * u, 2.4, 3, 61 + k * 7, 3); } }
+  if (i === 3) { const u = smooth(clamp(a / 0.5, 0, 1)); const mm = maskEll(cx - 6 + 4 * u, cy, 20, 15, 0); shade(mm, P.MC3, P.MC4, P.MC2, P.MC0, {}); disc(cx - 14 + 4 * u, cy - 3, 5, P.NU2); blob(cx + 6, cy + 2, 2.2, 6, 81, 5 * (1 - 0.4 * u)); }
+}
+function stepPanels(t) {
+  if (!UI_ON || t < EV.steps4[0] - 0.1 || t > 40.1) return;
+  const out = t > 39.8 ? (40.1 - t) / 0.3 : 1, w = 122, h = 64, xs = [24, 196], ys = [292, 392];
+  EV.steps4.forEach((ts, i) => {
+    const k = K75(clamp((t - ts) / 0.18, 0, 1)) * out; if (k <= 0) return;
+    const x0 = xs[i % 2], y0 = ys[i >> 1];
+    withDither(k, () => {
+      tintRect(x0 - 6, y0 - 6, x0 + w + 6, y0 + h + 32, P.K0, 0.72);
+      miniPanel(i, x0, y0, w, h, t - ts);
+      disc(x0 + 10, y0 + 10, 7, P.YEL); text(FS, String(i + 1), x0 + 10, y0 + 7, { sc: 1, c: P.K0, ol: null, align: 'center' });
+      const [l1, l2] = STEPS4[i].split('|');
+      text(FS, l1, x0 + w / 2, y0 + h + 4, { sc: 2, c: P.INK, ol: null, align: 'center' }); text(FS, l2, x0 + w / 2, y0 + h + 17, { sc: 2, c: P.INK, ol: null, align: 'center' });
+      if (i % 2 === 0) { lineW(x0 + w + 6, y0 + h / 2, x0 + w + 40, y0 + h / 2, 2, P.YEL); arrowHead(x0 + w + 44, y0 + h / 2, 0, 5, P.YEL); }
+    });
+  });
+}
+// ---------------------------------------------------------------- the lymph-node inset
+function lymphInset(t) {
+  if (!UI_ON || t < EV.node || t > 31.2) return;
+  const k = K75(clamp((t - EV.node) / 0.2, 0, 1)) * (t > 30.95 ? (31.2 - t) / 0.25 : 1); if (k <= 0) return;
+  withDither(k, () => {
+    const x0 = 170, y0 = 92, x1 = 300, y1 = 300, m = maskRR(x0, y0, x1, y1, 10); mFill(m, P.K0); mOutline(m, P.LY2);
+    // the whole arm: hand at the bottom, forearm with the star, elbow, upper arm up to the armpit
+    const arm = maskPoly([214, 290, 236, 290, 246, 236, 254, 196, 266, 160, 270, 106, 246, 106, 240, 158, 226, 196, 216, 238]); shade(arm, P.SK3, P.SK4, P.SK2, P.SK1, {});
+    const sx = 231, sy = 244; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU / 5, b = -Math.PI / 2 + (i + 2) * TAU / 5; line(sx + Math.cos(a) * 6, sy + Math.sin(a) * 6, sx + Math.cos(b) * 6, sy + Math.sin(b) * 6, P.IK1); }
+    // the lymphatic path drawn up the arm to the node at the elbow, then on toward the armpit
+    const pts = [sx, sy - 8, 236, 222, 242, 202, 248, 186, 254, 160, 258, 124], u = clamp((t - EV.node) / 0.5, 0, 1), nseg = pts.length / 2 - 1;
+    for (let i = 0; i < nseg; i++) { const v = clamp(u * nseg - i, 0, 1); if (v <= 0) break; lineW(pts[2 * i], pts[2 * i + 1], lerp(pts[2 * i], pts[2 * i + 2], v), lerp(pts[2 * i + 1], pts[2 * i + 3], v), 2.4, P.LY2); }
+    const nm = maskEll(248, 186, 9, 6, 0.9); shade(nm, P.LY1, P.LY2, P.LY0, P.LY0, {});
+    if (u > 0.55) for (let i = 0; i < 5; i++) disc(245 + (i % 3) * 3, 184 + (i >> 1) * 2.5, 1.1, P.PG0);
+    text(FS, 'LYMPH', x0 + 8, 166, { sc: 2, c: P.LY3, ol: null }); text(FS, 'NODE', x0 + 8, 180, { sc: 2, c: P.LY3, ol: null }); line(x0 + 50, 186, 238, 186, P.LY3);
+  });
+}
+// ---------------------------------------------------------------- "ink in view" meter (the clearance time-lapse)
+function inkMeter(t) {
+  if (!UI_ON || t < 31.1 || t > 33.2) return;
+  const k = K75(clamp((t - 31.1) / 0.2, 0, 1)) * (t > 32.95 ? (33.2 - t) / 0.25 : 1);
+  const left = BULK.reduce((a, b) => a + bulkLeft(b, t), 0) / BULK.length;
+  withDither(k, () => {
+    const x0 = 20, y0 = 446, w = 170; tintRect(x0 - 6, y0 - 26, x0 + w + 8, y0 + 18, P.K0, 0.8);
+    text(FS, 'INK IN THIS AREA', x0, y0 - 18, { sc: 2, c: P.SUB, ol: null });
+    rect(x0, y0 - 4, x0 + w, y0 + 10, P.N2); rect(x0, y0 - 4, x0 + w * left, y0 + 10, P.PG2); frame(x0, y0 - 4, x0 + w, y0 + 10, P.N5);
+  });
+}
+// ---------------------------------------------------------------- the closing recap: four icons
+const RECAP = ['LASER', 'FRAGMENTS', 'MACROPHAGE', 'FADING'];
+function recapIcon(i, cx, cy, k) {
+  const m = maskRR(cx - 34, cy - 30, cx + 34, cy + 30, 10); mFill(m, i === 3 ? P.SK3 : P.DM3); mOutline(m, P.YEL);
+  if (i === 0) { lineW(cx + 18, cy - 24, cx + 2, cy - 2, 6, P.HP3); lineW(cx + 18, cy - 24, cx + 2, cy - 2, 3, P.HP4); for (let s = 0; s < 6; s++) disc(lerp(cx + 2, cx - 10, s / 5), lerp(cy - 2, cy + 16, s / 5), 1.2, P.LZ2); disc(cx - 12, cy + 18, 4, P.PG0); }
+  if (i === 1) for (let s = 0; s < 7; s++) { const a = s * 0.9, d = 6 + 10 * hash(s + 40); disc(cx + Math.cos(a) * d * (0.5 + 0.5 * k), cy + Math.sin(a) * d * (0.5 + 0.5 * k), 2.4, P.PG0); }
+  if (i === 2) { const mm = maskEll(cx, cy, 22, 17, 0.2); shade(mm, P.MC3, P.MC4, P.MC2, P.MC0, {}); disc(cx - 8, cy - 3, 6, P.NU2); disc(cx + 8, cy + 3, 6, P.MC4); ring(cx + 8, cy + 3, 6, 1, P.VS); for (let s = 0; s < 4; s++) disc(cx + 6 + (s % 2) * 4, cy + 1 + (s >> 1) * 4, 1.2, P.PG0); }
+  if (i === 3) for (let s = 0; s < 3; s++) { const x = cx - 20 + s * 20, c = mixc(P.IK1, P.SK3, s / 2.4); for (let j = 0; j < 5; j++) { const a = -Math.PI / 2 + j * TAU / 5, b = -Math.PI / 2 + (j + 2) * TAU / 5; line(x + Math.cos(a) * 8, cy + Math.sin(a) * 8, x + Math.cos(b) * 8, cy + Math.sin(b) * 8, c); } }
+}
+function recapPanel(t) {
+  if (!UI_ON || t < EV.recap[0] - 0.05 || t > 46.6) return;
+  const out = t > 46.35 ? (46.6 - t) / 0.25 : 1, pos = [[96, 132], [264, 132], [96, 248], [264, 248]];
+  tintRect(20, 92, 340, 300, P.K0, 0.62 * out * K75(clamp((t - EV.recap[0] + 0.05) / 0.15, 0, 1)));
+  EV.recap.forEach((tr, i) => {
+    const k = K75(clamp((t - tr) / 0.18, 0, 1)) * out; if (k <= 0) return;
+    const [cx, cy] = pos[i];
+    withDither(k, () => {
+      recapIcon(i, cx, cy, clamp((t - tr) / 0.5, 0, 1));
+      text(FS, RECAP[i], cx, cy + 36, { sc: 2, c: P.INK, ol: null, align: 'center' });
+      if (i === 0 || i === 2) { lineW(cx + 40, cy, cx + 124, cy, 2, P.YEL); arrowHead(cx + 128, cy, 0, 5, P.YEL); }
+      if (i === 1) { lineW(cx - 20, cy + 52, cx - 140, cy + 80, 2, P.YEL); arrowHead(cx - 144, cy + 81, Math.atan2(28, -120), 5, P.YEL); }
+    });
+  });
+}
+
+// ---- 23_scenes.js
+// ============================================================================
+// SCENE COMPOSITOR: 20 micro-scenes in 5 continuous sequences (SC_T, 120 BPM).
+// One forearm, one black star, one handpiece; one ink aggregate followed from
+// the dermis through absorption, expansion and fragmentation; some of its
+// fragments followed into one macrophage, some ink into one lymphatic vessel;
+// back out to the same forearm, the next session, and the whole treatment
+// course until the star is no longer visible; the course rewinds to frame one.
+// Scales join with calm zoom crossfades (arm → skin block → dermis and back).
+// Passes: visual (worlds and crossfades, by time), hud (time labels, timeline,
+// step bars, insets, recap), tags (leader labels), overlays (captions, chips,
+// title).
+// ============================================================================
+function crossWorld(drawB, k) {
+  if (k <= 0) return; if (k >= 1) { drawB(); return; }
+  withBuffer(TMPBUF, drawB);
+  mixInto(buf, TMPBUF, k);
+}
+const ph = (t, a, b, e) => (e || smooth)(seg(t, a, b));
+const xf = (t, a, b) => smooth(seg(t, a, b));
+const LEFTBUF = SPARE[2].subarray(0, 360 * 640);
+const ALL_PULSES = [...EV.hook, ...EV.pulses2, ...EV.pulses3];
+// ============================================================================ cameras
+// the forearm: still for the hook, a push toward the cut-away, the pull-back for the next session
+function armCam(t) {
+  if (t < 3.0) return new Cam(180, 320, 1);
+  if (t < 20) return camTrack([[3.0, 180, 320, 1], [3.6, 180, 268, 1.5, K50]], t);
+  if (t < 36.0) return camTrack([[34.0, 180, 268, 1.5], [34.8, 180, 320, 1.0, K50], [36.0, 180, 324, 1.035, lin]], t);
+  if (t < 40.5) return camTrack([[36.0, 180, 324, 1.035], [36.75, 214, 236, 0.62, K50], [39.6, 220, 242, 0.66, lin], [40.0, 180, 320, 1, K50]], t);
+  return new Cam(180, 320, 1);
+}
+// the skin block: settles, holds while its layers are named, then the camera dives into the ink (and the reverse)
+const BP = blkPt(BLK_INK.cuts[0], 0.33);
+const blockCam = t => t < 20
+  ? camTrack([[3.25, 180, 334, 1.12], [3.5, 180, 320, 1.0, K50], [3.75, 180, 320, 1.0, lin], [4.3, BP[0], BP[1], 3.4, ein]], t)
+  : camTrack([[33.3, BP[0], BP[1], 3.4], [33.95, 180, 320, 1.0, K50], [34.4, 180, 334, 1.12, lin]], t);
+// the micro world: one continuous track from the whole dermis to one aggregate, a macrophage, a vessel and back
+const IN_C = (() => { const pp = phagoPos(26.8), m = macPos(26.8); return [lerp(pp[0], m[0], 0.3), lerp(pp[1], m[1], 0.3)]; })();
+const MKEYS = [
+  [3.95, 0, 330, 0.5], [4.25, 0, 330, 0.62, K50], [6.0, 0, 360, 1.5, K50],
+  [6.6, 0, 210, 1.05, K50], [7.6, 0, 210, 1.05, lin],
+  [8.3, 0, 380, 24, K75], [11.0, 0, 380, 26, lin], [11.4, 0, 380, 18, K50], [13.0, 0, 380, 18, lin],
+  [13.8, 0, 380, 27, K50], [14.0, 0, 380, 27, lin], [16.0, -1, 382, 12.8, K50], [18.6, -1, 382, 12, lin],
+  [19.0, -8, 387, 8, K50], [21.0, -16, 392, 5, K50], [22.5, -12, 390, 6, K50], [23.4, -9, 388, 12, K50], [26.0, -9, 388, 12.5, lin],
+  [26.8, IN_C[0], IN_C[1], 20, K50], [28.0, IN_C[0], IN_C[1], 20.5, lin],
+  [28.7, 10, 440, 4, K50], [30.6, 12, 440, 4.2, lin], [31.6, 0, 380, 0.9, K50], [33.0, 0, 380, 0.88, lin], [33.4, 0, 330, 0.62, K50],
+];
+const microCam = t => camTrack(MKEYS, t);
+// ============================================================================ pass 1: the worlds and the crossfades between them
+function armScene(t) {
+  const cam = armCam(t);
+  armWorld(cam, t, {});
+  // the patch that will be lifted out as a block, outlined just before the dive (and after the way back)
+  const cut = ph(t, 3.0, 3.2) * (1 - ph(t, 3.45, 3.6)) + ph(t, 34.0, 34.2) * (1 - ph(t, 34.6, 34.9));
+  const dim = ph(t, 3.1, 3.45) * (t < 20 ? 1 : 0) + (t > 20 ? 1 - ph(t, 34.1, 34.6) : 0) * (t >= 34.0 && t < 34.9 ? 1 : 0);
+  if (dim > 0) { const [x0, y0, x1, y1] = [cam.x(BLK.ax0), cam.y(BLK.ay0), cam.x(BLK.ax1), cam.y(BLK.ay1)]; tintRect(0, 0, W, y0, P.BG, 0.85 * dim); tintRect(0, y1, W, H, P.BG, 0.85 * dim); tintRect(0, y0, x0, y1, P.BG, 0.85 * dim); tintRect(x1, y0, W, y1, P.BG, 0.85 * dim); }
+  if (cut > 0) { const [x0, y0, x1, y1] = [cam.x(BLK.ax0), cam.y(BLK.ay0), cam.x(BLK.ax1), cam.y(BLK.ay1)]; withDither(cut, () => { dashLine(x0, y0, x1, y0, P.INK, 4, 3, t * 30); dashLine(x1, y0, x1, y1, P.INK, 4, 3, t * 30); dashLine(x1, y1, x0, y1, P.INK, 4, 3, t * 30); dashLine(x0, y1, x0, y0, P.INK, 4, 3, t * 30); }); }
+  if (aimAt(t).away < 0.999) drawHandpiece(cam, t, { pulses: ALL_PULSES, console: cam.z < 0.95 });
+  else if (cam.z < 0.95) drawConsole(cam, t);
+}
+const blockScene = t => blockView(blockCam(t), t, {});
+const microScene = t => microWorld(microCam(t), t, {});
+// before / after, side by side; then the divider slides away into the real tissue
+function splitScene(t) {
+  const m = K75(seg(t, EV.merge, EV.merge + 0.6)), div = 180 * (1 - m);
+  const draw = () => {
+    const zs = 12.8 - 0.8 * smooth(seg(t, EV.compare, EV.merge + 0.6));
+    microWorld(new Cam(AGG.x - 1, AGG.y + 2, zs, lerp(270, 180, m), 330), t, {});
+    if (div > 0.5) {
+      withBuffer(LEFTBUF, () => microWorld(new Cam(AGG.x, AGG.y, zs, 90 - (180 - div), 330), t, { pigT: 7.9, noFx: true, noFrag: true }));
+      const d = Math.min(W, Math.floor(div)); for (let y = 0; y < H; y++) { const r = y * W; for (let x = 0; x < d; x++) buf[r + x] = LEFTBUF[r + x]; }
+      rect(d - 1, 0, d + 1, H, P.INK);
+    }
+  };
+  if (t < 16.3) { microScene(t); crossWorld(draw, xf(t, 16.0, 16.3)); } else draw();
+}
+function visual(t) {
+  if (t < 3.25) armScene(t);
+  else if (t < 3.6) { armScene(t); crossWorld(() => blockScene(t), xf(t, 3.25, 3.6)); }
+  else if (t < 3.95) blockScene(t);
+  else if (t < 4.3) { blockScene(t); crossWorld(() => microScene(t), xf(t, 3.95, 4.3)); }
+  else if (t < 16.0) microScene(t);
+  else if (t < 18.6) splitScene(t);
+  else if (t < 33.3) microScene(t);
+  else if (t < 33.6) { microScene(t); crossWorld(() => blockScene(t), xf(t, 33.3, 33.6)); }
+  else if (t < 34.0) blockScene(t);
+  else if (t < 34.4) { blockScene(t); crossWorld(() => armScene(t), xf(t, 34.0, 34.4)); }
+  else armScene(t);
+}
+// ============================================================================ pass 2: instruments
+function boxLabel(s, x, y, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const k = K75(clamp((t - t0) / 0.18, 0, 1)) * (t1 - t < 0.15 ? (t1 - t) / 0.15 : 1); if (k <= 0) return;
+  const tw = textW(FS, s, 2), x0 = Math.round(x - tw / 2);
+  withDither(k, () => { rect(x0 - 6, y - 5, x0 + tw + 6, y + 17, P.K0); rect(x0 - 6, y + 15, x0 + tw + 6, y + 17, col); text(FS, s, x0, y, { sc: 2, c: P.INK, ol: null }); });
+}
+function hud(t) {
+  timePill('WEEKS LATER', EV.weeks1, 2.95, t);
+  timePill('WEEKS LATER', EV.weeks2, 35.9, t);
+  // the large aggregate singled out
+  if (t >= EV.agg && t < 6.2) { const cam = microCam(t), k = ph(t, EV.agg, EV.agg + 0.25) * (1 - ph(t, 5.95, 6.2)); withDither(k, () => ring(cam.x(AGG.x), cam.y(AGG.y), Math.max(9, 7.5 * cam.z), 1.6, P.YEL)); }
+  if (t >= 16.0 && t < 18.3) { boxLabel('BEFORE', 90, 96, 16.1, 18.2, t, P.SUB); boxLabel('AFTER', 270, 96, 16.15, 18.2, t, P.YEL); }
+  stepBar(t); lymphInset(t); inkMeter(t); stepPanels(t);
+  const ta = ph(t, 39.85, 40.1) * (1 - ph(t, 44.75, 45.0)) + ph(t, 47.38, 47.5) * (1 - ph(t, 47.78, 47.93));
+  timelineBar(t, ta);
+  recapPanel(t);
+}
+// ============================================================================ pass 3: leader-line tags on the things themselves
+function tags(t) {
+  if (t < 3.0) { tag('TEMPORARY FROSTING', STAR.cx, STAR.cy - STAR.R + 32, 22, 190, 1.25, 1.95, t, P.FR1, 2); return; }
+  if (t < 4.3) {
+    const c = blockCam(t), A_ = (u, w) => { const p = blkPt(u, w); return [c.x(p[0]), c.y(p[1])]; };
+    let a = A_(0.1, 0.05); tag('EPIDERMIS', a[0], a[1], 24, 112, 3.5, 4.15, t, P.EP2, 2);
+    a = A_(BLK_INK.cuts[0], 0.33); tag('TATTOO PIGMENT', a[0], a[1], 24, 140, 3.55, 4.15, t, P.PG3, 2);
+    a = A_(0.8, 0.5); tag('DERMIS', a[0], a[1], 214, 140, 3.6, 4.15, t, P.DM3, 2);
+    return;
+  }
+  if (t < 16.0) {
+    const c = microCam(t), S = (x, y) => [c.x(x), c.y(y)];
+    let a = S(-120, 46); tag('EPIDERMIS', a[0], a[1], 196, 96, 4.4, 5.0, t, P.EP2, 2);
+    a = S(-150, 270); tag('DERMIS', a[0], a[1], 24, 240, 4.55, 5.3, t, P.DM3, 2);
+    a = S(RES[6].x, RES[6].y); tag('INK INSIDE A MACROPHAGE', a[0], a[1], 24, 420, 4.9, 5.9, t, P.MC3, 2);
+    a = S(AGG.x + 4, AGG.y - 3); tag('LARGE INK AGGREGATE', a[0], a[1], 120, 120, 5.1, 6.0, t, P.YEL, 2);
+    { const p = PH6[SCAT_I[0]], x = p.x * (1 - Math.min(1, (p.sc - p.t0) * 0.25)), y = -30 + 240 * (p.sc - p.t0); a = S(x, y); tag('SCATTERED LIGHT', a[0], a[1], 190, 128, 6.55, 7.6, t, P.LZ3, 2); }
+    a = S(AGG.x, AGG.y - 4); tag('TATTOO INK', a[0], a[1], 24, 300, 6.8, 7.8, t, P.PG3, 2);
+    a = S(AGG.x + 2.6, AGG.y - 2.6); tag('INK PARTICLES', a[0], a[1], 190, 120, 8.5, 10.9, t, P.PG3, 2);
+    a = S(AGG.x - 3.3, AGG.y + 1.5); tag('RAPID HEATING', a[0], a[1], 24, 440, 9.5, 10.9, t, P.HT3, 2);
+    { const R = pressR(Math.max(t, EV.expand)), an = -0.75; a = S(AGG.x + Math.cos(an) * R, AGG.y + Math.sin(an) * R); tag('PRESSURE WAVE', a[0], a[1], 190, 110, 11.3, 12.9, t, P.PR, 2); }
+    { const b = BUBBLES[1]; a = S(AGG.x + b.x, AGG.y + b.y); tag('GAS BUBBLES', a[0], a[1], 24, 440, 11.8, 12.9, t, P.BB1, 2); }
+    { const cr = CRACKS[1]; a = S(AGG.x + cr.c[0] + cr.d[0] * 1.6, AGG.y + cr.c[1] + cr.d[1] * 1.6); tag('CRACKS', a[0], a[1], 24, 140, 13.3, 13.98, t, P.PR, 2); }
+    { const f = FRAGS.find(q => !q.target && q.n >= 4) || FRAGS[0], [fx, fy] = fragXform(f, t); a = S(AGG.x + f.cx + fx, AGG.y + f.cy + fy); tag('FRAGMENTS', a[0], a[1], 200, 440, 14.3, 15.9, t, P.PG3, 2); }
+    return;
+  }
+  if (t < 19.0) {
+    const zs = 12.8 - 0.8 * smooth(seg(t, EV.compare, EV.merge + 0.6)), L = new Cam(AGG.x, AGG.y, zs, 90, 330), R = new Cam(AGG.x - 1, AGG.y + 2, zs, 270, 330);
+    tag('ONE LARGE AGGREGATE', L.x(AGG.x), L.y(AGG.y + 3.4), 24, 440, 16.4, 18.0, t, P.SUB, 2);
+    const f = FRAGS.find(q => !q.target && q.n >= 3) || FRAGS[1], [fx, fy] = fragXform(f, t);
+    tag('SMALL FRAGMENTS', R.x(AGG.x + f.cx + fx), R.y(AGG.y + f.cy + fy), 150, 400, 16.6, 18.0, t, P.YEL, 2);
+    return;
+  }
+  if (t < 33.0) {
+    const c = microCam(t), S = (x, y) => [c.x(x), c.y(y)], [mx, my] = macPos(t), tp = [AGG.x + TP[0], AGG.y + TP[1]], aT = Math.atan2(tp[1] - my, tp[0] - mx);
+    let a = S(mx - Math.cos(aT) * 3.6, my - Math.sin(aT) * 3.6); tag('NUCLEUS', a[0], a[1], 214, 120, 19.8, 20.95, t, P.NU3, 2);
+    a = S(mx - M_R, my + 1); tag('MEMBRANE', a[0], a[1], 24, 440, 20.1, 20.95, t, P.MC3, 2);
+    a = S(mx + Math.cos(aT) * (M_R + 1), my + Math.sin(aT) * (M_R + 1)); tag('REACHING FOR THE INK', a[0], a[1], 24, 440, 21.1, 22.9, t, P.MC4, 2);
+    const pp = phagoPos(t); a = S(pp[0] + 1.6, pp[1] - 1.6); tag('VESICLE WITH INK', a[0], a[1], 150, 112, 26.3, 27.9, t, P.MC4, 2);
+    { const l = LYSO[0], u = smooth(seg(t, l.t - 0.75, l.t)), d = lerp(l.d, 2.25, u); a = S(pp[0] + Math.cos(l.a) * d, pp[1] + Math.sin(l.a) * d); tag('LYSOSOME', a[0], a[1], 24, 440, 26.15, 26.7, t, P.LS2, 2); }
+    a = S(-60, LYV.y); tag('LYMPHATIC VESSEL', a[0], a[1], 24, 420, 28.6, 30.1, t, P.LY3, 2);
+    { const [x2, y2] = m2Pos(t); a = S(x2 + 4, y2 - 5); tag('INK-LADEN MACROPHAGE', a[0], a[1], 70, 120, 28.8, 29.9, t, P.MC3, 2); }
+    return;
+  }
+  if (t >= 36.0 && t < 40.0) {
+    const c = armCam(t), aim = aimAt(t);
+    tag('LASER HANDPIECE', c.x(aim.x + 5 + HP_DIR[0] * 120), c.y(aim.y - 8 + HP_DIR[1] * 120), 24, 120, 36.7, 37.9, t, P.HP3, 2);
+  }
+}
+// ============================================================================ frame
+function renderFrame(t) {
+  t = clamp(t, 0, DUR - 1e-6);
+  visual(t);
+  hud(t);
+  tags(t);
+  overlays(t);
+}
+function engineInit() { }
+
+// ---- 24_overlay.js
+// ============================================================================
+// TEXT LAYER, small but readable on a phone: one caption at a time in a
+// solid dark box with a yellow accent bar (top left, big letters), leader-line
+// tags in solid boxes next to the thing they name (two sizes), one honesty
+// chip at a time (bottom left), and the closing title. Everything stays inside
+// the short-video safe area (x 14..292, y 36..506); nothing sits under the
+// right-hand buttons or the bottom description. Captions and chips leave after
+// about 3 s.
+// ============================================================================
+const SAFE = { l: 14, r: 292, t: 36, b: 506 };
+const CAP_X = 22, CAP_Y = 46;
+function caption(s, t0, t1, t) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const lines = wrapBal(FC, s, SAFE.r - CAP_X - 8, 2), cps = 56;
+  const out = t1 - t < 0.16 ? (t1 - t) / 0.16 : 1, inn = clamp((t - t0) / 0.14, 0, 1), k = Math.min(inn, out);
+  // the box: grows with the text, solid enough for any picture behind it
+  const wMax = Math.max(...lines.map(l => textW(FC, l, 2))), h = lines.length * 21 + 8;
+  tintRect(CAP_X - 8, CAP_Y - 6, CAP_X - 8 + (wMax + 16) * K75(k), CAP_Y - 6 + h, P.K0, 0.82);
+  rect(CAP_X - 8, CAP_Y - 6, CAP_X - 5, CAP_Y - 6 + h * K75(k), P.YEL);
+  let left = Math.min((t - t0 - 0.06) * cps, s.length * out + 0.01);
+  lines.forEach((ln, i) => {
+    if (left <= 0) return;
+    const n = Math.min(ln.length, left);
+    text(FC, ln, CAP_X, CAP_Y + i * 21, { sc: 2, n, c: P.INK, ol: P.SH });
+    left -= ln.length + 1;
+  });
+}
+// a leader-line tag: anchor (ax, ay) on the object, label box at (lx, ly) (top-left of the text); sc 2 or 3
+function tag(s, ax, ay, lx, ly, t0, t1, t, col, sc) {
+  if (!UI_ON || t < t0 || t > t1 || ax === null || !isFinite(ax) || !isFinite(ay)) return;
+  col = col === undefined ? P.INK : col; sc = sc || 2;
+  const age = t - t0, out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1, gk = K75(clamp(age / 0.18, 0, 1)) * out;
+  const th = 6 * sc, tw = textW(FS, s, sc), x0 = Math.round(clamp(lx, SAFE.l + 3, SAFE.r - tw - 3)), y0 = Math.round(clamp(ly, SAFE.t + 50, SAFE.b - th - 4));
+  ax = Math.round(ax); ay = Math.round(ay);
+  const ux = ax < x0 ? x0 - 4 : ax > x0 + tw ? x0 + tw + 3 : ax, uy = ay < y0 ? y0 - 4 : y0 + th + 2;
+  const ex = lerp(ax, ux, gk), ey = lerp(ay, uy, gk);
+  lineW(ax, ay, ex, ey, 2, P.SH); line(ax, ay, ex, ey, col);
+  disc(ax + 0.5, ay + 0.5, 2.5, P.SH); disc(ax + 0.5, ay + 0.5, 1.6, col);
+  if (gk < 1) return;
+  const n = clamp((age - 0.16) * 56, 0, s.length) * out;
+  if (n <= 0) return;
+  const pw = textW(FS, s.slice(0, Math.ceil(n)), sc);
+  rect(x0 - 4, y0 - 4, x0 + pw + 4, y0 + th + 2, P.K0); rect(x0 - 4, y0 + th + 2, x0 + pw + 4, y0 + th + 4, col);
+  text(FS, s, x0, y0, { sc, c: P.INK, ol: null, n });
+}
+// a plain label (no leader), typed in; align 'center' supported
+function label(s, x, y, t0, t1, t, col, align, f, sc) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  f = f || FS; sc = sc || 2;
+  const out = t1 - t < 0.14 ? (t1 - t) / 0.14 : 1, n = clamp((t - t0) * 56, 0, s.length) * out;
+  if (n <= 0) return;
+  text(f, s, x, y, { sc, c: col === undefined ? P.INK : col, ol: P.SH, n, align });
+}
+function chip(s, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t > t1) return;
+  const k = K75(clamp((t - t0) / 0.22, 0, 1)) * (t1 - t < 0.15 ? (t1 - t) / 0.15 : 1), tw = textW(FS, s, 2), y = 486;
+  const x = Math.round(lerp(-tw - 30, SAFE.l + 2, k));
+  rect(x - 5, y - 5, x + tw + 5, y + 15, P.K0); frame(x - 5, y - 5, x + tw + 5, y + 15, col === undefined ? P.N6 : col);
+  text(FS, s, x, y, { sc: 2, c: P.C4, ol: null });
+}
+// ---------------------------------------------------------------- the captions (the brief's context labels) and the honesty chips
+const CAPS = [
+  [3.25, 4.25, 'INSIDE THE SKIN'], [4.3, 6.0, 'INK IN THE DERMIS'], [6.05, 8.0, '1064 nm LASER'], [8.05, 11.0, 'ENERGY ABSORPTION'],
+  [11.05, 13.0, 'RAPID EXPANSION'], [13.05, 16.0, 'PIGMENT FRAGMENTATION'], [16.05, 19.0, 'SMALLER INK PARTICLES'], [19.25, 22.4, 'MACROPHAGE'],
+  [23.05, 26.0, 'PHAGOCYTOSIS'], [26.1, 28.0, 'PIGMENT UPTAKE'], [28.1, 31.0, 'LYMPHATIC TRANSPORT'], [31.1, 33.0, 'GRADUAL CLEARANCE'],
+  [36.05, 38.0, 'NEXT SESSION'], [40.05, 42.4, 'THE TREATMENT COURSE'],
+];
+const CHIPS = [
+  [6.25, 8.4, 'INVISIBLE IN REALITY'], [8.5, 11.5, 'SLOW MOTION · NANOSECONDS'], [16.25, 19.0, 'NOT TO SCALE'], [26.5, 28.4, 'OFTEN NOT DIGESTED'],
+  [28.6, 31.0, 'SOME INK, NOT ALL'], [31.2, 33.0, 'OVER WEEKS'], [44.25, 47.2, 'RESULTS VARY'],
+];
+function titleCard(t) {
+  const t0 = EV.title, t1 = EV.title + 0.95;
+  if (!UI_ON || t < t0 || t > t1) return;
+  const out = t > t1 - 0.12 ? (t1 - t) / 0.12 : 1;
+  const lines = [[['HOW ', P.INK], ['LASERS', P.LZ3]], [['REMOVE TATTOOS', P.INK]]];
+  let left = (t - t0) * 40;
+  tintRect(0, 32, W, 112, P.K0, 0.62 * Math.min(1, (t - t0) / 0.12) * out);
+  lines.forEach((segs, li) => {
+    const y = 40 + li * 34, total = textW(FT, segs.map(s => s[0]).join(''), 3, true);
+    let x = CX - total / 2;
+    for (const [s, c] of segs) {
+      if (left <= 0) break;
+      const k = Math.min(s.length, left);
+      if (out >= 1 || bay(0, y) < out) text(FT, s, x, y, { sc: 3, bold: true, c, ol: P.SH, n: k, shadow: P.SH, sd: 2 });
+      x += textW(FT, s, 3, true) + 3; left -= s.length;
+    }
+  });
+}
+function overlays(t) {
+  if (!UI_ON) return;
+  for (const [a, b, s] of CAPS) caption(s, a, Math.min(b, a + 3.2), t);
+  for (const [a, b, s] of CHIPS) chip(s, a, Math.min(b, a + 3.0), t);
+  titleCard(t);
+}
+
+// ---- 30_audio.js
+// ============================================================================
+// AUDIO — an original electronic science score plus SFX locked to the picture,
+// synthesised sample by sample in plain JS (no samples, no Web Audio graph).
+// 120 BPM, 24 bars = 48.000 s, D major. The theme is the tattoo itself: a
+// five-note "star" motif that walks the D-major pentatonic the way a pentagram
+// joins the points of a star (D–F#–B–E–A, every second note, rising, on dotted
+// eighths). It changes instrument with the story and gets lighter as the star
+// fades: bright lead in the hook · glass bell for the time jumps · marimba in
+// the dermis · a saw lead on the first climax (the fragmentation, 14.0 s) ·
+// warm plucks on the second (the phagocytosis click, 24.0 s) · the band
+// low-passed inside the cell · liquid arpeggios down the lymphatic vessel ·
+// chip pulses climbing an octave through the treatment course · bells on the
+// final result (44.0 s) · a riser back into bar 1 (seamless loop).
+// SFX: every cue is read from the same event table (EV, 03_clock.js) that
+// draws the picture, so each sound starts on the frame its event is drawn
+// (all event times sit on the eighth-note grid = 15 frames). Each physical
+// event has its own sound: the laser's sharp snap, the frosting's fizz, a tick
+// per absorbed photon rising with the energy under a low rumble, a tight
+// pressure pulse, bubble pops, four cracks, the shatter, membrane stretches,
+// the closure gloop and its uptake click, lysosome plops, the lymph flow, the
+// diminishing tones of clearance, ascending time-lapse ticks and a clean
+// completion tone. The band ducks under them. Microscopic processes are not
+// audible in reality: this is educational sound design.
+// ============================================================================
+const SR = 48000, NS = Math.round(DUR * SR);
+const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const nm = (n, o) => 12 * (o + 1) + NOTE[n];
+const fq = (n, o) => mtof(nm(n, o));
+const PENT_OFF = [0, 2, 4, 7, 9];
+const pent = (i, o) => mtof(nm('D', o) + PENT_OFF[((i % 5) + 5) % 5] + 12 * Math.floor(i / 5));   // i-th step up the D pentatonic from D(o)
+// ---------------------------------------------------------------- harmony and the star motif
+const CHORDS = ['D', 'A', 'Bm', 'G', 'Bm', 'G', 'A', 'D', 'A', 'Bm', 'G', 'A', 'D', 'Bm', 'G', 'A', 'Bm', 'G', 'D', 'A', 'Bm', 'G', 'D', 'A'];
+const CROOT = { D: 'D', A: 'A', Bm: 'B', G: 'G' }, CMIN = { Bm: 1 };
+function rootM(ch, oct) { return nm(CROOT[ch], oct); }
+function triad(ch, oct) { const r = rootM(ch, oct); return [r, r + (CMIN[ch] ? 3 : 4), r + 7]; }
+const STAR_NOTES = [nm('D', 4), nm('F#', 4), nm('B', 4), nm('E', 5), nm('A', 5)];   // the pentagram path through the pentatonic
+const STAR_RH = [[0, 2], [3, 2], [6, 2], [9, 2], [12, 4]];                          // dotted eighths: [16th step, length]
+const GATES = [[13.875, 14.0], [23.875, 24.0]];                                      // a breath before each climax
+function musicEvents() {
+  const ev = [], E = o => ev.push(o);
+  const at = (b, beat) => barT(b) + beat * BEAT, ch = b => CHORDS[b - 1];
+  const star = (b, k, v, o) => { o = o || {}; const lift = 12 * (o.lift || 0), t0 = barT(b) + (o.shift || 0) * BEAT; STAR_RH.forEach(([st, l], i) => { if (!o.only || o.only(i)) E({ t: t0 + st * S16, d: l * S16, k, m: STAR_NOTES[i] + lift, v: v * (i === 4 ? 1.1 : 1), cut: o.cut, post: o.post }); }); };
+  const D = (b, beat, k, v, x) => E(Object.assign({ t: at(b, beat), d: 0.5, k, v }, x || {}));
+  const kick4 = (b, v, from) => { for (let i = from || 0; i < 4; i++) D(b, i, 'kick', v); };
+  const claps = (b, v) => { D(b, 1, 'clap', v); D(b, 3, 'clap', v); };
+  const hats = (b, v, sixteenths, open, from) => { for (let i = 0; i < (sixteenths ? 16 : 8); i++) { const beat = i * (sixteenths ? 0.25 : 0.5); if (beat < (from || 0)) continue; const off = beat % 1 === 0.5; D(b, beat, 'hat', v * (off ? 1 : 0.6), { p: off ? 0.2 : -0.2, open: open && off }); } };
+  const shaker = (b, v, from) => { for (let i = 0; i < 16; i++) { if (i / 4 < (from || 0)) continue; D(b, i / 4, 'shaker', v * (i % 2 ? 1 : 0.6), { p: 0.35 }); } };
+  const roll = (b, from, to, step, v0, v1, k) => { for (let x = from; x < to - 1e-6; x += step) D(b, x, k || 'snare', lerp(v0, v1, (x - from) / (to - from))); };
+  const root = (b, oct) => rootM(ch(b), oct), subR = b => { const r = rootM(ch(b), 1); return r < 28 ? r + 12 : r; };
+  const sub = (b, v, beats) => (beats || [0, 2]).forEach(bt_ => E({ t: at(b, bt_), d: 1.8 * BEAT, k: 'sub', m: subR(b), v }));
+  const bassOff = (b, v) => { for (let i = 0; i < 4; i++) E({ t: at(b, i + 0.5), d: 0.42 * BEAT, k: 'bass', m: root(b, 2) + (i % 2 ? 12 : 0), v }); sub(b, v * 0.9); };
+  const bassRoll = (b, v) => { for (let i = 0; i < 16; i++) E({ t: at(b, i / 4), d: 0.2 * BEAT, k: 'roll', m: root(b, 2) + (i % 4 === 2 ? 12 : 0), v: v * (i % 4 === 0 ? 1 : 0.75) }); sub(b, v * 0.6); };
+  const bassBounce = (b, v) => { [[0, 0, 0.7], [1.5, 7, 0.4], [2, 0, 0.7], [2.75, 12, 0.3], [3.5, 10, 0.4]].forEach(([beat, iv, l]) => E({ t: at(b, beat), d: l * BEAT, k: 'bass', m: root(b, 2) + (CMIN[ch(b)] || iv !== 10 ? iv : 9), v })); };
+  const pad = (b, v, cut, x) => E(Object.assign({ t: at(b, 0), d: 3.9 * BEAT, k: 'pad', ms: triad(ch(b), 3).concat([root(b, 4) + 7]), v, cut: cut || 1400 }, x || {}));
+  const stab = (b, beat, v) => E({ t: at(b, beat), d: 0.3 * BEAT, k: 'stab', ms: triad(ch(b), 4), v });
+  const arp = (b, k, v, oct, up) => { const tr = triad(ch(b), oct), seq = up ? [0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6] : [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 2, 3]; for (let i = 0; i < 16; i++) { const s_ = seq[i], m = tr[s_ % 3] + 12 * Math.floor(s_ / 3); E({ t: at(b, i / 4), d: 0.22 * BEAT, k, m, v: v * (i % 4 === 0 ? 1 : 0.7), p: i % 2 ? 0.3 : -0.3 }); } };
+  const halfTime = (b, v) => { D(b, 0, 'kick', 0.75 * v); D(b, 2.5, 'kick', 0.55 * v); D(b, 2, 'snap', 0.5 * v); shaker(b, 0.4 * v); };
+  // ---- A: the hook (bar 1) — kick, sub and pad leave room for the laser's four snaps; the star motif on a bright lead
+  E({ t: 0, d: 1.4, k: 'crash', v: 0.45 }); D(1, 0, 'kick', 0.9); D(1, 1.5, 'kick', 0.7); D(1, 2, 'kick', 0.85); D(1, 3, 'clap', 0.5); hats(1, 0.4, true);
+  sub(1, 0.7); pad(1, 0.4, 1500); star(1, 'starlead', 0.75);
+  // bar 2: weeks pass (the motif on a glass bell), then the lift into the skin (a downlifter and the dive)
+  D(2, 0, 'kick', 0.8); hats(2, 0.3); pad(2, 0.42, 1100); sub(2, 0.55, [0]); star(2, 'glass', 0.55, { only: i => i < 3 });
+  E({ t: 3.0, d: 0.9, k: 'down', v: 0.45 });
+  // ---- B: the ink in the dermis and the pulse inside it (bars 3–7)
+  for (const b of [3, 4]) { halfTime(b, 0.85); pad(b, 0.36, 1000); bassBounce(b, 0.55); }
+  star(3, 'marimba', 0.8); arp(4, 'sqarp', 0.32, 5, true);                                           // bar 4: light shimmer as the photons cross the skin
+  // bars 5–6: the absorption builds (pulsing bass, an opening pad, a riser), the expansion lands at 11.0 s
+  for (const b of [5, 6]) { kick4(b, 0.85); hats(b, 0.35, true); for (let i = 0; i < 8; i++) E({ t: at(b, i * 0.5), d: 0.4 * BEAT, k: 'bass', m: root(b, 2) + (i % 2 ? 12 : 0), v: 0.5 + 0.03 * i + (b - 5) * 0.1 }); sub(b, 0.55); }
+  E({ t: at(5, 0), d: 4 * BAR / 2, k: 'pad', ms: triad('Bm', 3).concat([nm('F#', 4)]), v: 0.4, cut: 700, cutTo: 2600 });
+  E({ t: 9.0, d: 2.0, k: 'riser', v: 0.45 });
+  // bar 7: after the pressure pulse the band thins; a riser under the bubbles; the cracks get the stage; a breath (13.875–14.0)
+  D(7, 0, 'kick', 0.8); D(7, 2, 'kick', 0.7); pad(7, 0.35, 900); sub(7, 0.5); roll(7, 0, 1.75, 0.25, 0.15, 0.45);
+  E({ t: 12.0, d: 1.875, k: 'riser', v: 0.6 });
+  // ---- first climax (bar 8): the fragmentation — saw lead, wide chords, sub impact
+  E({ t: 14.0, d: 2.2, k: 'impact', v: 0.8 }); E({ t: 14.0, d: 1.8, k: 'crash', v: 0.7 });
+  kick4(8, 1.0); claps(8, 0.7); hats(8, 0.5, false, true); bassRoll(8, 0.8);
+  E({ t: at(8, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('D', 5)]), v: 0.65 });
+  star(8, 'laser', 0.8, { cut: 5200 }); star(8, 'pluck', 0.35, { lift: 1 });
+  // bar 9: before / after — lighter
+  D(9, 0, 'kick', 0.85); D(9, 2, 'kick', 0.75); D(9, 3, 'clap', 0.5); hats(9, 0.4); pad(9, 0.4, 1500); sub(9, 0.6); star(9, 'pluck', 0.6);
+  // ---- C: the macrophage (bars 10–12): an organic, bouncing groove, then the build to the closure
+  for (const b of [10, 11]) { D(b, 0, 'kick', 0.85); D(b, 1.75, 'kick', 0.55); D(b, 2.5, 'kick', 0.7); D(b, 1, 'snap', 0.5); D(b, 3, 'snap', 0.5); shaker(b, 0.45); bassBounce(b, 0.65); pad(b, 0.34, 1200); }
+  star(10, 'marimba', 0.75); star(11, 'marimba', 0.6, { only: i => i !== 2 });
+  kick4(12, 0.9); hats(12, 0.45, true); bassRoll(12, 0.7); pad(12, 0.38, 1800); roll(12, 0, 3.5, 0.25, 0.15, 0.6); roll(12, 3, 3.75, 0.125, 0.6, 0.85);
+  E({ t: at(12, 0), d: 3.75 * BEAT, k: 'riser', v: 0.7 });
+  // ---- second climax (bar 13): the uptake click — warm and satisfying
+  E({ t: 24.0, d: 2.0, k: 'impact', v: 0.7 }); E({ t: 24.0, d: 1.6, k: 'crash', v: 0.6 });
+  kick4(13, 1.0); claps(13, 0.65); hats(13, 0.5, true); bassOff(13, 0.8);
+  E({ t: at(13, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('A', 4)]), v: 0.55 });
+  star(13, 'pluck', 0.85); star(13, 'glass', 0.35, { lift: 1 });
+  // bar 14: inside the cell (the whole band is low-passed: see bandFilter)
+  halfTime(14, 0.8); pad(14, 0.5, 1400); sub(14, 0.6); star(14, 'glass', 0.5, { only: i => i % 2 === 0 });
+  // ---- the lymphatic vessel (bars 15–16): liquid arpeggios on a steady beat
+  for (const b of [15, 16]) { kick4(b, 0.85); D(b, 1, 'clap', 0.4); D(b, 3, 'clap', 0.4); hats(b, 0.35); bassOff(b, 0.65); arp(b, 'sqarp', 0.4, 5, b === 16); pad(b, 0.3, 1300); }
+  star(15, 'glass', 0.55);
+  // bar 17: weeks of clearance — a ticking clock, sparse motif
+  D(17, 0, 'kick', 0.7); D(17, 2, 'kick', 0.6); hats(17, 0.3, true); pad(17, 0.45, 1000); sub(17, 0.5); star(17, 'marimba', 0.55, { only: i => i % 2 === 0 });
+  // bar 18: back to the surface; a riser into the next session
+  D(18, 0, 'kick', 0.8); D(18, 2, 'kick', 0.7); pad(18, 0.4, 1600); sub(18, 0.55); E({ t: at(18, 1), d: 3 * BEAT, k: 'riser', v: 0.55 });
+  // ---- D: the next session (bars 19–20): the groove returns; four stabs land with the four steps
+  kick4(19, 0.95); claps(19, 0.6); hats(19, 0.45, true); bassOff(19, 0.75); pad(19, 0.35, 1800); star(19, 'pluck', 0.75);
+  kick4(20, 0.95); hats(20, 0.4, true); bassOff(20, 0.7); for (let i = 0; i < 4; i++) stab(20, i, 0.45);
+  // ---- E: the treatment course (bars 21–22): building as the star fades; the motif climbs an octave
+  for (const b of [21, 22]) { kick4(b, 1.0); claps(b, 0.65); hats(b, 0.5, true); shaker(b, 0.35); bassRoll(b, 0.75); arp(b, 'chiparp', 0.4, 5, b === 22); }
+  star(21, 'chip', 0.75); star(22, 'chip', 0.75, { lift: 1 }); roll(22, 2, 4, 0.25, 0.2, 0.7); E({ t: at(22, 0), d: 4 * BEAT, k: 'riser', v: 0.65 });
+  // ---- the final result (bar 23): the star is gone — a big, clean D-major chord, the motif on bells
+  E({ t: 44.0, d: 2.2, k: 'impact', v: 0.7 }); E({ t: 44.0, d: 2.0, k: 'crash', v: 0.7 });
+  kick4(23, 1.0); claps(23, 0.6); hats(23, 0.45, false, true); bassOff(23, 0.8);
+  E({ t: at(23, 0), d: 3.8 * BEAT, k: 'supersaw', ms: triad('D', 4).concat([nm('F#', 5), nm('A', 5)]), v: 0.6 });
+  star(23, 'glass', 0.7, { lift: 1 }); star(23, 'pluck', 0.5);
+  // bar 24: the title, the rewind, a riser into bar 1
+  D(24, 0, 'kick', 0.8); D(24, 2, 'kick', 0.6); pad(24, 0.5, 2000); sub(24, 0.6); star(24, 'glass', 0.45, { only: i => i < 4 });
+  roll(24, 3, 4, 0.125, 0.25, 0.7); E({ t: at(24, 1), d: 3 * BEAT, k: 'riser', v: 0.6 });
+  return ev;
+}
+// ---------------------------------------------------------------- SFX map: read from the event table (EV), one sound per physical event
+function sfxEvents() {
+  const ev = [];
+  const S = (t, k, v, x) => ev.push(Object.assign({ t, k, v: v === undefined ? 1 : v, p: 0, f: 440, d: 0.2 }, x || {}));
+  // A — the laser snaps, the frosting fizzes, weeks pass, the skin lifts and the camera dives
+  EV.hook.forEach((tp, i) => { S(tp, 'snap', 1.0, { p: -0.15 + 0.1 * i }); S(tp + 1 / 60, 'fizz', 0.55, { d: 0.45, p: -0.15 + 0.1 * i }); });
+  S(EV.weeks1, 'timelapse', 0.75, { d: 0.6 }); S(EV.tilt, 'whoosh', 0.5, { d: 0.45 }); S(EV.dive, 'dive', 0.65, { d: 0.75 }); S(EV.ambient, 'ambience', 0.35, { d: 1.75 });
+  // B — the aggregate singled out, the pulse inside the skin, scattering, absorption, expansion, bubbles, cracks, the split
+  S(EV.agg, 'ping', 0.6, { f: fq('A', 5) }); S(EV.micro, 'snap', 0.9, { deep: 1 }); S(EV.micro, 'beam', 0.45, { d: 1.7 });
+  EV.scatter.forEach((ts, i) => S(ts, 'ping', 0.45, { f: pent(7 + i, 4), p: [-0.6, 0.6, -0.4][i] }));
+  EV.hits.forEach((th, i) => S(th, 'absorb', 0.55 + 0.03 * i, { f: pent(2 + i, 4), p: (i % 2 ? 0.25 : -0.25) }));
+  S(EV.hits[0], 'rumble', 0.6, { d: EV.expand - EV.hits[0] });
+  S(EV.expand, 'boom', 1.0); S(EV.expand, 'pressure', 0.55, { d: 1.4 });
+  EV.bubbles.forEach((tb, i) => S(tb, 'bubble', 0.6, { f: pent(9 + i, 4), p: (i % 2 ? 0.4 : -0.4) }));
+  EV.cracks.forEach((tc, i) => S(tc, 'crack', 0.75 + 0.08 * i, { f: [2600, 3100, 2300, 3500][i], p: [-0.3, 0.3, -0.1, 0.2][i] }));
+  S(EV.split, 'shatter', 1.0, { d: 0.9 });
+  S(EV.compare, 'swoosh', 0.45, { d: 0.35 }); S(EV.disperse, 'liquid', 0.35, { d: 2.6 }); S(EV.merge, 'swoosh', 0.45, { d: 0.5, rev: 1 });
+  // C — the macrophage: movement, four reaches, the membrane stretching, the closure and the uptake click, the vesicle, lysosomes
+  S(EV.macro, 'organic', 0.5, { d: 2.0 }); S(EV.macro, 'bloop', 0.55, { f: fq('D', 4) });
+  EV.reach.forEach((tr, i) => S(tr, 'boing', 0.55, { f: pent(3 + i, 3), p: -0.3 + 0.2 * i }));
+  S(EV.wrap, 'stretch', 0.6, { d: EV.close - EV.wrap });
+  S(EV.close, 'gloop', 0.9); S(EV.close, 'click', 1.0);
+  S(EV.vesicle, 'popin', 0.7, { f: fq('F#', 5) });
+  S(EV.inside, 'muffle', 0.45, { d: 2.0 });
+  EV.lyso.forEach((tl, i) => S(tl, 'plop', 0.7, { f: pent(5 + 2 * i, 3), p: [-0.4, 0.4, 0][i] }));
+  // the lymphatic vessel: the flow, three slips through the wall, one squeeze, the node
+  S(EV.lymph, 'flow', 0.5, { d: 3.0 }); EV.enter.forEach((te, i) => S(te, 'slip', 0.6, { f: pent(8 + i, 4), p: [-0.3, 0, 0.3][i] }));
+  S(EV.cellIn, 'squelch', 0.65); S(EV.node, 'chime', 0.55, { f: fq('B', 5) });
+  // weeks of clearance: seven diminishing tones
+  EV.clear.forEach((tc, i) => S(tc, 'dim', 0.6 - 0.06 * i, { f: pent(12 - i, 4), p: (i % 2 ? 0.3 : -0.3) }));
+  // D — back to the surface, weeks later, the next session, four quick steps
+  S(EV.out, 'undive', 0.55, { d: 0.75 }); S(EV.weeks2, 'timelapse', 0.7, { d: 0.6 });
+  S(EV.session, 'whoosh', 0.4, { d: 0.6 });
+  EV.pulses2.forEach((tp, i) => { S(tp, 'snap', 0.9, { p: [-0.3, -0.2, 0.25, 0.35][i] }); S(tp + 1 / 60, 'fizz', 0.45, { d: 0.4 }); });
+  EV.steps4.forEach((ts, i) => S(ts, 'cue' + (i + 1), 0.8));
+  // E — the course: five ascending stage ticks over a fading tone, softer session snaps; the result; the recap; the title; the rewind
+  EV.stages.forEach((ts, i) => S(ts, 'stage', 0.7 + 0.05 * i, { f: pent(5 + 2 * i, 4) }));
+  S(EV.stages[0], 'fadetone', 0.45, { d: EV.stages[4] + 0.5 - EV.stages[0] });
+  EV.pulses3.forEach((tp, i) => { S(tp, 'snap', 0.55, { soft: 1, p: (i % 2 ? 0.25 : -0.25) }); S(tp + 1 / 60, 'fizz', 0.3, { d: 0.3 }); });
+  S(EV.done, 'complete', 0.9);
+  EV.recap.forEach((tr, i) => S(tr, 'pop', 0.65, { f: pent(5 + i, 4), p: [-0.3, 0.3, -0.3, 0.3][i] }));
+  S(EV.title, 'title', 0.6, { d: 1.0 }); S(EV.rewind, 'rewind', 0.65, { d: DUR - EV.rewind });
+  return ev;
+}
+// how far the band dips under each SFX (the SFX lead)
+const DUCK = { snap: 0.35, boom: 0.45, crack: 0.3, shatter: 0.45, click: 0.4, gloop: 0.3, complete: 0.35, absorb: 0.12, bubble: 0.12, plop: 0.2, slip: 0.15, squelch: 0.2, boing: 0.15, popin: 0.2, stage: 0.2, pop: 0.18, cue1: 0.2, cue2: 0.2, cue3: 0.2, cue4: 0.2, ping: 0.15, dim: 0.12, chime: 0.15, fizz: 0.12, timelapse: 0.2, rewind: 0.25 };
+// ---------------------------------------------------------------- synthesis helpers
+let SND_L = null, SND_R = null, ECH_L = null, ECH_R = null, SCG = null;    // reverb send, delay send, sidechain gain (one value per 64 samples)
+const nz = i => hash(i) * 2 - 1;
+// write one voice into (L, R); wraps at 48 s; o: { send (reverb), echo (delay), duck (sidechain) }
+function voice(L, R, t0, dur, pan, gain, fn, o) {
+  o = o || {};
+  const i0 = Math.round(t0 * SR), n = Math.max(1, Math.round(dur * SR)), snd = o.send || 0, ech = o.echo || 0, dk = !!o.duck;
+  const pl = Math.cos((pan + 1) * Math.PI / 4) * gain, pr = Math.sin((pan + 1) * Math.PI / 4) * gain;
+  for (let k = 0; k < n; k++) {
+    let s = fn(k / SR, k); if (s === 0) continue;
+    let i = (i0 + k) % NS; if (i < 0) i += NS;
+    if (dk) s *= SCG[i >> 6];
+    const l = s * pl, r = s * pr;
+    L[i] += l; R[i] += r;
+    if (snd) { SND_L[i] += l * snd; SND_R[i] += r * snd; }
+    if (ech) { ECH_L[i] += l * ech; ECH_R[i] += r * ech; }
+  }
+}
+const dec = r => t => Math.exp(-t * r);
+function blep(t, dt) { if (t < dt) { t /= dt; return t + t - t * t - 1; } if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+// state-variable filters (Chamberlin); cutoff in Hz, q = damping (lower = more resonant)
+function lpf() { let lo = 0, bp = 0; return (x, fc, q) => { const f = Math.min(0.8, TAU * fc / SR); lo += f * bp; const hi = x - lo - q * bp; bp += f * hi; return lo; }; }
+function bpf() { let lo = 0, bp = 0; return (x, fc, q) => { const f = Math.min(0.8, TAU * fc / SR); lo += f * bp; const hi = x - lo - q * bp; bp += f * hi; return bp; }; }
+const rel = (t, d, r) => t > d ? Math.max(0, 1 - (t - d) / r) : 1;
+// ---- tonal instruments
+function beepLeadFn(f, d) { let p = 0; return t => { p += f / SR; p -= Math.floor(p); return (fsin(TAU * p) + 0.22 * fsin(3 * TAU * p) + 0.1 * fsin(2 * TAU * p)) * (t < 0.003 ? t / 0.003 : 1) * (0.55 + 0.45 * Math.exp(-t * 9)) * rel(t, d, 0.04); }; }
+function pluckFn(f, d) { let p1 = 0, p2 = 0; const F = lpf(), a = f * 1.0035 / SR, b = f * 0.9965 / SR; return t => { p1 += a; if (p1 >= 1) p1 -= 1; p2 += b; if (p2 >= 1) p2 -= 1; const x = (2 * p1 - 1 - blep(p1, a)) + (2 * p2 - 1 - blep(p2, b)); return F(x * 0.5, 380 + 5200 * Math.exp(-t * 15), 0.45) * (t < 0.003 ? t / 0.003 : 1) * Math.exp(-t * 4) * rel(t, d, 0.08); }; }
+function marimbaFn(f) { let p = 0, q = 0; return t => { p += f / SR; q += f * 3.98 / SR; p -= Math.floor(p); q -= Math.floor(q); return (fsin(TAU * p) + 0.35 * fsin(TAU * q) * Math.exp(-t * 30)) * Math.exp(-t * 7) * (t < 0.002 ? t / 0.002 : 1); }; }
+function squareFn(f, d) { let p = 0; const F = lpf(), dt = f / SR; return t => { p += dt; if (p >= 1) p -= 1; const v = (p < 0.5 ? 1 : -1) + blep(p, dt) - blep((p + 0.5) % 1, dt); return F(v, 2800, 0.6) * (t < 0.004 ? t / 0.004 : 1) * (0.5 + 0.5 * Math.exp(-t * 7)) * rel(t, d, 0.05); }; }
+function glassFn(f) { let pc = 0, pm = 0; return t => { pc += f / SR; pm += f * 3.5 / SR; pc -= Math.floor(pc); pm -= Math.floor(pm); return fsin(TAU * pc + 1.2 * Math.exp(-t * 5) * fsin(TAU * pm)) * Math.exp(-t * 2.4) * (t < 0.004 ? t / 0.004 : 1); }; }
+function laserFn(f, d, f0, cut) {
+  const p = [0, 0, 0], det = [1, 1.006, 0.994], F = lpf();
+  return t => {
+    const g = f0 ? f0 * Math.pow(f / f0, Math.min(1, t / 0.04)) : f, vib = t > 0.16 ? 1 + 0.01 * fsin(TAU * 5.6 * t) : 1; let x = 0;
+    for (let j = 0; j < 3; j++) { const dt = g * vib * det[j] / SR; p[j] += dt; if (p[j] >= 1) p[j] -= 1; x += 2 * p[j] - 1 - blep(p[j], dt); }
+    return F(x / 3, cut * (0.65 + 0.35 * Math.exp(-t * 6)), 0.5) * (t < 0.006 ? t / 0.006 : 1) * rel(t, d, 0.07);
+  };
+}
+function chipFn(f, d) { let p = 0; const dt = f / SR, w = 0.125; return t => { p += dt; if (p >= 1) p -= 1; const v = (p < w ? 1 : -1) + blep(p, dt) - blep((p - w + 1) % 1, dt) - (2 * w - 1); return v * (t < 0.002 ? t / 0.002 : 1) * (0.65 + 0.35 * Math.exp(-t * 10)) * rel(t, d, 0.03); }; }
+function chordFn(ms, d, cut, att, env, cutTo) { // detuned saws through a low-pass: pads, stabs, the drop's supersaw (cutTo: the filter opens over d)
+  const n = ms.length * 2, ph = new Float64Array(n), dts = []; ms.forEach(m => { const f = mtof(m); dts.push(f * 1.005 / SR, f * 0.995 / SR); }); const F = lpf();
+  return t => { let x = 0; for (let j = 0; j < n; j++) { let q = ph[j] + dts[j]; if (q >= 1) q -= 1; ph[j] = q; x += 2 * q - 1; } const fc = env ? cut * (0.25 + 0.75 * Math.exp(-t * env)) : cutTo ? cut * Math.pow(cutTo / cut, clamp(t / d, 0, 1)) : cut; return F(x / n, fc, 0.7) * Math.min(1, t / att) * rel(t, d, att > 0.1 ? 0.5 : 0.06) * (env ? Math.exp(-t * 3) : 1); };
+}
+function bassFn(f, d, kind) {
+  let p = 0, s = 0; const F = lpf(), dt = f / SR;
+  return t => {
+    p += dt; if (p >= 1) p -= 1; s += dt; s -= Math.floor(s);
+    const y = kind === 'sub' ? 0.9 * fsin(TAU * s) + 0.3 * fsin(2 * TAU * s) : F(2 * p - 1 - blep(p, dt), 160 + (kind === 'roll' ? 900 : 1500) * Math.exp(-t * 20), 0.55) * 0.85 + 0.3 * fsin(TAU * s);
+    return y * (t < 0.004 ? t / 0.004 : 1) * rel(t, d, 0.03);
+  };
+}
+// ---- drums and effects
+function kickFn(seed) { let p = 0, q = 0; return (t, k) => { p += (60 + 120 * Math.exp(-t * 38)) / SR; q += 1600 / SR; return fsin(TAU * p) * Math.exp(-t * 11) * (t < 0.0015 ? t / 0.0015 : 1) + fsin(TAU * q) * 0.18 * Math.exp(-t * 110) + (t < 0.003 ? nz(k * 7 + seed) * 0.3 * (1 - t / 0.003) : 0); }; }
+function clapFn(seed) { const F = bpf(); return (t, k) => { let e = Math.exp(-t * 20) * 0.5; for (const o of [0, 0.009, 0.019]) if (t >= o) e += Math.exp(-(t - o) * 280) * 0.8; return F(nz(k * 3 + seed), 1400, 0.8) * e * 1.6; }; }
+function snapFn(seed) { const F = bpf(); let p = 0; return (t, k) => { p += 900 / SR; return F(nz(k * 3 + seed), 2600, 0.6) * Math.exp(-t * 60) * 1.4 + fsin(TAU * p) * Math.exp(-t * 90) * 0.35; }; }
+function snareFn(seed) { const F = bpf(); let p = 0; return (t, k) => { p += 190 / SR; return F(nz(k * 5 + seed), 2300, 0.9) * Math.exp(-t * 20) * 1.5 + fsin(TAU * p) * Math.exp(-t * 32) * 0.45; }; }
+function hatFn(seed, open) { let lp = 0; return (t, k) => { const x = nz(k * 11 + seed); lp += 0.55 * (x - lp); return (x - lp) * Math.exp(-t * (open ? 11 : 65)); }; }
+function shakerFn(seed) { const F = bpf(); return (t, k) => F(nz(k * 13 + seed), 6200, 1.0) * (t < 0.006 ? t / 0.006 : Math.exp(-(t - 0.006) * 32)) * 1.4; }
+function crashFn(seed) { let lp = 0; return (t, k) => { const x = nz(k * 17 + seed); lp += 0.4 * (x - lp); return (x - lp) * Math.exp(-t * 2.0) * (t < 0.002 ? t / 0.002 : 1); }; }
+function riserFn(d, seed) { const F = bpf(); let p = 0; return (t, k) => { const u = clamp(t / d, 0, 1); p += 110 * Math.pow(4, u) / SR; p -= Math.floor(p); return (F(nz(k * 19 + seed), 300 * Math.pow(22, u), 0.7) + (2 * p - 1) * 0.12) * u * u; }; }
+function downFn(d, seed) { const F = bpf(); return (t, k) => { const u = clamp(t / d, 0, 1); return F(nz(k * 23 + seed), 6000 * Math.pow(0.05, u), 0.7) * (1 - u) * (1 - u); }; }
+function impactFn(seed) { let p = 0; return (t, k) => { p += (32 + 52 * Math.exp(-t * 6)) / SR; return fsin(TAU * p) * Math.exp(-t * 2.6) + (t < 0.05 ? nz(k * 29 + seed) * 0.3 * (1 - t / 0.05) : 0); }; }
+// one music event
+const LEAD_PREV = {};
+function playMusic(e, L, R) {
+  const k = e.k, sd = Math.round(e.t * 1000), v = e.v;
+  switch (k) {
+    case 'starlead': voice(L, R, e.t, e.d + 0.1, 0.05, 0.2 * v, beepLeadFn(mtof(e.m), e.d), { send: 0.15, echo: 0.25 }); break;
+    case 'pluck': voice(L, R, e.t, e.d + 0.5, -0.1, 0.3 * v, pluckFn(mtof(e.m), e.d), { send: 0.18, echo: 0.22 }); break;
+    case 'marimba': voice(L, R, e.t, 0.8, 0.1, 0.36 * v, marimbaFn(mtof(e.m)), { send: 0.2, echo: 0.2 }); break;
+    case 'glass': voice(L, R, e.t, 1.6, 0.15, 0.24 * v, glassFn(mtof(e.m)), { send: 0.4, echo: 0.2 }); break;
+    case 'laser': { const f = mtof(e.m), pf = LEAD_PREV.laser && e.t - LEAD_PREV.laser.t < 0.3 ? LEAD_PREV.laser.f : 0; LEAD_PREV.laser = { t: e.t + e.d, f }; voice(L, R, e.t, e.d + 0.1, -0.05, 0.22 * v, laserFn(f, e.d, pf, e.cut || 3000), { send: 0.2, echo: 0.28 }); break; }
+    case 'chip': voice(L, R, e.t, e.d + 0.05, 0.1, 0.14 * v, chipFn(mtof(e.m), e.d), { send: 0.12, echo: 0.25 }); break;
+    case 'sqarp': voice(L, R, e.t, e.d + 0.06, e.p || 0, 0.09 * v, squareFn(mtof(e.m), e.d), { send: 0.1, duck: 1 }); break;
+    case 'chiparp': voice(L, R, e.t, e.d + 0.04, e.p || 0, 0.09 * v, chipFn(mtof(e.m), e.d), { send: 0.1, duck: 1 }); break;
+    case 'pad': voice(L, R, e.t, e.d + 0.6, 0, 0.26 * v, chordFn(e.ms, e.d, e.cut || 1400, 0.25, 0, e.cutTo), { send: 0.4, duck: 1 }); break;
+    case 'stab': voice(L, R, e.t, e.d + 0.1, 0.1, 0.26 * v, chordFn(e.ms, e.d, 4200, 0.003, 14), { send: 0.15, duck: 1 }); break;
+    case 'supersaw': voice(L, R, e.t, e.d + 0.6, 0, 0.3 * v, chordFn(e.ms, e.d, 2600, 0.02), { send: 0.3, duck: 1 }); break;
+    case 'bass': case 'roll': case 'sub': voice(L, R, e.t, e.d + 0.05, 0, (k === 'sub' ? 0.06 : 0.13) * v, bassFn(mtof(e.m), e.d, k), { duck: k !== 'sub' }); break;
+    case 'kick': voice(L, R, e.t, 0.5, 0, 0.4 * v, kickFn(sd)); break;
+    case 'clap': voice(L, R, e.t, 0.35, 0.05, 0.34 * v, clapFn(sd), { send: 0.22 }); break;
+    case 'snap': voice(L, R, e.t, 0.15, 0.1, 0.3 * v, snapFn(sd), { send: 0.25 }); break;
+    case 'snare': voice(L, R, e.t, 0.3, -0.05, 0.24 * v, snareFn(sd), { send: 0.18 }); break;
+    case 'hat': voice(L, R, e.t, e.open ? 0.3 : 0.08, e.p || 0, 0.22 * v, hatFn(sd, e.open)); break;
+    case 'shaker': voice(L, R, e.t, 0.12, e.p || 0, 0.1 * v, shakerFn(sd)); break;
+    case 'crash': voice(L, R, e.t, e.d, 0, 0.14 * v, crashFn(sd), { send: 0.25 }); break;
+    case 'riser': voice(L, R, e.t, e.d, 0, 0.18 * v, riserFn(e.d, sd), { send: 0.3 }); break;
+    case 'down': voice(L, R, e.t, e.d, 0, 0.18 * v, downFn(e.d, sd), { send: 0.4 }); break;
+    case 'impact': voice(L, R, e.t, e.d, 0, 0.4 * v, impactFn(sd), { send: 0.2 }); break;
+  }
+}
+// ---------------------------------------------------------------- SFX: one sound per physical event, tuned to the D pentatonic
+function playSfx(e, L, R) {
+  const k = e.k, v = e.v * 1.25, f = e.f || 440, p = e.p || 0, d = e.d || 0.2, sd = Math.round(e.t * 1000);
+  const V = (t0, dur, g, fn, snd, pan) => voice(L, R, t0, dur, pan === undefined ? p : pan, g * v, fn, { send: snd === undefined ? 0.2 : snd });
+  const sine = (fAt, envFn) => { let ph = 0; return t => { ph += fAt(t) / SR; ph -= Math.floor(ph); return fsin(TAU * ph) * envFn(t); }; };
+  const bell = (f0, r, idx) => { let pc = 0, pm = 0; return t => { pc += f0 / SR; pm += f0 * 3.5 / SR; pc -= Math.floor(pc); pm -= Math.floor(pm); return fsin(TAU * pc + idx * Math.exp(-t * 8) * fsin(TAU * pm)) * Math.exp(-t * r) * (t < 0.002 ? t / 0.002 : 1); }; };
+  const noiseLP = (cutAt, envFn, seed) => { let lp = 0, lp2 = 0; return (t, kk) => { const a = 1 - Math.exp(-TAU * cutAt(t) / SR); lp += a * (nz(kk * 7 + seed) - lp); lp2 += a * (lp - lp2); return lp2 * envFn(t); }; };
+  const noiseBP = (fcAt, q, envFn, seed) => { const F = bpf(); return (t, kk) => F(nz(kk * 13 + seed), fcAt(t), q) * envFn(t); };
+  const swell = dd => t => Math.sin(Math.PI * clamp(t / dd, 0, 1));
+  const att = (a, r) => t => (t < a ? t / a : 1) * Math.exp(-Math.max(0, t - a) * r);
+  const edge = (dd, a, r) => t => Math.min(1, t / a) * Math.min(1, Math.max(0, dd - t) / r);
+  switch (k) {
+    // the Q-switched laser: a sharp, dry snap (a photoacoustic crack) — broadband click, a high ring, a small low thump
+    case 'snap': {
+      const s = e.soft ? 0.55 : 1;
+      V(e.t, 0.012, 0.95 * s, (t, kk) => nz(kk * 3 + sd) * (1 - t / 0.012) ** 2, 0.08);
+      V(e.t, 0.06, 0.38 * s, noiseBP(() => 5200, 0.25, dec(70), sd + 1), 0.12);
+      V(e.t, 0.09, 0.42 * s, sine(t => 95 + 120 * Math.exp(-t * 60), dec(45)), 0.05);
+      if (e.deep) V(e.t, 0.4, 0.3, sine(t => 55 + 40 * Math.exp(-t * 20), dec(9)), 0.2);
+      break;
+    }
+    // frosting: tiny gas bubbles crackling under the skin's surface
+    case 'fizz': { const n = 22; for (let i = 0; i < n; i++) { const tt = e.t + d * Math.pow(hash(sd + i), 1.6); V(tt, 0.012, 0.16 * (1 - (tt - e.t) / d), (t, kk) => nz(kk * 5 + sd + i) * (1 - t / 0.012), 0.15, p + (hash(sd + i + 40) - 0.5) * 0.6); } V(e.t, d, 0.06, noiseLP(() => 7000, t => (1 - t / d) ** 2, sd), 0.2); break; }
+    // a time jump: a rising sweep and a clock that ticks faster and faster
+    case 'timelapse': { V(e.t, d, 0.22, noiseBP(t => 600 * Math.pow(9, t / d), 0.5, swell(d), sd), 0.3); for (let i = 0; i < 9; i++) { const tt = e.t + d * (1 - Math.pow(1 - i / 9, 1.7)); V(tt, 0.03, 0.22, sine(() => i % 2 ? 2600 : 2100, dec(160)), 0.1); } break; }
+    case 'whoosh': V(e.t, d, 0.22, noiseLP(t => 1200 + 3000 * Math.sin(Math.PI * t / d), swell(d), sd), 0.3); break;
+    case 'dive': V(e.t, d, 0.28, noiseLP(t => 7000 * Math.pow(0.06, t / d), swell(d), sd), 0.3); V(e.t, d, 0.18, sine(t => 220 * Math.pow(0.35, t / d), swell(d)), 0.3); break;
+    case 'undive': V(e.t, d, 0.26, noiseLP(t => 500 * Math.pow(14, t / d), swell(d), sd), 0.3); V(e.t, d, 0.14, sine(t => 80 * Math.pow(3, t / d), swell(d)), 0.3); break;
+    case 'ambience': V(e.t, d, 0.1, noiseLP(t => 700 + 250 * fsin(TAU * 0.7 * t), edge(d, 0.4, 0.5), sd), 0.4); break;
+    case 'ping': V(e.t, 0.6, 0.3, bell(f, 6, 0.7), 0.4); break;
+    // the beam entering the skin: a faint descending shimmer
+    case 'beam': V(e.t, d, 0.1, (t) => { const fr = 1760 * Math.pow(0.5, t / d); return (fsin(TAU * fr * t) + 0.5 * fsin(TAU * fr * 1.5 * t)) * edge(d, 0.08, 0.4)(t); }, 0.5); break;
+    // one photon absorbed: a short tick, rising in pitch with the energy
+    case 'absorb': V(e.t, 0.09, 0.32, sine(t => f * (1 + 0.2 * Math.exp(-t * 80)), att(0.001, 40)), 0.15); V(e.t, 0.01, 0.16, (t, kk) => nz(kk + sd) * (1 - t / 0.01), 0.05); break;
+    // the low-frequency energy rise under the absorption
+    case 'rumble': { let ph = 0; V(e.t, d + 0.05, 0.3, t => { const u = clamp(t / d, 0, 1); ph += (38 + 52 * u * u) / SR; ph -= Math.floor(ph); return (fsin(TAU * ph) + 0.35 * fsin(2 * TAU * ph) * u) * u * u * (t > d ? Math.max(0, 1 - (t - d) / 0.05) : 1); }, 0.05); break; }
+    // thermoelastic expansion: a deep, tight pressure pulse
+    case 'boom': V(e.t, 0.45, 0.7, sine(t => 48 + 85 * Math.exp(-t * 26), dec(9)), 0.1); V(e.t, 0.02, 0.4, (t, kk) => nz(kk * 9 + sd) * (1 - t / 0.02), 0.05); V(e.t, 0.18, 0.22, noiseLP(() => 900, dec(18), sd + 3), 0.2); break;
+    case 'pressure': V(e.t, d, 0.16, noiseLP(t => 3000 * Math.pow(0.12, t / d), edge(d, 0.02, d * 0.8), sd), 0.45, -0.5); V(e.t, d, 0.16, noiseLP(t => 3000 * Math.pow(0.12, t / d), edge(d, 0.02, d * 0.8), sd + 7), 0.45, 0.5); break;
+    case 'bubble': V(e.t, 0.1, 0.34, sine(t => f * (0.6 + 0.9 * Math.min(1, t / 0.03)), att(0.002, 35)), 0.3); break;
+    // one crack running through the aggregate
+    case 'crack': V(e.t, 0.006, 0.8, (t, kk) => nz(kk * 11 + sd), 0.1); V(e.t, 0.07, 0.42, noiseBP(() => f, 0.18, dec(55), sd + 2), 0.2); V(e.t + 0.012, 0.03, 0.3, (t, kk) => nz(kk * 17 + sd) * (1 - t / 0.03), 0.15); break;
+    // the split: a crunchy shatter, fragments tinkling apart, a chime
+    case 'shatter': {
+      V(e.t, 0.3, 0.55, sine(t => 70 + 70 * Math.exp(-t * 20), dec(10)), 0.1); V(e.t, 0.05, 0.5, noiseBP(() => 2400, 0.4, dec(40), sd), 0.2);
+      for (let i = 0; i < 14; i++) { const tt = e.t + 0.02 + 0.5 * Math.pow(i / 14, 1.4); V(tt, 0.12, 0.2 * (1 - i / 18), bell(pent(8 + (i * 3) % 7, 4), 22, 0.5), 0.35, (hash(sd + i) - 0.5) * 1.4); }
+      V(e.t, 1.2, 0.18, bell(fq('D', 6), 3, 1.0), 0.5, -0.2); V(e.t + 0.02, 1.2, 0.15, bell(fq('A', 6), 3, 1.0), 0.5, 0.2); break;
+    }
+    case 'swoosh': V(e.t, d, 0.2, noiseLP(t => e.rev ? 6000 - 5000 * t / d : 1000 + 5000 * t / d, swell(d), sd), 0.3); break;
+    case 'liquid': for (let i = 0; i < 9; i++) V(e.t + d * hash(sd + i), 0.14, 0.12, sine(t => (300 + 300 * hash(sd + i + 9)) * (1 + 2.5 * t), att(0.004, 20)), 0.3, (hash(sd + i + 3) - 0.5) * 1.2); break;
+    // the macrophage: a soft, squishy living texture
+    case 'organic': V(e.t, d, 0.12, noiseLP(t => 400 + 300 * fsin(TAU * 1.7 * t) + 200 * fsin(TAU * 3.1 * t), edge(d, 0.3, 0.6), sd), 0.4); break;
+    case 'bloop': V(e.t, 0.35, 0.38, sine(t => f * (1 + 0.6 * Math.exp(-t * 18)), att(0.005, 9)), 0.35); break;
+    case 'boing': V(e.t, 0.32, 0.32, sine(t => f * (1 + 0.35 * Math.min(1, t / 0.12)) * (1 + 0.03 * fsin(TAU * 11 * t)), att(0.008, 8)), 0.35); break;
+    case 'stretch': V(e.t, d, 0.2, sine(t => fq('D', 4) * Math.pow(2, t / d), t => Math.min(1, t / 0.15) * (0.7 + 0.3 * fsin(TAU * 6 * t)) * Math.min(1, (d - t) / 0.05 + 0.0001)), 0.3); break;
+    // the closure: the membrane meets (gloop) and the uptake click
+    case 'gloop': V(e.t, 0.35, 0.42, sine(t => 140 * (1 + 1.4 * Math.exp(-t * 14)), att(0.004, 10)), 0.2); V(e.t, 0.2, 0.18, noiseLP(() => 900, dec(16), sd), 0.2); break;
+    case 'click': V(e.t + 0.004, 0.012, 0.75, (t, kk) => nz(kk * 19 + sd) * (1 - t / 0.012), 0.1); V(e.t + 0.004, 0.25, 0.32, bell(fq('A', 6), 14, 0.9), 0.35); V(e.t + 0.03, 0.9, 0.2, bell(fq('D', 6), 4, 1.0), 0.5); break;
+    case 'popin': V(e.t, 0.3, 0.34, sine(t => f * (0.7 + 0.3 * Math.min(1, t / 0.04)), att(0.003, 12)), 0.35); break;
+    case 'muffle': V(e.t, d, 0.12, noiseLP(() => 300, edge(d, 0.3, 0.5), sd), 0.3); V(e.t, d, 0.08, sine(() => fq('D', 2), edge(d, 0.3, 0.5)), 0.2); break;
+    case 'plop': V(e.t, 0.22, 0.4, sine(t => f * (0.55 + 0.8 * Math.min(1, t / 0.05)), att(0.003, 14)), 0.35); break;
+    case 'flow': V(e.t, d, 0.14, noiseBP(t => 700 + 250 * fsin(TAU * 0.9 * t), 0.6, edge(d, 0.3, 0.6), sd), 0.4, -0.3); V(e.t, d, 0.14, noiseBP(t => 750 + 250 * fsin(TAU * 0.7 * t + 1), 0.6, edge(d, 0.3, 0.6), sd + 5), 0.4, 0.3); break;
+    case 'slip': V(e.t, 0.18, 0.34, sine(t => f * (1.4 - 0.5 * Math.min(1, t / 0.08)), att(0.003, 16)), 0.3); break;
+    case 'squelch': V(e.t, 0.35, 0.3, sine(t => 180 * (1 + 0.5 * fsin(TAU * 18 * t)) * (1 - 0.4 * t), att(0.01, 8)), 0.3); V(e.t, 0.3, 0.12, noiseLP(() => 1200, att(0.01, 9), sd), 0.3); break;
+    case 'chime': V(e.t, 1.0, 0.3, bell(f, 3.5, 1.0), 0.5); break;
+    // clearance: tones that grow quieter step by step
+    case 'dim': V(e.t, 0.4, 0.3, bell(f, 7, 0.6), 0.45); break;
+    // the four quick steps of the next session
+    case 'cue1': V(e.t, 0.2, 0.42, sine(t => fq('D', 4) * (1 + 0.2 * Math.exp(-t * 40)), att(0.002, 16)), 0.25); break;
+    case 'cue2': { let ph = 0; V(e.t, 0.16, 0.3, t => { ph += 300 * Math.pow(5, Math.min(1, t / 0.1)) / SR; ph -= Math.floor(ph); return (2 * ph - 1) * 0.5 * (t < 0.1 ? 1 : Math.max(0, 1 - (t - 0.1) / 0.06)); }, 0.2); break; }
+    case 'cue3': for (let i = 0; i < 4; i++) V(e.t + i * 0.025, 0.05, 0.28, noiseBP(() => 2800 + 400 * i, 0.2, dec(60), sd + i), 0.15, -0.3 + 0.2 * i); break;
+    case 'cue4': V(e.t, 0.25, 0.36, sine(t => 160 * (1 + 1.2 * Math.exp(-t * 16)), att(0.004, 12)), 0.2); V(e.t + 0.06, 0.4, 0.22, bell(fq('A', 5), 8, 0.8), 0.4); break;
+    // the treatment course: ascending clock ticks over a tone that fades as the star does
+    case 'stage': V(e.t, 0.025, 0.3, sine(() => 2400, dec(180)), 0.1); V(e.t, 0.5, 0.3, bell(f, 6, 0.8), 0.45); break;
+    case 'fadetone': V(e.t, d, 0.07, (t) => (fsin(TAU * fq('A', 4) * t) + 0.4 * fsin(TAU * fq('E', 5) * t)) * Math.min(1, t / 0.3) * Math.pow(1 - clamp(t / d, 0, 1), 1.5), 0.5); break;
+    case 'complete': [['D', 5], ['F#', 5], ['A', 5], ['D', 6], ['E', 6]].forEach(([n, o], i) => V(e.t + i * 0.03, 1.6, 0.13, bell(fq(n, o), 2.2, 0.9), 0.55, -0.4 + 0.2 * i)); V(e.t, 0.6, 0.12, sine(() => fq('D', 3), att(0.01, 4)), 0.3); break;
+    case 'pop': V(e.t, 0.16, 0.4, sine(t => f * (1.5 - 0.5 * Math.min(1, t * 40)), att(0.002, 22)), 0.25); break;
+    case 'title': [['D', 4], ['A', 4], ['D', 5], ['F#', 5], ['A', 5]].forEach(([n, o], i) => V(e.t + i * 0.035, d + 0.8, 0.12, bell(fq(n, o), 1.6, 0.9), 0.5, -0.4 + 0.2 * i)); break;
+    // the timeline rewinds: fast reverse chatter rising in pitch
+    case 'rewind': { const n = 16; for (let i = 0; i < n; i++) V(e.t + d * (i / n), 0.02, 0.16, sine(() => 900 + 1400 * (i / n), dec(140)), 0.1, (i % 2 ? 0.3 : -0.3)); V(e.t, d, 0.14, noiseBP(t => 500 * Math.pow(8, t / d), 0.5, swell(d), sd), 0.25); break; }
+  }
+}
+// ---------------------------------------------------------------- effects
+// plate-like Schroeder reverb (4 damped combs + 2 allpasses per side), run twice round the loop so the tail wraps
+function reverb(inL, inR, outL, outR, wet) {
+  const C = [1116, 1188, 1277, 1356].map(n => Math.round(n * SR / 44100)), A = [556, 441].map(n => Math.round(n * SR / 44100));
+  [[inL, outL, 0], [inR, outR, 23]].forEach(([inp, out, sp]) => {
+    const c0 = new Float32Array(C[0] + sp), c1 = new Float32Array(C[1] + sp), c2 = new Float32Array(C[2] + sp), c3 = new Float32Array(C[3] + sp);
+    const a0 = new Float32Array(A[0] + sp), a1 = new Float32Array(A[1] + sp);
+    let i0 = 0, i1 = 0, i2 = 0, i3 = 0, j0 = 0, j1 = 0, f0 = 0, f1 = 0, f2 = 0, f3 = 0;
+    const fb = 0.86, dm = 0.32, dm1 = 1 - dm;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = inp[i] * 0.2; let o, y = 0;
+      o = c0[i0]; f0 = o * dm1 + f0 * dm; c0[i0] = x + f0 * fb; if (++i0 >= c0.length) i0 = 0; y += o;
+      o = c1[i1]; f1 = o * dm1 + f1 * dm; c1[i1] = x + f1 * fb; if (++i1 >= c1.length) i1 = 0; y += o;
+      o = c2[i2]; f2 = o * dm1 + f2 * dm; c2[i2] = x + f2 * fb; if (++i2 >= c2.length) i2 = 0; y += o;
+      o = c3[i3]; f3 = o * dm1 + f3 * dm; c3[i3] = x + f3 * fb; if (++i3 >= c3.length) i3 = 0; y += o;
+      o = a0[j0]; a0[j0] = y + o * 0.5; y = o - y; if (++j0 >= a0.length) j0 = 0;
+      o = a1[j1]; a1[j1] = y + o * 0.5; y = o - y; if (++j1 >= a1.length) j1 = 0;
+      if (pass === 1) out[i] += y * wet;
+    }
+  });
+}
+// inside the macrophage the whole band is heard muffled (low-passed from 26.0 s, opened again as the camera leaves at 28 s)
+const FILT = { a: 25.9, b: 26.4, c: 27.85, d: 28.5, lo: 800 };
+function bandFilter(L, R) {
+  const i0 = Math.round((FILT.a - 0.05) * SR), i1 = Math.round((FILT.d + 0.05) * SR);
+  for (const ch of [L, R]) {
+    const F = lpf();
+    for (let i = i0; i < i1; i++) {
+      const t = i / SR, u = t < FILT.b ? seg(t, FILT.a, FILT.b) : t < FILT.c ? 1 : 1 - seg(t, FILT.c, FILT.d);
+      const fc = 16000 * Math.pow(FILT.lo / 16000, smooth(u)), y = F(ch[i], fc, 0.55);
+      const w = t < FILT.a ? 0 : t > FILT.d ? 0 : 1;
+      ch[i] = w ? y : ch[i];
+    }
+  }
+}
+// ---------------------------------------------------------------- render: opts.bus 'm' (music only) / 's' (SFX only) / both
+function renderAudio(opts) {
+  opts = opts || {};
+  const L = new Float32Array(NS), R = new Float32Array(NS);
+  SND_L = new Float32Array(NS); SND_R = new Float32Array(NS); ECH_L = new Float32Array(NS); ECH_R = new Float32Array(NS);
+  const sfx = sfxEvents();
+  if (opts.bus !== 's') {
+    const inGate = t => GATES.some(([a, b]) => t >= a - 0.005 && t < b);
+    const mus = musicEvents().filter(e => e.post || !inGate(e.t));
+    // sidechain: the bed ducks under every kick
+    SCG = new Float32Array((NS >> 6) + 2).fill(1);
+    for (const e of mus) if (e.k === 'kick') {
+      const depth = ((e.t >= 14.0 && e.t < 16.0) || (e.t >= 24.0 && e.t < 26.0) || (e.t >= 44.0 && e.t < 46.0) ? 0.55 : 0.4) * e.v, j0 = Math.round(e.t * SR) >> 6, n = Math.round(0.26 * SR) >> 6;
+      for (let q = 0; q < n; q++) { const j = (j0 + q) % SCG.length, u = q * 64 / SR, a = u < 0.004 ? u / 0.004 : Math.exp(-(u - 0.004) * 13); SCG[j] *= 1 - depth * a; }
+    }
+    LEAD_PREV.laser = null;
+    for (const e of mus) if (!e.post) playMusic(e, L, R);
+    // the gates: a sixteenth of silence before each climax (reverb tails ring on)
+    for (const [a, b] of GATES) {
+      const i0 = Math.round(a * SR), i1 = Math.round(b * SR), r = Math.round(0.008 * SR);
+      for (let i = i0; i < i1; i++) { const g = i < i0 + r ? 1 - (i - i0) / r : i > i1 - r ? (i - (i1 - r)) / r : 0; L[i] *= g; R[i] *= g; ECH_L[i] *= g; ECH_R[i] *= g; }
+    }
+    for (const e of mus) if (e.post) playMusic(e, L, R);
+    bandFilter(L, R);
+    // the band dips under the SFX
+    for (const e of sfx) {
+      const dk = DUCK[e.k]; if (!dk) continue;
+      const i0 = Math.round(e.t * SR), n = Math.round(0.45 * SR), att = Math.round(0.006 * SR);
+      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k - att) / SR * 7), g = 1 - dk * a; L[i] *= g; R[i] *= g; }
+    }
+  }
+  if (opts.bus !== 'm') for (const e of sfx) playSfx(e, L, R);
+  // dotted-eighth ping-pong delay on the leads (circular)
+  { const D = Math.round(0.75 * BEAT * SR), fb = 0.36;
+    for (let i = 0; i < NS; i++) { let el = 0, er = 0, w = 1; for (let k = 1; k <= 4; k++) { w *= fb; const j = (i - k * D + NS * 4) % NS; if (k % 2) { el += w * ECH_R[j]; er += w * ECH_L[j]; } else { el += w * ECH_L[j]; er += w * ECH_R[j]; } } L[i] += el; R[i] += er; SND_L[i] += el * 0.3; SND_R[i] += er * 0.3; } }
+  ECH_L = null; ECH_R = null; SCG = null;
+  reverb(SND_L, SND_R, L, R, 0.8);
+  SND_L = null; SND_R = null;
+  // master: DC blocking, a gentle top roll-off (~15 kHz) and soft saturation; circular, in place
+  const a = Math.exp(-TAU * 15000 / SR);
+  for (const ch of [L, R]) {
+    let y = 0, x1 = 0, hp = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = ch[i];
+      y = a * y + (1 - a) * x;
+      hp = 0.9993 * (hp + y - x1); x1 = y;
+      if (pass === 1) ch[i] = Math.tanh(hp * 1.15) / 1.15;
+    }
+  }
+  return { L, R };
+}
+// ---------------------------------------------------------------- player playback (one buffer, the audio clock drives the picture)
+const LIVE = { ctx: null, buf: null, src: null, gain: null, muted: false, startAt: 0, offset: 0, ready: false };
+function liveInit() {
+  if (LIVE.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  LIVE.ctx = new AC({ sampleRate: SR });
+  LIVE.gain = LIVE.ctx.createGain(); LIVE.gain.gain.value = 0.9; LIVE.gain.connect(LIVE.ctx.destination);
+}
+function liveBuild() {
+  if (LIVE.buf) return;
+  liveInit();
+  const a = renderAudio();
+  const b = LIVE.ctx.createBuffer(2, NS, SR); b.getChannelData(0).set(a.L); b.getChannelData(1).set(a.R);
+  LIVE.buf = b; LIVE.ready = true;
+}
+function livePlay(t) {
+  liveBuild();
+  if (LIVE.ctx.state === 'suspended') LIVE.ctx.resume();
+  const s = LIVE.ctx.createBufferSource(); s.buffer = LIVE.buf; s.connect(LIVE.gain);
+  LIVE.startAt = LIVE.ctx.currentTime + 0.03; LIVE.offset = t; s.start(LIVE.startAt, t); LIVE.src = s;
+}
+function livePause() { if (LIVE.src) { try { LIVE.src.stop(); } catch (e) { } LIVE.src = null; } }
+function liveNow() { return LIVE.offset + Math.max(0, LIVE.ctx.currentTime - LIVE.startAt); }
+function liveMute(m) { LIVE.muted = m; if (LIVE.gain) LIVE.gain.gain.value = m ? 0 : 0.9; }
+
+// ---- 40_player.js
+// ============================================================================
+// PLAYER: 360x640 canvas shown with nearest-neighbour scaling, controls
+// outside the composition. Audio starts on the first user gesture; the audio
+// clock drives the picture, so pause / resume / seek never duplicate sounds.
+// ============================================================================
+const PL = { t: 0, playing: false, wallT0: 0, pos0: 0, audioOK: true, scrubbing: false, img: null, cx: null };
+function plClock() {
+  if (!PL.playing) return PL.t;
+  if (PL.audioOK && LIVE.ctx) return liveNow();
+  return PL.pos0 + (performance.now() - PL.wallT0) / 1000;
+}
+function plDraw(t) {
+  renderFrame(t);
+  const d = PL.img.data, u = new Uint32Array(d.buffer); u.set(buf);
+  PL.cx.putImageData(PL.img, 0, 0);
+}
+function plFmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+function plUI() {
+  const el = PL.el;
+  el.play.innerHTML = PL.playing ? ICON.pause : ICON.play;
+  el.play.setAttribute('aria-label', PL.playing ? 'Pause' : 'Play');
+  el.mute.innerHTML = LIVE.muted ? ICON.muted : ICON.sound;
+  el.mute.setAttribute('aria-label', LIVE.muted ? 'Unmute' : 'Mute');
+  if (!PL.scrubbing) el.scrub.value = String(Math.round(PL.t * FPS));
+  el.time.textContent = plFmt(PL.t) + ' / ' + plFmt(DUR);
+  const i = sceneIndex(PL.t);
+  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / ' + SCENE_NAMES.length + '  ' + SCENE_NAMES[i];
+  el.scrub.style.setProperty('--p', (PL.t / DUR * 100).toFixed(2) + '%');
+}
+function plPlay() {
+  if (PL.t >= DUR - 1 / FPS) PL.t = 0;
+  PL.playing = true; PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  try { livePlay(PL.t); if (LIVE.muted) liveMute(true); } catch (e) { PL.audioOK = false; }
+  PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  plUI();
+}
+function plPause() {
+  PL.t = plClock(); PL.playing = false;
+  try { livePause(); } catch (e) { }
+  plUI();
+}
+function plSeek(t, keepPlaying) {
+  t = clamp(t, 0, DUR - 1 / FPS);
+  const was = PL.playing;
+  if (was) { try { livePause(); } catch (e) { } PL.playing = false; }
+  PL.t = t; plDraw(t);
+  if (was && keepPlaying !== false) plPlay(); else plUI();
+}
+function plLoop() {
+  if (PL.playing) {
+    let t = plClock();
+    if (t >= DUR - 1 / FPS) { t = DUR - 1 / FPS; PL.t = t; plDraw(t); plPause(); }
+    else { PL.t = t; plDraw(t); plUI(); }
+  }
+  requestAnimationFrame(plLoop);
+}
+const ICON = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/></svg>',
+  replay: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1.5L7 6l5 4.5V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15 8.6a4.6 4.6 0 0 1 0 6.8l-1.3-1.3a2.8 2.8 0 0 0 0-4.2zM17.6 6a8.3 8.3 0 0 1 0 12l-1.3-1.3a6.5 6.5 0 0 0 0-9.4z"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15.2 9.3l1.3-1.3 2.2 2.2 2.2-2.2 1.3 1.3-2.2 2.2 2.2 2.2-1.3 1.3-2.2-2.2-2.2 2.2-1.3-1.3 2.2-2.2z"/></svg>',
+};
+function plStart() {
+  const cv = document.getElementById('screen');
+  PL.cx = cv.getContext('2d', { alpha: false });
+  PL.img = PL.cx.createImageData(W, H);
+  PL.el = { play: document.getElementById('play'), replay: document.getElementById('replay'), mute: document.getElementById('mute'), scrub: document.getElementById('scrub'), time: document.getElementById('time'), scene: document.getElementById('scene') };
+  PL.el.replay.innerHTML = ICON.replay;
+  PL.el.scrub.max = String(NF - 1);
+  const fit = () => {
+    const stage = document.getElementById('stage');
+    const aw = stage.clientWidth, ah = stage.clientHeight;
+    let s = Math.min(aw / W, ah / H);
+    if (s >= 2) s = Math.floor(s);                       // integer scale when there is room
+    cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
+  };
+  addEventListener('resize', fit); fit();
+  PL.el.play.onclick = () => (PL.playing ? plPause() : plPlay());
+  PL.el.replay.onclick = () => { plSeek(0, false); plPlay(); };
+  PL.el.mute.onclick = () => { try { liveInit(); liveMute(!LIVE.muted); } catch (e) { LIVE.muted = !LIVE.muted; } plUI(); };
+  const sc = PL.el.scrub;
+  sc.addEventListener('input', () => { PL.scrubbing = true; const t = (+sc.value) / FPS; if (PL.playing) { try { livePause(); } catch (e) { } PL.playing = false; PL.resumeAfter = true; } PL.t = t; plDraw(t); plUI(); });
+  sc.addEventListener('change', () => { PL.scrubbing = false; if (PL.resumeAfter) { PL.resumeAfter = false; plPlay(); } else plUI(); });
+  cv.addEventListener('click', () => (PL.playing ? plPause() : plPlay()));
+  addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); PL.playing ? plPause() : plPlay(); }
+    else if (e.key === 'ArrowRight') plSeek(PL.t + (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'ArrowLeft') plSeek(PL.t - (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'm') PL.el.mute.click();
+    else if (e.key === 'r') PL.el.replay.click();
+  });
+  document.getElementById('loading').remove();
+  plDraw(0); plUI(); requestAnimationFrame(plLoop);
+  // synthesise the soundtrack once (a couple of seconds) right after the first frame is on screen
+  PL.el.scene.textContent = 'preparing audio…';
+  setTimeout(() => { try { liveBuild(); } catch (e) { PL.audioOK = false; } plUI(); }, 60);
+}
+// public API (used by the MP4 export through Playwright)
+if (typeof window !== 'undefined') {
+  window.TATTOO = { W, H, FPS, DUR, NF, renderFrame, getBuf: () => buf, renderAudio, sceneIndex, seek: t => plSeek(t, false) };
+  const boot = () => setTimeout(() => { engineInit(); if (!/[?&]headless/.test(location.search)) plStart(); window.TATTOO.ready = true; }, 30);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+}
+
+})();
+</script>
+</body>
+</html>
