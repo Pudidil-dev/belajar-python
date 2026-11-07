@@ -1,0 +1,2512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>How a Pregnancy Test Creates Two Lines</title>
+<meta name="description" content="How a lateral-flow hCG pregnancy test creates two lines: a 72-second seamless-loop 16-bit pixel-art science animation (capillary flow, gold-labelled antibodies, the hCG sandwich, why gold nanoparticles look red, the control line) with a chiptune score.">
+<style>
+:root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #8fe9f5; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 500 14px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { display: flex; flex-direction: column; min-height: 100%; }
+#stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px 16px 6px; position: relative; }
+#screen { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #0b1020; box-shadow: 0 0 0 1px var(--line), 0 18px 50px rgba(0,0,0,.55); cursor: pointer; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); letter-spacing: .08em; }
+#bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 16px 6px; max-width: 720px; width: 100%; margin: 0 auto; }
+.btn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.btn:hover { border-color: #3a4b7c; }
+.btn:focus-visible, #scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+#scrub { flex: 1 1 auto; min-width: 60px; height: 40px; background: transparent; -webkit-appearance: none; appearance: none; margin: 0; --p: 0%; }
+#scrub::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--p), var(--line) var(--p)); }
+#scrub::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+#scrub::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+#scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--ink); border: 0; }
+#scrub::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 0; }
+#time { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--sub); min-width: 104px; text-align: right; }
+#scene { text-align: center; color: var(--sub); font-size: 12px; letter-spacing: .06em; padding: 0 16px 12px; min-height: 28px; }
+@media (max-width: 420px) { #time { min-width: 0; font-size: 12px; } .btn { width: 36px; height: 36px; } #bar { gap: 6px; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="180" height="320" role="img" aria-label="Pixel-art animation with short captions: a finished pregnancy test with two red lines; a sample drop runs up the strip, gold-labelled antibodies grab hCG, a second antibody captures it at the test line, many gold particles make the red line, a separate antibody makes the control line; comparison of positive, negative and invalid results."></canvas>
+  <div id="loading">LOADING…</div>
+</div>
+<div id="bar">
+  <button id="play" class="btn" aria-label="Play"></button>
+  <button id="replay" class="btn" aria-label="Replay"></button>
+  <input id="scrub" type="range" min="0" max="4319" step="1" value="0" aria-label="Seek">
+  <span id="time">0:00.0 / 1:12.0</span>
+  <button id="mute" class="btn" aria-label="Mute"></button>
+</div>
+<div id="scene" aria-live="polite"></div>
+<script>
+(function(){
+// ---- 00_core.js
+// ============================================================================
+// HOW A PREGNANCY TEST CREATES TWO LINES — core: pixel buffer, palette,
+// rasterisers, masks, easing, camera. Everything draws into one 180x320
+// Uint32 buffer (crisp pixels, no anti-aliasing), shown exactly 6x
+// nearest-neighbour (1080x1920) by the player and the export.
+// W, H and buf can be swapped temporarily (withCanvas) to draw a world into a
+// larger square buffer, e.g. for the Mode-7-style turn (rotBlit).
+// ============================================================================
+const FPS = 60, DUR = 72, NF = 4320;
+let W = 180, H = 320, CX = 90, CY = 160;
+const MAXPIX = 420 * 420;
+let buf = new Uint32Array(W * H);
+const SPARE = [new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX)];
+const FEEDBUF = SPARE[1].subarray(0, 180 * 320), TMPBUF = SPARE[3].subarray(0, 180 * 320), TMP2 = SPARE[4].subarray(0, 180 * 320);
+// draw into a w x h buffer (taken from SPARE[0]) and return it
+function withCanvas(w, h, fn) {
+  const oW = W, oH = H, oCX = CX, oCY = CY, oBuf = buf;
+  W = w; H = h; CX = w / 2; CY = h / 2; buf = SPARE[0].subarray(0, w * h);
+  try { fn(); } finally { const out = buf; W = oW; H = oH; CX = oCX; CY = oCY; buf = oBuf; withCanvas.last = out; }
+  return withCanvas.last;
+}
+function hexc(h) {
+  const n = parseInt(h.slice(1), 16);
+  return (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255)) >>> 0;
+}
+const P = {};
+const PAL_HEX = {
+  // ground: deep navy flat (hue ~210°, outside the blue-purple band); wet ground = pore liquid seen from inside
+  K0: '#050B14', BG: '#0D1B2A', N1: '#122338', N2: '#182E47', N3: '#203B58', N4: '#2A4B6D', N5: '#3A6187',
+  WB0: '#10283E', WB1: '#163650', WB2: '#1E4662', WB3: '#295A7A',
+  // liquid (illustrative pale blue)
+  LB0: '#E4F5FF', LB1: '#AEDCF6', LB2: '#7CBCE2', LB3: '#4F92BE', LB4: '#2E6890',
+  // device: ivory plastic, restrained teal accents
+  IV0: '#FFFBEF', IV1: '#EFE6CE', IV2: '#D4C7A6', IV3: '#A89A77', IV4: '#6F6449', IV5: '#3E3828',
+  TE0: '#8FE6D6', TE1: '#45BCA8', TE2: '#2A8C7E', TE3: '#1A5C55',
+  // membrane and pads: pale grey (dry), blue-grey (wet); absorbent pad off-white
+  GR0: '#F7F9FB', GR1: '#DCE3EA', GR2: '#B3BFCC', GR3: '#8593A4', GR4: '#5A6678', GR5: '#3A4352',
+  GW0: '#E2EEF7', GW1: '#C0D3E3', GW2: '#94AEC6', GW3: '#6A86A2', GW4: '#4A6380',
+  AB0: '#F6F2E8', AB1: '#E6E0D2', AB2: '#C7BFAD', AB3: '#998F7C',
+  // hCG magenta
+  MG0: '#FFC2EC', MG1: '#F25FC4', MG2: '#C2309A', MG3: '#7E1866', MG4: '#4A0C3C',
+  // mobile detection antibody cyan
+  CY0: '#D2FBFF', CY1: '#5FE3F5', CY2: '#25ABCB', CY3: '#136C88', CY4: '#0A3E50',
+  // test capture antibody mint
+  MI0: '#D8FFE9', MI1: '#7FEBB0', MI2: '#3EBA80', MI3: '#227553', MI4: '#124430',
+  // control capture antibody violet (small sprite only)
+  VI0: '#E6D8FF', VI1: '#B38CF5', VI2: '#7E5ACB', VI3: '#4D3586', VI4: '#2C1E52',
+  // gold nanoparticle: ruby disk + thin amber identity outline (a teaching convention)
+  RU0: '#FF9C9C', RU1: '#E0304A', RU2: '#A8173C', RU3: '#640D28', AM0: '#FFE7A0', AM1: '#FFB43F', AM2: '#C97A12', AM3: '#7A4808',
+  // result lines on the membrane (red / pink)
+  RL0: '#F7A3B5', RL1: '#EC6A88', RL2: '#D83C62', RL3: '#A92449',
+  // inset: muted amber positive ion core; light (white) and its colour strands
+  PA0: '#E0B577', PA1: '#C4944F', PA2: '#9A7036', PA3: '#664A22',
+  LW: '#FFFFFF', LG0: '#B4F7B4', LG1: '#5BD66A', LG2: '#2E9A40', LR0: '#FFB0A0', LR1: '#FF5A4F', LR2: '#C42A2A', LBL0: '#A8CEFF', LBL1: '#5A96F0',
+  // non-target molecules (subdued)
+  DB0: '#24324A', DB1: '#34465F', DB2: '#4A5E7A', DB3: '#647A98',
+  // UI
+  INK: '#F4F8FF', SUB: '#A7BCD4', SH: '#03070D', BOX: '#08121F', C6: '#FFFFFF',
+};
+for (const k in PAL_HEX) P[k] = hexc(PAL_HEX[k]);
+
+// ---------------------------------------------------------------- math/ease
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const smooth = t => t * t * (3 - 2 * t);
+const eio = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eout = t => 1 - Math.pow(1 - t, 3);
+const ein = t => t * t * t;
+function bezierEase(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  return function (x) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const fx = ((ax * t + bx) * t + cx) * t - x;
+      const d = (3 * ax * t + 2 * bx) * t + cx;
+      if (Math.abs(fx) < 1e-6) break;
+      t -= fx / (d || 1e-6);
+      t = clamp(t, 0, 1);
+    }
+    return ((ay * t + by) * t + cy) * t;
+  };
+}
+const K75 = bezierEase(0.75, 0, 0.25, 1);      // Kurzgesagt camera ease
+const K50 = bezierEase(0.5, 0, 0.2, 1);
+function backOut(t, s) { s = s === undefined ? 1.70158 : s; t = clamp(t, 0, 1) - 1; return t * t * ((s + 1) * t + s) + 1; }
+const TAU = Math.PI * 2;
+
+// stateless hash -> [0,1)
+function hash(n) {
+  n = (n | 0) ^ 0x9e3779b9;
+  n = Math.imul(n ^ (n >>> 16), 0x21f0aaad);
+  n = Math.imul(n ^ (n >>> 15), 0x735a2d97);
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+const hash2 = (a, b) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663));
+const hash3 = (a, b, c) => hash(Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663) ^ Math.imul(c | 0, 83492791));
+function vnoise(x, s) { // 1-D value noise, smooth
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(hash2(i, s), hash2(i + 1, s), u);
+}
+
+// ---------------------------------------------------------------- dithering
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bay = (x, y) => (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+
+// ---------------------------------------------------------------- primitives
+function clear(c) { buf.fill(c); }
+function pset(x, y, c) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c; }
+function psetD(x, y, c, lv) { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && x < W && y >= 0 && y < H && bay(x, y) < lv) buf[y * W + x] = c; }
+function rect(x0, y0, x1, y1, c, lv) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1));
+  const p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  if (a >= b || p >= q) return;
+  if (lv === undefined || lv >= 1) { for (let y = p; y < q; y++) buf.fill(c, y * W + a, y * W + b); return; }
+  if (lv <= 0) return;
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+}
+function frame(x0, y0, x1, y1, c) { rect(x0, y0, x1, y0 + 1, c); rect(x0, y1 - 1, x1, y1, c); rect(x0, y0, x0 + 1, y1, c); rect(x1 - 1, y0, x1, y1, c); }
+function disc(cx, cy, r, c, lv) {
+  if (r <= 0) return;
+  if (lv !== undefined && lv <= 0) return;
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy, h = r * r - dy * dy;
+    if (h < 0) continue;
+    const s = Math.sqrt(h);
+    const a = Math.max(0, Math.ceil(cx - s - 0.5)), b = Math.min(W - 1, Math.floor(cx + s - 0.5));
+    if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+    else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+  }
+}
+function ring(cx, cy, r, w, c, lv) {
+  const ro = r + w / 2, ri = Math.max(0, r - w / 2);
+  const y0 = Math.max(0, Math.floor(cy - ro)), y1 = Math.min(H - 1, Math.ceil(cy + ro));
+  const x0 = Math.max(0, Math.floor(cx - ro)), x1 = Math.min(W - 1, Math.ceil(cx + ro));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+      if (d2 <= ro * ro && d2 >= ri * ri && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function ellipse(cx, cy, rx, ry, c, lv, rot) {
+  const R = Math.max(rx, ry);
+  const cs = Math.cos(rot || 0), sn = Math.sin(rot || 0);
+  const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
+  const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
+  for (let y = y0; y <= y1; y++) {
+    const dy = y + 0.5 - cy;
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx;
+      const u = (dx * cs + dy * sn) / rx, v = (-dx * sn + dy * cs) / ry;
+      if (u * u + v * v <= 1 && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+// scanline polygon fill (even-odd) on pixel centres; pts = [x0,y0,x1,y1,...]
+const _xs = [];
+function poly(pts, c, lv) {
+  const n = pts.length >> 1; if (n < 3) return;
+  let ymin = Infinity, ymax = -Infinity;
+  for (let i = 0; i < n; i++) { const y = pts[2 * i + 1]; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+  const y0 = Math.max(0, Math.floor(ymin)), y1 = Math.min(H - 1, Math.ceil(ymax));
+  for (let y = y0; y <= y1; y++) {
+    const sy = y + 0.5; _xs.length = 0;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const yi = pts[2 * i + 1], yj = pts[2 * j + 1];
+      if ((yi > sy) !== (yj > sy)) { const xi = pts[2 * i], xj = pts[2 * j]; _xs.push(xi + (sy - yi) * (xj - xi) / (yj - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < _xs.length; k += 2) {
+      const a = Math.max(0, Math.ceil(_xs[k] - 0.5)), b = Math.min(W - 1, Math.floor(_xs[k + 1] - 0.5));
+      if (lv === undefined || lv >= 1) { if (a <= b) buf.fill(c, y * W + a, y * W + b + 1); }
+      else for (let x = a; x <= b; x++) if (bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// clip a segment to the screen (Liang-Barsky); returns null if outside
+function clipSeg(x0, y0, x1, y1, m) {
+  m = m || 2;
+  let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
+  const p = [-dx, dx, -dy, dy], q = [x0 + m, W + m - 1 - x0, y0 + m, H + m - 1 - y0];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; }
+    else { const r = q[i] / p[i]; if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; } }
+  }
+  return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
+}
+function line(x0, y0, x1, y1, c, lv) {
+  const s = clipSeg(x0, y0, x1, y1); if (!s) return;
+  x0 = Math.floor(s[0]); y0 = Math.floor(s[1]); x1 = Math.floor(s[2]); y1 = Math.floor(s[3]);
+  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1, err = dx + dy;
+  for (let guard = 0; guard < 4000; guard++) {
+    if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H && (lv === undefined || bay(x0, y0) < lv)) buf[y0 * W + x0] = c;
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function lineW(x0, y0, x1, y1, w, c, lv) {
+  if (w <= 1.2) { line(x0, y0, x1, y1, c, lv); return; }
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1e-6;
+  const nx = -dy / L * w / 2, ny = dx / L * w / 2;
+  poly([x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny], c, lv);
+}
+function polyline(pts, c, lv) { for (let i = 0; i + 3 < pts.length; i += 2) line(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], c, lv); }
+function dashLine(x0, y0, x1, y1, c, on, off, phase) {
+  const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) return;
+  const per = on + off; let s = -((phase || 0) % per);
+  for (; s < L; s += per) {
+    const a = Math.max(0, s), b = Math.min(L, s + on); if (b <= a) continue;
+    line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
+  }
+}
+// Kurzgesagt-style pixel glow: stacked dithered discs in darker tints
+function glow(cx, cy, r, c1, c2, lv) {
+  lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
+  disc(cx, cy, r, c1, 0.28 * lv);
+  disc(cx, cy, r * 0.62, c1, 0.55 * lv);
+  if (c2 !== undefined && c2 !== null) disc(cx, cy, r * 0.32, c2, 0.6 * lv);
+}
+function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
+  rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
+}
+
+// ---------------------------------------------------------------- masks
+// Bounding-box masks for 16-bit style shading (outline, rim light, shadow)
+class Mask {
+  constructor(x0, y0, x1, y1) {
+    this.x0 = Math.max(-2, Math.floor(x0) - 2); this.y0 = Math.max(-2, Math.floor(y0) - 2);
+    this.x1 = Math.min(W + 2, Math.ceil(x1) + 2); this.y1 = Math.min(H + 2, Math.ceil(y1) + 2);
+    this.w = Math.max(0, this.x1 - this.x0); this.h = Math.max(0, this.y1 - this.y0);
+    this.d = new Uint8Array(this.w * this.h);
+  }
+  get(x, y) { x -= this.x0; y -= this.y0; return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.d[y * this.w + x] : 0; }
+  empty() { return this.w === 0 || this.h === 0; }
+}
+function maskFn(x0, y0, x1, y1, fn) { // fn(px+0.5, py+0.5) -> bool
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) if (fn(m.x0 + i + 0.5, m.y0 + j + 0.5)) m.d[j * m.w + i] = 1;
+  return m;
+}
+function maskPoly(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+  const m = new Mask(x0, y0, x1, y1); if (m.empty()) return m;
+  const n = pts.length >> 1;
+  for (let j = 0; j < m.h; j++) {
+    const sy = m.y0 + j + 0.5; _xs.length = 0;
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const yi = pts[2 * i + 1], yk = pts[2 * k + 1];
+      if ((yi > sy) !== (yk > sy)) { const xi = pts[2 * i], xk = pts[2 * k]; _xs.push(xi + (sy - yi) * (xk - xi) / (yk - yi)); }
+    }
+    _xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < _xs.length; q += 2) {
+      const a = Math.max(0, Math.ceil(_xs[q] - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(_xs[q + 1] - 0.5 - m.x0));
+      for (let i = a; i <= b; i++) m.d[j * m.w + i] = 1;
+    }
+  }
+  return m;
+}
+function _span(m, j, xa, xb) { // fill pixels whose centres lie in [xa, xb] on mask row j
+  const a = Math.max(0, Math.ceil(xa - 0.5 - m.x0)), b = Math.min(m.w - 1, Math.floor(xb - 0.5 - m.x0));
+  if (a <= b) m.d.fill(1, j * m.w + a, j * m.w + b + 1);
+}
+function maskDisc(cx, cy, r) {
+  const m = new Mask(cx - r, cy - r, cx + r, cy + r);
+  for (let j = 0; j < m.h; j++) { const dy = m.y0 + j + 0.5 - cy, h = r * r - dy * dy; if (h < 0) continue; const s = Math.sqrt(h); _span(m, j, cx - s, cx + s); }
+  return m;
+}
+function maskEll(cx, cy, rx, ry, rot) {
+  const R = Math.max(rx, ry), c = Math.cos(rot || 0), s = Math.sin(rot || 0);
+  const m = new Mask(cx - R, cy - R, cx + R, cy + R);
+  const A = c * c / (rx * rx) + s * s / (ry * ry), Bk = 2 * (c * s / (rx * rx) - s * c / (ry * ry)), Ck = s * s / (rx * rx) + c * c / (ry * ry);
+  for (let j = 0; j < m.h; j++) {
+    const dy = m.y0 + j + 0.5 - cy, B = Bk * dy, C = Ck * dy * dy - 1, disc_ = B * B - 4 * A * C;
+    if (disc_ < 0) continue; const q = Math.sqrt(disc_);
+    _span(m, j, cx + (-B - q) / (2 * A), cx + (-B + q) / (2 * A));
+  }
+  return m;
+}
+function maskRR(x0, y0, x1, y1, r) { // rounded rect
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const m = new Mask(x0, y0, x1, y1);
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j + 0.5; if (y < y0 || y > y1) continue;
+    const qy = Math.max(y0 + r - y, 0, y - (y1 - r));
+    if (qy > r) continue;
+    const dx = r - Math.sqrt(Math.max(0, r * r - qy * qy));
+    _span(m, j, x0 + dx, x1 - dx);
+  }
+  return m;
+}
+function mFill(m, c, lv, clip) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      if (clip && !clip(x, y)) continue;
+      if (lv === undefined || lv >= 1 || bay(x, y) < lv) buf[y * W + x] = c;
+    }
+  }
+}
+// pixels of m whose neighbour at (x-dx, y-dy) is outside m (the edge facing -dx,-dy)
+function mRim(m, c, dx, dy, lv) {
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const ii = i - dx, jj = j - dy;
+      const inside = ii >= 0 && jj >= 0 && ii < m.w && jj < m.h && m.d[jj * m.w + ii];
+      if (!inside && (lv === undefined || bay(x, y) < lv)) buf[y * W + x] = c;
+    }
+  }
+}
+function mOutline(m, c) { // inner 4-neighbour outline
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (!m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i === 0 || !m.d[j * m.w + i - 1]) || (i === m.w - 1 || !m.d[j * m.w + i + 1]) || (j === 0 || !m.d[(j - 1) * m.w + i]) || (j === m.h - 1 || !m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+function mOuter(m, c) { // outer 4-neighbour outline (1 px outside the shape)
+  for (let j = 0; j < m.h; j++) {
+    const y = m.y0 + j; if (y < 0 || y >= H) continue;
+    for (let i = 0; i < m.w; i++) {
+      if (m.d[j * m.w + i]) continue; const x = m.x0 + i; if (x < 0 || x >= W) continue;
+      const e = (i > 0 && m.d[j * m.w + i - 1]) || (i < m.w - 1 && m.d[j * m.w + i + 1]) || (j > 0 && m.d[(j - 1) * m.w + i]) || (j < m.h - 1 && m.d[(j + 1) * m.w + i]);
+      if (e) buf[y * W + x] = c;
+    }
+  }
+}
+// standard 16-bit shading: base, light rim top-left, shadow rim bottom-right, outline
+function shade(m, base, hi, lo, ol, opt) {
+  opt = opt || {};
+  mFill(m, base, opt.lv, opt.clip);
+  const k = opt.k || 1;
+  if (lo !== null && lo !== undefined) for (let s = 1; s <= k; s++) mRim(m, lo, -s, -s);
+  if (hi !== null && hi !== undefined) for (let s = 1; s <= (opt.kh || k); s++) mRim(m, hi, s, s);
+  if (ol !== null && ol !== undefined) { if (opt.outer) mOuter(m, ol); else mOutline(m, ol); }
+}
+
+// ---------------------------------------------------------------- camera
+class Cam {
+  constructor(cx, cy, z, ax, ay) { this.cx = cx; this.cy = cy; this.z = z; this.ax = ax === undefined ? CX : ax; this.ay = ay === undefined ? CY : ay; }
+  x(wx) { return (wx - this.cx) * this.z + this.ax; }
+  y(wy) { return (wy - this.cy) * this.z + this.ay; }
+  s(v) { return v * this.z; }
+  wx(sx) { return (sx - this.ax) / this.z + this.cx; }
+  wy(sy) { return (sy - this.ay) / this.z + this.cy; }
+  pts(arr) { const o = new Array(arr.length); for (let i = 0; i < arr.length; i += 2) { o[i] = this.x(arr[i]); o[i + 1] = this.y(arr[i + 1]); } return o; }
+}
+// keyframe track: [[t, cx, cy, z, easeFn?], ...] with log-zoom interpolation
+function camTrack(keys, t, ax, ay) {
+  if (t <= keys[0][0]) { const k = keys[0]; return new Cam(k[1], k[2], k[3], ax, ay); }
+  for (let i = 0; i + 1 < keys.length; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t <= b[0]) {
+      const e = b[4] || K75; const f = e(seg(t, a[0], b[0]));
+      const z = Math.exp(lerp(Math.log(a[3]), Math.log(b[3]), f));
+      // zoom-aware centre blend: keep motion even across big zoom changes
+      let g = f;
+      if (Math.abs(Math.log(b[3] / a[3])) > 0.2) { const za = a[3], zb = b[3]; g = (1 / za - 1 / z) / (1 / za - 1 / zb); g = clamp(g, 0, 1); }
+      return new Cam(lerp(a[1], b[1], g), lerp(a[2], b[2], g), z, ax, ay);
+    }
+  }
+  const k = keys[keys.length - 1]; return new Cam(k[1], k[2], k[3], ax, ay);
+}
+
+// ---------------------------------------------------------------- buffers
+function withBuffer(target, fn) { const old = buf; buf = target; try { fn(); } finally { buf = old; } }
+function copyBuf(dst, src) { dst.set(src); }
+// dithered dissolve: show b where bayer < k
+function dissolve(a, b, k, out) {
+  out = out || buf;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; out[i] = bay(x, y) < k ? b[i] : a[i]; }
+}
+// Mode-7-style affine blit (the SNES trick): sample src (sw x sh) rotated by ang about its centre,
+// scaled by k, into the screen buffer around (dx, dy). Nearest neighbour, no blending.
+function rotBlit(src, sw, sh, ang, k, dx, dy) {
+  const c = Math.cos(ang), s = Math.sin(ang), hx = sw / 2, hy = sh / 2;
+  for (let y = 0; y < H; y++) {
+    const ry = y + 0.5 - dy;
+    for (let x = 0; x < W; x++) {
+      const rx = x + 0.5 - dx;
+      const iu = Math.floor((rx * c + ry * s) / k + hx), iv = Math.floor((-rx * s + ry * c) / k + hy);
+      if (iu >= 0 && iv >= 0 && iu < sw && iv < sh) buf[y * W + x] = src[iv * sw + iu];
+    }
+  }
+}
+
+// ---- 01_font.js
+// ============================================================================
+// Pixel fonts. FC: mixed-case caption/label font (cap height 7, descenders 2).
+// FS: micro font for axes and tags (5-row caps, row 6 = descender). FT: 9-row bold title.
+// ============================================================================
+function mkFont(h, defs, spaceW, base) {
+  const g = {};
+  for (const ch in defs) {
+    const rows = defs[ch].split('/');
+    const w = rows[0].length, off = (base && base[ch]) || 0;
+    const bits = new Array(h).fill(0);
+    rows.forEach((r, i) => { let v = 0; for (let k = 0; k < r.length; k++) if (r[k] === '#') v |= 1 << k; if (i + off < h) bits[i + off] = v; });
+    g[ch] = { w, bits };
+  }
+  g[' '] = { w: spaceW, bits: new Array(h).fill(0) };
+  return { h, g };
+}
+// FC: rows 0..6 = cap height, 7..8 = descenders. Lowercase x-height rows 2..6.
+const FC_DEF = {
+  A: '.###./#...#/#...#/#####/#...#/#...#/#...#', B: '####./#...#/#...#/####./#...#/#...#/####.', C: '.###./#...#/#..../#..../#..../#...#/.###.',
+  D: '####./#...#/#...#/#...#/#...#/#...#/####.', E: '#####/#..../#..../####./#..../#..../#####', F: '#####/#..../#..../####./#..../#..../#....',
+  G: '.###./#...#/#..../#.###/#...#/#...#/.####', H: '#...#/#...#/#...#/#####/#...#/#...#/#...#', I: '###/.#./.#./.#./.#./.#./###',
+  J: '..###/...#./...#./...#./#..#./#..#./.##..', K: '#...#/#..#./#.#../##.../#.#../#..#./#...#', L: '#..../#..../#..../#..../#..../#..../#####',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#', N: '#...#/##..#/#.#.#/#.#.#/#..##/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/.###.',
+  P: '####./#...#/#...#/####./#..../#..../#....', Q: '.###./#...#/#...#/#...#/#.#.#/#..#./.##.#', R: '####./#...#/#...#/####./#.#../#..#./#...#',
+  S: '.####/#..../#..../.###./....#/....#/####.', T: '#####/..#../..#../..#../..#../..#../..#..', U: '#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  V: '#...#/#...#/#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#', X: '#...#/#...#/.#.#./..#../.#.#./#...#/#...#',
+  Y: '#...#/#...#/.#.#./..#../..#../..#../..#..', Z: '#####/....#/...#./..#../.#.../#..../#####',
+  a: '..../..../.##./...#/.###/#..#/.###', b: '#.../#.../###./#..#/#..#/#..#/###.', c: '..../..../.##./#..#/#.../#..#/.##.',
+  d: '...#/...#/.###/#..#/#..#/#..#/.###', e: '..../..../.##./#..#/####/#.../.###', f: '..##/.#../####/.#../.#../.#../.#..',
+  g: '..../..../.###/#..#/#..#/.###/...#/#..#/.##.', h: '#.../#.../###./#..#/#..#/#..#/#..#', i: '.#./.../##./.#./.#./.#./###',
+  j: '..#/.../.##/..#/..#/..#/..#/#.#/.#.', k: '#.../#.../#..#/#.#./##../#.#./#..#', l: '##./.#./.#./.#./.#./.#./###',
+  m: '...../...../##.#./#.#.#/#.#.#/#.#.#/#.#.#', n: '..../..../###./#..#/#..#/#..#/#..#', o: '..../..../.##./#..#/#..#/#..#/.##.',
+  p: '..../..../###./#..#/#..#/#..#/###./#.../#...', q: '..../..../.###/#..#/#..#/#..#/.###/...#/...#', r: '..../..../#.##/##../#.../#.../#...',
+  s: '..../..../.###/#.../.##./...#/###.', t: '.#../.#../####/.#../.#../.#../..##', u: '..../..../#..#/#..#/#..#/#..#/.###',
+  v: '...../...../#...#/#...#/.#.#./.#.#./..#..', w: '...../...../#...#/#...#/#.#.#/#.#.#/.#.#.', x: '..../..../#..#/#..#/.##./#..#/#..#',
+  y: '..../..../#..#/#..#/#..#/#..#/.###/...#/.##.', z: '..../..../####/...#/.##./#.../####',
+  0: '.###./#...#/#..##/#.#.#/##..#/#...#/.###.', 1: '..#../.##../..#../..#../..#../..#../.###.', 2: '.###./#...#/....#/...#./..#../.#.../#####',
+  3: '####./....#/....#/.###./....#/....#/####.', 4: '...#./..##./.#.#./#..#./#####/...#./...#.', 5: '#####/#..../####./....#/....#/#...#/.###.',
+  6: '.###./#..../#..../####./#...#/#...#/.###.', 7: '#####/....#/...#./..#../.#.../.#.../.#...', 8: '.###./#...#/#...#/.###./#...#/#...#/.###.',
+  9: '.###./#...#/#...#/.####/....#/....#/.###.',
+  '.': '././././././#', ',': '././././././#/#/#.', ':': './#/./././#/.', '-': '..../..../..../####/..../..../....',
+  '+': '...../..#../..#../#####/..#../..#../.....', '=': '...../...../#####/...../#####/...../.....', '(': '.#/#./#./#./#./#./.#', ')': '#./.#/.#/.#/.#/.#/#.',
+  '/': '....#/...#./...#./..#../.#.../.#.../#....', '~': '...../...../.#..#/#.##./...../...../.....', '&': '.##../#..#./#.#../.#.../#.#.#/#..#./.##.#',
+  '!': '#/#/#/#/#/./#', '?': '.###./#...#/....#/...#./..#../...../..#..', "'": '#/#/./././././', '%': '##..#/##.#./...#./..#../.#.../.#.##/#..##',
+  '→': '......./....#../.....#./#######/.....#./....#../.......', '←': '......./..#..../.#...../#######/.#...../..#..../.......',
+  '↓': '..#../..#../..#../..#../#.#.#/.###./..#..', 'γ': '...../...../#...#/#...#/.#.#./.#.#./..#../.#.#./..#..',
+  '×': '...../...../#...#/.#.#./..#../.#.#./#...#', '^': '..#../.#.#./#...#/...../...../...../.....', '•': '...../...../.##../.##../...../...../.....',
+  '±': '..#../..#../#####/..#../..#../...../#####', '#': '.#.#./#####/.#.#./.#.#./#####/.#.#./.....', '_': '...../...../...../...../...../...../#####',
+  '°': '.##./#..#/.##./..../..../..../....', '⁻': '.../###/.../.../.../.../...', '⁺': '.#./###/.#./.../.../.../...', '⁶': '.##/#../##./#.#/.#./.../...', '·': '../../../##/##/../..', '≈': '...../.#..#/#.##./...../.#..#/#.##./.....', '≠': '...#./#####/..#../#####/.#.../...../.....',
+  '²': '.##./#..#/..#./.#../####/..../....', '↔': '......./..#.#../.#...#./#######/.#...#./..#.#../.......', '≠': '...../....#/#####/..#../#####/#..../.....',
+  'α': '...../...../.##.#/#..#./#..#./#..#./.##.#', 'β': '.##../#..#./#.#../#..#./#..#./###../#..../#....', '◀': '...#/..##/.###/####/.###/..##/...#',
+  '₂': '..../..../..../..../.##./#..#/..#./.#../####', '÷': '...../..#../...../#####/...../..#../.....', 'λ': '#..../.#.../.#.../..#../.#.#./#...#/#...#',
+};
+const FC = mkFont(9, FC_DEF, 3);
+FC.g['–'] = FC.g['-'];
+// FS: 5-row micro font (caps, digits, a few lowercase for units)
+const FS = mkFont(6, {
+  A: '.##./#..#/####/#..#/#..#', B: '###./#..#/###./#..#/###.', C: '.###/#.../#.../#.../.###', D: '###./#..#/#..#/#..#/###.',
+  E: '####/#.../###./#.../####', F: '####/#.../###./#.../#...', G: '.###/#.../#.##/#..#/.###', H: '#..#/#..#/####/#..#/#..#',
+  I: '###/.#./.#./.#./###', J: '...#/...#/...#/#..#/.##.', K: '#..#/#.#./##../#.#./#..#', L: '#.../#.../#.../#.../####',
+  M: '#...#/##.##/#.#.#/#...#/#...#', N: '#..#/##.#/#.##/#..#/#..#', O: '.##./#..#/#..#/#..#/.##.', P: '###./#..#/###./#.../#...',
+  Q: '.##./#..#/#..#/#.#./.#.#', R: '###./#..#/###./#.#./#..#', S: '.###/#.../.##./...#/###.', T: '###/.#./.#./.#./.#.',
+  U: '#..#/#..#/#..#/#..#/.##.', V: '#...#/#...#/.#.#./.#.#./..#..', W: '#...#/#...#/#.#.#/##.##/#...#', X: '#.#/#.#/.#./#.#/#.#',
+  Y: '#.#/#.#/.#./.#./.#.', Z: '####/...#/.##./#.../####',
+  0: '.##./#..#/#..#/#..#/.##.', 1: '.#./##./.#./.#./###', 2: '##./..#/.#./#../###', 3: '##./..#/.#./..#/##.', 4: '#.#/#.#/###/..#/..#',
+  5: '###/#../##./..#/##.', 6: '.##/#../###/#.#/###', 7: '###/..#/.#./.#./.#.', 8: '###/#.#/###/#.#/###', 9: '###/#.#/###/..#/##.',
+  a: '..../.##./..##/#.#./.###', c: '.../.##/#../#../.##', e: '..../.##./####/#.../.##.', k: '#.../#.#./##../#.#./#..#', l: '#/#/#/#/#',
+  m: '...../##.#./#.#.#/#.#.#/#.#.#', n: '.../##./#.#/#.#/#.#', o: '.../.#./#.#/#.#/.#.', s: '.../.##/##./..#/##.', t: '.#./###/.#./.#./..#',
+  i: '#/./#/#/#', h: '#../#../##./#.#/#.#', r: '.../#.#/##./#../#..', u: '.../#.#/#.#/#.#/.##', q: '.../.##/#.#/.##/..#', g: '.../.##/#.#/.##/##.',
+  ',': './././#/#', ':': './#/./#/.', '-': '.../.../###/.../...', '+': '.../.#./###/.#./...',
+  '(': '.#/#./#./#./.#', ')': '#./.#/.#/.#/#.', '/': '..#/.#./.#./.#./#..', '~': '..../.#.#/#.#./..../....', '%': '#..#/..#./.#../#.../#..#',
+  '→': '...#./....#/#####/....#/...#.', '↓': '.#./.#./.#./###/.#.', '×': '.../#.#/.#./#.#/...', '=': '.../###/.../###/...', "'": '#/#/./././',
+  '^': '.#./#.#/.../.../...', '!': '#/#/#/./#', '?': '##./..#/.#./.../.#.', 'γ': '#.#/#.#/.#./.#./#.#', '°': '##/##/../../..', '·': '../##/##/../..', '⁻': '###/.../.../.../...', '⁺': '.#./###/.#./.../...', '⁶': '.#/#./##/../..', '≈': '.#.#/#.#./.#.#/#.#./....', '≠': '..#/###/.#./###/#..',
+  p: '.../##./#.#/##./#../#..', b: '#../#../##./#.#/##.', d: '..#/..#/.##/#.#/.##', f: '.#/#./##/#./#.', v: '.../#.#/#.#/#.#/.#.',
+  w: '...../#...#/#.#.#/#.#.#/.#.#.', x: '.../#.#/.#./.#./#.#', y: '.../#.#/#.#/.##/..#/##.', z: '.../###/..#/.#./###',
+  '²': '##./..#/.#./###/...', '↔': '......./.#...#./#######/.#...#./.......', '≠': '..#/###/.#./###/#..', 'α': '..../.#.#/#.#./#.#./.#.#', 'β': '.##./#..#/###./#..#/###./#...', 'j': '.#/../.#/.#/.#/#.',
+  '₂': '.../.../##./..#/.#./###', '÷': '.#./.../###/.../.#.', '[': '##/#./#./#./##', ']': '##/.#/.#/.#/##', '>': '#../.#./..#/.#./#..', '<': '..#/.#./#../.#./..#',
+}, 2);
+FS.g['.'] = { w: 1, bits: [0, 0, 0, 0, 1] };
+FS.g['–'] = FS.g['-'];
+FS.g['•'] = FS.g['·'];
+FS.g['#'] = { w: 5, bits: [0b01010, 0b11111, 0b01010, 0b11111, 0b01010, 0] };
+// FT: 9-row title capitals (drawn bold)
+const FT = mkFont(9, {
+  H: '#...#/#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', O: '.###./#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.',
+  W: '#.....#/#.....#/#.....#/#.....#/#..#..#/#..#..#/#.#.#.#/##...##/#.....#', S: '.###./#...#/#..../#..../.###./....#/....#/#...#/.###.',
+  P: '####./#...#/#...#/#...#/####./#..../#..../#..../#....', E: '####/#.../#.../#.../###./#.../#.../#.../####',
+  C: '.###./#...#/#..../#..../#..../#..../#..../#...#/.###.', T: '#####/..#../..#../..#../..#../..#../..#../..#../..#..',
+  A: '.###./#...#/#...#/#...#/#####/#...#/#...#/#...#/#...#', N: '#...#/##..#/##..#/#.#.#/#.#.#/#.#.#/#..##/#..##/#...#',
+  R: '####./#...#/#...#/#...#/####./#.#../#..#./#...#/#...#', K: '#...#/#..#./#.#../##.../##.../#.#../#..#./#...#/#...#',
+  U: '#...#/#...#/#...#/#...#/#...#/#...#/#...#/#...#/.###.', L: '#.../#.../#.../#.../#.../#.../#.../#.../####',
+  X: '#...#/#...#/.#.#./.#.#./..#../.#.#./.#.#./#...#/#...#', I: '###/.#./.#./.#./.#./.#./.#./.#./###',
+  M: '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#/#...#/#...#',
+  D: '####./#...#/#...#/#...#/#...#/#...#/#...#/#...#/####.', V: '#...#/#...#/#...#/#...#/#...#/.#.#./.#.#./.#.#./..#..',
+}, 3);
+function glyphOf(f, ch) { return f.g[ch] || f.g[ch.toUpperCase()] || f.g[ch.toLowerCase()] || f.g['?'] || f.g[' ']; }
+function textW(f, s, sc, bold) {
+  sc = sc || 2; let w = 0;
+  for (let i = 0; i < s.length; i++) { w += glyphOf(f, s[i]).w; if (i < s.length - 1) w += 1; }
+  return w * sc + (bold ? 1 : 0);
+}
+// draw text; returns width. opt: {sc, c, ol (outline colour or null), n (chars shown), bold, align, shadow, sd}
+function text(f, s, x, y, opt) {
+  opt = opt || {};
+  const sc = opt.sc || 2, c = opt.c === undefined ? P.INK : opt.c, ol = opt.ol === undefined ? P.SH : opt.ol;
+  const bold = opt.bold ? 1 : 0, n = opt.n === undefined ? s.length : Math.floor(opt.n);
+  const tw = textW(f, s, sc, bold);
+  if (opt.align === 'center') x -= tw / 2; else if (opt.align === 'right') x -= tw;
+  x = Math.round(x); y = Math.round(y);
+  const passes = [];
+  if (opt.shadow !== undefined && opt.shadow !== null) passes.push([opt.shadow, 0, 1, opt.sd || 1]);
+  if (ol !== null) passes.push([ol, 1, 0, 0]);
+  passes.push([c, 0, 0, 0]);
+  for (const [col, grow, isSh, sd] of passes) {
+    let cx = x;
+    for (let i = 0; i < s.length && i < n; i++) {
+      const g = glyphOf(f, s[i]);
+      for (let r = 0; r < f.h; r++) {
+        const bits = g.bits[r]; if (!bits) continue;
+        for (let k = 0; k < g.w; k++) if (bits & (1 << k)) {
+          const px = cx + k * sc, py = y + r * sc;
+          if (isSh) rect(px + sd, py + sd, px + sc + bold + sd, py + sc + sd, col);
+          else if (grow) rect(px - 1, py - 1, px + sc + bold + 1, py + sc + 1, col);
+          else rect(px, py, px + sc + bold, py + sc, col);
+        }
+      }
+      cx += (g.w + 1) * sc;
+    }
+  }
+  return tw;
+}
+function wrap(f, s, maxW, sc) {
+  const words = s.split(' '); const lines = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (textW(f, t, sc) <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur); return lines;
+}
+function wrapBal(f, s, maxW, sc) {
+  let best = wrap(f, s, maxW, sc); const n = best.length; if (n < 2) return best;
+  for (let w = maxW - 2; w > 24; w -= 2) { const L = wrap(f, s, w, sc); if (L.length > n) break; best = L; }
+  return best;
+}
+
+// ---- 02_util.js
+// ============================================================================
+// Shared helpers: noise, splines, periodic wobble (every ambient motion repeats
+// exactly every 72 s, so the loop is seamless), pops, seeded RNG.
+// Colour code (fixed for the whole film; colours are illustrative): deep navy
+// ground; ivory cassette with teal accents; pale grey membrane; pale blue
+// liquid; magenta hCG; cyan mobile detection antibody; mint test capture
+// antibody; violet control capture antibody; ruby gold particle with a thin
+// amber outline; red / pink result lines.
+// ============================================================================
+// 2-D value noise in [0,1)
+function vn2(x, y, s) {
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash3(i, j, s), b = hash3(i + 1, j, s), c = hash3(i, j + 1, s), d = hash3(i + 1, j + 1, s);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// Catmull-Rom spline through control points -> dense flat polyline (open or closed)
+function spline(pts, n, closed) {
+  const m = pts.length / 2, out = [];
+  const P_ = i => closed ? ((i % m) + m) % m : clamp(i, 0, m - 1);
+  const segs = closed ? m : m - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = P_(i - 1), b = P_(i), c = P_(i + 1), d = P_(i + 2);
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      for (let q = 0; q < 2; q++) {
+        const p0 = pts[2 * a + q], p1 = pts[2 * b + q], p2 = pts[2 * c + q], p3 = pts[2 * d + q];
+        out.push(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3));
+      }
+    }
+  }
+  if (!closed) out.push(pts[2 * (m - 1)], pts[2 * (m - 1) + 1]);
+  return out;
+}
+// periodic wobble: every environmental motion repeats exactly every 72 s (seamless loop)
+const LOOPW = k => TAU * k / DUR;
+function wob(t, k, ph) { return Math.sin(LOOPW(k) * t + ph); }
+// UI switch (renders a scene without its captions)
+let UI_ON = true;
+// Kurzgesagt pop: ~90% at 0.25 s, ~108% overshoot, settles by 0.5 s
+const pop = (t, t0, d) => t < t0 ? 0 : backOut(clamp((t - t0) / (d || 0.5), 0, 1), 1.1);
+function pulse(t, t0, d) { return t < t0 ? 0 : Math.max(0, 1 - (t - t0) / d); }
+// 2-bone IK: knee position for a limb from (bx,by) to (tx,ty) with segment lengths L1, L2; side = +1/-1 bends the knee
+function ik(bx, by, tx, ty, L1, L2, side) {
+  let dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1e-6;
+  const dm = Math.min(d, L1 + L2 - 1e-3), dn = Math.max(dm, Math.abs(L1 - L2) + 1e-3);
+  const a = (L1 * L1 - L2 * L2 + dn * dn) / (2 * dn), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+  const ux = dx / d, uy = dy / d;
+  return [bx + ux * a - uy * h * side, by + uy * a + ux * h * side];
+}
+// small 3-vector helpers
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add3 = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mul3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+// seeded RNG (deterministic paths)
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gaussR(r) { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+// fast sine table (big per-pixel loops)
+const SIN_N = 4096, SIN_T = new Float32Array(SIN_N + 1);
+for (let i = 0; i <= SIN_N; i++) SIN_T[i] = Math.sin(i / SIN_N * TAU);
+function fsin(x) { const u = x / TAU; return SIN_T[Math.floor((u - Math.floor(u)) * SIN_N)]; }
+
+// ---- 03_clock.js
+// ============================================================================
+// THE CLOCK: 120 BPM in 4/4 (beat 0.5 s, bar 2 s); 36 bars = 72.000 s.
+// Each of the 18 scenes is exactly 2 bars. Every event below sits on the
+// eighth-note grid (0.25 s = 15 frames at 60 fps), so a sound and the picture
+// change it belongs to land on the same frame. The audio reads this table.
+// ============================================================================
+const BPM = 120, BEAT = 60 / BPM, BAR = 4 * BEAT, E8 = BEAT / 2, S16 = BEAT / 4, NBARS = 36;
+const SC_T = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72];
+const SCENE_NAMES = ['THE TWO-LINE MYSTERY', 'A FRESH TEST', 'REVEAL THE STRIP', 'CAPILLARY FLOW', 'RELEASE THE LABELS',
+  'MEET THE TARGET', 'FIRST BINDING EVENT', 'APPROACH THE TEST ZONE', 'THE MOLECULAR SANDWICH', 'MANY CAPTURES',
+  'WHY GOLD LOOKS RED', 'ELECTRON-SCALE REVEAL', 'THE LINE BECOMES VISIBLE', 'THE CONTROL MECHANISM', 'TWO ZONES, TWO JOBS',
+  'WITHOUT DETECTABLE hCG', 'THE CONTROL MATTERS', 'LOOP RETURN'];
+function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[i + 1]) i++; return i; }
+const T = i => SC_T[i];
+const rng8 = (a, b, step) => { const o = []; for (let t = a; t <= b + 1e-9; t += step) o.push(Math.round(t * 1000) / 1000); return o; };
+
+// capture clicks in the test zone (scene 10): eighths, then sixteenths as the labels pile up
+const CAPTURES = [...rng8(36.25, 37.75, 0.5), ...rng8(38.0, 38.75, 0.25), ...rng8(39.0, 39.75, 0.125)];
+const EV = {
+  // 01 the two-line mystery
+  push1: 0.5, glintT: 2.5, glintC: 3.0, qOut: 3.5,
+  // 02 a fresh test
+  cut2: 4.0, cap2: 4.25, toWell: 4.75, dropper: 5.25, dropFall: 6.0, dropHit: 6.5, soak: 6.75,
+  // 03 reveal the strip
+  pull3: 7.75, peel: 8.5, layers: [8.75, 9.0, 9.25, 9.5], cap3: 8.5, track3: 9.75, dive: 11.25,
+  // 04 capillary flow
+  fibres: 12.0, flowArrow: 12.25, cap4: 12.75, pores: [13.0, 13.5, 14.0, 14.5, 15.0, 15.5],
+  // 05 release the labels
+  reachConj: 16.0, release: [17.0, 17.25, 17.5, 17.75], cap5: 17.5, lock: 18.5,
+  // 06 meet the target
+  pull6: 20.0, hcgIn: 20.5, cap6: 20.75, hcgTag: 21.5,
+  // 07 first binding event
+  push7: 24.0, turn: [25.0, 25.25, 25.5], bind1: 26.0, cap7: 26.25,
+  // 08 approach the test zone
+  pull8: 28.0, zoneIn: 29.5, cap8: 30.0, rise: 30.5, settle: 31.25,
+  // 09 the molecular sandwich
+  push9: 32.0, bind2: 33.0, cap9: 33.25, chain: [33.5, 33.75, 34.0, 34.25, 34.5], tags9: [34.75, 35.0, 35.25, 35.5],
+  // 10 many captures
+  steps: [36.0, 36.5, 37.0], cap10: 36.25, captures: CAPTURES, flip: 38.0,
+  // 11 why gold looks red
+  lock11: 40.25, inset: 40.5, cap11: 41.0, light: 41.5,
+  // 12 electron-scale reveal
+  osc: 44.0, cap12: 44.25, plasmon: 45.0, strands: 46.0, absorbTag: 46.5,
+  // 13 the line becomes visible
+  insetClose: 48.0, cap13: 48.5, zoomOut: 48.75, lineSeen: 51.0,
+  // 14 the control mechanism
+  lens14: 52.0, spareIn: 52.5, cap14: 53.0, bindC: 54.0, noHcgTag: 54.5,
+  // 15 two zones, two jobs
+  lensClose: 56.0, tagT: 57.0, tagC: 57.5,
+  // 16 without detectable hCG
+  split: 60.0, negDots: 61.0, cap16: 61.5, negC: 63.0,
+  // 17 the control matters
+  invalidIn: 64.0, cap17: 65.0, warn: 65.25,
+  // 18 loop return
+  ret: 68.0, rest: 69.5, cap18: 70.0,
+};
+
+// ---- 05_fx.js
+// ============================================================================
+// Paths (arc-length parameterised polylines) and small geometric helpers.
+// ============================================================================
+class Path {
+  constructor(pts) { // flat [x0,y0,x1,y1,...]
+    this.p = pts; this.n = pts.length >> 1; this.c = [0];
+    for (let i = 1; i < this.n; i++) this.c.push(this.c[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]));
+    this.L = this.c[this.n - 1];
+  }
+  _seg(s) { s = clamp(s, 0, this.L); let lo = 0, hi = this.n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (this.c[m] <= s) lo = m; else hi = m; } return [lo, s]; }
+  at(s) { const [i, ss] = this._seg(s); const l = this.c[i + 1] - this.c[i] || 1e-9, f = (ss - this.c[i]) / l; return [lerp(this.p[2 * i], this.p[2 * i + 2], f), lerp(this.p[2 * i + 1], this.p[2 * i + 3], f)]; }
+  tan(s) { const [i] = this._seg(s); const dx = this.p[2 * i + 2] - this.p[2 * i], dy = this.p[2 * i + 3] - this.p[2 * i + 1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+  sub(s0, s1, step) { // flat points of the sub-path
+    step = step || 2; const out = []; s0 = clamp(s0, 0, this.L); s1 = clamp(s1, 0, this.L);
+    for (let s = s0; s < s1; s += step) { const q = this.at(s); out.push(q[0], q[1]); }
+    const q = this.at(s1); out.push(q[0], q[1]); return out;
+  }
+}
+// rotate (x,y) by angle a about the origin
+function rot(x, y, a) { const c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; }
+// is a screen rect visible (with margin)
+const onScreen = (x0, y0, x1, y1, m) => { m = m || 0; return x1 >= -m && x0 <= W + m && y1 >= -m && y0 <= H + m; };
+// ---------------------------------------------------------------- particles shared by every world
+// starburst flash (detections, interactions)
+function flash(x, y, r, k, cols) {
+  cols = cols || [P.CY3, P.CY2, P.CY1, P.C6];
+  if (k <= 0) return;
+  disc(x, y, r * 1.6, cols[0], 0.3 * k); disc(x, y, r, cols[1], 0.6 * k); disc(x, y, r * 0.55, cols[2]); disc(x, y, r * 0.28, cols[3]);
+  for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + 0.2, L = r * (i % 2 ? 1.5 : 2.4) * k; line(x + Math.cos(a) * r * 0.4, y + Math.sin(a) * r * 0.4, x + Math.cos(a) * L, y + Math.sin(a) * L, i % 2 ? cols[1] : cols[2]); }
+}
+// arrows and marks used by labels
+function arrowHead(x, y, ang, s, col) { const ca = Math.cos(ang), sa = Math.sin(ang); poly([x + ca * s, y + sa * s, x - ca * s * 0.7 - sa * s * 0.7, y - sa * s * 0.7 + ca * s * 0.7, x - ca * s * 0.7 + sa * s * 0.7, y - sa * s * 0.7 - ca * s * 0.7], col); }
+function crossMark(x, y, s, col) { for (const d of [-1, 0, 1]) { line(x - s + d, y - s, x + s + d, y + s, col); line(x + s + d, y - s, x - s + d, y + s, col); } }
+function checkMark(x, y, s, col) { const pts = [x - s, y, x - s * 0.3, y + s * 0.7, x + s, y - s * 0.8]; for (const d of [-1, 0, 1]) { line(pts[0], pts[1] + d, pts[2], pts[3] + d, col); line(pts[2], pts[3] + d, pts[4], pts[5] + d, col); } }
+
+// ---- 10_device.js
+// ============================================================================
+// DEVICE WORLD (device pixels; at zoom 1 one device pixel = one screen pixel).
+// A generic, unbranded lateral-flow cassette: ivory plastic, restrained teal
+// accents, sample well near the bottom, result window in the middle with C
+// above T (flow runs upward: sample pad → conjugate pad → T → C → absorbent pad).
+// The cutaway shows the strip lying in the bottom shell.
+// ============================================================================
+const DEV = {
+  bx0: -34, bx1: 34, by0: -118, by1: 118, br: 16,
+  win: { x0: -7, x1: 7, y0: -56, y1: 4 },
+  sx0: -6, sx1: 6,                                   // strip width
+  yC: -40, yT: -18, lineH: 2,                        // control line downstream (above) the test line
+  well: { x: 0, y: 84, rx: 11, ry: 13 },
+  samp: [58, 108], conj: [36, 66], mem: [-66, 42], abs: [-108, -60],
+};
+// world-anchored hash texture: is (wx, wy) a texture dot at density d (cell = 1/zs device px)
+function texDot(wx, wy, zs, d, seed) { return hash3(Math.floor(wx * zs), Math.floor(wy * zs), seed) < d; }
+
+// fibre strokes of a pad (device coords), deterministic
+const PAD_FIB = (() => {
+  const r = mulberry(71), out = [];
+  for (let i = 0; i < 260; i++) {
+    const y = lerp(DEV.mem[0] - 46, DEV.samp[1], r()), x = lerp(DEV.sx0 + 0.5, DEV.sx1 - 0.5, r());
+    const a = r() * Math.PI, L = 1.5 + r() * 3.5;
+    out.push([x - Math.cos(a) * L / 2, y - Math.sin(a) * L / 2, x + Math.cos(a) * L / 2, y + Math.sin(a) * L / 2, r()]);
+  }
+  return out;
+})();
+// wet colour remap (dry → wet) for strip materials
+const WETMAP = new Map();
+function wetInit() {
+  const pairs = [['GR0', 'GW0'], ['GR1', 'GW1'], ['GR2', 'GW2'], ['GR3', 'GW3'], ['AB0', 'GW0'], ['AB1', 'GW1'], ['AB2', 'GW2'], ['AB3', 'GW3'],
+    ['BG', 'WB2'], ['N1', 'WB2'], ['N2', 'WB3'], ['N3', 'WB3'], ['K0', 'WB1']];
+  for (const [a, b] of pairs) WETMAP.set(P[a], P[b]);
+}
+// the wetting front at device scale (device y of the front at strip x; wet below it)
+const frontY = (x, fy) => fy + Math.sin(x * 0.9 + fy * 0.15) * 0.8 + (hash2(Math.floor(x), Math.floor(fy * 0.25)) - 0.5) * 1.2;
+
+// draw the strip materials inside the screen rectangle clip (sx0..sx1, sy0..sy1)
+function drawStrip(cam, o, sx0, sy0, sx1, sy1) {
+  sx0 = Math.max(0, Math.round(sx0)); sy0 = Math.max(0, Math.round(sy0)); sx1 = Math.min(W, Math.round(sx1)); sy1 = Math.min(H, Math.round(sy1));
+  if (sx0 >= sx1 || sy0 >= sy1) return;
+  const z = cam.z, zs = Math.pow(2, Math.floor(Math.log2(Math.max(1, z)))), fy = o.wetY === undefined ? Infinity : o.wetY;
+  const conjK = o.conjK === undefined ? 1 : o.conjK;      // how much dried gold the conjugate pad still holds
+  for (let y = sy0; y < sy1; y++) {
+    const wy = cam.wy(y + 0.5);
+    for (let x = sx0; x < sx1; x++) {
+      const wx = cam.wx(x + 0.5);
+      if (wx < DEV.sx0 || wx >= DEV.sx1) continue;
+      let c;
+      const inAbs = wy >= DEV.abs[0] && wy < DEV.abs[1], inSamp = wy >= DEV.samp[0] && wy < DEV.samp[1];
+      const inConj = wy >= DEV.conj[0] && wy < DEV.conj[1], inMem = wy >= DEV.mem[0] && wy < DEV.mem[1];
+      if (inAbs) c = texDot(wx, wy, zs * 2, 0.16, 3) ? P.AB2 : P.AB0;
+      else if (inSamp) c = texDot(wx, wy, zs * 2, 0.14, 5) ? P.AB2 : P.AB1;
+      else if (inConj) c = (texDot(wx, wy, zs * 2, 0.45 * conjK, 7) ? (texDot(wx, wy, zs * 2, 0.4, 9) ? P.RU2 : P.RU1) : P.AB1);
+      else if (inMem) c = texDot(wx, wy, zs * 4, 0.05, 11) ? P.GR1 : P.GR0;
+      else continue;
+      const wet = wy > frontY(wx, fy);
+      if (wet && !inConj) c = WETMAP.get(c) || c;
+      buf[y * W + x] = c;
+    }
+  }
+  // pad overlaps: a shadow row where the upper pad lies on the next one
+  const edge = (yy, col) => { const py = Math.round(cam.y(yy)); if (py >= sy0 && py < sy1) rect(Math.max(sx0, cam.x(DEV.sx0)), py, Math.min(sx1, cam.x(DEV.sx1)), py + 1, col); };
+  if (o.edges) { edge(DEV.abs[1], P.AB3); edge(DEV.conj[0], P.GR3); edge(DEV.samp[0], P.AB3); }
+  // fibre strokes in the pads (visible when magnified)
+  if (z > 1.6) for (const f of PAD_FIB) {
+    const my = (f[1] + f[3]) / 2; if (my > DEV.abs[1] && my < DEV.conj[0]) continue;
+    const ax = cam.x(f[0]), ay = cam.y(f[1]), bx = cam.x(f[2]), by = cam.y(f[3]);
+    if (Math.max(ax, bx) < sx0 || Math.min(ax, bx) > sx1 || Math.max(ay, by) < sy0 || Math.min(ay, by) > sy1) continue;
+    const wet = my > frontY((f[0] + f[2]) / 2, fy);
+    const col = wet ? (f[4] < 0.5 ? P.GW2 : P.GW3) : (f[4] < 0.5 ? P.AB2 : P.AB3);
+    const w = Math.max(1, z * 0.32);
+    if (w <= 1.2) line(ax, ay, bx, by, col); else lineW(ax, ay, bx, by, w, col);
+  }
+  // the front itself: a bright pale-blue meniscus row
+  if (isFinite(fy) && o.frontLine !== false) {
+    for (let x = sx0; x < sx1; x++) {
+      const wx = cam.wx(x + 0.5); if (wx < DEV.sx0 || wx >= DEV.sx1) continue;
+      const py = Math.round(cam.y(frontY(wx, fy)));
+      if (py >= sy0 && py < sy1) { buf[py * W + x] = P.LB0; if (py + 1 < sy1) buf[(py + 1) * W + x] = P.LB1; if (z > 2.5 && py + 2 < sy1) buf[(py + 2) * W + x] = P.LB2; }
+    }
+  }
+  // capture-zone markers on an unused strip (schematic: where the antibodies are sprayed)
+  if (o.zoneMarks > 0) {
+    const k = o.zoneMarks;
+    for (const [yy, col] of [[DEV.yT, P.MI2], [DEV.yC, P.VI2]]) {
+      const py = Math.round(cam.y(yy));
+      if (py < sy0 || py >= sy1) continue;
+      for (let x = sx0; x < sx1; x++) { const wx = cam.wx(x + 0.5); if (wx < DEV.sx0 || wx >= DEV.sx1) continue; if (((x >> 1) & 1) === 0 && bay(x, py) < k) buf[py * W + x] = col; }
+    }
+  }
+  // result lines (intensity 0..1 → ordered dither, then solid)
+  for (const [yy, k, g] of [[DEV.yT, o.lineT || 0, o.glintT], [DEV.yC, o.lineC || 0, o.glintC]]) {
+    if (k <= 0) continue;
+    const ya = cam.y(yy - DEV.lineH / 2), yb = cam.y(yy + DEV.lineH / 2);
+    const a = Math.max(sy0, Math.round(ya)), b = Math.min(sy1, Math.max(Math.round(ya) + 1, Math.round(yb)));
+    for (let y = a; y < b; y++) for (let x = sx0; x < sx1; x++) {
+      const wx = cam.wx(x + 0.5); if (wx < DEV.sx0 || wx >= DEV.sx1) continue;
+      if (k >= 1 || bay(x, y) < k) buf[y * W + x] = y === a && b - a > 2 ? P.RL1 : P.RL2;
+    }
+    if (g !== undefined && g >= 0 && g <= 1) {           // a glint sweeps left → right across the line
+      const gx = Math.round(lerp(cam.x(DEV.sx0) - 2, cam.x(DEV.sx1) + 2, g));
+      for (let y = a; y < b; y++) { pset(gx, y, P.LW); pset(gx - 1, y, P.RL0); pset(gx + 1, y + 1, P.RL0); }
+      pset(gx + 1, a - 1, P.LW); pset(gx + 2, a - 2, P.RL0);
+    }
+  }
+  // moving labels drawn by the scene (negative example: dots pass T and stop at C)
+  if (o.dots) for (const d of o.dots) {
+    const px = Math.round(cam.x(d[0])), py = Math.round(cam.y(d[1]));
+    if (px >= sx0 && px < sx1 && py >= sy0 && py < sy1) buf[py * W + px] = d[2] || P.RU1;
+  }
+}
+
+// the cassette. o: lineT, lineC, glintT, glintC, wetY, wellWet, cutY (shell kept above it), zoneMarks, dropper, dots
+function drawDevice(cam, o) {
+  o = o || {};
+  const X = v => cam.x(v), Y = v => cam.y(v), S = v => cam.s(v), z = cam.z;
+  const cutY = o.cutY === undefined ? Infinity : o.cutY, cutSy = Y(cutY);
+  const shellClip = isFinite(cutY) ? (x, y) => y < cutSy : null;
+  // flat drop shadow
+  const sh = maskRR(X(DEV.bx0) + 3, Y(DEV.by0) + 4, X(DEV.bx1) + 3, Y(DEV.by1) + 4, S(DEV.br));
+  mFill(sh, P.K0);
+  // bottom shell (tray): visible wherever the top shell is cut away
+  const body = maskRR(X(DEV.bx0), Y(DEV.by0), X(DEV.bx1), Y(DEV.by1), S(DEV.br));
+  if (isFinite(cutY)) {
+    shade(body, P.IV2, P.IV1, P.IV3, P.IV5, { k: 2 });
+    const rimI = maskRR(X(DEV.bx0 + 4), Y(DEV.by0 + 4), X(DEV.bx1 - 4), Y(DEV.by1 - 4), S(DEV.br - 4));
+    shade(rimI, P.IV3, null, P.IV2, null, { k: 1 });
+    mRim(rimI, P.IV4, 1, 1);
+    // strip lying in the tray, with plastic posts
+    const sx0 = X(DEV.sx0), sx1 = X(DEV.sx1);
+    rect(sx0 - 1, Y(DEV.abs[0]) - 1, sx1 + 1, Y(DEV.samp[1]) + 1, P.IV4);
+    drawStrip(cam, Object.assign({ edges: true }, o), sx0, Y(DEV.abs[0]), sx1, Y(DEV.samp[1]));
+    for (const py of [-86, -30, 22, 74]) { rect(X(-10), Y(py), X(-7), Y(py + 5), P.IV1); rect(X(7), Y(py), X(10), Y(py + 5), P.IV1); rect(X(-10), Y(py + 4), X(-7), Y(py + 5), P.IV4); rect(X(7), Y(py + 4), X(10), Y(py + 5), P.IV4); }
+  }
+  // top shell (kept above cutY)
+  shade(body, P.IV1, P.IV0, P.IV2, P.IV4, { k: Math.max(1, Math.round(z * 1.5)), clip: shellClip });
+  if (!isFinite(cutY) || cutSy > Y(DEV.by0)) {
+    const inShell = (x, y) => !shellClip || shellClip(x, y);
+    // grip ridges near the top
+    for (let i = 0; i < 4; i++) {
+      const yy = -104 + i * 4;
+      if (Y(yy) < cutSy) { rect(X(-12), Y(yy), X(12), Y(yy) + Math.max(1, S(1)), P.IV2); rect(X(-12), Y(yy) + Math.max(1, S(1)), X(12), Y(yy) + Math.max(2, S(2)), P.IV0); }
+    }
+    // result window: teal frame, recess, strip, T / C marks
+    const w = DEV.win;
+    if (Y(w.y0 - 4) < cutSy) {
+      const fr = maskRR(X(w.x0 - 4), Y(w.y0 - 4), X(w.x1 + 4), Y(w.y1 + 4), S(4));
+      shade(fr, P.TE1, P.TE0, P.TE2, P.TE3, { k: Math.max(1, Math.round(z)), clip: shellClip });
+      const wy1 = Math.min(Y(w.y1), cutSy);
+      if (wy1 > Y(w.y0)) {
+        rect(X(w.x0), Y(w.y0), X(w.x1), wy1, P.IV4);
+        drawStrip(cam, o, X(DEV.sx0), Y(w.y0) + 1, X(DEV.sx1), wy1);
+        rect(X(w.x0), Y(w.y0), X(w.x1), Y(w.y0) + Math.max(1, Math.round(z)), P.IV5);            // recess shadow (top)
+        rect(X(w.x0), Y(w.y0), X(w.x0) + Math.max(1, Math.round(z * 0.8)), wy1, P.IV4);           // recess shadow (left)
+      }
+      const ms = Math.max(1, Math.round(z * 0.85));
+      if (Y(DEV.yC) < cutSy) textZ(FS, 'C', X(w.x1 + 6), Y(DEV.yC) - 2.5 * ms, ms, P.TE2);
+      if (Y(DEV.yT) < cutSy) textZ(FS, 'T', X(w.x1 + 6), Y(DEV.yT) - 2.5 * ms, ms, P.TE2);
+    }
+    // sample well
+    const wl = DEV.well;
+    if (Y(wl.y - wl.ry - 3) < cutSy) {
+      const ringO = maskEll(X(wl.x), Y(wl.y), S(wl.rx + 3), S(wl.ry + 3));
+      shade(ringO, P.TE1, P.TE0, P.TE2, P.TE3, { k: Math.max(1, Math.round(z)), clip: shellClip });
+      const hole = maskEll(X(wl.x), Y(wl.y), S(wl.rx), S(wl.ry));
+      mFill(hole, P.IV4, undefined, shellClip);
+      const floor = maskEll(X(wl.x), Y(wl.y) + S(2), S(wl.rx - 1.5), S(wl.ry - 2.5));
+      const ww = o.wellWet || 0;
+      for (let j = 0; j < floor.h; j++) for (let i = 0; i < floor.w; i++) {
+        if (!floor.d[j * floor.w + i]) continue;
+        const x = floor.x0 + i, y = floor.y0 + j; if (x < 0 || y < 0 || x >= W || y >= H || (shellClip && !shellClip(x, y))) continue;
+        const wx = cam.wx(x + 0.5), wy = cam.wy(y + 0.5), r = Math.hypot((wx - wl.x) / wl.rx, (wy - wl.y - 2) / wl.ry);
+        const wet = r < ww * 1.1;
+        buf[y * W + x] = wet ? (texDot(wx, wy, 2, 0.18, 21) ? P.LB3 : P.LB2) : (texDot(wx, wy, 2, 0.16, 21) ? P.AB2 : P.AB1);
+      }
+      mRim(hole, P.IV5, 0, 1); mRim(hole, P.IV3, 0, -1);
+    }
+    mOuter(body, P.K0);
+  }
+  // the cut edge: a bright sweep line across the shell
+  if (isFinite(cutY) && cutSy > Y(DEV.by0) && cutSy < Y(DEV.by1)) {
+    const yy = Math.round(cutSy);
+    for (let x = Math.max(0, Math.floor(X(DEV.bx0))); x < Math.min(W, Math.ceil(X(DEV.bx1))); x++) if (body.get(x, yy - 1)) { pset(x, yy - 1, P.TE0); pset(x, yy - 2, P.IV3); }
+  }
+  // dropper tip and drop
+  if (o.dropper) drawDropper(cam, o.dropper);
+}
+// scaled font (each glyph bit rasterised as an s x s block on the native grid)
+function textZ(f, s, x, y, sc, col) { text(f, s, Math.round(x), Math.round(y), { sc, c: col, ol: null }); }
+
+// a schematic dropper tip; d = {y: tip device y, drop: null | {y, k}}
+function drawDropper(cam, d) {
+  const X = v => cam.x(v), Y = v => cam.y(v);
+  const tip = d.y;
+  const pts = [X(-3), Y(tip - 2), X(-7), Y(tip - 30), X(-9), Y(tip - 140), X(9), Y(tip - 140), X(7), Y(tip - 30), X(3), Y(tip - 2)];
+  const m = maskPoly(pts);
+  shade(m, P.IV0, P.LW, P.IV2, P.IV4, { k: 1 });
+  // liquid inside the tip
+  const lq = maskPoly([X(-2), Y(tip - 3), X(-5), Y(tip - 26), X(-6), Y(tip - 60), X(6), Y(tip - 60), X(5), Y(tip - 26), X(2), Y(tip - 3)]);
+  mFill(lq, P.LB2); mRim(lq, P.LB1, 1, 0);
+  rect(X(-6), Y(tip - 61), X(6), Y(tip - 60), P.LB0);
+  if (d.drop) {
+    const r = 3.2 * d.drop.k, cy = d.drop.y;
+    const dm = maskPoly([X(0), Y(cy - r * 2.1), X(r * 0.9), Y(cy - r * 0.6), X(r), Y(cy), X(r * 0.7), Y(cy + r * 0.75), X(0), Y(cy + r), X(-r * 0.7), Y(cy + r * 0.75), X(-r), Y(cy), X(-r * 0.9), Y(cy - r * 0.6)]);
+    shade(dm, P.LB1, P.LB0, P.LB3, P.LB4, { k: 1 });
+    pset(X(-r * 0.4), Y(cy - r * 0.2), P.LW);
+  }
+}
+// a bare result window panel (scenes 16-17): the window region of a cassette, magnified
+function drawWindowPanel(cam, o, x0, y0, x1, y1) {
+  const m = maskRR(x0, y0, x1, y1, 6);
+  mFill(maskRR(x0 + 3, y0 + 4, x1 + 3, y1 + 4, 6), P.K0);
+  shade(m, P.IV1, P.IV0, P.IV2, P.IV4, { k: 2 });
+  const w = DEV.win, X = v => cam.x(v), Y = v => cam.y(v), S = v => cam.s(v), z = cam.z;
+  const fr = maskRR(X(w.x0 - 4), Y(w.y0 - 4), X(w.x1 + 4), Y(w.y1 + 4), S(4));
+  shade(fr, P.TE1, P.TE0, P.TE2, P.TE3, { k: Math.max(1, Math.round(z)) });
+  rect(X(w.x0), Y(w.y0), X(w.x1), Y(w.y1), P.IV4);
+  drawStrip(cam, o, X(DEV.sx0), Y(w.y0) + 1, X(DEV.sx1), Y(w.y1));
+  rect(X(w.x0), Y(w.y0), X(w.x1), Y(w.y0) + Math.max(1, Math.round(z)), P.IV5);
+  rect(X(w.x0), Y(w.y0), X(w.x0) + Math.max(1, Math.round(z * 0.8)), Y(w.y1), P.IV4);
+  const ms = Math.max(1, Math.round(z * 0.85));
+  textZ(FS, 'C', X(w.x1 + 6), Y(DEV.yC) - 2.5 * ms, ms, P.TE2);
+  textZ(FS, 'T', X(w.x1 + 6), Y(DEV.yT) - 2.5 * ms, ms, P.TE2);
+  mOuter(m, P.K0);
+}
+// the ground: deep navy, flat (the brief: no extra particles to fill the frame)
+function ground(cam) { clear(P.BG); }
+let G_T = 0;   // the current film time (set by renderFrame; used by ambient layers)
+
+// ---- 11_level.js
+// ============================================================================
+// THE STRIP AS A SIDE-SCROLLING LEVEL (level units; u along the flow →, v down).
+//   u < 0          sample pad (glass fibres)
+//   0 .. 380       conjugate pad (fibres; dried gold conjugates sit on them)
+//   u > 330        nitrocellulose membrane: a porous floor (top surface v ≈ 60)
+//   540 .. 680     test zone: mint capture antibodies anchored on the floor
+//   900 .. 1040    control zone: violet anti-mouse antibodies anchored on the floor
+// Liquid fills the pores behind the wetting front (pale blue meniscus).
+// ============================================================================
+const LV = { MEM0: 330, FLOOR: 60, T0: 540, C0: 900, NZ: 11, DZ: 13, CONJ1: 380 };
+// fibre strands (mid layer) — deterministic
+const FIBRES = (() => {
+  const r = mulberry(17), out = [];
+  const mk = (pts, w, sh) => out.push({ pts: spline(pts, 8, false), w, sh });
+  // the hero fibre: carries the conjugate the film follows (top surface near u = 140, v = 4)
+  mk([-420, 112, -160, 70, 60, 40, 240, 28, 380, 30, 470, 50], 48, 0.5);
+  for (let i = 0; i < 40; i++) {
+    const cu = lerp(-1300, 300, r()), cv = lerp(-900, 900, r());
+    const a = (r() - 0.5) * Math.PI * 0.95, L = 520 + r() * 700, w = 26 + r() * 34, pts = [];
+    for (let k = -2; k <= 2; k++) { const s = k * L / 4; pts.push(cu + Math.cos(a) * s + (r() - 0.5) * 90, cv + Math.sin(a) * s + (r() - 0.5) * 90); }
+    const sp = spline(pts, 8, false); let near = false;                        // keep the hero's neighbourhood readable
+    for (let q = 0; q < sp.length; q += 2) if (sp[q] > -170 && sp[q] < 470 && sp[q + 1] > -190 && sp[q + 1] < 125) { near = true; break; }
+    if (near || out.length > 30) continue;
+    let far = false; for (let q = 0; q < sp.length; q += 2) if (sp[q] > LV.CONJ1 + 40 && sp[q + 1] > -200) { far = true; break; }
+    if (far) continue;
+    mk(pts, w, r());
+  }
+  return out;
+})();
+// far layer: big dark strands (parallax 0.55)
+const FAR = (() => { const r = mulberry(29), out = []; for (let i = 0; i < 26; i++) { const cu = lerp(-1600, 2200, r()), cv = lerp(-900, 900, r()), a = (r() - 0.5) * 2.6, L = 600 + r() * 600, pts = []; for (let k = -2; k <= 2; k++) { const s = k * L / 4; pts.push(cu + Math.cos(a) * s + (r() - 0.5) * 120, cv + Math.sin(a) * s + (r() - 0.5) * 120); } out.push({ pts: spline(pts, 6, false), w: 60 + r() * 70 }); } return out; })();
+// floor top (v) at u; the membrane starts with a slope at its left end
+function floorV(u) { const b = LV.FLOOR + 1.4 * Math.sin(u / 9.3) + 1.1 * Math.sin(u / 4.1 + 1.7); return u < LV.MEM0 + 25 ? b + Math.pow((LV.MEM0 + 25 - u) / 25, 2) * 40 : b; }
+const ZONE_T = [], ZONE_C = [];
+for (let i = 0; i < LV.NZ; i++) {
+  const uT = LV.T0 + i * LV.DZ + (hash(i * 7 + 1) - 0.5) * 3, uC = LV.C0 + i * LV.DZ + (hash(i * 7 + 2) - 0.5) * 3;
+  ZONE_T.push({ u: uT, v: floorV(uT) + 0.6, a: (hash(i * 7 + 3) - 0.5) * 0.28 });
+  ZONE_C.push({ u: uC, v: floorV(uC) + 0.6, a: (hash(i * 7 + 4) - 0.5) * 0.28 });
+}
+// the wetting front in the level: enters at 12 s, reaches the conjugate pad (u = 0) at 16 s
+const LF = { t0: 12.0, u0: -560, v: 140 };
+const frontU = (v, t) => (t < LF.t0 - 0.5 ? -1e9 : LF.u0 + LF.v * (t - LF.t0)) + 34 * Math.sin(v / 95 + 1.3) + 26 * (vnoise(v / 47, 3) - 0.5) * 2;
+
+function strandPoly(cam, pts, w) {
+  const n = pts.length >> 1, L = [], R = [];
+  for (let i = 0; i < n; i++) {
+    const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1);
+    let dx = pts[2 * i1] - pts[2 * i0], dy = pts[2 * i1 + 1] - pts[2 * i0 + 1]; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const x = pts[2 * i], y = pts[2 * i + 1];
+    L.push(cam.x(x - dy * w / 2), cam.y(y + dx * w / 2)); R.push(cam.x(x + dy * w / 2), cam.y(y - dx * w / 2));
+  }
+  const out = L.slice(); for (let i = R.length - 2; i >= 0; i -= 2) out.push(R[i], R[i + 1]);
+  return out;
+}
+function bboxHit(cam, pts, m) {
+  let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { const x = cam.x(pts[i]), y = cam.y(pts[i + 1]); a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); }
+  return b >= -m && a <= W + m && d >= -m && c <= H + m;
+}
+// draw the level environment (no molecules). o: {front: true/false, streaks}
+function drawLevel(cam, t, o) {
+  o = o || {};
+  clear(P.BG);
+  // far layer (parallax): flat dark strands
+  const fc = new Cam(cam.cx * 0.55, cam.cy * 0.55, cam.z * 0.55, cam.ax, cam.ay);
+  for (const f of FAR) { if (!bboxHit(fc, f.pts, f.w * fc.z)) continue; poly(strandPoly(fc, f.pts, f.w), P.K0); }
+  // fibres
+  const z = cam.z, k = Math.max(1, Math.round(z * 1.6));
+  for (const f of FIBRES) {
+    if (!bboxHit(cam, f.pts, f.w * z)) continue;
+    const m = maskPoly(strandPoly(cam, f.pts, f.w));
+    if (m.empty()) continue;
+    shade(m, f.sh < 0.5 ? P.GR1 : P.GR2, P.GR0, f.sh < 0.5 ? P.GR2 : P.GR3, P.GR4, { k });
+    if (z > 0.9) {                                  // fibre surface texture: sparse flecks
+      for (let j = 0; j < m.h; j += 1) for (let i = 0; i < m.w; i += 1) {
+        if (!m.d[j * m.w + i]) continue; const x = m.x0 + i, y = m.y0 + j; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (hash3(Math.floor(cam.wx(x) * 0.7), Math.floor(cam.wy(y) * 0.7), 41) < 0.05) buf[y * W + x] = P.GR3;
+      }
+    }
+  }
+  // membrane floor (porous)
+  const ps = z > 1.2 ? 0.16 : z > 0.5 ? 0.12 : 0.08;
+  for (let x = 0; x < W; x++) {
+    const u = cam.wx(x + 0.5); if (u < LV.MEM0) continue;
+    const top = Math.round(cam.y(floorV(u)));
+    for (let y = Math.max(0, top); y < H; y++) {
+      const v = cam.wy(y + 0.5), dpt = y - top;
+      const n = vn2(u * ps, v * ps, 51);
+      let c = n > 0.66 ? P.GR3 : n > 0.6 ? P.GR2 : P.GR1;
+      if (dpt < 1) c = P.GR0; else if (dpt < 2 && n < 0.6) c = P.GR0;
+      if (n > 0.74 && dpt > 2) c = P.GR4;
+      buf[y * W + x] = c;
+    }
+    if (top >= 1 && top < H) buf[(top - 1) * W + x] = P.GR4 === buf[(top - 1) * W + x] ? P.GR4 : buf[(top - 1) * W + x];
+  }
+  // wet pass: everything behind the front takes the wet colours, plus the meniscus
+  if (o.front !== false) {
+    for (let y = 0; y < H; y++) {
+      const v = cam.wy(y + 0.5), fu = frontU(v, t), fx = cam.x(fu);
+      const xe = Math.min(W, Math.floor(fx));
+      for (let x = 0; x < xe; x++) { const i = y * W + x, c = WETMAP.get(buf[i]); if (c !== undefined) buf[i] = c; }
+      if (xe >= 0 && xe < W) {
+        const mz = Math.max(1, Math.round(z * 1.5));
+        for (let q = 0; q < mz + 1 && xe - q >= 0; q++) buf[y * W + xe - q] = q === 0 ? P.LB0 : q < mz ? P.LB1 : P.LB2;
+      }
+    }
+  } else {
+    for (let i = 0; i < W * H; i++) { const c = WETMAP.get(buf[i]); if (c !== undefined) buf[i] = c; }
+  }
+  // flow streaks in the liquid (background only)
+  if (o.streaks !== false) {
+    const sp = 70, cell = 46;
+    const u0 = cam.wx(0), u1 = cam.wx(W), v0 = cam.wy(0), v1 = cam.wy(H);
+    for (let cv = Math.floor(v0 / cell); cv <= Math.floor(v1 / cell); cv++) {
+      const off = hash2(cv, 9) * cell, du = (t * sp + off) % cell;
+      for (let cu = Math.floor((u0 - du) / cell) - 1; cu <= Math.floor((u1 - du) / cell) + 1; cu++) {
+        if (hash2(cu, cv) > 0.33) continue;
+        const u = cu * cell + du + hash2(cu, cv + 77) * 20, v = cv * cell + hash2(cu + 3, cv) * cell;
+        const x = Math.round(cam.x(u)), y = Math.round(cam.y(v)), L = Math.max(2, Math.round(z * 3));
+        if (y < 0 || y >= H) continue;
+        for (let q = 0; q < L; q++) { const xx = x + q; if (xx >= 0 && xx < W && buf[y * W + xx] === P.WB2) buf[y * W + xx] = q === L - 1 ? P.LB3 : P.LB4; }
+      }
+    }
+  }
+}
+// anchored capture antibodies (both zones); hi: {T: index, C: index} to flash
+function drawZones(cam, o) {
+  o = o || {};
+  const foot = (z) => { const x = cam.x(z.u), y = cam.y(z.v); if (cam.z > 1) rect(x - cam.z * 1.2, y - 1, x + cam.z * 1.2, y + 1, P.GW4); };
+  ZONE_T.forEach((z, i) => { drawAb(cam, z.u, z.v, z.a, RAMP.mi, { hi: o.hiT === i }); foot(z); });
+  ZONE_C.forEach((z, i) => { drawAb(cam, z.u, z.v, z.a, RAMP.vi, { hi: o.hiC === i }); foot(z); });
+}
+
+// ---- 12_mol.js
+// ============================================================================
+// MOLECULE SPRITES (drawn procedurally, so they stay crisp at any zoom; sizes
+// in level units, s = screen px per unit). Schematic symbols, not structures:
+//   antibody  — a Y: stem (Fc) + two arms (Fab); an antigen binds at one arm tip
+//   hCG       — a compact magenta two-lobed protein; a detection site on top of
+//               the upper lobe, a capture site under the lower lobe
+//   gold      — a ruby disk with a thin amber identity outline (teaching convention)
+// Angles: a = 0 points up (dir = (sin a, -cos a)), a = PI points down.
+// ============================================================================
+const AB = { STEM: 4.2, ARM: 5.0, SP: 0.62, TH: 1.9 };
+const RG = 6.5, NAB = 7;                       // gold radius, antibodies per conjugate
+const HCG = { OFF: 2.1, RA: 3.0, RB: 2.7 };    // lobe offset from centre, upper / lower lobe radius
+const dirv = a => [Math.sin(a), -Math.cos(a)];
+const RAMP = {
+  cy: [P.CY0, P.CY1, P.CY2, P.CY3], mi: [P.MI0, P.MI1, P.MI2, P.MI3], vi: [P.VI0, P.VI1, P.VI2, P.VI3],
+  cyD: [P.CY2, P.CY3, P.CY4, P.CY4], miD: [P.MI2, P.MI3, P.MI4, P.MI4], viD: [P.VI2, P.VI3, P.VI4, P.VI4],
+};
+function segD2(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
+  let q = ((px - ax) * dx + (py - ay) * dy) / l2; q = q < 0 ? 0 : q > 1 ? 1 : q;
+  const ex = ax + q * dx - px, ey = ay + q * dy - py; return ex * ex + ey * ey;
+}
+// antibody geometry in world units: base (stem end), hinge, the two arm tips (j = -1 left, +1 right of the stem axis)
+function abGeom(bx, by, a) {
+  const d = dirv(a), hx = bx + d[0] * AB.STEM, hy = by + d[1] * AB.STEM;
+  const l = dirv(a - AB.SP), r = dirv(a + AB.SP);
+  return { bx, by, hx, hy, lx: hx + l[0] * AB.ARM, ly: hy + l[1] * AB.ARM, rx: hx + r[0] * AB.ARM, ry: hy + r[1] * AB.ARM };
+}
+const abTip = (g, j) => j < 0 ? [g.lx, g.ly] : [g.rx, g.ry];
+// draw an antibody from its world geometry with camera cam; ramp = [light, base, shade, outline]
+function drawAbG(cam, g, ramp, o) {
+  o = o || {};
+  const s = cam.z, w = Math.max(1, AB.TH * s), r2 = (w / 2) * (w / 2);
+  const B = [cam.x(g.bx), cam.y(g.by)], Hh = [cam.x(g.hx), cam.y(g.hy)], L = [cam.x(g.lx), cam.y(g.ly)], R = [cam.x(g.rx), cam.y(g.ry)];
+  const x0 = Math.min(B[0], Hh[0], L[0], R[0]) - w, x1 = Math.max(B[0], Hh[0], L[0], R[0]) + w;
+  const y0 = Math.min(B[1], Hh[1], L[1], R[1]) - w, y1 = Math.max(B[1], Hh[1], L[1], R[1]) + w;
+  if (x1 < -4 || x0 > W + 4 || y1 < -4 || y0 > H + 4) return;
+  if (w <= 1.5) {                                  // far away: a 1-px Y
+    line(B[0], B[1], Hh[0], Hh[1], ramp[1]); line(Hh[0], Hh[1], L[0], L[1], ramp[1]); line(Hh[0], Hh[1], R[0], R[1], ramp[1]);
+    return;
+  }
+  const m = maskFn(x0, y0, x1, y1, (px, py) => segD2(px, py, B[0], B[1], Hh[0], Hh[1]) <= r2 || segD2(px, py, Hh[0], Hh[1], L[0], L[1]) <= r2 || segD2(px, py, Hh[0], Hh[1], R[0], R[1]) <= r2);
+  shade(m, ramp[1], ramp[0], ramp[2], ramp[3], { k: w > 4 ? 1 : 1 });
+  if (o.hi) mOutline(m, P.LW);                    // binding flash
+}
+function drawAb(cam, bx, by, a, ramp, o) { const g = abGeom(bx, by, a); drawAbG(cam, g, ramp, o); return g; }
+
+// gold nanoparticle: a 16-bit sphere in ruby with a thin amber outline
+function drawGold(cam, gx, gy, o) {
+  o = o || {};
+  const x = cam.x(gx), y = cam.y(gy), r = RG * cam.z * (o.k === undefined ? 1 : o.k);
+  if (x < -r - 3 || x > W + r + 3 || y < -r - 3 || y > H + r + 3) return;
+  if (r < 1.6) { pset(x, y, P.RU1); if (r > 0.9) { pset(x + 1, y, P.RU2); pset(x, y + 1, P.RU2); pset(x - 1, y, P.AM2); } return; }
+  const m = maskDisc(x, y, r);
+  mFill(m, P.RU2);
+  disc(x - r * 0.12, y - r * 0.12, r * 0.86, P.RU1);
+  if (r > 3) disc(x - r * 0.38, y - r * 0.38, r * 0.3, P.RU0);
+  if (r > 5) { pset(x - r * 0.45, y - r * 0.5, P.LW); pset(x - r * 0.45 + 1, y - r * 0.5, P.LW); }
+  mOutline(m, P.RU3);
+  mOuter(m, o.hi ? P.LW : P.AM1);
+}
+// a conjugate: gold + NAB antibodies; rot = rotation; returns the antibody geometries (world units)
+function conjGeoms(gx, gy, rot) {
+  const out = [];
+  for (let i = 0; i < NAB; i++) { const a = rot + i * TAU / NAB, d = dirv(a); out.push(abGeom(gx + d[0] * (RG - 0.6), gy + d[1] * (RG - 0.6), a)); }
+  return out;
+}
+function drawConj(cam, gx, gy, rot, o) {
+  o = o || {};
+  const s = cam.z;
+  if (s * (RG + AB.STEM + AB.ARM) < 3) {           // very far: a ruby pixel with a cyan fleck
+    const x = cam.x(gx), y = cam.y(gy); pset(x, y, P.RU1); pset(x + 1, y - 1, P.CY2); return null;
+  }
+  const gs = conjGeoms(gx, gy, rot);
+  gs.forEach((g, i) => drawAbG(cam, g, o.dim ? RAMP.cyD : RAMP.cy, { hi: o.hiAb === i }));
+  drawGold(cam, gx, gy, { hi: o.hiGold });
+  return gs;
+}
+// hCG: two lobes along axis angle b (upper lobe toward dir(b)); returns world positions of the two binding sites
+function hcgSites(cx, cy, b) {
+  const d = dirv(b);
+  return { top: [cx + d[0] * (HCG.OFF + HCG.RA), cy + d[1] * (HCG.OFF + HCG.RA)], bot: [cx - d[0] * (HCG.OFF + HCG.RB), cy - d[1] * (HCG.OFF + HCG.RB)] };
+}
+function drawHCG(cam, cx, cy, b, o) {
+  o = o || {};
+  const s = cam.z, d = dirv(b);
+  const ax = cam.x(cx + d[0] * HCG.OFF), ay = cam.y(cy + d[1] * HCG.OFF), bx_ = cam.x(cx - d[0] * HCG.OFF), by_ = cam.y(cy - d[1] * HCG.OFF);
+  const ra = HCG.RA * s, rb = HCG.RB * s;
+  if (Math.max(ax, bx_) < -ra - 2 || Math.min(ax, bx_) > W + ra + 2 || Math.max(ay, by_) < -ra - 2 || Math.min(ay, by_) > H + ra + 2) return;
+  if (ra < 1.4) { pset(ax, ay, P.MG1); pset(bx_, by_, P.MG2); return; }
+  const m = maskFn(Math.min(ax, bx_) - ra, Math.min(ay, by_) - ra, Math.max(ax, bx_) + ra, Math.max(ay, by_) + ra,
+    (px, py) => (px - ax) * (px - ax) + (py - ay) * (py - ay) <= ra * ra || (px - bx_) * (px - bx_) + (py - by_) * (py - by_) <= rb * rb);
+  const ramp = o.dim ? [P.MG2, P.MG2, P.MG3, P.MG4] : [P.MG0, P.MG1, P.MG2, P.MG3];
+  shade(m, ramp[1], ramp[0], ramp[2], ramp[3], { k: 1 });
+  // the seam between the two subunits
+  if (ra > 3) { const mx = (ax + bx_) / 2, my = (ay + by_) / 2, px = -d[1], py = d[0]; line(mx - px * ra * 0.6, my - py * ra * 0.6, mx + px * ra * 0.6, my + py * ra * 0.6, ramp[2]); }
+  if (o.hi) mOuter(m, P.LW);
+  if (o.sites && ra > 2.5) {                       // two accessible sites: small pale bumps
+    const st = hcgSites(cx, cy, b);
+    for (const p of [st.top, st.bot]) { const x = cam.x(p[0]), y = cam.y(p[1]); rect(x - 1, y - 1, x + 1, y + 1, P.MG0); }
+  }
+}
+// subdued non-target molecules
+function drawJunk(cam, x, y, kind, a) {
+  const s = cam.z, sx = cam.x(x), sy = cam.y(y);
+  if (sx < -10 || sx > W + 10 || sy < -10 || sy > H + 10) return;
+  if (kind === 0) { const d = dirv(a); disc(sx, sy, 1.3 * s, P.DB2); disc(sx + d[0] * 1.8 * s, sy + d[1] * 1.8 * s, 1.0 * s, P.DB1); disc(sx - d[0] * 1.8 * s, sy - d[1] * 1.8 * s, 1.0 * s, P.DB1); }
+  else { const m = maskEll(sx, sy, 3.2 * s, 2.2 * s, a); shade(m, P.DB1, P.DB2, P.DB0, P.DB0, { k: 1 }); }
+}
+// binding sparkle: stepped 4-point star (3 frames big, 3 small, then a dot)
+function sparkle(x, y, age, col) {
+  if (age < 0 || age > 0.3) return;
+  col = col || P.LW;
+  const st = Math.floor(age / 0.05), L = st < 2 ? 5 : st < 4 ? 3 : 1;
+  x = Math.round(x); y = Math.round(y);
+  for (let i = 1; i <= L; i++) { pset(x + i, y, col); pset(x - i, y, col); pset(x, y + i, col); pset(x, y - i, col); }
+  pset(x, y, P.LW);
+  if (st < 2) { pset(x + 2, y + 2, col); pset(x - 2, y - 2, col); pset(x + 2, y - 2, col); pset(x - 2, y + 2, col); }
+}
+// game lock-on bracket around (x, y), half size r; shrinks in on t0 in 3 steps, then blinks
+function bracket(x, y, r, t0, t, col) {
+  if (t < t0) return;
+  col = col || P.TE0;
+  const age = t - t0, st = Math.min(3, Math.floor(age / 0.06));
+  if (st >= 3 && Math.floor(age * 5) % 2 === 1 && age < 1.2) return;
+  const rr = Math.round(r * (1 + 0.5 * (3 - st) / 3)), L = Math.max(3, Math.round(rr * 0.4));
+  x = Math.round(x); y = Math.round(y);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const cx = x + sx * rr, cy = y + sy * rr;
+    rect(Math.min(cx, cx - sx * L), cy, Math.max(cx, cx - sx * L) + 1, cy + 1, col);
+    rect(cx, Math.min(cy, cy - sy * L), cx + 1, Math.max(cy, cy - sy * L) + 1, col);
+  }
+}
+
+// ---- 13_top.js
+// ============================================================================
+// THE MEMBRANE FROM ABOVE (top-view units: u along the flow, w across the strip).
+// Mapped onto the device: 80 units = 1 device pixel; the T band (u 525..685)
+// is the device's T line (2 device px), the C band sits where the device's C
+// line is; the strip is w = -480..480 (12 device px). Drawn in device
+// orientation (flow up) into the square buffer, then turned with rotBlit.
+// Each captured label is a separate ruby dot: many dots, not one object,
+// make the line.
+// ============================================================================
+const TOPK = 80, TOP_UT = 605, TOP_UC = TOP_UT + (DEV.yT - DEV.yC) * TOPK;
+const TBAND = [TOP_UT - 80, TOP_UT + 80], CBAND = [TOP_UC - 80, TOP_UC + 80];
+const devToU = y => TOP_UT - (y - DEV.yT) * TOPK, uToDev = u => DEV.yT - (u - TOP_UT) / TOPK;
+// captured labels in the test band: positions + the time each one lands
+const TOPDOTS = (() => {
+  const r = mulberry(123), out = [];
+  for (let i = 0; i < 1500; i++) {
+    const u = lerp(TBAND[0] + 4, TBAND[1] - 4, r()), w = lerp(-474, 474, r());
+    const near = Math.abs(w - 40) < 260;                                  // the part the camera sees lands on the capture beats
+    let ta = near ? EV.captures[Math.floor(r() * EV.captures.length)] : lerp(37.6, 47.5, r());
+    if (near && r() < 0.35) ta = lerp(39.8, 40.4, r());
+    out.push([u, w, ta, r()]);
+  }
+  return out;
+})();
+// control-band labels (for the zoom-out: the C line is forming at the same time)
+const TOPDOTS_C = (() => { const r = mulberry(321), out = []; for (let i = 0; i < 1100; i++) out.push([lerp(CBAND[0] + 4, CBAND[1] - 4, r()), lerp(-474, 474, r()), lerp(38, 56, r()), r()]); return out; })();
+// a top-view camera: centre (cu, cw), zoom z (px per unit), drawn in device orientation
+function topCam(cu, cw, z) { return { cu, cw, z, sx: w => (w - cw) * z + CX, sy: u => -(u - cu) * z + CY, iw: x => (x - CX) / z + cw, iu: y => -(y - CY) / z + cu }; }
+function drawTop(tc, t, o) {
+  o = o || {};
+  const z = tc.z;
+  // membrane (wet), strip edges and the tray beyond them
+  const ps = z > 0.4 ? 0.09 : z > 0.18 ? 0.045 : 0.02, tex = clamp((z - 0.05) / 0.12, 0, 1);
+  for (let y = 0; y < H; y++) {
+    const u = tc.iu(y + 0.5);
+    for (let x = 0; x < W; x++) {
+      const w = tc.iw(x + 0.5);
+      let c;
+      if (Math.abs(w) > 480) c = Math.abs(w) < 480 + 1.2 / z ? P.IV4 : P.IV3;
+      else {
+        const n = vn2(u * ps, w * ps, 61);
+        c = P.GW0;
+        if (tex > 0 && bay(x, y) < tex) c = n > 0.72 ? P.GW3 : n > 0.62 ? P.GW2 : P.GW1;
+      }
+      buf[y * W + x] = c;
+    }
+  }
+  // the anchored capture antibodies seen from above: mint specks in the T band, violet in the C band
+  if (z > 0.22) for (const [b0, b1, col, sd] of [[TBAND[0], TBAND[1], P.MI2, 7], [CBAND[0], CBAND[1], P.VI2, 8]]) {
+    const cs = 11, wa = tc.iw(0), wb = tc.iw(W), ua = tc.iu(H), ub = tc.iu(0);
+    for (let cu = Math.floor(Math.max(b0, ua) / cs); cu <= Math.floor(Math.min(b1, ub) / cs); cu++)
+      for (let cw = Math.floor(Math.max(-480, wa) / cs); cw <= Math.floor(Math.min(480, wb) / cs); cw++) {
+        if (hash3(cu, cw, sd) > 0.55) continue;
+        const u = cu * cs + hash3(cu, cw, sd + 1) * cs, w = cw * cs + hash3(cu, cw, sd + 2) * cs; if (u < b0 || u > b1) continue;
+        const x = tc.sx(w), y = tc.sy(u); pset(x, y, col); if (z > 0.6) pset(x + 1, y, col);
+      }
+  }
+  // labels: each dot lands on its time; far away a dot is one pixel
+  const r = RG * z, drawDot = (u, w, hiK) => {
+    const x = tc.sx(w), y = tc.sy(u);
+    if (x < -6 || x > W + 6 || y < -6 || y > H + 6) return;
+    if (r < 1.2) { pset(x, y, P.RU1); return; }
+    if (r < 2.6) { rect(x - 1, y - 1, x + 1, y + 1, P.RU1); pset(x - 1, y - 1, P.RU0); pset(x + 1, y + 1, P.RU2); return; }
+    const m = maskDisc(x, y, r); mFill(m, P.RU2); disc(x - r * 0.15, y - r * 0.15, r * 0.82, P.RU1); disc(x - r * 0.4, y - r * 0.4, r * 0.3, P.RU0);
+    mOutline(m, P.RU3); mOuter(m, hiK ? P.LW : P.AM1);
+  };
+  for (const d of TOPDOTS) if (t >= d[2]) drawDot(d[0], d[1], false);
+  for (const d of TOPDOTS_C) if (t >= d[2] + (o.cDelay || 0)) drawDot(d[0], d[1], false);
+  // unbound labels flowing past (cyan flecks = their antibodies); they do not stop in the test band
+  if (o.movers) for (let i = 0; i < 9; i++) {
+    const u = ((t * 60 + i * 137) % 900) + TOP_UT - 520, w = -150 + i * 40 + 20 * Math.sin(i * 1.7 + t);
+    const x = tc.sx(w), y = tc.sy(u);
+    if (r >= 2.6) { disc(x, y, r, P.RU1); for (let k = 0; k < 6; k++) { const a = k * TAU / 6 + i; pset(x + Math.cos(a) * (r + 2), y + Math.sin(a) * (r + 2), P.CY1); } }
+    else pset(x, y, P.RU1);
+  }
+  if (o.hero) drawDot(o.hero[0], o.hero[1], o.heroHi);
+}
+// the hero label in the top view (where the film's conjugate was captured)
+const TOP_HERO = [TOP_UT + 6, 24];
+
+// ---- 14_inset.js
+// ============================================================================
+// THE NANOPARTICLE INSET (screen space). A slowed, schematic model:
+// a fixed positive ion background (muted amber, "+" lattice) and the
+// conduction-electron density (translucent cyan) that the light's electric
+// field pushes up and down as ONE cloud — it never orbits and never leaves the
+// particle. White light is drawn as a wave; split into colour strands, the
+// green strand drives the cloud (resonance) and ends at the particle, while
+// red (and some blue) goes on: the eye gets light with the green taken out.
+// ============================================================================
+const INS = { x0: 14, y0: 62, x1: 166, y1: 214 }, PCX = 100, PCY = 138, PR = 34;
+// panel frame; k = 0..1 opening (4 stepped sizes) from the point (fx, fy)
+function insetPanel(k, fx, fy) {
+  const st = Math.min(4, Math.floor(k * 4 + 1e-6));
+  if (st <= 0) return false;
+  const f = st / 4, x0 = Math.round(lerp(fx - 6, INS.x0, f)), y0 = Math.round(lerp(fy - 6, INS.y0, f));
+  const x1 = Math.round(lerp(fx + 6, INS.x1, f)), y1 = Math.round(lerp(fy + 6, INS.y1, f));
+  rect(x0 + 3, y0 + 3, x1 + 3, y1 + 3, P.SH);
+  rect(x0, y0, x1, y1, P.N1);
+  for (let y = y0 + 4; y < y1 - 2; y += 6) for (let x = x0 + 4; x < x1 - 2; x += 6) pset(x, y, P.N2);
+  frame(x0 - 1, y0 - 1, x1 + 1, y1 + 1, P.K0); frame(x0, y0, x1, y1, P.TE1); frame(x0 + 1, y0 + 1, x1 - 1, y1 - 1, P.TE3);
+  for (const [cx, cy] of [[x0, y0], [x1 - 2, y0], [x0, y1 - 2], [x1 - 2, y1 - 2]]) rect(cx, cy, cx + 2, cy + 2, P.TE0);
+  return st >= 4;
+}
+// electric-field value of the light at the particle (drives the cloud): f Hz, phase velocity 64 px/s
+const WAVE = { v: 64, white: 32, b: 26, g: 32, r: 40, A: 6 };
+function waveY(x, t, lam, t0) { return Math.sin(TAU * ((x - INS.x0) / lam - (WAVE.v / lam) * (t - t0))); }
+function drawWave(x0, x1, yc, t, lam, t0, col, col2, amp, dim) {
+  let px = null, py = null;
+  for (let x = Math.ceil(x0); x <= Math.floor(x1); x++) {
+    const y = Math.round(yc - amp * waveY(x, t, lam, t0));
+    if (px !== null) { line(px, py, x, y, col); if (col2 !== undefined && !dim) line(px, py + 1, x, y + 1, col2); }
+    px = x; py = y;
+  }
+}
+// the cloud displacement (px, + = down): rings up as the light arrives, then follows the green strand
+function cloudDy(t) {
+  const A = 9 * smooth(seg(t, EV.light + 0.75, EV.osc)), x = PCX;
+  return A * waveY(x - 20, t, WAVE.g, EV.light);        // a little behind the drive (lag), same frequency
+}
+function drawParticleInset(t, o) {
+  o = o || {};
+  const dy = Math.round(cloudDy(t));
+  // body: ruby rim with the amber identity outline
+  const body = maskDisc(PCX, PCY, PR);
+  mFill(body, P.RU2);
+  const core = maskDisc(PCX, PCY, PR - 3);
+  mFill(core, P.PA2);
+  // fixed positive ion lattice
+  for (let y = PCY - PR + 6; y < PCY + PR - 4; y += 9) for (let x = PCX - PR + 6; x < PCX + PR - 4; x += 9) {
+    if ((x - PCX) * (x - PCX) + (y - PCY) * (y - PCY) > (PR - 7) * (PR - 7)) continue;
+    pset(x, y, P.PA0); pset(x - 1, y, P.PA0); pset(x + 1, y, P.PA0); pset(x, y - 1, P.PA0); pset(x, y + 1, P.PA0);
+  }
+  // the electron cloud: a translucent dither over the ions, denser where it is pushed against the surface
+  const r2 = (PR - 3) * (PR - 3), rc2 = (PR - 8) * (PR - 8);
+  for (let y = PCY - PR; y <= PCY + PR; y++) for (let x = PCX - PR; x <= PCX + PR; x++) {
+    const ix = x - PCX, iy = y - PCY; if (ix * ix + iy * iy > r2) continue;
+    const cy = iy - dy; if (ix * ix + cy * cy > rc2) continue;             // outside the displaced cloud: bare ions (+)
+    const edge = (ix * ix + iy * iy) > (PR - 10) * (PR - 10) && Math.sign(iy) === Math.sign(dy) && Math.abs(dy) > 2;
+    const dens = edge ? 0.8 : 0.38;
+    if (bay(x, y) < dens) buf[y * W + x] = edge ? P.CY1 : P.CY2;
+  }
+  mRim(body, P.RU0, 1, 1); mOutline(body, P.RU3); mOuter(body, P.AM1);
+  // charge separation marks
+  if (Math.abs(dy) > 3) {
+    const sy = Math.sign(dy), my = PCY + sy * (PR - 9), py = PCY - sy * (PR - 9);
+    rect(PCX - 3, my, PCX + 4, my + 1, P.CY0); rect(PCX - 3, my + 1, PCX + 4, my + 2, P.SH);           // −
+    rect(PCX - 3, py, PCX + 4, py + 1, P.AM0); rect(PCX, py - 3, PCX + 1, py + 4, P.AM0);              // +
+  }
+}
+// the whole inset content at time t (panel already drawn)
+function drawInsetContent(t) {
+  const left = INS.x0 + 3, pl = PCX - PR - 2, pr = PCX + PR + 2, right = INS.x1 - 3;
+  const front = left + WAVE.v * (t - EV.light);                    // leading edge of the arriving light
+  const split = t >= EV.strands;
+  if (t >= EV.light) {
+    if (!split) drawWave(left, Math.min(front, pl), PCY, t, WAVE.white, EV.light, P.LW, P.SUB, WAVE.A);
+    else {
+      const st = Math.min(2, Math.floor((t - EV.strands) / 0.08));     // white → two → three strands, stepped
+      const yb = PCY - 12 * st / 2, yr = PCY + 12 * st / 2;
+      drawWave(left, pl, yb, t, WAVE.b, EV.light, P.LBL1, P.LBL0, 4);
+      drawWave(left, pl, yr, t, WAVE.r, EV.light, P.LR1, P.LR0, 4);
+      drawWave(left, pl, PCY, t, WAVE.g, EV.light, P.LG1, P.LG0, 4);
+      // after the particle: the red strand goes on, blue weaker, the green strand has ended at the particle
+      const out = pr + WAVE.v * (t - EV.strands - 0.2);
+      if (out > pr) { drawWave(pr, Math.min(out, right), PCY + 6, t, WAVE.r, EV.light, P.LR1, P.LR0, 4); drawWave(pr, Math.min(out, right), PCY - 8, t, WAVE.b, EV.light, P.LBL1, P.LBL1, 2, true); }
+    }
+    // the field arrow at the particle: up or down with the wave
+    if (front > pl - 4) {
+      const e = waveY(pl - 6, t, WAVE.g, EV.light), ax = pl - 6, L = Math.round(6 * Math.abs(e)) + 2, sg = e > 0 ? -1 : 1;
+      if (Math.abs(e) > 0.2) { rect(ax, Math.min(PCY, PCY + sg * L), ax + 1, Math.max(PCY, PCY + sg * L), P.AM0); pset(ax - 1, PCY + sg * (L - 2), P.AM0); pset(ax + 1, PCY + sg * (L - 2), P.AM0); }
+    }
+  }
+  drawParticleInset(t);
+}
+
+// ---- 20_scenes.js
+// ============================================================================
+// THE FILM: 18 scenes on one clock. Device shots use a device camera (cx, cy,
+// zoom); the two 90° turns render into a square buffer and use the Mode-7
+// blit. Molecular shots use the level camera (u along the flow, v down) or
+// the top-view camera. Text is drawn last (25_text.js).
+// ============================================================================
+const ph = (t, a, b, e) => (e || smooth)(seg(t, a, b));
+const lin = x => x;
+const RB = 368;                                    // square buffer that covers the screen at any roll angle
+const SPARE_B = SPARE[2];                          // second square buffer (dissolves inside a rolled frame)
+
+// the wetting front at device scale: soaks the well from 6.75 s, creeps up the sample pad
+const devFront = t => t < EV.soak ? Infinity : 86 - 2.6 * (t - EV.soak);
+const DEVCAM = [
+  [0, 0, -18, 1.0], [EV.push1, 0, -18, 1.0], [EV.push1 + 1.5, 0, -32, 1.28, eio],
+  [EV.toWell, 0, -32, 1.28], [EV.toWell + 1.0, 0, 58, 1.6, K75],
+  [EV.pull3, 0, 58, 1.6], [EV.pull3 + 0.75, 0, -8, 1.02, K75],
+  [EV.track3, 0, -8, 1.02], [EV.track3 + 1.25, 0, 70, 2.2, K75],
+  [EV.dive, 0, 70, 2.2], [EV.dive + 1.25, 0, 71, 27, bezierEase(0.6, 0, 0.9, 1)],
+];
+const devCam = t => camTrack(DEVCAM, t);
+// draw into the square buffer and blit it turned by ang (radians); straight frames draw directly
+function rolled(ang, draw) {
+  if (Math.abs(ang) < 1e-4) { draw(); return; }
+  const src = withCanvas(RB, RB, draw);
+  rotBlit(src, RB, RB, ang, 1, CX, CY);
+}
+const OPEN_STATE = { lineT: 1, lineC: 1 };       // the finished test of the first and last frame
+const C_OPEN = [0, -18, 1.0];                    // the opening composition (device cx, cy, zoom)
+
+// ---------------------------------------------------------------- 01-03: the cassette, the drop, the cutaway, the dive
+function sDevice(t) {
+  const fresh = t >= EV.cut2;
+  const ang = t > EV.dive ? (Math.PI / 2) * eio(seg(t, EV.dive + 0.1, EV.dive + 1.0)) : 0;
+  rolled(ang, () => {
+    const cam = devCam(t);
+    ground(cam);
+    let o;
+    if (!fresh) o = Object.assign({}, OPEN_STATE, { glintT: t >= EV.glintT && t < EV.glintT + 0.3 ? seg(t, EV.glintT, EV.glintT + 0.25) : -1, glintC: t >= EV.glintC && t < EV.glintC + 0.3 ? seg(t, EV.glintC, EV.glintC + 0.25) : -1 });
+    else {
+      o = { wellWet: ph(t, EV.dropHit, EV.dropHit + 0.75, eout), wetY: devFront(t) };
+      if (t >= EV.peel) o.cutY = lerp(DEV.by1 + 2, DEV.by0 - 2, ph(t, EV.peel, EV.peel + 1.0, lin));
+      o.zoneMarks = ph(t, EV.layers[2], EV.layers[2] + 0.5);
+      if (t >= EV.dropper && t < EV.dropHit + 1.0) {
+        const inK = ph(t, EV.dropper, EV.dropper + 0.6, eout), outK = ph(t, EV.dropHit + 0.25, EV.dropHit + 1.0, ein);
+        const tipY = lerp(-160, 52, inK) - 200 * outK;
+        let drop = null;
+        if (t < EV.dropFall) drop = { y: tipY + 2 + 3 * ph(t, EV.dropper + 0.5, EV.dropFall), k: ph(t, EV.dropper + 0.5, EV.dropFall, eout) };
+        else if (t < EV.dropHit) { const f = seg(t, EV.dropFall, EV.dropHit); drop = { y: lerp(tipY + 5, DEV.well.y, f * f), k: 1 }; }
+        o.dropper = { y: tipY, drop };
+      }
+    }
+    drawDevice(cam, o);
+    if (fresh && t >= EV.dropHit && t < EV.dropHit + 0.3) {     // splash: a few stepped droplets
+      const k = Math.floor((t - EV.dropHit) / 0.05);
+      for (let i = 0; i < 5; i++) { const a = -Math.PI * (0.15 + 0.7 * i / 4); pset(cam.x(Math.cos(a) * (3 + k * 2)), cam.y(DEV.well.y + Math.sin(a) * (2 + k * 1.5) - 2), P.LB1); }
+    }
+  });
+}
+
+// ---------------------------------------------------------------- 10b-13: the band from above, the inset, the pull-back
+const SIDE_END = () => levelCam(EV.flip - 1e-3);
+const FLOOR_Y = () => { const c = SIDE_END(); return Math.round(c.y(floorV(c.cx))); };
+function topView() { const c = SIDE_END(), yf = FLOOR_Y(); return { cu: c.cx, cw: (CY - yf) / c.z - 40, z: c.z, yf }; }
+// screen position of a top-view point when the view is turned (u → right, w → down)
+function topToScreen(tv, u, w) { return [90 + (u - tv.cu) * tv.z, 160 + (w - tv.cw) * tv.z]; }
+function drawTopTurned(t, tv, o) { rolled(Math.PI / 2, () => drawTop(topCam(tv.cu, tv.cw, tv.z), t, o)); }
+function sFlip(t) {
+  const yf = FLOOR_Y(), tv = topView(), m = EV.flip + 0.25, e = EV.flip + 0.5;
+  if (t < m) sLevel(t, SIDE_END()); else drawTopTurned(t, tv, { movers: true, hero: TOP_HERO });
+  TMPBUF.set(buf);
+  const k = t < m ? 1 - eio(seg(t, EV.flip, m)) : eio(seg(t, m, e));
+  const yc = t < m ? yf : Math.round(topToScreen(tv, 0, 0)[1]);
+  clear(P.BG);
+  if (k < 0.03) { rect(0, yc, W, yc + 1, P.GW1); return; }
+  for (let y = 0; y < H; y++) {
+    const sy = Math.round(yc + (y - yc) / k);
+    if (sy < 0 || sy >= H) continue;
+    buf.set(TMPBUF.subarray(sy * W, sy * W + W), y * W);
+  }
+}
+function insetK(t) { return t < EV.insetClose ? seg(t, EV.inset, EV.inset + 0.75) : 1 - seg(t, EV.insetClose, EV.insetClose + 0.5); }
+function sTop(t) {
+  const tv = topView(), hs = topToScreen(tv, TOP_HERO[0], TOP_HERO[1]);
+  drawTopTurned(t, tv, { movers: true, hero: TOP_HERO, heroHi: t >= EV.lock11 && t < EV.inset + 0.5 });
+  if (t >= EV.lock11 && t < EV.inset + 0.5) bracket(hs[0], hs[1], 8, EV.lock11, t);
+  const k = insetK(t);
+  if (t >= EV.inset && k > 0) {
+    darken(0.875 * Math.min(1, k * 2));
+    if (insetPanel(k, hs[0], hs[1])) drawInsetContent(t);
+  }
+}
+// pull back from the top view to the device (both drawn in device orientation, then turned upright)
+const ZO = { t0: EV.zoomOut, t1: EV.zoomOut + 2.5 };
+function zoomState(t) {
+  const tv = topView(), f = K75(seg(t, ZO.t0, ZO.t1));
+  const z0 = tv.z * TOPK, z1 = 1.3, zd = Math.exp(lerp(Math.log(z0), Math.log(z1), f));
+  const c0x = tv.cw / TOPK, c0y = uToDev(tv.cu), g = clamp((1 / z0 - 1 / zd) / (1 / z0 - 1 / z1), 0, 1);
+  return { zd, cx: lerp(c0x, 0, g), cy: lerp(c0y, -28, g), ang: (Math.PI / 2) * (1 - eio(seg(t, ZO.t0 + 0.4, ZO.t1 - 0.3))) };
+}
+const RUN_STATE = t => ({ lineT: 1, lineC: clamp(seg(t, 46, 56) * 1.25, 0, 1), wetY: -999, frontLine: false });
+function sZoom(t) {
+  const s = zoomState(t);
+  rolled(s.ang, () => {
+    const drawT = () => drawTop(topCam(devToU(s.cy), s.cx * TOPK, s.zd / TOPK), t, { hero: TOP_HERO });
+    const drawD = () => { const cam = new Cam(s.cx, s.cy, s.zd); ground(cam); drawDevice(cam, RUN_STATE(t)); };
+    if (s.zd >= 9) drawT();
+    else if (s.zd < 4.5) drawD();
+    else {
+      const n = W * H; drawT(); SPARE_B.set(buf.subarray(0, n)); drawD();
+      const k = 1 - (s.zd - 4.5) / 4.5;                        // device share of the dither
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (bay(x, y) >= k) buf[i] = SPARE_B[i]; }
+    }
+  });
+}
+// ---------------------------------------------------------------- 14-15: a lens into the control zone and back
+const WIN_CAM = () => new Cam(0, -28, 1.3);
+const LENS = { a: EV.lens14, b: EV.lens14 + 0.75, c: EV.lensClose, d: EV.lensClose + 0.75 };
+// the control capture: search for a clean contact (a violet arm tip on the side of a cyan antibody; no hCG anywhere)
+const CTRL = (() => {
+  const z = ZONE_C[4], segsOf = g => [[g.bx, g.by, g.hx, g.hy], [g.hx, g.hy, g.lx, g.ly], [g.hx, g.hy, g.rx, g.ry]];
+  const sd = (s, q) => { let m = Infinity; for (let k = 0; k <= 6; k++) { const px = lerp(s[0], s[2], k / 6), py = lerp(s[1], s[3], k / 6); m = Math.min(m, Math.sqrt(segD2(px, py, q[0], q[1], q[2], q[3]))); } return m; };
+  let best = null;
+  for (let av = -0.4; av <= 0.41; av += 0.1) for (const jv of [-1, 1]) {
+    const gv = abGeom(z.u, z.v, z.a + av), tip = abTip(gv, jv), ev = [tip[0] - gv.hx, tip[1] - gv.hy], el = Math.hypot(ev[0], ev[1]);
+    const vs = segsOf(gv), others = [ZONE_C[3], ZONE_C[5]].map(q => segsOf(abGeom(q.u, q.v, q.a)));
+    for (let rot = 0; rot < TAU; rot += 0.03) {
+      const g0 = conjGeoms(0, 0, rot)[0], cands = [];
+      for (const [sx, sy, ex, ey, f] of [[g0.bx, g0.by, g0.hx, g0.hy, 0.6], [g0.hx, g0.hy, g0.lx, g0.ly, 0.35], [g0.hx, g0.hy, g0.rx, g0.ry, 0.35]]) {
+        const dx = ex - sx, dy = ey - sy, l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l;
+        for (const sg of [-1, 1]) cands.push([sx + dx * f + sg * nx * (AB.TH / 2 + 0.2), sy + dy * f + sg * ny * (AB.TH / 2 + 0.2), sg * nx, sg * ny]);
+      }
+      for (const c of cands) {
+        const head = -(ev[0] * c[2] + ev[1] * c[3]) / el; if (head < 0.75) continue;          // the tip meets the surface head-on
+        const gx = tip[0] - c[0], gy = tip[1] - c[1], gs = conjGeoms(gx, gy, rot);
+        let cl = Infinity, ok = gy + RG < z.v - 6;
+        for (const g of gs) for (const p of [[g.bx, g.by], [g.hx, g.hy], [g.lx, g.ly], [g.rx, g.ry]]) if (p[1] > floorV(p[0]) - 3) ok = false;
+        if (!ok) continue;
+        gs.forEach((g, i) => segsOf(g).forEach(s => {
+          vs.forEach((v, vi) => { if (i === 0 && vi === (jv < 0 ? 1 : 2)) return; cl = Math.min(cl, sd(s, v)); });
+          if (i !== 0) cl = Math.min(cl, sd(s, vs[jv < 0 ? 1 : 2]));
+          others.forEach(o => o.forEach(v => { cl = Math.min(cl, sd(s, v)); }));
+        }));
+        for (const v of vs) cl = Math.min(cl, Math.sqrt(segD2(gx, gy, v[0], v[1], v[2], v[3])) - RG);
+        const score = cl + head * 0.5;
+        if (!best || score > best.score) best = { score, gx, gy, rot, av, jv, tip, clear: cl };
+      }
+    }
+  }
+  return best;
+})();
+function ctrlPose(t) {
+  const f = smooth(seg(t, EV.spareIn, EV.bindC)), q = 1 - f;
+  return { gx: CTRL.gx - 64 * q + jx(t, 5, 1.0) * q, gy: CTRL.gy - 40 * q + jy(t, 5, 1.0) * q, rot: CTRL.rot - 0.5 * q };
+}
+function sCtrlLevel(t, z) {
+  const cam = new Cam(CTRL.gx + 4, CTRL.gy + 10, z);
+  drawLevel(cam, 40);
+  const zc = ZONE_C[4], a0 = zc.a;
+  zc.a = a0 + CTRL.av * smooth(seg(t, EV.bindC - 0.5, EV.bindC)); drawZones(cam, { hiC: t >= EV.bindC && t < EV.bindC + 0.1 ? 4 : -1 }); zc.a = a0;
+  for (const c of PASSERS.slice(0, 3)) drawConj(cam, LV.C0 + c.du + 40 * (t - 52), c.v - 10 + jy(t, c.id, 1.2), c.r + 0.3 * t, { dim: true });
+  const p = ctrlPose(t);
+  drawConj(cam, p.gx, p.gy, p.rot);
+  if (t >= EV.bindC) sparkle(cam.x(CTRL.tip[0]), cam.y(CTRL.tip[1]), t - EV.bindC, P.VI0);
+  return cam;
+}
+function lensR(t) { return t < LENS.c ? 230 * ein(seg(t, LENS.a, LENS.b)) : 230 * ein(1 - seg(t, LENS.c, LENS.d)); }
+const LENS_C = () => { const c = WIN_CAM(); return [c.x(0), c.y(DEV.yC)]; };
+function sLens(t) {
+  const r = lensR(t), [lx, ly] = LENS_C();
+  { const c = WIN_CAM(); ground(c); drawDevice(c, t < LENS.c ? RUN_STATE(t) : OPEN_STATE); }
+  if (r <= 0.5) return;
+  TMPBUF.set(buf);
+  const zin = t < LENS.c ? lerp(1.4, 2.4, eout(seg(t, LENS.a, LENS.b))) : 2.4;
+  sCtrlLevel(t, zin); TMP2.set(buf);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const d = Math.hypot(x + 0.5 - lx, y + 0.5 - ly), i = y * W + x;
+    buf[i] = d < r ? TMP2[i] : TMPBUF[i];
+    if (d >= r - 2 && d < r) buf[i] = P.VI1; else if (d >= r && d < r + 1) buf[i] = P.K0;
+  }
+}
+function sWindow(t) { const c = WIN_CAM(); ground(c); drawDevice(c, t < EV.lens14 ? RUN_STATE(t) : OPEN_STATE); }
+
+// ---------------------------------------------------------------- 16-18: results and the return
+const NEG_DOTS = (() => { const r = mulberry(77), a = []; for (let i = 0; i < 46; i++) a.push({ x: lerp(-5.2, 5.2, r()), t0: lerp(EV.negDots - 0.4, EV.negC - 0.6, r()), sp: 16 + r() * 8, cy: DEV.yC + (r() - 0.5) * 1.6 }); return a; })();
+function negState(t) {
+  const dots = []; let cap = 0;
+  for (const d of NEG_DOTS) {
+    if (t < d.t0) continue;
+    const y = DEV.win.y1 + 1 - d.sp * (t - d.t0);
+    if (y <= d.cy) { cap++; dots.push([d.x, d.cy, P.RU2]); } else if (y < DEV.win.y1) dots.push([d.x, y, P.RU1]);
+  }
+  return { lineT: 0, lineC: clamp(cap / 30, 0, 1), dots };
+}
+const SPLIT = { z: 0.85, xl: 46, xr: 134, cy: -26 };
+function cassetteCam(sx, z, cy) { return new Cam(-(sx - 90) / z, cy, z); }
+function sResults(t) {
+  ground(null);
+  if (t < EV.invalidIn + 0.5) {
+    const f = K75(seg(t, EV.split, EV.split + 1.0));
+    const z = lerp(1.3, SPLIT.z, f), sxl = lerp(90, SPLIT.xl, f), cy = lerp(-28, SPLIT.cy, f);
+    const out = K75(seg(t, EV.invalidIn, EV.invalidIn + 0.5));
+    drawDevice(cassetteCam(sxl - 140 * out, z, cy), OPEN_STATE);
+    const sr = lerp(250, SPLIT.xr, K75(seg(t, EV.split + 0.25, EV.split + 1.0))) + 140 * out;
+    if (t >= EV.split + 0.25) drawDevice(cassetteCam(sr, SPLIT.z, SPLIT.cy), negState(t));
+  }
+  if (t >= EV.invalidIn + 0.25) drawInvalid(t);
+}
+// a separate schematic result window with T but no C
+const INV_CAM = dx => new Cam(-dx / 2.6 + 3, -24, 2.6);
+const RET = { a: EV.ret, b: EV.rest };             // the invalid window is pushed out right as the cassette slides in from the left
+function drawInvalid(t) {
+  const inK = K75(seg(t, EV.invalidIn + 0.25, EV.invalidIn + 0.75)), outK = K75(seg(t, RET.a, RET.b));
+  const dx = Math.round(200 * (1 - inK) + 200 * outK); if (dx > 200) return;
+  const cam = INV_CAM(dx);
+  const x0 = cam.x(-16), x1 = cam.x(20), y0 = cam.y(-70), y1 = cam.y(14);
+  drawWindowPanel(cam, { lineT: 1, lineC: 0 }, x0, y0, x1, y1);
+  if (t >= EV.warn) {
+    const yy = cam.y(DEV.yC);
+    dashLine(cam.x(DEV.sx0) - 2, yy - 3, cam.x(DEV.sx1) + 2, yy - 3, P.AM1, 2, 2, 0); dashLine(cam.x(DEV.sx0) - 2, yy + 3, cam.x(DEV.sx1) + 2, yy + 3, P.AM1, 2, 2, 0);
+    const age = t - EV.warn, s = age < 0.05 ? 0.6 : age < 0.1 ? 1.25 : 1, cx = x1 + 16, cy = yy, hS = Math.round(9 * s);
+    poly([cx, cy - hS - 1, cx + hS + 1, cy + hS * 0.8 + 1, cx - hS - 1, cy + hS * 0.8 + 1], P.K0);
+    poly([cx, cy - hS, cx + hS, cy + hS * 0.8, cx - hS, cy + hS * 0.8], P.AM1);
+    poly([cx, cy - hS + 3, cx + hS - 3, cy + hS * 0.8 - 1, cx - hS + 3, cy + hS * 0.8 - 1], P.AM0);
+    if (s >= 1) { rect(cx, cy - 4, cx + 1, cy + 2, P.K0); rect(cx, cy + 3, cx + 1, cy + 4, P.K0); }
+  }
+}
+// 18: the original cassette slides back into the opening composition and stops
+function sReturn(t) {
+  ground(null);
+  drawInvalid(t);
+  const f = K75(seg(t, RET.a, RET.b)), off = 200 * (1 - f);
+  drawDevice(new Cam(C_OPEN[0] + off / C_OPEN[2], C_OPEN[1], C_OPEN[2]), OPEN_STATE);
+}
+
+// ---------------------------------------------------------------- scene table
+function renderFrame(t) {
+  t = clamp(t, 0, DUR - 1e-6); G_T = t;
+  if (t < EV.fibres) sDevice(t);
+  else if (t < EV.fibres + 0.5) {                  // the turned strip dissolves into the fibres (ordered dither)
+    sDevice(t); TMPBUF.set(buf); sLevel(t); TMP2.set(buf);
+    dissolve(TMPBUF, TMP2, seg(t, EV.fibres, EV.fibres + 0.5), buf);
+  }
+  else if (t < EV.flip) sLevel(t);
+  else if (t < EV.flip + 0.5) sFlip(t);
+  else if (t < ZO.t0) sTop(t);
+  else if (t < ZO.t1) sZoom(t);
+  else if (t < LENS.a) sWindow(t);
+  else if (t < LENS.d) sLens(t);
+  else if (t < EV.split) sWindow(t);
+  else if (t < EV.ret) sResults(t);
+  else sReturn(t);
+  overlays(t);
+}
+function engineInit() { wetInit(); }
+
+// ---- 21_story.js
+// ============================================================================
+// THE STORY IN THE LEVEL: the conjugate the film follows (the hero), its hCG,
+// the other labels and the captures. Motion = net flow + small random motion
+// (stepped at 15 Hz) + encounter + a little turning; no attraction at a
+// distance. A bound complex is one rigid group of separate sprites.
+// ============================================================================
+const STEP = t => Math.floor(t * 15) / 15;                                    // stepped sprite time
+const JIT = (t, id, a) => a * (vnoise(STEP(t) * 2.3 + id * 7.1, id) - 0.5) * 2;
+const jx = (t, id, a) => JIT(t, id * 2 + 1, a), jy = (t, id, a) => JIT(t, id * 2 + 2, a);
+// tip of arm j of antibody i on a conjugate (world units)
+function conjTip(gx, gy, rot, i, j) { const a = rot + i * TAU / NAB, d = dirv(a); return abTip(abGeom(gx + d[0] * (RG - 0.6), gy + d[1] * (RG - 0.6), a), j); }
+// hCG held at the tip of arm +1 of antibody 0 (its detection site touching the tip)
+function hcgOn(gx, gy, rot) {
+  const tip = conjTip(gx, gy, rot, 0, 1), e = dirv(rot + AB.SP);
+  return { cx: tip[0] + e[0] * (HCG.OFF + HCG.RA), cy: tip[1] + e[1] * (HCG.OFF + HCG.RA), b: rot + AB.SP + Math.PI, tip };
+}
+// the pose of a complex captured by mint antibody z (arm -1 tip on hCG's capture site); rot = conjugate rotation
+function capturedPose(z, rot) {
+  const gm = abGeom(z.u, z.v, z.a), tm = abTip(gm, -1), b = rot + AB.SP + Math.PI, d = dirv(b);
+  const cx = tm[0] + d[0] * (HCG.OFF + HCG.RB), cy = tm[1] + d[1] * (HCG.OFF + HCG.RB);   // bottom site = centre - d * (OFF+RB)
+  const top = [cx + d[0] * (HCG.OFF + HCG.RA), cy + d[1] * (HCG.OFF + HCG.RA)], off = conjTip(0, 0, rot, 0, 1);
+  return { gx: top[0] - off[0], gy: top[1] - off[1], rot, h: { cx, cy, b }, mtip: tm };
+}
+// hero fibre surface: centre and unit normal (pointing up) near u
+function fibreAt(u) {
+  const p = FIBRES[0].pts; let best = 0;
+  for (let i = 0; i < p.length; i += 2) if (Math.abs(p[i] - u) < Math.abs(p[best] - u)) best = i;
+  const i0 = Math.max(0, best - 2), i1 = Math.min(p.length - 2, best + 2);
+  let dx = p[i1] - p[i0], dy = p[i1 + 1] - p[i0 + 1]; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+  return { u: p[best], v: p[best + 1], nx: dy, ny: -dx };
+}
+const frontOff = v => 34 * Math.sin(v / 95 + 1.3) + 26 * (vnoise(v / 47, 3) - 0.5) * 2;
+// dried conjugates on the hero fibre, placed so the front reaches each one on its release beat
+const DRY = (() => {
+  const out = [];
+  EV.release.forEach((tr, i) => {
+    const side = (i === 1 || i === 2) ? -1 : 1;                       // -1 = resting on top of the fibre (the hero is index 1)
+    let u = 140 + (i - 1) * 36, v = 0;
+    for (let it = 0; it < 6; it++) {
+      const f = fibreAt(u), r = FIBRES[0].w / 2 + 11.5;
+      v = f.v + (side < 0 ? f.ny * r : -f.ny * r);
+      u = LF.u0 + LF.v * (tr - LF.t0) + frontOff(v);
+    }
+    const f = fibreAt(u), r = FIBRES[0].w / 2 + 11.5;
+    out.push({ u, v: f.v + (side < 0 ? f.ny * r : -f.ny * r), tr, side, rot: i * 1.3 + 0.4, id: 10 + i });
+  });
+  return out;
+})();
+const HERO0 = DRY[1];
+// other dried conjugates across the conjugate pad (seen tiny in the wide shot)
+const DRY_FAR = (() => {
+  const out = [];
+  for (let k = 1; k < FIBRES.length; k++) {
+    const p = FIBRES[k].pts;
+    for (let i = 0; i < p.length; i += 14) {
+      const u = p[i], v = p[i + 1]; if (u < 15 || u > LV.CONJ1 - 10) continue;
+      const tr = LF.t0 + (u - LF.u0 - frontOff(v)) / LF.v;
+      out.push({ u, v: v - FIBRES[k].w / 2 - 10, tr, rot: hash(i + k * 31) * TAU, id: 100 + out.length });
+    }
+  }
+  return out;
+})();
+function freePose(c, t) {                       // a dried conjugate that floats off when the liquid arrives
+  if (t < c.tr) return { gx: c.u, gy: c.v, rot: c.rot };
+  const a = t - c.tr, lift = smooth(clamp(a / 0.9, 0, 1));
+  return { gx: c.u + 9 * a + jx(t, c.id, 1.4) * lift, gy: c.v + (c.side === 1 ? 7 : -7) * lift + jy(t, c.id, 1.4) * lift, rot: c.rot + 0.1 * a };
+}
+// ---------------------------------------------------------------- the hero conjugate and its hCG
+const ROT_B = -1.2;                             // antibody 0 points up-left toward the arriving hCG at the binding beat
+const ROT_F = Math.PI - AB.SP;                  // in the sandwich, arm +1 of antibody 0 points straight down
+const HERO_Z = 4;                               // the mint antibody that captures it
+const H_FINAL = capturedPose(ZONE_T[HERO_Z], ROT_F);
+function heroPose(t) {
+  const rel = HERO0.tr;
+  const rotDrift = tt => ROT_B + 0.1 * (tt - EV.bind1);
+  if (t < rel) return { gx: HERO0.u, gy: HERO0.v, rot: rotDrift(rel) };
+  const base = tt => ({ gx: HERO0.u + 7 * (tt - rel), gy: HERO0.v - 9 * smooth(clamp((tt - rel) / 1.0, 0, 1)) });
+  if (t < EV.pull8 + 0.25) {
+    const b = base(t), q = smooth(clamp((t - rel) / 0.8, 0, 1)) * (t > EV.bind1 ? 0.5 : 1);
+    return { gx: b.gx + jx(t, 1, 1.3) * q, gy: b.gy + jy(t, 1, 1.3) * q, rot: rotDrift(t) };
+  }
+  // travel to the test zone (28.25 → 31.25), then the last approach to the capture beat
+  const p0 = base(EV.pull8 + 0.25), r0 = rotDrift(EV.pull8 + 0.25);
+  const A = { gx: H_FINAL.gx - 26, gy: H_FINAL.gy - 20 };
+  if (t < EV.settle) {
+    const f = eio(seg(t, EV.pull8 + 0.25, EV.settle)), g = K75(seg(t, EV.pull8 + 0.5, EV.settle));
+    return { gx: lerp(p0.gx, A.gx, f) + jx(t, 1, 0.8), gy: lerp(p0.gy, A.gy, f) + jy(t, 1, 0.8), rot: lerp(r0, ROT_F, g) };
+  }
+  if (t < EV.bind2) {
+    const f = smooth(seg(t, EV.settle, EV.bind2)), q = 1 - f;
+    return { gx: lerp(A.gx, H_FINAL.gx, f) + jx(t, 1, 1.0) * q, gy: lerp(A.gy, H_FINAL.gy, f) + jy(t, 1, 1.0) * q, rot: ROT_F };
+  }
+  return { gx: H_FINAL.gx, gy: H_FINAL.gy, rot: ROT_F };
+}
+// hCG: free until the first binding beat, then rides on antibody 0
+function hcgPose(t) {
+  if (t >= EV.bind1) { const h = heroPose(t), q = hcgOn(h.gx, h.gy, h.rot); return { cx: q.cx, cy: q.cy, b: q.b, bound: true }; }
+  const h = heroPose(t), on = hcgOn(h.gx, h.gy, h.rot), e = dirv(h.rot + AB.SP);
+  // approach along the arm direction: far → near (contact at bind1); small random motion fading out
+  const S = { cx: on.cx - 92, cy: on.cy - 30 }, near = { cx: on.cx + e[0] * 14, cy: on.cy + e[1] * 14 };
+  let cx, cy;
+  if (t < EV.turn[0]) { const f = smooth(seg(t, EV.hcgIn, EV.turn[0])); cx = lerp(S.cx, near.cx, f); cy = lerp(S.cy, near.cy, f); }
+  else { const f = smooth(seg(t, EV.turn[0] + 0.25, EV.bind1)); cx = lerp(near.cx, on.cx, f); cy = lerp(near.cy, on.cy, f); }
+  const q = 1 - seg(t, EV.turn[2], EV.bind1);
+  // turning: a slow tumble, then three small steps that line the detection site up with the arm tip
+  let b = on.b + 1.1 + 0.6 * Math.sin(STEP(t) * 1.7);
+  if (t >= EV.turn[0]) b = on.b + 0.75; if (t >= EV.turn[1]) b = on.b + 0.4; if (t >= EV.turn[2]) b = on.b;
+  return { cx: cx + jx(t, 2, 2.2) * q, cy: cy + jy(t, 2, 2.2) * q, b, bound: false };
+}
+// ---------------------------------------------------------------- other complexes captured in the test zone (side view)
+const OTHER_CAP = [[1, 0], [7, 1], [9, 2], [2, 3]].map(([zi, k]) => {
+  const rot = ROT_F + (hash(zi * 13) - 0.5) * 0.3, pose = capturedPose(ZONE_T[zi], rot);
+  return Object.assign(pose, { tc: EV.captures[k], id: 40 + zi, zi });
+});
+function otherPose(c, t) {                      // arrives from the upper left with the flow, lands on its beat
+  const f = smooth(seg(t, c.tc - 0.9, c.tc)), q = 1 - f;
+  return { gx: c.gx - 70 * q + jx(t, c.id, 1.0) * q, gy: c.gy - 44 * q + jy(t, c.id, 1.0) * q, rot: c.rot - 0.6 * q };
+}
+// unbound conjugates (no hCG) drifting over the zone: they pass the test zone
+const PASSERS = [[-70, -40, 0.4], [-160, -6, 1.9], [-250, -60, 3.1], [-30, -82, 4.4], [-330, -24, 2.2]].map(([du, v, r], i) => ({ du, v, r, id: 60 + i }));
+// subdued non-target molecules near the hero
+const JUNK = (() => { const r = mulberry(91), a = []; for (let i = 0; i < 26; i++) a.push({ u: lerp(40, 330, r()), v: lerp(-95, 40, r()), k: r() < 0.6 ? 0 : 1, a: r() * TAU, id: 200 + i }); return a; })();
+// dim background conjugates (parallax layer) during the trip
+const BACKC = (() => { const r = mulberry(33), a = []; for (let i = 0; i < 12; i++) a.push({ u: lerp(60, 760, r()), v: lerp(-130, 10, r()), rot: r() * TAU, sp: 18 + r() * 22, id: 300 + i }); return a; })();
+function drawBackConj(cam, t) {
+  const bc = new Cam(cam.cx * 0.7, cam.cy * 0.7, cam.z * 0.62, cam.ax, cam.ay);
+  for (const c of BACKC) drawConj(bc, c.u + c.sp * (t - 24), c.v + jy(t, c.id, 1.5), c.rot + 0.2 * t, { dim: true });
+}
+// ---------------------------------------------------------------- the level camera (u, v, zoom)
+const LVCAM = (() => {
+  const H = HERO0, hb = hcgOn(...Object.values(heroPose(EV.bind1)).slice(0, 3)), F = H_FINAL;
+  return [
+    [EV.fibres, -230, 0, 0.2], [EV.reachConj, -200, 0, 0.205, lin],
+    [EV.reachConj + 1.25, H.u + 8, H.v + 4, 1.7, K75],
+    [EV.lock, H.u + 8, H.v + 4, 1.7], [EV.pull6, H.u + 14, H.v - 2, 1.7, lin],
+    [EV.pull6 + 1.0, H.u - 4, H.v - 16, 1.35, K75], [EV.push7 - 0.25, H.u + 4, H.v - 20, 1.35, lin],
+    [EV.push7 + 0.75, hb.cx + 4, hb.cy + 4, 2.6, K75], [EV.pull8, hb.cx + 10, hb.cy + 2, 2.6, lin],
+    [EV.pull8 + 0.75, H.u + 70, H.v - 6, 1.05, K75], [EV.settle, F.gx + 16, F.gy + 20, 1.2, eio],
+    [EV.push9 - 0.25, F.gx + 16, F.gy + 20, 1.2], [EV.push9 + 0.75, F.gx - 14, F.gy + 16, 2.4, K75],
+    [EV.steps[0], F.gx - 14, F.gy + 16, 2.4],
+    [EV.steps[0] + 0.12, F.gx + 8, F.gy + 18, 1.45, eout], [EV.steps[1], F.gx + 8, F.gy + 18, 1.45],
+    [EV.steps[1] + 0.12, F.gx + 16, F.gy + 26, 0.82, eout], [EV.steps[2], F.gx + 16, F.gy + 26, 0.82],
+    [EV.steps[2] + 0.12, LV.T0 + 72, F.gy + 44, 0.46, eout], [EV.flip, LV.T0 + 72, F.gy + 44, 0.46],
+  ];
+})();
+const levelCam = t => camTrack(LVCAM, t);
+// strip mini-map position (0..1) of a level u
+function mapU(u) {
+  const K = [[-900, 0.02], [0, 0.23], [380, 0.39], [610, 0.56], [970, 0.68], [1500, 0.84]];
+  for (let i = 0; i + 1 < K.length; i++) if (u < K[i + 1][0]) return lerp(K[i][1], K[i + 1][1], clamp((u - K[i][0]) / (K[i + 1][0] - K[i][0]), 0, 1));
+  return K[K.length - 1][1];
+}
+// ---------------------------------------------------------------- side-view frame of the level (scenes 4-10a)
+function sLevel(t, cam) {
+  cam = cam || levelCam(t);
+  drawLevel(cam, t);
+  // chain flash in the sandwich: membrane → capture Ab → hCG → detection Ab → gold
+  const ch = EV.chain, on = (i) => t >= ch[i] && t < ch[i] + 0.2 && Math.floor((t - ch[i]) / 0.05) % 2 === 0;
+  const hiT = on(1) ? HERO_Z : (t >= EV.bind2 && t < EV.bind2 + 0.1 ? HERO_Z : -1);
+  drawZones(cam, { hiT });
+  if (on(0)) { const z = ZONE_T[HERO_Z]; rect(cam.x(z.u - 6), cam.y(z.v) - 1, cam.x(z.u + 6), cam.y(z.v) + 1, P.LW); }
+  if (t > 24 && t < 33) drawBackConj(cam, t);
+  if (t < 30) for (const j of JUNK) drawJunk(cam, j.u + 11 * (t - 20) + jx(t, j.id, 1.6), j.v + jy(t, j.id, 1.6), j.k, j.a + 0.3 * STEP(t));
+  if (t < 24) for (const c of DRY_FAR) { const p = freePose(c, t); drawConj(cam, p.gx, p.gy, p.rot); }
+  for (let i = 0; i < DRY.length; i++) { if (i === 1) continue; const p = freePose(DRY[i], t); drawConj(cam, p.gx, p.gy, p.rot); }
+  if (t >= EV.steps[0] - 1.2) {
+    for (const c of PASSERS) drawConj(cam, LV.T0 + c.du + 46 * (t - EV.steps[0]) + jx(t, c.id, 1.2), c.v + jy(t, c.id, 1.2), c.r + 0.3 * t);
+    for (const c of OTHER_CAP) { if (t < c.tc - 0.9) continue; const p = otherPose(c, t), h = hcgOn(p.gx, p.gy, p.rot); drawHCG(cam, h.cx, h.cy, h.b); drawConj(cam, p.gx, p.gy, p.rot); if (t >= c.tc) sparkle(cam.x(c.mtip[0]), cam.y(c.mtip[1]), t - c.tc, P.MI0); }
+  }
+  // the hero and its hCG
+  const hp = heroPose(t), hc = hcgPose(t);
+  if (t >= EV.hcgIn - 0.5) drawHCG(cam, hc.cx, hc.cy, hc.b, { sites: t > EV.hcgTag && t < EV.bind2 + 0.5, hi: on(2) });
+  drawConj(cam, hp.gx, hp.gy, hp.rot, { hiAb: on(3) ? 0 : -1, hiGold: on(4) });
+  // dried crust around conjugates that have not been reached yet (pale sugar matrix)
+  for (const c of DRY) if (t < c.tr + 0.25 && cam.z > 1) {
+    const x = cam.x(c.u), y = cam.y(c.v), r = (RG + 6) * cam.z, k = t < c.tr ? 1 : 1 - (t - c.tr) / 0.25;
+    for (let a = 0; a < 24; a++) { if (hash2(a, c.id) > 0.55 * k + 0.1) continue; const aa = a / 24 * TAU; pset(x + Math.cos(aa) * r, y + Math.sin(aa) * r, P.AB0); }
+  }
+  // binding sparkles
+  const b1 = hcgOn(...Object.values(heroPose(EV.bind1)).slice(0, 3));
+  if (t >= EV.bind1 && t < EV.bind1 + 0.3) { const q = hcgOn(hp.gx, hp.gy, hp.rot); sparkle(cam.x(q.tip[0]), cam.y(q.tip[1]), t - EV.bind1, P.CY0); }
+  if (t >= EV.bind2 && t < EV.bind2 + 0.3) sparkle(cam.x(H_FINAL.mtip[0]), cam.y(H_FINAL.mtip[1]), t - EV.bind2, P.MI0);
+  // lock-on bracket on the hero conjugate
+  if (t >= EV.lock && t < EV.pull6 + 1.5) bracket(cam.x(hp.gx), cam.y(hp.gy), (RG + 10) * cam.z, EV.lock, t);
+  return { hp, hc, cam };
+}
+
+// ---- 24_overlay.js
+// ============================================================================
+// TEXT LAYER (the editor's layer, never part of the art): one dominant caption
+// at a time in a game-style dialog box at the top, short annotation tags with
+// leader lines beside the object they name, one honesty chip at a time, the
+// strip mini-map during magnification. Safe area for short-video apps:
+// x 6..150 below y 130 (right-hand buttons), y 22..254 (top bar, description).
+// ============================================================================
+const SAFE = { l: 6, r: 174, t: 22, b: 254, rb: 150 };
+const CAP_Y = 28;
+// dialog-box caption: box grows in 3 steps, text types at 40 chars/s, a cursor blinks while it holds; erased backwards
+function caption(s, t0, t1, t, opt) {
+  if (!UI_ON || t < t0 || t >= t1) return;
+  opt = opt || {};
+  const lines = wrapBal(FC, s, 156, 1), lh = 10, n = s.length;
+  const tw = Math.max(...lines.map(l => textW(FC, l, 1)));
+  const bw = tw + 12, bh = lines.length * lh + 7;
+  const cx = opt.cx === undefined ? CX : opt.cx, y0 = opt.y === undefined ? CAP_Y : opt.y;
+  const x0 = Math.round(clamp(cx - bw / 2, SAFE.l, SAFE.r - bw)), age = t - t0, left = t1 - t;
+  const open = opt.instant ? 1 : Math.min(1, Math.floor(age / 0.05 + 1) / 3);          // 3 stepped frames
+  const close = left < 0.15 ? Math.max(0, Math.ceil(left / 0.05) / 3) : 1;
+  const k = Math.min(open, close); if (k <= 0) return;
+  const hh = Math.max(3, Math.round(bh * k)), yy = y0 + Math.round((bh - hh) / 2);
+  rect(x0 + 2, yy + 2, x0 + bw + 2, yy + hh + 2, P.SH);                                   // hard shadow
+  rect(x0, yy, x0 + bw, yy + hh, P.BOX);
+  frame(x0, yy, x0 + bw, yy + hh, P.TE1);
+  rect(x0 + 1, yy + 1, x0 + bw - 1, yy + 2, P.N3);
+  if (k < 1) return;
+  // typed text; erased backwards in the last 0.3 s
+  let shown = opt.instant ? n : Math.floor((age - 0.12) * 40);
+  if (left < 0.45) shown = Math.min(shown, Math.floor(n * Math.max(0, (left - 0.15) / 0.3)));
+  let rem = shown;
+  lines.forEach((ln, i) => {
+    if (rem <= 0) return;
+    const lx = Math.round(x0 + (bw - textW(FC, ln, 1)) / 2);
+    text(FC, ln, lx, y0 + 4 + i * lh, { sc: 1, c: P.INK, ol: null, n: Math.min(ln.length, rem), shadow: P.N2 });
+    rem -= ln.length + 1;
+  });
+  if (shown >= n && left > 0.45 && Math.floor(t * 4) % 2 === 0) {                       // blinking ▼ on the frame (global phase: loops cleanly)
+    const bx = x0 + bw - 7, by = yy + hh - 1;
+    rect(bx, by, bx + 5, by + 1, P.TE0); rect(bx + 1, by + 1, bx + 4, by + 2, P.TE0); pset(bx + 2, by + 2, P.TE0);
+  }
+}
+// leader-line tag: anchor (ax, ay) on the object, label at (lx, ly) (top-left of the text)
+function tag(s, ax, ay, lx, ly, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t >= t1 || ax === null || !isFinite(ax) || !isFinite(ay)) return;
+  col = col === undefined ? P.INK : col;
+  const age = t - t0, left = t1 - t, out = left < 0.2 ? left / 0.2 : 1, gk = K75(clamp(age / 0.2, 0, 1)) * out;
+  const tw = textW(FS, s, 1), x0 = Math.round(clamp(lx, SAFE.l + 1, SAFE.r - tw - 1)), y0 = Math.round(clamp(ly, SAFE.t + 30, SAFE.b - 8));
+  ax = Math.round(ax); ay = Math.round(ay);
+  const ux = ax < x0 ? x0 - 2 : ax > x0 + tw ? x0 + tw + 1 : ax, uy = ay < y0 ? y0 - 2 : y0 + 6;
+  const ex = Math.round(lerp(ax, ux, gk)), ey = Math.round(lerp(ay, uy, gk));
+  line(ax + 1, ay + 1, ex + 1, ey + 1, P.SH); line(ax, ay, ex, ey, col);
+  rect(ax - 1, ay - 1, ax + 1, ay + 1, col);
+  if (gk < 1) return;
+  const n = clamp((age - 0.2) * 45, 0, s.length) * out;
+  if (n <= 0) return;
+  const pw = textW(FS, s.slice(0, Math.ceil(n)), 1);
+  rect(x0 - 2, y0 - 2, x0 + pw + 2, y0 + 7, P.BOX); rect(x0 - 2, y0 + 7, x0 + pw + 2, y0 + 8, col);
+  text(FS, s, x0, y0, { sc: 1, c: P.INK, ol: null, n });
+}
+// small chip (bottom-left): honesty notes, one at a time
+function chip(s, t0, t1, t, col) {
+  if (!UI_ON || t < t0 || t >= t1) return;
+  const age = t - t0, left = t1 - t;
+  const k = Math.min(1, Math.floor(age / 0.05 + 1) / 3) * (left < 0.15 ? Math.ceil(left / 0.05) / 3 : 1);
+  const tw = textW(FS, s, 1), y = 244, x = SAFE.l + 1;
+  const w = Math.round((tw + 6) * k); if (w < 2) return;
+  rect(x, y - 2, x + w, y + 8, P.BOX); frame(x, y - 2, x + w, y + 8, col === undefined ? P.N4 : col);
+  if (k >= 1) text(FS, s, x + 3, y, { sc: 1, c: P.SUB, ol: null });
+}
+// the strip mini-map: horizontal thumbnail (sample left → absorbent right), a blinking "you are here" marker
+const MAP = { x: 7, y: 230, w: 70, h: 7 };
+function miniMap(t, u, t0, t1, hilite) {
+  if (!UI_ON || t < t0 || t >= t1) return;
+  const age = t - t0, left = t1 - t, k = Math.min(1, Math.floor(age / 0.05 + 1) / 3) * (left < 0.15 ? Math.ceil(left / 0.05) / 3 : 1);
+  if (k < 1) { if (k > 0) rect(MAP.x, MAP.y + 3, MAP.x + MAP.w * k, MAP.y + 4, P.N4); return; }
+  const { x, y, w, h } = MAP;
+  rect(x - 2, y - 2, x + w + 9, y + h + 2, P.BOX); frame(x - 2, y - 2, x + w + 9, y + h + 2, P.N4);
+  // sample 0-26%, conjugate 22-40%, membrane 36-86%, absorbent 82-100%
+  const X = f => Math.round(x + f * w);
+  rect(X(0), y, X(0.26), y + h, P.AB1);
+  rect(X(0.22), y + 1, X(0.40), y + h - 1, P.RU2);
+  rect(X(0.38), y + 1, X(0.86), y + h - 1, P.GR0);
+  rect(X(0.84), y, X(1), y + h, P.AB2);
+  rect(X(0.56), y + 1, X(0.56) + 1, y + h - 1, hilite === 'T' ? P.MI1 : P.RL2);
+  rect(X(0.68), y + 1, X(0.68) + 1, y + h - 1, hilite === 'C' ? P.VI1 : P.RL2);
+  text(FS, 'T', X(0.56) - 1, y - 8, { sc: 1, c: P.SUB, ol: null }); text(FS, 'C', X(0.68) - 1, y - 8, { sc: 1, c: P.SUB, ol: null });
+  // flow arrow at the right end
+  const ax = x + w + 2;
+  rect(ax, y + 3, ax + 4, y + 4, P.LB1); pset(ax + 4, y + 2, P.LB1); pset(ax + 4, y + 4, P.LB1); pset(ax + 5, y + 3, P.LB1); pset(ax + 3, y + 1, P.LB1); pset(ax + 3, y + 5, P.LB1);
+  // marker (u in 0..1 along the strip)
+  if (u !== null && Math.floor(t * 4) % 2 === 0) { const mx = X(u); rect(mx - 1, y - 2, mx + 2, y - 1, P.LW); rect(mx, y - 1, mx + 1, y + h + 1, P.LW); }
+}
+
+// ---- 25_text.js
+// ============================================================================
+// THE TEXT TRACK: one dominant caption at a time, annotations beside their
+// objects, the honesty chip and the strip mini-map during magnification.
+// ============================================================================
+const Q = 'How does urine create two lines?';
+function flowArrow(t, t0, t1) {                     // the signpost while the view turns: flow now runs left → right
+  if (!UI_ON || t < t0 || t >= t1) return;
+  const k = Math.min(1, Math.floor((t - t0) / 0.05 + 1) / 3) * (t1 - t < 0.15 ? Math.ceil((t1 - t) / 0.05) / 3 : 1);
+  if (k <= 0) return;
+  const x0 = 58, y0 = 66, L = Math.round(52 * k);
+  rect(x0 - 2, y0 - 5, x0 + L + 9, y0 + 6, P.BOX); frame(x0 - 2, y0 - 5, x0 + L + 9, y0 + 6, P.LB3);
+  rect(x0 + 1, y0 - 1, x0 + L, y0 + 2, P.LB1);
+  for (let i = 0; i < 4; i++) { rect(x0 + L + i, y0 - 3 + i, x0 + L + i + 1, y0 + 4 - i, P.LB1); }
+  if (k >= 1) text(FS, 'flow', x0 + 16, y0 + 9, { sc: 1, c: P.LB1, ol: P.SH });
+}
+function overlays(t) {
+  if (!UI_ON) return;
+  // ---- 01-03 device
+  caption(Q, -1, EV.qOut + 0.25, t, { instant: true });
+  caption('Follow the sample', EV.cap2, EV.cap2 + 3.4, t);
+  caption('Inside the test', EV.cap3, EV.cap3 + 2.6, t);
+  if (t >= EV.layers[0] && t < EV.track3 + 1.25) {
+    const cam = devCam(t);
+    const L = [['sample pad', 92], ['conjugate pad', 50], ['membrane', -12], ['absorbent pad', -84]];
+    L.forEach(([s, yy], i) => tag(s, cam.x(DEV.sx0) - 1, cam.y(yy), cam.x(DEV.bx0) - textW(FS, s, 1) + 8, cam.y(yy) - 3, EV.layers[i], EV.layers[i] + 1.75, t, P.INK));
+  }
+  flowArrow(t, EV.fibres, EV.fibres + 1.25);
+  // ---- 04-10 the strip as a level
+  caption('Capillary flow', EV.cap4, EV.cap4 + 3.0, t);
+  caption('Gold-labeled antibodies', EV.cap5, EV.cap5 + 2.35, t);
+  caption('Target hormone: hCG', EV.cap6, EV.cap6 + 3.0, t);
+  caption('hCG binds', EV.cap7, EV.cap7 + 1.65, t);
+  caption('Test zone', EV.cap8, EV.cap8 + 1.9, t);
+  caption('Captured', EV.cap9, EV.cap9 + 2.65, t);
+  caption('Many labels accumulate', EV.cap10, EV.cap10 + 3.65, t);
+  if (t >= EV.hcgTag && t < EV.push7) {
+    const cam = levelCam(t), h = hcgPose(t);
+    tag('hCG', cam.x(h.cx), cam.y(h.cy) - 4, cam.x(h.cx) - 6, cam.y(h.cy) - 24, EV.hcgTag, EV.push7, t, P.MG0);
+  }
+  if (t >= EV.tags9[0] && t < EV.steps[0]) {
+    const cam = levelCam(t), hp = heroPose(t), h = hcgOn(hp.gx, hp.gy, hp.rot), z = ZONE_T[HERO_Z], gc = conjGeoms(hp.gx, hp.gy, hp.rot)[0];
+    const items = [['gold label', hp.gx - RG * 0.7, hp.gy - RG * 0.7, P.RU0], ['detection antibody', (gc.bx + gc.hx) / 2, (gc.by + gc.hy) / 2, P.CY1],
+      ['hCG', h.cx, h.cy, P.MG0], ['capture antibody', (z.u + abGeom(z.u, z.v, z.a).hx) / 2, z.v - 2, P.MI1]];
+    items.forEach(([s, wx, wy, col], i) => tag(s, cam.x(wx), cam.y(wy), 8, 76 + i * 30, EV.tags9[i], EV.steps[0], t, col));
+  }
+  if (t >= EV.flip + 0.6 && t < EV.lock11) tag('seen from above', 120, 60, 92, 56, EV.flip + 0.6, EV.lock11, t, P.SUB);
+  // ---- 11-13 why gold is red
+  caption('Why does gold look red?', EV.cap11, EV.cap11 + 2.9, t);
+  caption('Electrons respond together', EV.cap12, EV.cap12 + 3.6, t);
+  if (t >= EV.light + 0.4 && t < EV.osc) tag('white light', INS.x0 + 18, PCY - 7, INS.x0 + 8, INS.y0 + 10, EV.light + 0.4, EV.osc, t, P.LW);
+  if (t >= EV.plasmon && t < EV.insetClose) tag('Plasmon resonance', PCX + PR - 6, PCY - PR + 10, INS.x0 + 64, INS.y0 + 8, EV.plasmon, EV.insetClose, t, P.CY0);
+  if (t >= EV.absorbTag && t < EV.insetClose) tag('absorbs green', PCX - PR, PCY + 2, INS.x0 + 8, INS.y1 - 16, EV.absorbTag, EV.insetClose, t, P.LG0);
+  if (t >= EV.absorbTag + 0.5 && t < EV.insetClose) tag('red goes on', INS.x1 - 12, PCY + 8, INS.x1 - 58, INS.y1 - 16, EV.absorbTag + 0.5, EV.insetClose, t, P.LR0);
+  caption('Nanoparticles → visible line', EV.cap13, EV.cap13 + 3.4, t);
+  // ---- 14-15 the control line
+  caption('Control captures the label', EV.cap14, EV.cap14 + 2.9, t);
+  if (t >= EV.noHcgTag && t < LENS.c) {
+    const cam = new Cam(CTRL.gx + 4, CTRL.gy + 10, 2.4);
+    tag('no hCG needed', cam.x(CTRL.tip[0]), cam.y(CTRL.tip[1]), 10, 196, EV.noHcgTag, LENS.c, t, P.VI0);
+  }
+  if (t >= EV.tagT && t < EV.split) {
+    const c = WIN_CAM();
+    tag('hCG detected', c.x(DEV.sx0), c.y(DEV.yT), 8, c.y(DEV.yT) + 8, EV.tagT, EV.split, t, P.RL0);
+    tag('Procedural control', c.x(DEV.sx0), c.y(DEV.yC), 8, c.y(DEV.yC) - 16, EV.tagC, EV.split, t, P.RL0);
+  }
+  // ---- 16-17 results
+  caption('hCG not detected', EV.cap16, EV.cap16 + 2.45, t, { cx: 118 });
+  if (t >= EV.cap16 && t < EV.invalidIn) {
+    text(FS, 'T + C', SPLIT.xl - 9, 66, { sc: 1, c: P.SUB, ol: P.SH }); text(FS, 'C only', SPLIT.xr - 11, 66, { sc: 1, c: P.SUB, ol: P.SH });
+  }
+  caption('No control = invalid', EV.cap17, EV.cap17 + 2.9, t);
+  if (t >= EV.warn + 0.25 && t < EV.ret) { const c = INV_CAM(0); tag('C missing', c.x(DEV.sx0) - 3, c.y(DEV.yC), 10, c.y(DEV.yC) - 30, EV.warn + 0.25, EV.ret, t, P.AM0); }
+  // ---- 18 the question returns (it stays on screen through the loop point)
+  caption(Q, EV.cap18, DUR + EV.qOut + 0.25, t);
+  // ---- the honesty chip and the strip mini-map: shown when the view magnifies or travels, then they get out of the way
+  chip('Schematic • not to scale', EV.flowArrow, EV.reachConj, t);
+  chip('Schematic • not to scale', EV.inset + 0.75, EV.osc, t);
+  chip('Slowed schematic', EV.osc, EV.insetClose + 0.25, t);
+  chip('Schematic • not to scale', LENS.a + 0.25, LENS.c, t);
+  miniMap(t, mapU(levelCam(t).cx), EV.flowArrow, EV.reachConj, null);
+  miniMap(t, mapU(levelCam(t).cx), EV.pull8, EV.push9, null);
+  miniMap(t, mapU(610), EV.inset + 0.75, EV.osc, 'T');
+  miniMap(t, mapU(970), LENS.a + 0.25, LENS.c, 'C');
+}
+
+// ---- 30_audio.js
+// ============================================================================
+// AUDIO — an original, bouncy pixel-game chiptune at 120 BPM in D major
+// (36 bars = 72.000 s) plus SFX built from the same chip voices, every one of
+// them read from the picture's event table (03_clock.js), so each sound lands
+// on the frame of the change it belongs to. Synthesised sample by sample in
+// plain JS: two pulse channels (12.5 / 25 / 50 % duty, band-limited edges), a
+// 4-bit stepped triangle (bass, kick), LFSR noise (snare, hats, sweeps), the
+// classic 60 Hz arpeggiated chip chord, a dotted-eighth ping-pong echo on the
+// lead. Everything that runs past 72 s wraps to 0:00, so the loop is seamless.
+// Arc: a question-like hook (bars 1-2) → answer → hook → flowing arps (capillary
+// flow) → gold sparkle (labels) → the hCG two-note motif → bind → build →
+// capture → dense accumulation → percussion out for the optics (bars 21-24,
+// a slowed oscillating tone follows the electron cloud) → the chorus when the
+// line appears and the control works → calm comparison → caution → the hook
+// again, whose last note (E over A) falls back into bar 1.
+// Molecules, light and electrons make no sound: every SFX is illustrative.
+// ============================================================================
+const SR = 48000, NS = Math.round(DUR * SR);
+const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const nm = (n, o) => 12 * (o + 1) + NOTE[n];
+const PENT = ['D', 'E', 'F#', 'A', 'B'];
+const pent = (i, o) => { const k = ((i % 5) + 5) % 5; return nm(PENT[k], o + Math.floor(i / 5)); };
+const CHD = { D: ['D', 'F#', 'A'], Bm: ['B', 'D', 'F#'], G: ['G', 'B', 'D'], A: ['A', 'C#', 'E'], Em: ['E', 'G', 'B'], Gmaj7: ['G', 'B', 'D', 'F#'], Bm7: ['B', 'D', 'F#', 'A'] };
+function chordMidi(name, oct) { let prev = -1; return CHD[name].map(n => { let m = nm(n, oct); while (m <= prev) m += 12; prev = m; return m; }); }
+const BARS = ['D', 'Bm', 'G', 'A', 'D', 'Bm', 'G', 'A', 'Bm', 'G', 'D', 'A', 'G', 'A', 'Bm', 'A', 'D', 'A', 'Bm', 'G',
+  'Gmaj7', 'A', 'Bm7', 'A', 'D', 'A', 'Bm', 'G', 'D', 'A', 'G', 'A', 'Em', 'A', 'D', 'A'];
+function sec(b) {
+  return b <= 2 ? 'hook' : b <= 4 ? 'answer' : b <= 6 ? 'hook2' : b <= 8 ? 'flow' : b <= 10 ? 'labels' : b <= 12 ? 'hcg' : b <= 14 ? 'bind' :
+    b <= 16 ? 'build' : b <= 18 ? 'capture' : b <= 20 ? 'accum' : b <= 22 ? 'optic' : b <= 24 ? 'plasmon' : b <= 30 ? 'chorus' :
+      b <= 32 ? 'compare' : b <= 34 ? 'caution' : 'hook';
+}
+// melodies: [step (16ths), note, octave, length (16ths)]
+const MEL = {
+  hookA: [[0, 'F#', 5, 2], [2, 'A', 5, 2], [4, 'D', 6, 3], [7, 'C#', 6, 1], [8, 'A', 5, 2], [10, 'F#', 5, 2], [12, 'A', 5, 4]],
+  hookB: [[0, 'B', 5, 3], [3, 'A', 5, 1], [4, 'F#', 5, 2], [6, 'D', 5, 2], [8, 'E', 5, 6]],
+  ansA: [[0, 'B', 5, 2], [2, 'D', 6, 2], [4, 'G', 5, 4], [8, 'B', 5, 2], [10, 'A', 5, 6]],
+  ansB: [[0, 'C#', 6, 2], [2, 'E', 6, 2], [4, 'A', 5, 4], [8, 'E', 5, 8]],
+  labA: [[0, 'F#', 5, 1], [1, 'B', 5, 1], [2, 'D', 6, 2], [4, 'B', 5, 1], [5, 'F#', 5, 1], [6, 'D', 5, 2], [8, 'F#', 5, 1], [9, 'B', 5, 1], [10, 'D', 6, 2], [12, 'C#', 6, 4]],
+  labB: [[0, 'D', 6, 1], [1, 'B', 5, 1], [2, 'G', 5, 2], [4, 'B', 5, 1], [5, 'D', 6, 1], [6, 'G', 6, 2], [8, 'F#', 6, 4], [12, 'E', 6, 4]],
+  hcgA: [[0, 'A', 5, 2], [2, 'D', 6, 6], [8, 'A', 5, 2], [10, 'D', 6, 2], [12, 'F#', 6, 4]],
+  hcgB: [[0, 'E', 6, 4], [4, 'C#', 6, 2], [6, 'A', 5, 2], [8, 'E', 6, 8]],
+  bindA: [[0, 'D', 6, 3], [3, 'B', 5, 1], [4, 'G', 5, 4], [8, 'B', 5, 2], [10, 'D', 6, 2], [12, 'G', 6, 4]],
+  bindB: [[4, 'C#', 6, 4], [8, 'E', 6, 2], [10, 'A', 5, 6]],
+  capA: [[8, 'F#', 6, 2], [10, 'A', 6, 6]],
+  capB: [[0, 'G', 6, 2], [2, 'F#', 6, 2], [4, 'E', 6, 4], [8, 'C#', 6, 2], [10, 'E', 6, 6]],
+  accA: [[0, 'B', 5, 1], [2, 'D', 6, 1], [4, 'F#', 6, 1], [6, 'B', 6, 1], [8, 'A', 6, 1], [10, 'F#', 6, 1], [12, 'D', 6, 1], [14, 'F#', 6, 1]],
+  accB: [[0, 'G', 6, 1], [2, 'D', 6, 1], [4, 'B', 5, 1], [6, 'D', 6, 1], [8, 'G', 6, 2], [10, 'A', 6, 2], [12, 'B', 6, 4]],
+  optA: [[0, 'F#', 6, 8], [8, 'D', 6, 8]], optB: [[0, 'E', 6, 8], [8, 'C#', 6, 8]],
+  c1: [[0, 'D', 6, 2], [2, 'D', 6, 1], [3, 'E', 6, 1], [4, 'F#', 6, 2], [6, 'A', 6, 2], [8, 'F#', 6, 2], [10, 'E', 6, 2], [12, 'D', 6, 2], [14, 'A', 5, 2]],
+  c2: [[0, 'C#', 6, 3], [3, 'D', 6, 1], [4, 'E', 6, 4], [8, 'A', 5, 2], [10, 'C#', 6, 2], [12, 'E', 6, 4]],
+  c3: [[0, 'D', 6, 2], [2, 'C#', 6, 1], [3, 'B', 5, 1], [4, 'F#', 5, 2], [6, 'B', 5, 2], [8, 'D', 6, 2], [10, 'F#', 6, 2], [12, 'E', 6, 2], [14, 'D', 6, 2]],
+  c4: [[0, 'B', 5, 2], [2, 'D', 6, 2], [4, 'G', 6, 4], [8, 'F#', 6, 2], [10, 'E', 6, 2], [12, 'D', 6, 4]],
+  c6: [[0, 'C#', 6, 2], [2, 'E', 6, 2], [4, 'A', 6, 6], [10, 'G', 6, 2], [12, 'F#', 6, 2], [14, 'E', 6, 2]],
+  cmpA: [[0, 'B', 5, 4], [4, 'D', 6, 4], [8, 'B', 5, 2], [10, 'A', 5, 6]], cmpB: [[0, 'C#', 6, 4], [4, 'E', 6, 4], [8, 'A', 5, 8]],
+  cauA: [[0, 'G', 5, 6], [8, 'E', 5, 8]], cauB: [[0, 'C#', 5, 6], [8, 'E', 5, 4], [12, 'A', 4, 4]],
+};
+// which melody plays in each bar (lead instrument, volume, duty)
+const LEAD_PLAN = {
+  1: ['hookA', 0.36], 2: ['hookB', 0.36], 3: ['ansA', 0.3], 4: ['ansB', 0.3], 5: ['hookA', 0.34], 6: ['hookB', 0.34],
+  9: ['labA', 0.26, 0.125], 10: ['labB', 0.26, 0.125], 11: ['hcgA', 0.34, 0.5], 12: ['hcgB', 0.32, 0.5], 13: ['bindA', 0.3], 14: ['bindB', 0.3],
+  17: ['capA', 0.4], 18: ['capB', 0.36], 19: ['accA', 0.3, 0.5], 20: ['accB', 0.3, 0.5], 21: ['optA', 0.2, 0.125], 22: ['optB', 0.2, 0.125],
+  25: ['c1', 0.4], 26: ['c2', 0.4], 27: ['c3', 0.4], 28: ['c4', 0.4], 29: ['c1', 0.42], 30: ['c6', 0.42],
+  31: ['cmpA', 0.28, 0.125], 32: ['cmpB', 0.28, 0.125], 33: ['cauA', 0.24, 0.5], 34: ['cauB', 0.24, 0.5], 35: ['hookA', 0.36], 36: ['hookB', 0.36],
+};
+function musicEvents() {
+  const ev = [];
+  const N = (t, d, k, m, v, p, x) => ev.push(Object.assign({ t, d, k, f: m === null ? 0 : mtof(m), m, v, p: p || 0 }, x || {}));
+  for (let b = 1; b <= NBARS; b++) {
+    const t0 = (b - 1) * BAR, chn = BARS[b - 1], s = sec(b), at = beat => t0 + beat * BEAT;
+    const tri = chordMidi(chn, 4), root = nm(CHD[chn][0], 2) + (NOTE[CHD[chn][0]] < 2 ? 12 : 0);
+    // ---- bass (triangle)
+    if (s === 'hook') { N(at(0), BEAT * 1.8, 'tri', root, 0.42); N(at(2), BEAT * 1.4, 'tri', root + 7, 0.38); N(at(3.5), BEAT * 0.4, 'tri', root + 12, 0.34); }
+    else if (s === 'answer' || s === 'hook2' || s === 'compare') for (let i = 0; i < 4; i++) N(at(i), BEAT * 0.85, 'tri', root + [0, 0, 7, 0][i] + (i === 3 ? 12 : 0), 0.44);
+    else if (s === 'accum') for (let i = 0; i < 16; i++) N(at(i / 4), S16 * 0.7, 'tri', root + (i % 4 === 2 ? 12 : 0), i % 2 ? 0.36 : 0.5);
+    else if (s === 'optic' || s === 'plasmon') N(at(0), BAR * 0.96, 'tri', root, 0.36);
+    else if (s === 'caution') { N(at(0), BEAT * 1.8, 'tri', root, 0.4); N(at(2), BEAT * 1.8, 'tri', root, 0.36); }
+    else for (let i = 0; i < 8; i++) N(at(i / 2), E8 * 0.82, 'tri', root + (i % 2 ? 12 : 0) + (s === 'chorus' && i === 7 ? -2 : 0), s === 'build' ? 0.42 + 0.01 * i : 0.48);
+    // ---- drums
+    const kick = (beat, v) => ev.push({ t: at(beat), d: 0.12, k: 'kick', v });
+    const snare = (beat, v) => ev.push({ t: at(beat), d: 0.16, k: 'snare', v, p: 0.1 });
+    const hat = (beat, v, open) => ev.push({ t: at(beat), d: open ? 0.14 : 0.04, k: 'hat', v, p: (beat * 2) % 2 ? 0.35 : -0.35, open });
+    const groove = (kv, sv, hv, h16) => { kick(0, kv); kick(1.5, kv * 0.7); kick(2, kv); snare(1, sv); snare(3, sv); for (let i = 0; i < (h16 ? 16 : 8); i++) hat(i * (h16 ? 0.25 : 0.5), hv * (i % 2 ? 0.75 : 1)); };
+    if (s === 'hook') { kick(0, 0.6); for (let i = 1; i < 8; i++) hat(i * 0.5, 0.18); if (b % 2 === 0) { kick(2, 0.5); snare(3.5, 0.32); snare(3.75, 0.4); } }
+    if (s === 'answer' || s === 'hook2') { kick(0, 0.75); kick(2, 0.7); snare(1, 0.42); snare(3, 0.46); for (let i = 0; i < 8; i++) hat(i * 0.5, 0.24, i === 7 && b % 2 === 0); }
+    if (s === 'flow') { groove(0.8, 0.5, 0.2, true); }
+    if (s === 'labels' || s === 'hcg' || s === 'bind') groove(0.88, 0.62, 0.3, false);
+    if (s === 'build') { for (let i = 0; i < 4; i++) kick(i, 0.7 + 0.04 * i); if (b === 15) { snare(1, 0.5); snare(3, 0.55); } else for (let i = 0; i < 16; i++) snare(i * 0.25, 0.16 + 0.03 * i); for (let i = 0; i < 16; i++) hat(i * 0.25, 0.2); }
+    if (s === 'capture') groove(0.95, 0.7, 0.32, false);
+    if (s === 'accum') { kick(0, 0.9); kick(0.5, 0.6); kick(2, 0.9); kick(2.5, 0.6); snare(1, 0.66); snare(3, 0.7); snare(3.75, 0.3); for (let i = 0; i < 16; i++) hat(i * 0.25, i % 2 ? 0.2 : 0.3, i === 15 && b === 20); }
+    if (s === 'optic') { for (let i = 0; i < 4; i++) hat(i + 0.5, 0.12); }
+    if (s === 'plasmon') { hat(1, 0.14); hat(3, 0.14); if (b === 24) { snare(3.5, 0.3); snare(3.75, 0.4); } }
+    if (s === 'chorus') groove(0.95, 0.72, 0.32, b >= 29);
+    if (s === 'compare') { kick(0, 0.7); kick(2, 0.65); for (let i = 0; i < 8; i++) hat(i * 0.5, 0.2); }
+    if (s === 'caution') { kick(0, 0.6); hat(2, 0.16, true); }
+    if (b === 17 || b === 25) ev.push({ t: t0, d: 1.4, k: 'crash', v: 0.45 });
+    // ---- arps and chords
+    const arp16 = (v, oct, pat) => { const tones = [...tri, tri[0] + 12]; pat = pat || [0, 1, 2, 3, 2, 1, 2, 1]; for (let i = 0; i < 16; i++) N(at(i / 4), S16 * 0.7, 'arp', tones[pat[i % pat.length]] + oct, v * (i % 4 === 0 ? 1 : 0.8), i % 2 ? 0.35 : -0.35, { echo: true }); };
+    if (s === 'flow') arp16(0.15, 12);
+    if (s === 'labels') arp16(0.12, 24, [0, 2, 3, 2]);
+    if (s === 'hcg' || s === 'bind' || s === 'capture') arp16(0.1, 12);
+    if (s === 'build') for (let i = 0; i < 16; i++) N(at(i / 4), S16 * 0.55, 'arp', tri[i % 3] + 12 + (b - 15) * 5 + Math.floor(i / 4), 0.1 + 0.006 * i, i % 2 ? 0.3 : -0.3);
+    if (s === 'accum') arp16(0.14, 12, [0, 1, 2, 3]);
+    if (s === 'chorus') arp16(0.1, 12);
+    if (s === 'optic' || s === 'plasmon' || s === 'caution') N(t0, BAR * 0.97, 'chord', tri[0] + 12, s === 'caution' ? 0.09 : 0.11, 0, { chord: tri.map(m => m + 12), soft: true });
+    if (s === 'hook2' || s === 'answer' || s === 'compare') for (let i = 0; i < 8; i++) N(at(i / 2), E8 * 0.9, 'arp', [...tri, tri[1] + 12][i % 4] + 12, 0.11, i % 2 ? 0.4 : -0.4, { echo: true });
+    // ---- the lead (pulse), with echo
+    const lp = LEAD_PLAN[b];
+    if (lp) MEL[lp[0]].forEach(([st, n, o, l]) => N(t0 + st * S16, l * S16 * 0.9, 'lead', nm(n, o), lp[1], 0, { duty: lp[2] || 0.25 }));
+  }
+  return ev;
+}
+// ---------------------------------------------------------------- SFX map (every cue belongs to a visible event)
+function sfxEvents() {
+  const ev = [], S = (t, k, v, x) => ev.push(Object.assign({ t, k, v }, x || {}));
+  // 01 the mystery: two restrained percussive notes on the two glints
+  S(EV.glintT, 'plink', 0.8, { f: mtof(nm('D', 6)) }); S(EV.glintC, 'plink', 0.8, { f: mtof(nm('A', 6)) });
+  // 02 a fresh test
+  S(EV.cut2, 'cut', 0.7); S(EV.dropper, 'slide', 0.55, { d: 0.6 }); S(EV.dropFall, 'blip', 0.35, { f: mtof(nm('B', 6)) });
+  S(EV.dropHit, 'drop', 1.0); S(EV.soak, 'soak', 0.8, { d: 1.1 });
+  // 03 reveal: the shell peels, each layer clicks in, the camera dives and turns
+  S(EV.pull3, 'whoosh', 0.6, { d: 0.6 }); S(EV.peel, 'sweep', 0.8, { d: 1.0 });
+  EV.layers.forEach((t, i) => S(t, 'layer', 0.7, { f: mtof(pent(5 + i, 5)) }));
+  S(EV.dive, 'zoom', 0.9, { d: 1.2 }); S(EV.dive, 'turn90', 0.7, { d: 1.0 });
+  // 04 capillary flow: soft granular texture, a drip as each pore fills
+  S(EV.fibres, 'flowtex', 0.8, { d: 4.0 });
+  EV.pores.forEach((t, i) => S(t, 'drip', 0.45, { f: mtof(pent(4 + (i % 3), 5)) }));
+  // 05 labels: the camera pushes in, the dried labels tick free, lock-on
+  S(EV.reachConj, 'zoom', 0.7, { d: 1.2 });
+  EV.release.forEach((t, i) => S(t, 'tick', 0.75, { f: mtof(pent(7 + i, 5)) }));
+  S(EV.lock, 'lock', 0.85);
+  // 06 the target: hCG's two-note motif
+  S(EV.pull6, 'whoosh', 0.55, { d: 0.9 }); S(EV.hcgTag, 'hcg', 1.0);
+  // 07 first binding
+  S(EV.push7, 'zoom', 0.5, { d: 0.75 });
+  EV.turn.forEach((t, i) => S(t, 'nudge', 0.5, { f: mtof(pent(6 + i, 5)) }));
+  S(EV.bind1, 'bind', 1.0);
+  // 08 approach: travel, the zone comes into view, anticipation
+  S(EV.pull8, 'whoosh', 0.7, { d: 0.9 }); S(EV.zoneIn, 'blip', 0.4, { f: mtof(nm('E', 6)) }); S(EV.rise, 'riser', 0.8, { d: 1.5 });
+  // 09 the sandwich: a stronger click, then the chain lights link by link
+  S(EV.push9, 'zoom', 0.45, { d: 0.75 }); S(EV.bind2, 'capture', 1.0);
+  EV.chain.forEach((t, i) => S(t, 'link', 0.6, { f: mtof(pent(5 + i, 5)) }));
+  EV.tags9.forEach(t => S(t, 'ui', 0.35));
+  // 10 many captures: stepped pull-back, rhythmic captures, the flip to the top view
+  EV.steps.forEach((t, i) => S(t, 'step', 0.7, { f: 700 - 120 * i }));
+  EV.captures.forEach((t, i) => S(t, 'cap', 0.55 + 0.015 * i, { f: mtof(pent([5, 7, 6, 8][i % 4] + Math.floor(i / 8), 5)) }));
+  S(EV.flip, 'flip', 0.75);
+  // 11 why gold looks red: lock, the inset opens, white light arrives
+  S(EV.lock11, 'lock', 0.7); S(EV.inset, 'window', 0.8); S(EV.light, 'optic', 0.9, { d: 1.8 });
+  // 12 the electron cloud: an oscillating tone that follows it exactly; the light splits
+  S(EV.osc, 'osc', 0.9, { d: 4.0 }); S(EV.plasmon, 'ui', 0.35); S(EV.strands, 'prism', 0.8); S(EV.absorbTag, 'ui', 0.35);
+  // 13 the line: inset closes, pull back, resolving tone when the dots read as a line
+  S(EV.insetClose, 'windowclose', 0.7); S(EV.zoomOut, 'zoomout', 0.8, { d: 2.0 }); S(EV.lineSeen, 'resolve', 1.0);
+  // 14 control: lens opens, the different control click
+  S(EV.lens14, 'lens', 0.75); S(EV.bindC, 'control', 1.0); S(EV.noHcgTag, 'ui', 0.35);
+  // 15 two zones, two jobs: lens closes, two related confirmation notes
+  S(EV.lensClose, 'lensclose', 0.7); S(EV.tagT, 'confirm', 0.9, { f: mtof(nm('D', 6)) }); S(EV.tagC, 'confirm', 0.9, { f: mtof(nm('A', 6)) });
+  // 16 without detectable hCG: one control confirmation note
+  S(EV.split, 'slide', 0.6, { d: 0.8 }); S(EV.negDots, 'trickle', 0.5, { d: 1.75 }); S(EV.negC, 'confirm', 0.9, { f: mtof(nm('A', 6)) });
+  // 17 invalid: one restrained caution tone
+  S(EV.invalidIn, 'slide', 0.6, { d: 0.7 }); S(EV.warn, 'caution', 0.85);
+  // 18 back to the start
+  S(EV.ret, 'slide', 0.7, { d: 1.2 }); S(EV.rest, 'land', 0.6);
+  // the dialog box blips when a caption opens (soft)
+  for (const t of [EV.cap2, EV.cap3, EV.cap4, EV.cap5, EV.cap6, EV.cap7, EV.cap8, EV.cap9, EV.cap10, EV.cap11, EV.cap12, EV.cap13, EV.cap14, EV.cap16, EV.cap17, EV.cap18]) S(t, 'box', 0.4);
+  return ev.sort((a, b) => a.t - b.t);
+}
+const DUCK = { bind: 0.25, capture: 0.35, resolve: 0.3, control: 0.3, drop: 0.25, caution: 0.25 };
+// ---------------------------------------------------------------- the chip
+const LFSR = (() => {
+  const long = new Float32Array(32767), short = new Float32Array(93);
+  let r = 1; for (let i = 0; i < 32767; i++) { const b = ((r >> 0) ^ (r >> 1)) & 1; r = (r >> 1) | (b << 14); long[i] = r & 1 ? 1 : -1; }
+  r = 1; for (let i = 0; i < 93; i++) { const b = ((r >> 0) ^ (r >> 6)) & 1; r = (r >> 1) | (b << 14); short[i] = r & 1 ? 1 : -1; }
+  return { long, short };
+})();
+function polyblep(t, dt) { if (t < dt) { t /= dt; return t + t - t * t - 1; } if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+function voice(L, R, t0, dur, pan, gain, fn) {
+  const i0 = Math.round(t0 * SR), n = Math.max(1, Math.round(dur * SR));
+  const pl = Math.cos((pan + 1) * Math.PI / 4) * gain, pr = Math.sin((pan + 1) * Math.PI / 4) * gain;
+  for (let k = 0; k < n; k++) { const s = fn(k / SR, k); if (s === 0) continue; let i = i0 + k; i = ((i % NS) + NS) % NS; L[i] += s * pl; R[i] += s * pr; }
+}
+const env = (t, a, d, sus, rel, dur) => { const e = t < a ? t / a : t < a + d ? 1 - (1 - sus) * (t - a) / d : sus; return t > dur ? e * Math.max(0, 1 - (t - dur) / rel) : e; };
+function pulseFn(fAt, duty, envFn) {
+  let ph = 0;
+  return (t) => {
+    const f = Math.min(12000, fAt(t)), dt = f / SR; ph += dt; if (ph >= 1) ph -= 1;
+    let v = ph < duty ? 1 : -1;
+    v += polyblep(ph, dt); let p2 = ph - duty; if (p2 < 0) p2 += 1; v -= polyblep(p2, dt);
+    return (v - (2 * duty - 1)) * envFn(t);
+  };
+}
+function triFn(fAt, envFn) {
+  let ph = 0;
+  return (t) => { ph += fAt(t) / SR; if (ph >= 1) ph -= 1; const q = Math.floor(ph * 32), s = q < 16 ? q : 31 - q; return (s / 7.5 - 1) * envFn(t); };
+}
+function noiseFn(rateAt, envFn, short) {
+  let ph = 0; const tab = short ? LFSR.short : LFSR.long, n = tab.length;
+  return (t) => { ph += rateAt(t) / SR; return tab[Math.floor(ph) % n] * envFn(t); };
+}
+const vibAt = (f, t, depth, rate, delay) => t < delay ? f : f * Math.pow(2, depth / 12 * Math.sin((t - delay) * rate * TAU));
+function playMusic(e, L, R, LL, LR) {
+  const k = e.k;
+  if (k === 'lead') {
+    const d = e.d, duty = e.duty || 0.25, gain = 0.5 * e.v, mk = () => pulseFn(t => vibAt(e.f, t, 0.2, 5.8, 0.16), duty, t => env(t, 0.004, 0.08, 0.7, 0.05, d));
+    voice(L, R, e.t, d + 0.06, -0.06, gain, mk()); voice(LL, LR, e.t, d + 0.06, -0.06, gain * 0.55, mk());
+  } else if (k === 'arp') {
+    voice(L, R, e.t, e.d + 0.04, e.p, 0.34 * e.v, pulseFn(() => e.f, 0.125, t => env(t, 0.002, 0.05, 0.45, 0.03, e.d)));
+    if (e.echo) voice(LL, LR, e.t, e.d + 0.04, -e.p, 0.2 * e.v, pulseFn(() => e.f, 0.125, t => env(t, 0.002, 0.05, 0.45, 0.03, e.d)));
+  } else if (k === 'chord') {
+    const ch = e.chord, fn = pulseFn(t => mtof(ch[Math.floor(t * 60) % ch.length]), 0.25, t => env(t, e.soft ? 0.25 : 0.01, 0.4, 0.6, 0.3, e.d));
+    voice(L, R, e.t, e.d + 0.3, 0.15, 0.3 * e.v, fn);
+  } else if (k === 'tri') {
+    voice(L, R, e.t, e.d + 0.02, 0, 0.42 * e.v, triFn(() => e.f, t => env(t, 0.003, 0.02, 1, 0.02, e.d)));
+  } else if (k === 'kick') {
+    voice(L, R, e.t, 0.14, 0, 0.62 * e.v, triFn(t => 58 + 190 * Math.exp(-t * 36), t => env(t, 0.001, 0.02, 0.8, 0.05, 0.07)));
+    voice(L, R, e.t, 0.014, 0, 0.3 * e.v, noiseFn(() => 26000, t => Math.min(1, t / 0.0004) * (1 - t / 0.014)));
+  } else if (k === 'snare') {
+    voice(L, R, e.t, 0.17, e.p, 0.4 * e.v, noiseFn(() => 18000, t => Math.min(1, t / 0.0004) * Math.exp(-t * 22)));
+    voice(L, R, e.t, 0.06, e.p, 0.2 * e.v, triFn(t => 220 - 600 * t, t => Math.exp(-t * 40)));
+  } else if (k === 'hat') {
+    voice(L, R, e.t, e.open ? 0.16 : 0.05, e.p, 0.2 * e.v, noiseFn(() => 40000, t => Math.min(1, t / 0.0004) * Math.exp(-t * (e.open ? 18 : 80)), true));
+  } else if (k === 'crash') {
+    voice(L, R, e.t, 1.5, 0, 0.28 * e.v, noiseFn(() => 30000, t => Math.min(1, t / 0.0004) * Math.exp(-t * 2.6)));
+  }
+}
+// one SFX: chip blips, sweeps and noises tuned to D major pentatonic
+// per-kind level trims (balanced against the music with tools/audio_qa.js)
+const KG = { control: 1.6, confirm: 1.35, cap: 1.7, link: 1.6, zoom: 1.6, tick: 1.25, windowclose: 1.6, soak: 1.5, nudge: 2.2, trickle: 2.2,
+  blip: 1.5, turn90: 1.5, riser: 1.35, zoomout: 1.35, layer: 1.25, drip: 1.25, ui: 1.3, box: 1.2 };
+function playSfx(e, L, R) {
+  const k = e.k, v = e.v * (KG[e.k] || 1), f = e.f || 880, p = e.p || 0;
+  const pls = (t0, d, fAt, duty, envFn, g, pan) => voice(L, R, t0, d, pan === undefined ? p : pan, g * v, pulseFn(fAt, duty, envFn));
+  const nz = (t0, d, rateAt, envFn, g, short, pan) => voice(L, R, t0, d, pan === undefined ? p : pan, g * v, noiseFn(rateAt, envFn, short));
+  const tr = (t0, d, fAt, envFn, g) => voice(L, R, t0, d, p, g * v, triFn(fAt, envFn));
+  const dec = r => t => Math.exp(-t * r), win = d => t => Math.sin(Math.PI * clamp(t / d, 0, 1));
+  const atk = (r, a) => t => (t < a ? t / a : 1) * Math.exp(-t * r);            // short attack: onset stays crisp, no click
+  switch (k) {
+    case 'plink': pls(e.t, 0.3, () => f, 0.125, atk(12, 0.002), 0.34); tr(e.t, 0.12, () => f / 2, atk(25, 0.002), 0.3); break;
+    case 'cut': nz(e.t, 0.05, () => 30000, atk(70, 0.001), 0.4, true); break;
+    case 'slide': nz(e.t, e.d, t => 6000 + 9000 * (t / e.d), win(e.d), 0.16); break;
+    case 'whoosh': nz(e.t, e.d, t => 9000 - 6000 * (t / e.d), win(e.d), 0.16); break;
+    case 'blip': pls(e.t, 0.1, () => f, 0.25, atk(24, 0.002), 0.26); break;
+    case 'drop': pls(e.t, 0.14, t => 520 * Math.pow(3.2, t / 0.1), 0.5, atk(16, 0.002), 0.36); nz(e.t + 0.02, 0.12, () => 22000, atk(30, 0.003), 0.18, true); tr(e.t, 0.1, t => 140 * Math.exp(-t * 8), atk(30, 0.002), 0.4); break;
+    case 'soak': nz(e.t, e.d, t => 3000 + 1500 * Math.sin(t * 7), t => 0.6 * Math.sin(Math.PI * clamp(t / e.d, 0, 1)) * (0.7 + 0.3 * Math.sin(t * 31)), 0.16); break;
+    case 'sweep': { const n = 10; for (let i = 0; i < n; i++) pls(e.t + i * e.d / n, 0.07, () => mtof(pent(i, 5)), 0.125, atk(30, 0.002), 0.14); nz(e.t, e.d, t => 4000 + 12000 * t / e.d, win(e.d), 0.08); break; }
+    case 'layer': pls(e.t, 0.09, () => f, 0.5, atk(26, 0.002), 0.28); nz(e.t, 0.012, () => 36000, atk(200, 0.001), 0.18, true); break;
+    case 'zoom': nz(e.t, e.d, t => 2500 + 30000 * (t / e.d), t => Math.pow(clamp(t / e.d, 0, 1), 1.5) * (t < e.d * 0.9 ? 1 : (e.d - t) / (e.d * 0.1)), 0.16); break;
+    case 'turn90': pls(e.t, e.d, t => 220 * Math.pow(2, 2 * t / e.d) * (1 + 0.04 * Math.sign(Math.sin(t * 120))), 0.25, win(e.d), 0.12); break;
+    case 'flowtex': { const r = mulberry(404); for (let tt = 0.15; tt < e.d - 0.1; tt += 0.025 + r() * 0.05) { const g = 0.05 + 0.06 * r(); nz(e.t + tt, 0.012, () => 9000 + 9000 * r(), dec(260), g * Math.sin(Math.PI * tt / e.d), true, (r() - 0.5) * 0.8); } break; }
+    case 'drip': pls(e.t, 0.09, t => f * (1 + 2.5 * t), 0.5, atk(26, 0.002), 0.2); break;
+    case 'tick': pls(e.t, 0.05, () => f, 0.5, atk(70, 0.001), 0.3); nz(e.t, 0.01, () => 40000, atk(220, 0.001), 0.16, true); break;
+    case 'lock': pls(e.t, 0.05, () => mtof(nm('E', 6)), 0.5, atk(40, 0.001), 0.28); pls(e.t + 0.06, 0.12, () => mtof(nm('B', 6)), 0.5, atk(22, 0.001), 0.28); break;
+    case 'hcg': {               // the hCG motif: A5 → D6, a fourth up, with a triangle an octave below
+      pls(e.t, 0.16, () => mtof(nm('A', 5)), 0.5, t => env(t, 0.003, 0.03, 0.7, 0.03, 0.12), 0.3); tr(e.t, 0.16, () => mtof(nm('A', 4)), t => env(t, 0.003, 0.03, 0.7, 0.03, 0.12), 0.32);
+      pls(e.t + 0.25, 0.5, t => vibAt(mtof(nm('D', 6)), t, 0.35, 7, 0.1), 0.5, t => env(t, 0.003, 0.08, 0.6, 0.12, 0.38), 0.3); tr(e.t + 0.25, 0.5, () => mtof(nm('D', 5)), t => env(t, 0.003, 0.08, 0.6, 0.12, 0.38), 0.32); break;
+    }
+    case 'nudge': pls(e.t, 0.04, () => f, 0.25, atk(70, 0.001), 0.18); break;
+    case 'bind': nz(e.t, 0.02, () => 34000, atk(160, 0.001), 0.3, true); pls(e.t, 0.14, () => mtof(nm('F#', 6)), 0.5, atk(26, 0.001), 0.3); tr(e.t, 0.12, t => 200 * Math.exp(-t * 10) + 60, atk(18, 0.002), 0.4); break;
+    case 'riser': { const n = Math.floor(e.d / 0.0625); for (let i = 0; i < n; i++) pls(e.t + i * 0.0625, 0.06, () => mtof(pent(i, 4)), 0.125, atk(40, 0.001), 0.08 + 0.008 * i); break; }
+    case 'capture': nz(e.t, 0.03, () => 30000, atk(110, 0.001), 0.4, true); pls(e.t, 0.3, () => mtof(nm('D', 6)), 0.5, atk(9, 0.001), 0.24); pls(e.t, 0.3, () => mtof(nm('A', 6)), 0.25, atk(9, 0.001), 0.2); tr(e.t, 0.18, t => 260 * Math.exp(-t * 12) + 50, atk(12, 0.002), 0.55); break;
+    case 'link': pls(e.t, 0.08, () => f, 0.25, atk(28, 0.001), 0.22); break;
+    case 'ui': pls(e.t, 0.04, () => mtof(nm('E', 6)), 0.5, atk(70, 0.001), 0.14); break;
+    case 'box': pls(e.t, 0.035, () => mtof(nm('A', 5)), 0.5, atk(80, 0.001), 0.12); pls(e.t + 0.04, 0.035, () => mtof(nm('E', 6)), 0.5, atk(80, 0.001), 0.12); break;
+    case 'step': pls(e.t, 0.12, t => f * Math.pow(0.5, t / 0.1), 0.5, atk(18, 0.001), 0.24); break;
+    case 'cap': nz(e.t, 0.012, () => 38000, atk(240, 0.001), 0.22, true); pls(e.t, 0.06, () => f, 0.5, atk(45, 0.001), 0.2, (hash(Math.round(e.t * 8)) - 0.5) * 0.8); break;
+    case 'flip': nz(e.t, 0.12, t => 26000 - 120000 * t, win(0.12), 0.2); nz(e.t + 0.25, 0.12, t => 12000 + 120000 * t, win(0.12), 0.2); break;
+    case 'window': [0, 0.1875, 0.375, 0.5625].forEach((dt, i) => pls(e.t + dt, 0.05, () => mtof(pent(5 + i, 5)), 0.25, atk(50, 0.001), 0.2)); break;
+    case 'windowclose': [0, 0.125, 0.25, 0.375].forEach((dt, i) => pls(e.t + dt, 0.05, () => mtof(pent(8 - i, 5)), 0.25, atk(50, 0.001), 0.18)); break;
+    case 'optic': tr(e.t, e.d, () => mtof(nm('A', 6)), t => env(t, 0.02, 0.3, 0.5, 0.4, e.d - 0.4), 0.2); for (let i = 0; i < 8; i++) pls(e.t + i * 0.09, 0.08, () => mtof(pent(10 + i, 5)), 0.125, atk(30, 0.002), 0.1); break;
+    case 'osc': {              // follows the drawn electron cloud: pitch and pan swing with its displacement
+      pls(e.t, e.d, t => mtof(nm('D', 5)) * (1 + 0.06 * cloudDy(e.t + t) / 9), 0.25, t => env(t, 0.05, 0.1, 0.8, 0.2, e.d - 0.25) * 0.7, 0.2, 0);
+      tr(e.t, e.d, t => mtof(nm('D', 4)) * (1 + 0.06 * cloudDy(e.t + t) / 9), t => env(t, 0.05, 0.1, 0.8, 0.2, e.d - 0.25), 0.22); break;
+    }
+    case 'prism': [0, 0.08, 0.16].forEach((dt, i) => pls(e.t + dt, 0.18, () => mtof([nm('A', 6), nm('F#', 6), nm('D', 6)][i]), 0.125, atk(16, 0.001), 0.2)); break;
+    case 'zoomout': nz(e.t, e.d, t => 26000 - 22000 * (t / e.d), t => win(e.d)(t) * 0.8, 0.13); pls(e.t, e.d * 0.8, t => 900 * Math.pow(0.35, t / (e.d * 0.8)), 0.125, win(e.d * 0.8), 0.08); break;
+    case 'resolve': [nm('D', 5), nm('F#', 5), nm('A', 5), nm('D', 6)].forEach((m, i) => pls(e.t + i * 0.06, 0.7 - i * 0.06, () => mtof(m), 0.25, t => env(t, 0.002, 0.1, 0.55, 0.25, 0.4 - i * 0.04), 0.17)); tr(e.t, 0.6, () => mtof(nm('D', 4)), t => env(t, 0.002, 0.1, 0.6, 0.2, 0.4), 0.3); break;
+    case 'lens': pls(e.t, 0.3, t => 300 * Math.pow(4, t / 0.3), 0.25, win(0.3), 0.18); break;
+    case 'lensclose': pls(e.t, 0.3, t => 1200 * Math.pow(0.25, t / 0.3), 0.25, win(0.3), 0.18); break;
+    case 'control': pls(e.t, 0.1, () => mtof(nm('G', 5)), 0.125, atk(24, 0.001), 0.3); pls(e.t + 0.05, 0.2, () => mtof(nm('B', 5)), 0.125, atk(16, 0.001), 0.3); nz(e.t, 0.02, () => 16000, atk(140, 0.001), 0.3, true); tr(e.t, 0.14, t => 180 * Math.exp(-t * 9) + 50, atk(16, 0.002), 0.45); break;
+    case 'confirm': pls(e.t, 0.45, () => f, 0.25, t => env(t, 0.002, 0.06, 0.5, 0.2, 0.25), 0.2); tr(e.t, 0.45, () => f / 2, t => env(t, 0.002, 0.06, 0.5, 0.2, 0.25), 0.26); break;
+    case 'trickle': { const r = mulberry(55); for (let tt = 0; tt < e.d; tt += 0.08 + r() * 0.07) pls(e.t + tt, 0.03, () => mtof(pent(8 + Math.floor(r() * 4), 5)), 0.5, atk(80, 0.001), 0.07); break; }
+    case 'caution': pls(e.t, 0.16, () => mtof(nm('A', 3)), 0.5, t => env(t, 0.004, 0.03, 0.8, 0.04, 0.12), 0.2); pls(e.t + 0.2, 0.22, () => mtof(nm('G#', 3)), 0.5, t => env(t, 0.004, 0.03, 0.8, 0.06, 0.16), 0.2); break;
+    case 'land': tr(e.t, 0.14, t => 120 * Math.exp(-t * 6) + 45, atk(14, 0.002), 0.5); nz(e.t, 0.04, () => 8000, atk(60, 0.001), 0.12); break;
+  }
+}
+// ---------------------------------------------------------------- render: opts.bus 'm' (music only) / 's' (SFX only) / both
+function renderAudio(opts) {
+  opts = opts || {};
+  const L = new Float32Array(NS), R = new Float32Array(NS);
+  const sfx = sfxEvents();
+  if (opts.bus !== 's') {
+    let LL = new Float32Array(NS), LR = new Float32Array(NS);
+    for (const e of musicEvents()) playMusic(e, L, R, LL, LR);
+    // dotted-eighth ping-pong echo on the lead bus (feedback 0.32, 6 taps, circular)
+    const D = Math.round(0.375 * SR), fb = 0.32, mix = 0.36;
+    for (let i = 0; i < NS; i++) {
+      let el = 0, er = 0, w = 1;
+      for (let k = 1; k <= 6; k++) { w *= fb; const j = (i - k * D + NS * 6) % NS; if (k % 2) { el += w * LR[j]; er += w * LL[j]; } else { el += w * LL[j]; er += w * LR[j]; } }
+      L[i] += (LL[i] + el) * mix; R[i] += (LR[i] + er) * mix;
+    }
+    LL = null; LR = null;
+    // in the full mix only: the music dips a little under the big hits
+    if (opts.bus === undefined) for (const e of sfx) {
+      const dk = DUCK[e.k]; if (!dk) continue;
+      const i0 = Math.round(e.t * SR), n = Math.round(0.45 * SR), att = 0.01 * SR;
+      for (let k = 0; k < n; k++) { const i = (i0 + k) % NS, a = k < att ? k / att : Math.exp(-(k / SR - 0.01) * 7), gg = 1 - dk * a; L[i] *= gg; R[i] *= gg; }
+    }
+  }
+  if (opts.bus !== 'm') for (const e of sfx) playSfx(e, L, R);
+  // the chip's output filter (gentle low-pass), DC blocking and soft clipping; circular, in place
+  const a = Math.exp(-TAU * 11000 / SR);
+  for (const ch of [L, R]) {
+    let y = 0, x1 = 0, hp = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < NS; i++) {
+      const x = ch[i];
+      y = a * y + (1 - a) * x;
+      hp = 0.9995 * (hp + y - x1); x1 = y;
+      if (pass === 1) ch[i] = Math.tanh(hp * 0.9);
+    }
+  }
+  return { L, R };
+}
+// ---------------------------------------------------------------- player playback (one buffer, the audio clock drives the picture)
+const LIVE = { ctx: null, buf: null, src: null, gain: null, muted: false, startAt: 0, offset: 0, ready: false };
+function liveInit() {
+  if (LIVE.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  LIVE.ctx = new AC({ sampleRate: SR });
+  LIVE.gain = LIVE.ctx.createGain(); LIVE.gain.gain.value = 0.9; LIVE.gain.connect(LIVE.ctx.destination);
+}
+function liveBuild() {
+  if (LIVE.buf) return;
+  liveInit();
+  const a = renderAudio();
+  const b = LIVE.ctx.createBuffer(2, NS, SR); b.getChannelData(0).set(a.L); b.getChannelData(1).set(a.R);
+  LIVE.buf = b; LIVE.ready = true;
+}
+function livePlay(t) {
+  liveBuild();
+  if (LIVE.ctx.state === 'suspended') LIVE.ctx.resume();
+  const s = LIVE.ctx.createBufferSource(); s.buffer = LIVE.buf; s.loop = true; s.connect(LIVE.gain);
+  LIVE.startAt = LIVE.ctx.currentTime + 0.03; LIVE.offset = t; s.start(LIVE.startAt, t); LIVE.src = s;
+}
+function livePause() { if (LIVE.src) { try { LIVE.src.stop(); } catch (e) { } LIVE.src = null; } }
+function liveNow() { return (LIVE.offset + Math.max(0, LIVE.ctx.currentTime - LIVE.startAt)) % DUR; }
+function liveMute(m) { LIVE.muted = m; if (LIVE.gain) LIVE.gain.gain.value = m ? 0 : 0.9; }
+
+// ---- 40_player.js
+// ============================================================================
+// PLAYER: 180x320 canvas shown with nearest-neighbour scaling, controls
+// outside the composition. Audio starts on the first user gesture; the audio
+// clock drives the picture, so pause / resume / seek never duplicate sounds.
+// ============================================================================
+const PL = { t: 0, playing: false, wallT0: 0, pos0: 0, audioOK: true, scrubbing: false, img: null, cx: null };
+function plClock() {
+  if (!PL.playing) return PL.t;
+  if (PL.audioOK && LIVE.ctx) return liveNow();
+  return (PL.pos0 + (performance.now() - PL.wallT0) / 1000) % DUR;
+}
+function plDraw(t) {
+  renderFrame(t);
+  const d = PL.img.data, u = new Uint32Array(d.buffer); u.set(buf);
+  PL.cx.putImageData(PL.img, 0, 0);
+}
+function plFmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+function plUI() {
+  const el = PL.el;
+  el.play.innerHTML = PL.playing ? ICON.pause : ICON.play;
+  el.play.setAttribute('aria-label', PL.playing ? 'Pause' : 'Play');
+  el.mute.innerHTML = LIVE.muted ? ICON.muted : ICON.sound;
+  el.mute.setAttribute('aria-label', LIVE.muted ? 'Unmute' : 'Mute');
+  if (!PL.scrubbing) el.scrub.value = String(Math.round(PL.t * FPS));
+  el.time.textContent = plFmt(PL.t) + ' / ' + plFmt(DUR);
+  const i = sceneIndex(PL.t);
+  el.scene.textContent = String(i + 1).padStart(2, '0') + ' / ' + SCENE_NAMES.length + '  ' + SCENE_NAMES[i];
+  el.scrub.style.setProperty('--p', (PL.t / DUR * 100).toFixed(2) + '%');
+}
+function plPlay() {
+  if (PL.t >= DUR - 1 / FPS) PL.t = 0;
+  PL.playing = true; PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  try { livePlay(PL.t); if (LIVE.muted) liveMute(true); } catch (e) { PL.audioOK = false; }
+  PL.pos0 = PL.t; PL.wallT0 = performance.now();
+  plUI();
+}
+function plPause() {
+  PL.t = plClock(); PL.playing = false;
+  try { livePause(); } catch (e) { }
+  plUI();
+}
+function plSeek(t, keepPlaying) {
+  t = clamp(t, 0, DUR - 1 / FPS);
+  const was = PL.playing;
+  if (was) { try { livePause(); } catch (e) { } PL.playing = false; }
+  PL.t = t; plDraw(t);
+  if (was && keepPlaying !== false) plPlay(); else plUI();
+}
+function plLoop() {
+  if (PL.playing) {
+    let t = plClock();
+    PL.t = t; plDraw(t); plUI();
+  }
+  requestAnimationFrame(plLoop);
+}
+const ICON = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/></svg>',
+  replay: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1.5L7 6l5 4.5V7a5.5 5.5 0 1 1-5.5 5.5H4.5A7.5 7.5 0 1 0 12 5z"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15 8.6a4.6 4.6 0 0 1 0 6.8l-1.3-1.3a2.8 2.8 0 0 0 0-4.2zM17.6 6a8.3 8.3 0 0 1 0 12l-1.3-1.3a6.5 6.5 0 0 0 0-9.4z"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM15.2 9.3l1.3-1.3 2.2 2.2 2.2-2.2 1.3 1.3-2.2 2.2 2.2 2.2-1.3 1.3-2.2-2.2-2.2 2.2-1.3-1.3 2.2-2.2z"/></svg>',
+};
+function plStart() {
+  const cv = document.getElementById('screen');
+  PL.cx = cv.getContext('2d', { alpha: false });
+  PL.img = PL.cx.createImageData(W, H);
+  PL.el = { play: document.getElementById('play'), replay: document.getElementById('replay'), mute: document.getElementById('mute'), scrub: document.getElementById('scrub'), time: document.getElementById('time'), scene: document.getElementById('scene') };
+  PL.el.replay.innerHTML = ICON.replay;
+  PL.el.scrub.max = String(NF - 1);
+  const fit = () => {
+    const stage = document.getElementById('stage');
+    const aw = stage.clientWidth, ah = stage.clientHeight;
+    let s = Math.min(aw / W, ah / H);
+    if (s >= 2) s = Math.floor(s);                       // integer scale when there is room
+    cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
+  };
+  addEventListener('resize', fit); fit();
+  PL.el.play.onclick = () => (PL.playing ? plPause() : plPlay());
+  PL.el.replay.onclick = () => { plSeek(0, false); plPlay(); };
+  PL.el.mute.onclick = () => { try { liveInit(); liveMute(!LIVE.muted); } catch (e) { LIVE.muted = !LIVE.muted; } plUI(); };
+  const sc = PL.el.scrub;
+  sc.addEventListener('input', () => { PL.scrubbing = true; const t = (+sc.value) / FPS; if (PL.playing) { try { livePause(); } catch (e) { } PL.playing = false; PL.resumeAfter = true; } PL.t = t; plDraw(t); plUI(); });
+  sc.addEventListener('change', () => { PL.scrubbing = false; if (PL.resumeAfter) { PL.resumeAfter = false; plPlay(); } else plUI(); });
+  cv.addEventListener('click', () => (PL.playing ? plPause() : plPlay()));
+  addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); PL.playing ? plPause() : plPlay(); }
+    else if (e.key === 'ArrowRight') plSeek(PL.t + (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'ArrowLeft') plSeek(PL.t - (e.shiftKey ? 1 / FPS : 1));
+    else if (e.key === 'm') PL.el.mute.click();
+    else if (e.key === 'r') PL.el.replay.click();
+  });
+  document.getElementById('loading').remove();
+  plDraw(0); plUI(); requestAnimationFrame(plLoop);
+  // synthesise the soundtrack once (a couple of seconds) right after the first frame is on screen
+  PL.el.scene.textContent = 'preparing audio…';
+  setTimeout(() => { try { liveBuild(); } catch (e) { PL.audioOK = false; } plUI(); }, 60);
+}
+// public API (used by the MP4 export through Playwright)
+if (typeof window !== 'undefined') {
+  window.HCG = { W, H, FPS, DUR, NF, renderFrame, getBuf: () => buf, renderAudio, sceneIndex, seek: t => plSeek(t, false) };
+  const boot = () => setTimeout(() => { engineInit(); if (!/[?&]headless/.test(location.search)) plStart(); window.HCG.ready = true; }, 30);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+}
+
+})();
+</script>
+</body>
+</html>
