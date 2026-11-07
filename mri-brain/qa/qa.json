@@ -1,0 +1,298 @@
+{
+ "project": "/home/user/belajar-python/mri-brain/engine",
+ "spec": null,
+ "segments": [
+  {
+   "id": "s01_monitor",
+   "window_lt": [
+    0.0,
+    2.98
+   ],
+   "frames": 89,
+   "ms_mean": 21.1,
+   "ms_max": 115.4,
+   "ms_cold": 136.1,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 17.31,
+   "motion_max": 62.05,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 4.7,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s02_scanner",
+   "window_lt": [
+    0.35,
+    4.98
+   ],
+   "frames": 138,
+   "ms_mean": 77.7,
+   "ms_max": 297.6,
+   "ms_cold": 437.8,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 28.24,
+   "motion_max": 69.22,
+   "still_pairs_pct": 2.9,
+   "spike_ratio": 2.3,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s03_hydrogen",
+   "window_lt": [
+    0.35,
+    5.98
+   ],
+   "frames": 168,
+   "ms_mean": 513.6,
+   "ms_max": 12634.1,
+   "ms_cold": 7.2,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 38.21,
+   "motion_max": 91.72,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.2,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s04_nmr",
+   "window_lt": [
+    0.35,
+    5.98
+   ],
+   "frames": 168,
+   "ms_mean": 26.6,
+   "ms_max": 44.6,
+   "ms_cold": 31.8,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 3.14,
+   "motion_max": 17.69,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 8.2,
+   "spikes_at_lt": [
+    0.519,
+    0.552,
+    0.586,
+    0.62,
+    0.653,
+    0.687
+   ],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s05_rf",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 32.3,
+   "ms_max": 207.4,
+   "ms_cold": 7.3,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 8.09,
+   "motion_max": 68.52,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 34.4,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.35,
+     0.619
+    ],
+    [
+     0.72,
+     2.703
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s06_relax",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 6.4,
+   "ms_max": 21.4,
+   "ms_cold": 7.6,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 1.07,
+   "motion_max": 10.6,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 13.5,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     4.153,
+     4.49
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s07_gradients",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 23.9,
+   "ms_max": 416.4,
+   "ms_cold": 78,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 6.72,
+   "motion_max": 58.14,
+   "still_pairs_pct": 15.2,
+   "spike_ratio": 35.3,
+   "spikes_at_lt": [
+    3.312,
+    3.446,
+    3.48,
+    3.514,
+    3.547,
+    3.581,
+    3.615,
+    3.648,
+    3.682,
+    3.715,
+    3.749,
+    3.783,
+    3.884,
+    3.917,
+    3.951,
+    3.985,
+    4.018,
+    4.052,
+    4.086
+   ],
+   "camera_events_lt": [
+    [
+     0.552,
+     1.225
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s08_signal",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 8.9,
+   "ms_max": 15.1,
+   "ms_cold": 11.1,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 5.97,
+   "motion_max": 13.95,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.5,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s09_recon",
+   "window_lt": [
+    0.35,
+    8.98
+   ],
+   "frames": 258,
+   "ms_mean": 6.1,
+   "ms_max": 19.0,
+   "ms_cold": 5.3,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 3.71,
+   "motion_max": 37.62,
+   "still_pairs_pct": 3.9,
+   "spike_ratio": 35.1,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     2.902,
+     3.372
+    ],
+    [
+     3.607,
+     5.555
+    ],
+    [
+     5.622,
+     6.126
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s10_brain3d",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 16.5,
+   "ms_max": 50.1,
+   "ms_cold": 76.5,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 10.77,
+   "motion_max": 35.86,
+   "still_pairs_pct": 4.6,
+   "spike_ratio": 3.1,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s11_final",
+   "window_lt": [
+    0.35,
+    4.98
+   ],
+   "frames": 138,
+   "ms_mean": 21.4,
+   "ms_max": 59.2,
+   "ms_cold": 10.4,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 16.4,
+   "motion_max": 30.31,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 1.7,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  }
+ ],
+ "transitions": [],
+ "page_errors": []
+}

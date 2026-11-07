@@ -1,0 +1,433 @@
+{
+ "project": "/home/user/belajar-python/electron-microscope/engine",
+ "spec": null,
+ "segments": [
+  {
+   "id": "s01_hook",
+   "window_lt": [
+    0.0,
+    3.98
+   ],
+   "frames": 119,
+   "ms_mean": 31.8,
+   "ms_max": 66.9,
+   "ms_cold": 72.4,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 17.62,
+   "motion_max": 69.91,
+   "still_pairs_pct": 6.8,
+   "spike_ratio": 9.6,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.978,
+     2.901
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s02_lab",
+   "window_lt": [
+    0.35,
+    4.98
+   ],
+   "frames": 138,
+   "ms_mean": 27.8,
+   "ms_max": 48.7,
+   "ms_cold": 46.2,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 8.69,
+   "motion_max": 14.8,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 1.5,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s03_column",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 37.3,
+   "ms_max": 79.2,
+   "ms_cold": 33.8,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 21.4,
+   "motion_max": 36.5,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 1.6,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s04_sample",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 88.0,
+   "ms_max": 684.9,
+   "ms_cold": 70.2,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 20.99,
+   "motion_max": 73.4,
+   "still_pairs_pct": 5.6,
+   "spike_ratio": 4.3,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s05_vacuum",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 46.4,
+   "ms_max": 684.5,
+   "ms_cold": 42.7,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 16.75,
+   "motion_max": 58.27,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 4.8,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s06_emission",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 30.9,
+   "ms_max": 177.4,
+   "ms_cold": 22.3,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 15.88,
+   "motion_max": 49.6,
+   "still_pairs_pct": 1.3,
+   "spike_ratio": 3.6,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s07_accel",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 19.6,
+   "ms_max": 45.0,
+   "ms_cold": 18.7,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 22.81,
+   "motion_max": 41.34,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 1.7,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s08_wave",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 28.9,
+   "ms_max": 74.3,
+   "ms_cold": 14.2,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 10.87,
+   "motion_max": 57.36,
+   "still_pairs_pct": 0.5,
+   "spike_ratio": 24.1,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.35,
+     1.292
+    ],
+    [
+     6.307,
+     6.98
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s09_lens",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 25.4,
+   "ms_max": 51.6,
+   "ms_cold": 59.9,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.35,
+   "motion_max": 43.67,
+   "still_pairs_pct": 6.1,
+   "spike_ratio": 98.8,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.35,
+     0.518
+    ],
+    [
+     0.586,
+     0.888
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s10_corrector",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 25.5,
+   "ms_max": 63.3,
+   "ms_cold": 32.4,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.85,
+   "motion_max": 59.16,
+   "still_pairs_pct": 17.3,
+   "spike_ratio": 91.5,
+   "spikes_at_lt": [
+    4.052,
+    4.086,
+    4.119,
+    4.153,
+    4.187,
+    4.22,
+    4.254,
+    4.288,
+    4.321,
+    4.355,
+    4.389,
+    4.422,
+    4.456,
+    4.49
+   ],
+   "camera_events_lt": [
+    [
+     4.759,
+     5.432
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s11_scan",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 387.5,
+   "ms_max": 934.0,
+   "ms_cold": 603.7,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 1.46,
+   "motion_max": 11.19,
+   "still_pairs_pct": 0.4,
+   "spike_ratio": 9.0,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     2.736,
+     3.106
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s12_scatter",
+   "window_lt": [
+    0.35,
+    8.98
+   ],
+   "frames": 258,
+   "ms_mean": 94.0,
+   "ms_max": 901.8,
+   "ms_cold": 156.9,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 5.31,
+   "motion_max": 61.7,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 21.6,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.35,
+     0.954
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s13_zcontrast",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 104.6,
+   "ms_max": 270.6,
+   "ms_cold": 197.6,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 1.61,
+   "motion_max": 4.32,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 3.0,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s14_detector",
+   "window_lt": [
+    0.35,
+    7.98
+   ],
+   "frames": 228,
+   "ms_mean": 19.7,
+   "ms_max": 154.2,
+   "ms_cold": 19.2,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.32,
+   "motion_max": 29.59,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 30.8,
+   "spikes_at_lt": [
+    1.459,
+    1.627,
+    1.661,
+    1.694,
+    1.728,
+    1.762,
+    1.795,
+    1.829,
+    1.863
+   ],
+   "camera_events_lt": [
+    [
+     2.938,
+     3.341
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s15_image",
+   "window_lt": [
+    0.35,
+    8.98
+   ],
+   "frames": 258,
+   "ms_mean": 30.9,
+   "ms_max": 70.2,
+   "ms_cold": 36.7,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.95,
+   "motion_max": 25.39,
+   "still_pairs_pct": 19.1,
+   "spike_ratio": 33.9,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.417,
+     1.559
+    ],
+    [
+     3.641,
+     5.387
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "s16_final",
+   "window_lt": [
+    0.35,
+    6.98
+   ],
+   "frames": 198,
+   "ms_mean": 33.1,
+   "ms_max": 54.8,
+   "ms_cold": 48.6,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 17.87,
+   "motion_max": 72.22,
+   "still_pairs_pct": 0.5,
+   "spike_ratio": 6.9,
+   "spikes_at_lt": [
+    2.706,
+    2.739,
+    2.773,
+    2.807,
+    2.84,
+    2.874
+   ],
+   "camera_events_lt": [
+    [
+     0.35,
+     0.518
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  }
+ ],
+ "transitions": [],
+ "page_errors": []
+}
