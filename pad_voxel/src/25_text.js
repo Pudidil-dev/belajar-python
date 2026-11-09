@@ -5,7 +5,7 @@
 // touches the animation. Style: white pixel letters on a dark dithered band at
 // the top with a thin cyan edge; the two key terms (STENOSIS / OCCLUSION) are
 // bigger with an orange edge; the final title stays to the last frame. Bands
-// open and close in stepped wipes — no fades, no blur.
+// slide open and closed with an ease, letters type in — no fades, no blur.
 // ============================================================================
 const TXT = { y: 75, sc: 2, lh: 20, padX: 11, padY: 6, maxW: 293 };
 const L_ = k => (LABELS[k] === undefined ? '' : String(LABELS[k]));
@@ -30,7 +30,7 @@ function caption(s, t0, t1, t, o) {
   const k = stepK(t, t0, t1, 4, 0.2);
   band(x0, y0, bw, bh, k, key ? P.WARN : P.ACC);
   if (k < 1) return;
-  const n = Math.ceil(clamp((t - t0 - 0.2) / 0.25, 0, 1) * 6) / 6;     // the letters wipe in, left to right, in 6 steps
+  const n = clamp((t - t0 - 0.2) / 0.3, 0, 1);                         // the letters type in, left to right
   lines.forEach((ln, i) => {
     const lx = Math.round(x0 + 2 + (bw - 2 - textW(f, ln, sc, key)) / 2), ly = y0 + TXT.padY + i * lh;
     text(f, ln, lx, ly, { sc, c: P.INK, ol: null, shadow: P.SH, sd: 1, bold: key, n: Math.ceil(ln.length * n) });
@@ -70,8 +70,8 @@ function overlays(t) {
   label(L_('s12demand'), BARS.lx, BARS.y - 4, EV.cut12 + 0.6, EV.rest13 + 2.85, t, { left: true, c: P.WARN, maxW: BARS.x - BARS.lx - 10 });
   label(L_('s12supply'), BARS.lx, BARS.y + BARS.gap - 4, EV.cut12 + 0.6, EV.rest13 + 2.85, t, { left: true, c: P.ACC, maxW: BARS.x - BARS.lx - 10 });
   // orientation of the CTA display: the patient's right is on the viewer's left
-  label(L_('s17right'), VIEW.x0 + 20, VIEW.y0 + 9, EV.cap17, EV.comp20, t);
-  label(L_('s17left'), VIEW.x1 - 20, VIEW.y0 + 9, EV.cap17, EV.comp20, t);
+  label(L_('s17right'), VIEW.x0 + 20, VIEW.y0 + 9, EV.cta17 + 1.75, EV.comp20, t);
+  label(L_('s17left'), VIEW.x1 - 20, VIEW.y0 + 9, EV.cta17 + 1.75, EV.comp20, t);
   // the comparison and the final title
   label(L_('s20normal'), CX - 90, 135, EV.cap20, DUR + 1, t, { sc: 2, maxW: 166, accent: P.ACC });
   label(L_('s20pad'), CX + 90, 135, EV.cap20 + 0.375, DUR + 1, t, { sc: 2, maxW: 166, accent: P.WARN });

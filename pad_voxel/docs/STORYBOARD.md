@@ -2,7 +2,7 @@
 
 63.000 s · 9:16 · 1080×1920 (a 360×640 pixel grid shown exactly 3× nearest-neighbour) · 60 fps · 21 scenes × 3 s.
 The picture sheet is `docs/storyboard.png` (one labeled frame per scene); the shot list with camera moves is `镜头表.md`.
-Version 2 (the look of the earlier CTA film); what changed from version 1 and why: `docs/REVISION_ANALYSIS.md`.
+Version 3 (the look of the earlier CTA film, natural motion, a realistic CT sequence); what changed and why: `docs/REVISION_ANALYSIS.md`.
 
 **Shared style for every prompt below.** 3D pixel-art medical animation in the look of the CTA film: smooth shaded
 models (no cubes) lit in limited five-step material ramps with ordered-dither steps between the tones, a soft rim light,
@@ -20,12 +20,12 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 ---
 
 ### S01 · 0:00–0:03 · WALKING
-**Camera:** lateral tracking from the patient's right at hip height (32° lens), lead room ahead of him.
-**Prompt:** A middle-aged man in a grey-blue T-shirt, dark knee-length shorts, white socks and grey trainers walks across a floor of large dark-navy checker tiles, framed from the shoulders down; smooth shaded skin with a rim light, natural adult proportions, arms swinging opposite the legs, heel strikes on each beat; soft contact shadows under the feet; the tiles slide past to show his speed. Text: *Pain while walking?* (optional).
+**Camera:** lateral tracking from the patient's right at hip height (32° lens), following the hips' running average like a camera operator, so the body breathes inside the frame.
+**Prompt:** A middle-aged man in a grey-blue T-shirt, dark knee-length shorts, white socks and grey trainers walks across a floor of large dark-navy checker tiles, framed from the shoulders down; smooth shaded skin with a rim light, natural adult proportions. A natural, unhurried walk: each foot lands on the heel, rolls flat, then pushes off from the toes while the heel rises; the swinging foot clears the floor on a smooth arc; the hips rise over the standing leg and dip when both feet are down, sway toward the standing foot and turn with the leading leg; the shoulders turn against the hips; the arms swing a moment behind the legs with the elbows bending as they come forward; heel strikes on each beat; soft contact shadows. Text: *Pain while walking?* (optional).
 
 ### S02 · 0:03–0:06 · THE PATIENT STOPS
 **Camera:** slow push in toward the right calf.
-**Prompt:** His stride shortens over three steps; he stops, bends forward and holds the back of his right calf with his right hand; the calf skin warms to orange from inside (pain on exertion) and short orange pixel strokes flick out from it on the beat. His head stays out of frame.
+**Prompt:** His steps shorten over three beats; a last short step brings the left foot up just behind the right and he stops. Overlapping actions: the knees give first, the back bends, then the right hand reaches round on an arc to the back of the right calf (the left hand braces on the left thigh) and rubs it while he breathes hard; both feet stay planted. The calf skin warms to orange from inside (pain on exertion) and short orange pixel strokes flick out from it on the beat. His head stays out of frame.
 
 ### S03 · 0:06–0:09 · ENTER THE LEG
 **Camera:** fast push: behind the knee, then up along the artery, then a dive into its lumen.
@@ -64,28 +64,28 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 **Prompt:** Two pink side channels around the blocked segment — present all along — widen into curved bypasses from above the block to below it; a thin stream of red cells travels through them and on, slowly, below the block. The block itself stays closed. Text: *Collateral flow*.
 
 ### S12 · 0:33–0:36 · WALKING INCREASES DEMAND
-**Camera:** cut to a side view tracking the walking legs.
-**Prompt:** The patient walks again; his right leg is glass showing red-brown calf muscles that turn orange and pulse with each step and the red arteries inside; his left leg is solid. At the top, under the caption, two bars without numbers: an orange *Demand* bar (muscle icon) climbs with each step past a fixed white mark, a cyan *Supply* bar (drop icon) stays at that mark; the overflow of the demand bar pulses orange. Text: *Demand exceeds supply*, *Demand*, *Supply*.
+**Camera:** cut to a side view tracking the walking legs smoothly.
+**Prompt:** The patient walks again with the same natural heel-to-toe walk, breathing harder; his right leg is glass showing red-brown calf muscles that turn orange and pulse with each step and the red arteries inside; his left leg is solid. At the top, under the caption, two bars without numbers: an orange *Demand* bar (muscle icon) climbs with each step past a fixed white mark, a cyan *Supply* bar (drop icon) stays at that mark; the overflow of the demand bar pulses orange. Text: *Demand exceeds supply*, *Demand*, *Supply*.
 
 ### S13 · 0:36–0:39 · REST RELIEVES THE SYMPTOM
-**Camera:** hold, close on the calves.
-**Prompt:** He stands still and slowly straightens; his hand leaves the calf; the orange glow fades; the demand bar falls back below the unchanged supply mark. Nothing in the arteries changes. Text: *Rest reduces demand*.
+**Camera:** a slow push in on the calves.
+**Prompt:** He stands still: his hand lets go of the calf, then his back straightens and his knees last, his breathing slows and his weight drifts gently from foot to foot; the orange glow fades; the demand bar falls back below the unchanged supply mark. Nothing in the arteries changes. Text: *Rest reduces demand*.
 
 ### S14 · 0:39–0:42 · CT ANGIOGRAPHY
-**Camera:** hold, a camera fixed in the room beside the gantry.
-**Prompt:** A generic grey CT gantry (no brand) with its table; the patient lies on his back under a pale sheet, head first, and slides into the bore (his head is inside, never seen); his right forearm rests on an arm board with an IV cannula; a contrast injector on a stand beside the table is connected by tubing that fills white-blue as the injection starts. Text: *CT angiography*.
+**Camera:** fixed in the room at the foot end of the table, a slow push toward the gantry.
+**Prompt:** A generic grey CT gantry (no brand) with a lit cyan ring round the bore, control panels with lit keys, a laser slot and an X-ray lamp; the table on its pedestal with a dark mattress. The same patient lies on his back, head first, arms raised above his head, shoes off (white socks), a flat strap over his knees; his head and arms are already inside the bore (never seen). The table glides slowly into the gantry while the red positioning laser draws a line across his body and runs down it as he passes; an IV line hangs from the dual-syringe injector beside the gantry, along the table edge into the bore to the cannula in his right elbow; as the table stops, the injector starts and white-blue contrast runs down the tube. Text: *CT angiography*.
 
 ### S15 · 0:42–0:45 · CONTRAST CIRCULATION
 **Camera:** slow lateral move and descent.
-**Prompt:** A glass torso: see-through pink lungs, a steel-blue right heart and veins, a red left heart and aorta continuing down to the iliac arteries; a white-blue contrast front travels arm vein → superior vena cava → right heart → pulmonary arteries → lungs → pulmonary veins → left heart → aorta and down toward the legs. White-blue is a teaching colour.
+**Prompt:** A glass torso: see-through pink lungs, a steel-blue right heart and veins, a red left heart and aorta continuing down to the iliac arteries; a white-blue contrast front travels from the cannula in the raised right elbow down the arm vein → subclavian vein → superior vena cava → right heart → pulmonary arteries → lungs → pulmonary veins → left heart → aorta and down toward the legs. White-blue is a teaching colour.
 
-### S16 · 0:45–0:48 · PELVIS-TO-FOOT FILLING
-**Camera:** vertical tracking from the pelvis down to the feet.
-**Prompt:** Inside a dark-navy glass body, the arterial tree from the aorta to both feet: a translucent red wall around each lumen; the lumen casts turn from blood red to white-blue as the contrast front moves down; yellow-orange plaque sleeves, white calcium nodules and the orange-brown occlusion plug sit in the walls; on the right leg the vessels below the popliteal block fill later, through the collaterals.
+### S16 · 0:45–0:48 · SCAN IMAGES
+**Camera:** hold in the control room, behind the console.
+**Prompt:** The CT control room: a dark wall with a lead-glass window; through it the gantry with its X-ray lamp lit and the table carrying the patient's legs on through the bore at a steady speed (the helical scan). In front, a console monitor on a desk with a keyboard: a grey topogram (frontal scout of the belly to the feet) with an orange scan-range box and a cyan line running down it; beside it the newest axial CT image in greys — air black, fat dark, muscle mid grey, bone cortex near white — with the contrast-filled arteries bright: belly (aorta beside the spine), pelvis, both thighs (the narrowed, calcified right SFA), the knees (the right popliteal without a bright lumen, small bright collaterals around it), the calves (the three tibial arteries) and the ankles; the earlier images line up as thumbnails below, one with each chime. A progress bar and a radiation lamp; no numbers.
 
 ### S17 · 0:48–0:51 · CTA RECONSTRUCTION
-**Camera:** pull back while the image turns slowly.
-**Prompt:** A volume-rendered CTA reconstruction on near-black: both legs' arteries from the aorta to the feet in smooth ivory-to-white shading, faint dithered bones (pelvis, femurs, tibiae), calcium the brightest white with a dark outline; viewer corner brackets, a tick ruler, *R* on the viewer's left and *L* on the right. Text: *Arterial reconstruction*, *R*, *L*.
+**Camera:** from a high three-quarter view down to the level CTA view, turning all the way.
+**Prompt:** The axial images become thin translucent slabs that drop into place one under another, belly to feet, building the volume of both legs; the soft tissue thins away like a screen door, leaving the bright bones and the contrast-filled arteries, which become a volume-rendered CTA reconstruction on near-black: both legs' arteries from the aorta to the feet in smooth ivory-to-white shading, faint dithered bones, calcium the brightest white with a dark outline; viewer corner brackets, a tick ruler, *R* on the viewer's left and *L* on the right. Text: *Arterial reconstruction*, *R*, *L*.
 
 ### S18 · 0:51–0:54 · STENOSIS ON CTA
 **Camera:** fast push to the right superficial femoral artery, then a slow orbit.

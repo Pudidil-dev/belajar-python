@@ -27,8 +27,8 @@ function standingPose(q) {
 function refPatient(view) {
   r3dBegin(); skyBG(P.K0, P.N2);
   if (view === 'supine') {
-    const cam = camLook([-1700, -2300, 1500], [-80, -700, -60], [0, 0, 1], 34);
-    drawCTRoom(cam, 0, 0); r3dOutlines();
+    const t = EV.tableStop, cam = ctCam(t);
+    drawCTRoom(cam, ctG(t), { t, laser: 1 }); r3dOutlines();
   } else {
     const hold = view === 'hold', pose = standingPose({ amp: 0, hold: hold ? 1 : 0 });
     const c = view === 'front' ? camLook([2700, 800, 0], [0, 760, 0], [0, 1, 0], 32) : camLook([60, 800, 2700], [60, 760, 0], [0, 1, 0], 32);
@@ -37,7 +37,7 @@ function refPatient(view) {
     r3dOutlines();
   }
   const T = { front: ['FRONT', 'standing, neck down'], side: ['RIGHT SIDE', 'the camera side: the symptomatic right leg is the near leg'],
-    hold: ['HOLDING THE CALF', 'scenes 2 and 13: the right calf glows orange where it hurts'], supine: ['ON THE CT TABLE', 'scene 14: supine under a sheet, the head inside the gantry'] }[view];
+    hold: ['HOLDING THE CALF', 'scenes 2 and 13: the right calf glows orange where it hurts'], supine: ['ON THE CT TABLE', 'scene 14: on his back, head first, arms raised, shoes off'] }[view];
   refTitle(T[0], T[1]);
 }
 // ---------------------------------------------------------------- normal anatomy (both legs, aorta to feet)

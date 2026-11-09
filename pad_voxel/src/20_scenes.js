@@ -10,16 +10,21 @@
 const ph = (t, a, b, e) => (e || smooth)(seg(t, a, b));
 const lin = x => x;
 const camAB = (e0, t0, e1, t1, f, fov, up) => camLook(lerp3(e0, e1, f), lerp3(t0, t1, f), up || [0, 1, 0], fov || 34);
-const qg = (x, n) => Math.round(clamp(x, 0, 1) * n) / n;            // quantised disease state (cached meshes)
+const qg = (x, n) => Math.round(clamp(x, 0, 1) * n) / n;            // disease state on a fine grid (finer than a frame's change: it grows smoothly)
 let G_T = 0;                                                          // the frame's time (for overlays that blink on the grid)
 // ---------------------------------------------------------------- 01-02: walking, slowing, stopping, holding the calf
 const PT_HOLD_END = 6.0, FOG_W = [2400, 9000, P.N2];
+// the stop and the reach for the calf as overlapping actions: the knees give first, the back bends, the arm follows
 function walkState(t) {
-  const tt = Math.min(t, 6), w = WALK.at(tt), hold = ph(tt, EV.hold - 0.1, EV.hold + 0.7);
-  return { root: [w[0], w[1], 0], q: { ph: gaitPhase(tt), amp: gaitAmp(tt), hold } };
+  const tt = Math.min(t, 6), g = WALK.sample(tt);
+  const holdLeg = ph(tt, EV.hold + 0.1, EV.hold + 0.8, eio), holdTorso = ph(tt, EV.hold + 0.2, EV.hold + 1.0, eio), holdArm = ph(tt, EV.hold + 0.3, EV.hold + 1.1, eio);
+  return { root: g.p, q: { g, holdLeg, holdTorso, holdArm, t, effort: ph(t, EV.slow, EV.hold + 0.6) } };
 }
+// a camera operator follows the walker smoothly: the hips speed up and slow down within every step, the camera
+// tracks their running average (a Gaussian over about half a second), so the body breathes inside the frame
+function smoothX(tab, t, lo, hi) { let s = 0, w = 0; for (let k = -7; k <= 7; k++) { const g = Math.exp(-k * k / 24); s += g * tab.at(clamp(t + k * 0.05, lo, hi))[0]; w += g; } return s / w; }
 function walkCam(t) {
-  const w = WALK.at(Math.min(t, 6))[0];
+  const w = smoothX(WALK, Math.min(t, 6), -0.5, 6);
   const A = { e: [w + 300, 780, 2900], g: [w + 160, 640, 0] };                // lateral tracking, lead room ahead of him
   const B = { e: [w + 120, 480, 1450], g: [w + 10, 330, 92] };                 // closer: the right calf
   const f = ph(t, 3.4, 5.6, eio);
@@ -37,22 +42,21 @@ function painMarks(cam, pose, k, t) {
   }
 }
 function sWalk(t) {
-  const s = walkState(t), cam = walkCam(t), pose = patientPose(s.root, 0, s.q), pain = ph(t, EV.pain - 0.3, EV.pain + 0.75);
+  const s = walkState(t), cam = walkCam(t), pose = plantedPose(s.root, s.q), pain = ph(t, EV.pain - 0.3, EV.pain + 0.75);
   skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: pain * 0.85, fog: FOG_W });
   r3dOutlines();
   painMarks(cam, pose, ph(t, EV.pain, EV.pain + 0.4, lin), t);
 }
 // ---------------------------------------------------------------- 03: into the leg (skin → muscle → arteries → the thigh artery)
-function holdPose() { const s = walkState(PT_HOLD_END); return patientPose(s.root, 0, s.q); }
+function holdPose(t) { const s = walkState(PT_HOLD_END); return plantedPose(s.root, Object.assign({}, s.q, { t: t === undefined ? PT_HOLD_END : t })); }
 function legCam(t, pose) {
   // the calf (where it hurts) → up along the artery → into the thigh artery at the site of the later stenosis (L1)
   const K = mApply(pose.right.sh, [0, 0, 0]), A = treeToWorld(pose, [-76, 690, 4]), c0 = walkCam(PT_HOLD_END);
   const k1 = { e: add3(K, [-640, 40, 560]), g: add3(K, [-60, -170, 0]) };
   const o2 = [-300, 30, 280], k2 = { e: add3(A, o2), g: A };
   const u = t - EV.reveal;
-  if (u < 1.2) return camAB(c0.eye, c0.tg, k1.e, k1.g, eio(u / 1.2), 34);
-  if (u < 2.25) return camAB(k1.e, k1.g, k2.e, k2.g, eio((u - 1.2) / 1.05), 34);
+  if (u < 2.25) return camSpline([{ t: 0, e: c0.eye, g: c0.tg }, { t: 1.2, e: k1.e, g: k1.g }, { t: 2.25, e: k2.e, g: k2.g }], u, 34);   // one glide: down to the calf, up the thigh
   // the dive: the distance shrinks on a log scale (an even push), so the red artery already fills the frame
   // when the crossfade into its lumen starts (EV.cut4 - 0.25): red blends into pink, never the navy room
   const s = eio(clamp((u - 2.25) / 0.75, 0, 1)), o4 = [0, 6, 40];   // ends in front of the SFA, the profunda off to the side
@@ -64,7 +68,7 @@ function sLeg(t) {
   // world, so the crossfade into the lumen blends red into red (navy straight into red or pink would pass
   // through a muddy purple)
   const warm = ph(t, EV.dive + 0.2, EV.cut4, eio), via = (a, b) => warm < 0.5 ? mixc(a, SKY_DARK, 2 * warm) : mixc(SKY_DARK, b, 2 * warm - 1);
-  const bot = via(P.N2, MSKY_BOT), pose = holdPose(), cam = legCam(t, pose), fog = [600, 6000, bot];
+  const bot = via(P.N2, MSKY_BOT), pose = holdPose(t), cam = legCam(t, holdPose()), fog = [600, 6000, bot];
   skyBG(via(P.K0, MSKY_TOP), bot); drawFloor(cam, fog);
   // the right leg turns to glass and stays; the rest of the body dissolves pixel by pixel; then the muscle clears
   const glass = ph(t, EV.reveal, EV.reveal + 0.75), bodyA = 1 - ph(t, EV.reveal + 0.2, EV.muscle + 0.2), musA = 1 - ph(t, EV.artery - 0.2, EV.artery + 0.5) * 0.85;
@@ -82,9 +86,9 @@ const FIELD = {};
 const fieldOf = (st, n, seed) => { const k = JSON.stringify(st) + n + seed; return FIELD[k] || (FIELD[k] = cellField(st, n, seed)); };
 const MSKY_TOP = hexc('#14070C'), MSKY_BOT = hexc('#2A0C14'), MSKY = () => skyBG(MSKY_TOP, MSKY_BOT), SKY_DARK = hexc('#050506');
 function microState(t) {                                              // the wall through the disease story: one segment, one state at a time
-  if (t < EV.ldl[0]) return { g: 0, xc: AR.XS, w: AR.WS, sick: t < EV.push6 ? 0 : qg(ph(t, EV.sick - 0.3, EV.sick + 0.9), 6) };
-  if (t < EV.grow8) return { g: qg(0.35 * ph(t, EV.foam - 0.2, EV.grow8), 12), xc: AR.XS, w: AR.WS, sick: 1 };
-  if (t < EV.comp9) return { g: qg(lerp(0.35, 1, ph(t, EV.grow8, EV.comp9 - 0.2)), 16), cal: qg(ph(t, EV.calc[0] - 0.2, EV.calc[1] + 0.3), 4), xc: AR.XS, w: AR.WS, sick: 1 };
+  if (t < EV.ldl[0]) return { g: 0, xc: AR.XS, w: AR.WS, sick: t < EV.push6 ? 0 : qg(ph(t, EV.sick - 0.3, EV.sick + 0.9), 90) };
+  if (t < EV.grow8) return { g: qg(0.35 * ph(t, EV.foam - 0.2, EV.grow8), 240), xc: AR.XS, w: AR.WS, sick: 1 };
+  if (t < EV.comp9) return { g: qg(lerp(0.35, 1, ph(t, EV.grow8, EV.comp9 - 0.2)), 240), cal: qg(ph(t, EV.calc[0] - 0.2, EV.calc[1] + 0.3), 90), xc: AR.XS, w: AR.WS, sick: 1 };
   return { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1 };
 }
 const vxf = (t, xf) => mMul(xf || MICRO_XF, mS(1, pulseScale(t), pulseScale(t)));
@@ -97,14 +101,20 @@ function normalCam(t) {
   return base;
 }
 function sNormal(t) {                                                  // 04-08
-  const st = microState(t), cam = normalCam(t), xf = vxf(t), close = t >= EV.push6 && t < EV.pull7 + 0.6;
+  const st = microState(t), cam = floatCam(normalCam(t), t, 1.4), xf = vxf(t), close = t >= EV.push6 && t < EV.pull7 + 0.6;
   MSKY(); drawVessel(cam, st, xf);
-  drawCells(cam, xf, st, fieldOf({ g: qg(st.g, 4), xc: st.xc, w: st.w }, 70, 3), t, { rate: 0.075, count: close ? 30 : 70 });
+  drawCells(cam, xf, st, cellField({ g: st.g, xc: st.xc, w: st.w }, 70, 3), t, { rate: 0.075, count: close ? 30 : 70 });
   // white cells roll along the dysfunctional lining and stick
-  if (t >= EV.push6 && t < EV.grow8 + 1) EV.wbc.forEach((e, i) => { const stop = st.xc - 20 + i * 26, x = t < e ? stop - (e - t) * 40 : stop; drawWBC(cam, xf, x, wallSurfY(x, st) + 6, -9 - i * 3); });
+  // white cells roll along the wall (turning as they roll), slow down, flatten a little and stick
+  if (t >= EV.push6 && t < EV.grow8 + 1) EV.wbc.forEach((e, i) => {
+    const stop = st.xc - 20 + i * 26, tau = e - t, T = 0.6, v = 40, x = tau <= 0 ? stop : tau <= T ? stop - v * tau * tau / (2 * T) : stop - v * T / 2 - v * (tau - T);
+    drawWBC(cam, xf, x, wallSurfY(x, st) + 6, -9 - i * 3, 1, -(x - stop) / 5.4, smooth(clamp(-tau / 0.5, 0, 1)));
+  });
   // lipid slips under the lining into the wall; a macrophage takes it up and becomes a foam cell
   if (t >= EV.ldl[0] - 0.4 && t < EV.comp9) {
-    EV.ldl.forEach((e, i) => { if (t < e - 0.35) return; for (let j = 0; j < 3; j++) { const x = st.xc - 18 + i * 12 + j * 5, ws = wallSurfY(x, st), f = ph(t, e - 0.35, e + 0.25); drawLDL(cam, xf, x, lerp(ws + 6, ws - 2.4 - j * 1.1, f), lerp(-4, 0.4, f)); } });
+    EV.ldl.forEach((e, i) => { if (t < e - 0.6) return; for (let j = 0; j < 3; j++) {           // lipid drifts in on a curve and slips under the lining
+      const x0 = st.xc - 18 + i * 12 + j * 5, f = ph(t, e - 0.6 + 0.06 * j, e + 0.3, eio), x = x0 - 7 * (1 - f) + 1.2 * Math.sin(Math.PI * f) * Math.sin(t * 6 + j), ws = wallSurfY(x, st);
+      drawLDL(cam, xf, x, lerp(ws + 7, ws - 2.4 - j * 1.1, f) + 1.6 * Math.sin(Math.PI * f), lerp(-5, 0.4, f)); } });
     if (t >= EV.ldl[1]) { const x = st.xc + 6; drawFoam(cam, xf, x, (-AR.RI + wallSurfY(x, st)) / 2, ph(t, EV.foam - 0.2, EV.foam + 0.4)); }
   }
   r3dOutlines();
@@ -113,7 +123,7 @@ function sNormal(t) {                                                  // 04-08
 }
 // 09: normal and narrowed, side by side, same scale
 function sCompare(t) {
-  const x0 = AR.XS, cam = camLook([0, microAt(x0) + 5, 500], [0, microAt(x0), -10], [0, 1, 0], 36);
+  const x0 = AR.XS, cam = floatCam(camLook([0, microAt(x0) + 5, lerp(520, 490, ph(t, EV.comp9, EV.comp9 + 3, lin))], [0, microAt(x0), -10], [0, 1, 0], 36), t, 2);
   const stN = { g: 0, xc: AR.XS, w: AR.WS }, stS = { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1 };
   const slide = ph(t, EV.comp9, EV.comp9 + 0.5, eout), pS = mS(1, pulseScale(t), pulseScale(t));
   const xfN = mMul(mT(-44 - 80 * (1 - slide), 0, 0), mMul(MICRO_XF, pS)), xfS = mMul(mT(44 * slide, 0, 0), mMul(MICRO_XF, pS));
@@ -131,21 +141,22 @@ function sCompare(t) {
 const OCC_ST = { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1, occ: { xc: AR.XO, w: AR.WO } };
 function occCam(t) {
   const c0 = microCam(AR.XS, 270, 0), c1 = microCam(AR.XO - 20, 270, 0), c2 = microCam(AR.XO - 32, 175, 0), c3 = microCam(AR.XO - 8, 360, 10, 10);
-  if (t < EV.pull11) { const a = camAB(c0.eye, c0.tg, c1.eye, c1.tg, ph(t, EV.pan10, EV.pan10 + 1.0, eio), 36); return camAB(a.eye, a.tg, c2.eye, c2.tg, ph(t, EV.block10, EV.block10 + 0.75, eio), 36); }
-  return camAB(c2.eye, c2.tg, c3.eye, c3.tg, ph(t, EV.pull11, EV.pull11 + 1.0, eio), 36);
+  // the pan down the artery runs straight into the slow push to the block (one move, no pause between), then a float
+  if (t < EV.pull11) return floatCam(camSpline([{ t: EV.pan10, e: c0.eye, g: c0.tg }, { t: EV.pan10 + 0.95, e: c1.eye, g: c1.tg }, { t: EV.block10 + 0.75, e: c2.eye, g: c2.tg }], t, 36), t, 1.4);
+  return floatCam(camAB(c2.eye, c2.tg, c3.eye, c3.tg, ph(t, EV.pull11, EV.pull11 + 1.0, eio), 36), t, 1.4);
 }
 function sOcclusion(t) {
   const cam = occCam(t), xf = vxf(t);
   MSKY(); drawVessel(cam, OCC_ST, xf);
-  if (t >= EV.pull11) drawCollat(cam, xf, t < EV.colGrow ? 0 : qg(ph(t, EV.colGrow, EV.colFlow), 8));
+  if (t >= EV.pull11) drawCollat(cam, xf, t < EV.colGrow ? 0 : ph(t, EV.colGrow, EV.colFlow + 0.4, eio));
   drawStagnant(cam, xf, OCC_ST, t, 56);
   drawCollatFlow(cam, xf, t, t > EV.colFlow ? ph(t, EV.colFlow, EV.colFlow + 0.6) : 0);
   r3dOutlines();
 }
 // ---------------------------------------------------------------- 12: walking again — the working calf needs more than the blocked arteries deliver
-function demandCam(t) { const x = WALK12.at(t)[0]; return camLook([x + 200, 440, 1750], [x + 110, 340, 92], [0, 1, 0], 32); }
+function demandCam(t) { const x = smoothX(WALK12, t, 32.5, 36.6); return camLook([x + 200, 440, 1750], [x + 110, 340, 92], [0, 1, 0], 32); }
 function sDemand(t) {
-  const w = WALK12.at(t), pose = patientPose([w[0], w[1], 0], 0, { ph: PH12(t), amp: AMP12() }), cam = demandCam(t);
+  const g = WALK12.sample(t), pose = patientPose(g.p, 0, { g, t, effort: ph(t, EV.cut12, EV.rest13) }), cam = demandCam(t);
   const pain = clamp(0.35 + 0.2 * EV.steps12.filter(e => t >= e).length, 0, 1), pulse = Math.max(0, Math.sin(TAU * ((t - EV.cut12) / 0.75))) ** 2;
   skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawLeg(cam, pose, { muscle: 1, bone: 0, art: 1, pain, pulse, fog: FOG_W });
@@ -154,44 +165,86 @@ function sDemand(t) {
 }
 // ---------------------------------------------------------------- 13: rest — demand falls; the arteries stay as they are
 function sRest(t) {
-  const s = walkState(PT_HOLD_END), relax = ph(t, EV.relax - 0.4, EV.relax + 1.3, eio);
-  const pose = patientPose(s.root, 0, Object.assign({}, s.q, { hold: 1 - relax })), cam = walkCam(5.0);
+  // straightening up: the hand lets go first, then the back rises, the knees last; he keeps breathing hard, then calms
+  const s = walkState(PT_HOLD_END), q = Object.assign({}, s.q, { t, effort: 1 - ph(t, EV.relax, EV.rest13 + 3, lin),
+    holdArm: 1 - ph(t, EV.relax - 0.4, EV.relax + 0.5, eio), holdTorso: 1 - ph(t, EV.relax - 0.25, EV.relax + 1.1, eio), holdLeg: 1 - ph(t, EV.relax - 0.1, EV.relax + 1.25, eio) });
+  const pose = plantedPose(s.root, q), c5 = walkCam(5.0), cam = floatCam(camLook(lerp3(c5.eye, add3(c5.tg, mul3(sub3(c5.eye, c5.tg), 0.9)), ph(t, EV.rest13, EV.rest13 + 3, lin)), c5.tg, [0, 1, 0], 32), t, 6);
   skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: 0.85 * (1 - ph(t, EV.relax, EV.rest13 + 2.9)), fog: FOG_W });
   r3dOutlines();
 }
-// ---------------------------------------------------------------- 14: CT angiography (head first into the gantry, contrast into the arm vein)
-function ctDY(t) { return lerp(0, 620, ph(t, EV.ct14, EV.tableStop, eio)); }
+// ---------------------------------------------------------------- 14: CT angiography — head first, the table glides into the gantry
+// the scan plane's place on the patient (patient-frame y): his head and raised arms are already in the bore; the
+// table glides on until his belly lies in the plane (tree level 1150, where the scan begins); the laser line runs
+// down his body as he passes it
+const ctG = t => lerp(-80, 1150 - 1610, ph(t, EV.ct14 + 0.1, EV.tableStop, eio));
+function ctCam(t) {
+  // fixed in the room at the foot end of the table, a slow push toward the gantry as he glides in
+  const u = ph(t, EV.ct14, EV.ct14 + 3, eio), G = ctG(t);
+  return camLook([lerp(-1180, -980, u), G + lerp(-2350, -2120, u), lerp(900, 780, u)], [lerp(-70, -40, u), G + lerp(-760, -640, u), -60], [0, 0, 1], 40);
+}
 function sCT(t) {
-  const dy = ctDY(t), drift = ph(t, EV.ct14, EV.ct14 + 3, lin);
-  // a camera fixed in the room (it moves with the gantry in the patient frame): the patient slides in toward it
-  const G = 24 - dy, cam = camLook([-1450 + 160 * drift, G - 2650, 1350], [-120, G - 420, -60], [0, 0, 1], 36);
-  skyBG(P.K0, P.N2); drawCTRoom(cam, dy, t >= EV.inject ? ph(t, EV.inject, EV.inject + 0.6, lin) : 0);
+  const G = ctG(t), cam = ctCam(t);
+  skyBG(P.K0, P.N2);
+  drawCTRoom(cam, G, { t, inj: t >= EV.inject ? ph(t, EV.inject, EV.inject + 0.7, lin) : 0, laser: 1 });
   r3dOutlines();
 }
 // ---------------------------------------------------------------- 15: the contrast's route: arm vein → heart → lungs → heart → aorta → down toward the legs
 function sCirc(t) {
   const u = ph(t, EV.circ15, EV.circ15 + 3, eio);
-  const cam = camLook([lerp(-70, 40, u), lerp(-360, -560, u), lerp(1150, 1300, u)], [lerp(-50, 30, u), lerp(-360, -560, u), 0], [0, 1, 0], 38);
+  const cam = camLook([lerp(-70, 40, u), lerp(-300, -560, u), lerp(1200, 1300, u)], [lerp(-50, 30, u), lerp(-300, -560, u), 0], [0, 1, 0], 38);
   skyBG(P.K0, P.N2); drawCirc(cam, t);
 }
-// ---------------------------------------------------------------- 16-21: the arterial tree
+// ---------------------------------------------------------------- 16: the scan, seen from the control room — the images appear on the console
+// the helical scan runs from the belly to the feet at a steady table speed (the table carries him on through the
+// bore while the X-ray tube turns); each new axial image shows on the screen, the earlier ones line up below
+const SCAN = { t0: EV.fill16 + 0.05, t1: EV.fill16 + 2.85, y0: 1150, y1: 25 };
+const scanY = t => lerp(SCAN.y0, SCAN.y1, clamp((t - SCAN.t0) / (SCAN.t1 - SCAN.t0), 0, 1));
+const THUMB_T = [0, 0.375, 0.75, 1.125, 1.5, 1.875].map(d => EV.fill16 + d);            // with the score's chimes
 const FOG_T = [2200, 6000, P.N2];
-function sFill(t) {                                                    // 16: pelvis to foot, the front moving down both legs
-  const u = t - EV.fill16, front = 120 + 640 * u;
-  const yc = lerp(1000, 330, ph(t, EV.fill16, EV.fill16 + 2.75, eio)), z = lerp(1350, 1750, ph(t, EV.fill16, EV.fill16 + 2.9));
-  const c = camLook([-150, yc + 110, z], [-45, yc, 0], [0, 1, 0], 34);
+const WIN = { x0: 22, y0: 62, x1: 338, y1: 238 };
+function sScan(t) {
+  // through the control-room window: the gantry, the table carrying the patient on through as the scan runs
+  const Y = scanY(t), G = Y - 1610, cam = camLook([2900, G - 1350, 1050], [0, G - 650, -680], [0, 0, 1], 30);   // aimed low: the room shows in the window
   skyBG(P.K0, P.N2);
-  ghostBody(c, null, ['torso', 'pelvis', 'R', 'L'], { fog: FOG_T });
-  drawTreeExpl(c, TREE(), { front, fog: FOG_T });
+  drawCTRoom(cam, G, { t, inj: 1, xray: t >= SCAN.t0 && t < SCAN.t1 + 0.1, fog: [1800, 7000, P.N2] });
   r3dOutlines();
+  // the control room: the wall around the window, a faint reflection on the glass, the desk below the monitor
+  const wall = hexc('#0B121B'), wall2 = hexc('#101A26');
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const inWin = x >= WIN.x0 && x < WIN.x1 && y >= WIN.y0 && y < WIN.y1;
+    if (!inWin) buf[y * W + x] = ((x >> 3) + (y >> 3)) % 7 === 0 ? wall2 : wall;
+    else if (((x + y * 2 + Math.floor(t * 18)) % 97) < 3 + (x > 200 ? 2 : 0)) buf[y * W + x] = mixc(buf[y * W + x], P.ST4, 0.18);
+  }
+  rect(WIN.x0 - 3, WIN.y0 - 3, WIN.x1 + 3, WIN.y0, hexc('#3A4654')); rect(WIN.x0 - 3, WIN.y1, WIN.x1 + 3, WIN.y1 + 3, hexc('#2A3440'));
+  rect(WIN.x0 - 3, WIN.y0, WIN.x0, WIN.y1, hexc('#34404C')); rect(WIN.x1, WIN.y0, WIN.x1 + 3, WIN.y1, hexc('#2A3440'));
+  rect(0, 566, W, H, hexc('#141B24')); rect(0, 566, W, 568, hexc('#2C3846'));
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 13; k++) rect(86 + k * 14 + r * 3, 584 + r * 10, 97 + k * 14 + r * 3, 591 + r * 10, hexc('#232D3A'));   // keyboard
+  rect(296, 590, 312, 606, hexc('#232D3A')); rect(303, 590, 305, 596, hexc('#3A4654'));                                                       // mouse
+  // the console screen: topogram with the scan line, the newest axial image, the images taken so far
+  const n = THUMB_T.reduce((a, e) => a + clamp((t - e) / 0.22, 0, 1), 0);
+  drawConsole(t, Y, n, 1);
 }
+// ---------------------------------------------------------------- 17: the reconstruction — the slices stack into a volume, the soft tissue falls away, the arteries remain
 function ctaRotCam(ang, dist, yc) { return camLook([-10 + dist * Math.sin(ang), yc + 60, dist * Math.cos(ang)], [-10, yc, 0], [0, 1, 0], 34); }
 const CTA_FAR = () => ctaRotCam(0.3, 1720, 560);
 const CTA_SKY = () => skyBG(hexc('#05070A'), hexc('#0E1218'));
-function sCTA(t) {                                                     // 17: the reconstruction turns slowly; both legs, aorta to feet
-  const c = ctaRotCam(lerp(-0.32, 0.3, ph(t, EV.cta17, EV.cta17 + 3, lin)), lerp(1380, 1720, ph(t, EV.cta17, EV.cta17 + 1.2, eout)), 560);
-  CTA_SKY(); drawBones(c, { ramp: RT.vr, glass: [0.08, 0.6, 1.6] }); drawTreeCTA(c, TREE()); r3dOutlines();
+const RECON = { stack: [EV.cta17, EV.cta17 + 1.1], soft: [EV.cta17 + 0.85, EV.cta17 + 1.6], vr: [EV.cta17 + 1.35, EV.cta17 + 2.0] };
+function reconCam(t) {
+  // from a high three-quarter view (the slabs read as a stack) down to the level CTA view, turning all the way
+  const far = CTA_FAR(), a0 = -0.55, e0 = 0.42, d0 = 2050, tg0 = [-10, 600, 0];
+  const k0 = { t: EV.cta17, e: add3(tg0, [d0 * Math.cos(e0) * Math.sin(a0), d0 * Math.sin(e0), d0 * Math.cos(e0) * Math.cos(a0)]), g: tg0 };
+  const k1 = { t: EV.cta17 + 1.6, e: add3([-10, 580, 0], [1900 * Math.cos(0.18) * Math.sin(-0.05), 1900 * Math.sin(0.18), 1900 * Math.cos(0.18) * Math.cos(-0.05)]), g: [-10, 580, 0] };
+  return camSpline([k0, k1, { t: EV.zoom18, e: far.eye, g: far.tg }], t, 34);
+}
+function sCTA(t) {
+  const c = reconCam(t), kStack = SLABS.n * smooth(seg(t, RECON.stack[0], RECON.stack[1])), soft = 1 - ph(t, RECON.soft[0], RECON.soft[1]), vr = ph(t, RECON.vr[0], RECON.vr[1]);
+  if (vr < 1) { CTA_SKY(); drawSlabs(c, kStack, soft, 0); r3dOutlines(); }
+  if (vr > 0) {
+    if (vr < 1) { SPARE[1].set(buf.subarray(0, W * H)); r3dBegin(); }
+    CTA_SKY(); drawBones(c, { ramp: RT.vr, glass: [0.08, 0.6, 1.6] }); drawTreeCTA(c, TREE()); r3dOutlines();
+    if (vr < 1) mixInto(buf, SPARE[1].subarray(0, W * H), 1 - vr);
+  }
 }
 const L1W = [-76, 690, 4], L2W = [-75, 520, -40];
 // a slow orbit-and-drift around a target after a camera move has landed (keeps a held CTA view alive)
@@ -238,7 +291,7 @@ function drawScene(t) {
   else if (i === 12) sRest(t);
   else if (i === 13) sCT(t);
   else if (i === 14) sCirc(t);
-  else if (i === 15) sFill(t);
+  else if (i === 15) sScan(t);
   else if (i === 16) sCTA(t);
   else if (i === 17) sCTAStenosis(t);
   else if (i === 18) sCTAOcclusion(t);

@@ -1,6 +1,6 @@
 'use strict';
 // ============================================================================
-// THE CONTRAST'S ROUTE (scene 15), from the CTA film's anatomy: the arm vein,
+// THE CONTRAST'S ROUTE (scene 15), from the CTA film's anatomy: the arm vein (from the raised arm),
 // the superior vena cava, the right heart (steel blue), the pulmonary arteries
 // branching through the see-through lungs, the pulmonary veins back to the
 // left heart (red), the aorta — and here the descending aorta continues down
@@ -21,8 +21,9 @@ function circ(ctrl, r, a0, a1, kind, opt) { const pts = smoothPath(ctrl, (opt &&
 const HEART = { RA: [-24, -335, 18], RV: [4, -362, 40], LA: [10, -328, -22], LV: [32, -372, 10] };
 const LUNG = { R: [-98, -338, -2], L: [96, -344, -2] };
 function buildCirc() {
-  // the arm vein (cannula tip upward), axillary, subclavian, brachiocephalic, superior vena cava
-  circ([CANNULA.tip, [-346, -456, -64], [-302, -392, -60], [-256, -332, -52], [-206, -292, -30], [-146, -252, 2], [-84, -246, 6], [-42, -258, 12], [-23, -282, 16], [-22, -318, 18]], 6, 6.6, 10.4, 'vein', { step: 4 });
+  // the arm vein from the cannula in the raised right elbow down the upper arm, axillary, subclavian, brachiocephalic,
+  // superior vena cava
+  circ([CANNULA.tip, [-140, 40, 0], [-176, -60, -14], [-196, -150, -22], [-170, -212, -12], [-120, -236, 0], [-70, -244, 8], [-38, -260, 12], [-23, -282, 16], [-22, -318, 18]], 6, 6.6, 10.4, 'vein', { step: 4 });
   // pulmonary trunk and the two pulmonary arteries
   circ([[12, -342, 50], [16, -320, 44], [18, -306, 26]], 9, 12.0, 12.25, 'pa');
   const rpa = circ([[18, -306, 26], [-18, -306, 20], [-56, -312, 10], [-74, -320, 4]], 7, 12.25, 12.6, 'pa');

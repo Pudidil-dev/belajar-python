@@ -155,9 +155,9 @@ function drawVessel(cam, st, xf, o) {
   drawMesh(cam, M.cut, { ramp: [0], back: [0], id: newId(CX_.ol), unlit: true, pixFn: (u, v) => cutPix(-AR.L / 2 + u * AR.L, -AR.RO + v * 2 * AR.RO, st) }, xf);
 }
 // ---------------------------------------------------------------- blood
-function cellField(st, n, seed) {
-  const r = mulberry(seed || 7), cells = [];
-  for (let i = 0; i < n; i++) cells.push({ eta: (r() * 2 - 1) * 0.78, zz: 0.15 + r() * 0.6, ph: r(), rot: r() * TAU, tilt: (r() - 0.5) * 1.4, spin: 0.5 + r() });
+const CELLS = {};
+function cellField(st, n, seed) {                  // the cells are fixed per seed; the transit-time map follows the channel every frame
+  const ck = n + ':' + seed, cells = CELLS[ck] || (CELLS[ck] = (() => { const r = mulberry(seed || 7), c = []; for (let i = 0; i < n; i++) c.push({ eta: (r() * 2 - 1) * 0.78, zz: 0.15 + r() * 0.6, ph: r(), rot: r() * TAU, tilt: (r() - 0.5) * 1.4, spin: 0.5 + r() }); return c; })());
   const L = AR.L, N = 200, tau = new Float32Array(N + 1); let acc = 0;
   for (let i = 0; i <= N; i++) { const x = -L / 2 - 20 + (L + 40) * i / N, k = Math.max(0.08, chanAt(x, { g: st.g || 0, xc: st.xc, w: st.w })[0]); tau[i] = acc; acc += k * k; }
   return { cells, tau, total: acc, N };
@@ -174,7 +174,8 @@ function drawCells(cam, xf, st, F, t, o) {
     const c = F.cells[i], x = xAtTau(F, (c.ph + clk) % 1);
     if (x < -AR.L / 2 + 4 || x > AR.L / 2 - 4) continue;
     const ch = chanAt(x, st), k = ch[0]; if (k < 0.12) continue;
-    const rr = AR.RL * k, y = ch[1] + c.eta * Math.max(0, rr - RBC_R * 0.8), z = -c.zz * Math.max(1, rr - RBC_R);
+    const eta = clamp(c.eta + 0.07 * Math.sin(t * (0.6 + c.spin) + i * 1.7), -0.85, 0.85);      // cells drift across the stream a little
+    const rr = AR.RL * k, y = ch[1] + eta * Math.max(0, rr - RBC_R * 0.8), z = -c.zz * Math.max(1, rr - RBC_R);
     drawRBC(cam, xf, x, y, z, c.rot + t * 0.6 * c.spin, c.tilt + 0.4 * Math.sin(t * c.spin + i), m);
   }
 }
@@ -196,24 +197,26 @@ function gluSprite(cam, xf, x, y, z, rot) {
   const hex = (rad, col) => { const pts = []; for (let k = 0; k < 6; k++) { const a = rot + k * TAU / 6; pts.push(sx + rad * Math.cos(a), sy + rad * Math.sin(a)); } poly(pts, col); };
   hex(r + 1, hexc('#5A4A12')); hex(r, hexc('#F5E27A')); hex(r * 0.42, hexc('#3A1420'));
 }
-function drawGlucose(cam, xf, st, t, n) {
-  const r = mulberry(17);
+function drawGlucose(cam, xf, st, t, n) {          // carried by the same pulsing plasma as the cells, jiggling as it goes
+  const r = mulberry(17), clk = flowClock(t, 0.075);
   for (let i = 0; i < n; i++) {
-    const p0 = r(), eta = (r() * 2 - 1) * 0.85, zz = 0.1 + r() * 0.7, x = -AR.L / 2 + ((p0 * AR.L + t * 22) % AR.L), ch = chanAt(x, st);
+    const p0 = r(), eta0 = (r() * 2 - 1) * 0.85, zz = 0.1 + r() * 0.7, sp = 0.8 + 0.4 * r(), x = -AR.L / 2 + (((p0 + clk * sp) % 1 + 1) % 1) * AR.L, ch = chanAt(x, st);
     if (ch[0] < 0.15) continue;
-    const rr = AR.RL * ch[0]; gluSprite(cam, xf, x, ch[1] + eta * (rr - 2), -zz * Math.max(1, rr - 2), t * 0.8 + i);
+    const eta = clamp(eta0 + 0.05 * Math.sin(t * 5.3 + i * 2.1) + 0.03 * Math.sin(t * 8.9 + i), -0.9, 0.9), rr = AR.RL * ch[0];
+    gluSprite(cam, xf, x + 0.6 * Math.sin(t * 7.1 + i), ch[1] + eta * (rr - 2), -zz * Math.max(1, rr - 2), t * (0.6 + 0.5 * sp) + i);
   }
 }
 // white cells, lipid particles, the macrophage / foam cell
-function drawWBC(cam, xf, x, y, z, s) {
-  drawMesh(cam, MICRO().wbc, { ramp: MR.wbc, id: newId(hexc('#3A3450')), amb: 0.36, dif: 0.62, rim: 0.3, spec: 0.3, mix: { ramp: MR.nuc, f: a => a } }, mMul(xf, mMul(mT(x, y, z), mS(5.4 * (s || 1)))));
+function drawWBC(cam, xf, x, y, z, s, roll, flat) {   // roll: angle rolled along the wall; flat: 0..1 flattened as it sticks
+  const k = 5.4 * (s || 1), f = flat || 0;
+  drawMesh(cam, MICRO().wbc, { ramp: MR.wbc, id: newId(hexc('#3A3450')), amb: 0.36, dif: 0.62, rim: 0.3, spec: 0.3, mix: { ramp: MR.nuc, f: a => a } }, mMul(xf, mMul(mT(x, y + 0.5 * k * f * 0.18, z), mMul(mS(k * (1 + 0.1 * f), k * (1 - 0.18 * f), k), mRz(roll || 0)))));
 }
 function drawLDL(cam, xf, x, y, z) { drawMesh(cam, MICRO().sph, { ramp: MR.ldl, id: newId(hexc('#4A3204')), amb: 0.4, dif: 0.6, spec: 0.5 }, mMul(xf, mMul(mT(x, y, z), mS(1.6)))); }
 function drawFoam(cam, xf, x, y, k) {             // k: 0 macrophage → 1 foam cell full of lipid droplets
   const z = 0.6, mm = mMul(xf, mMul(mT(x, y, z - 2), mS(6.2, 5.2, 4)));
   drawMesh(cam, MICRO().sph, { ramp: MR.mac, id: newId(hexc('#3A2E20')), amb: 0.38, dif: 0.6, rim: 0.25, mix: { ramp: MR.foam, f: () => 0.25 * k } }, mm);
-  const r = mulberry(5);
-  for (let i = 0; i < Math.round(8 * k); i++) { const a = r() * TAU, d = Math.sqrt(r()) * 4; drawMesh(cam, MICRO().sph, { ramp: MR.foam, id: 0, amb: 0.4, dif: 0.6, spec: 0.6 }, mMul(xf, mMul(mT(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, z + 1.2), mS(1.3)))); }
+  const r = mulberry(5);                          // the droplets swell in one after another
+  for (let i = 0; i < 8; i++) { const a = r() * TAU, d = Math.sqrt(r()) * 4, g = smooth(clamp(8 * k - i, 0, 1)); if (g < 0.05) continue; drawMesh(cam, MICRO().sph, { ramp: MR.foam, id: 0, amb: 0.4, dif: 0.6, spec: 0.6 }, mMul(xf, mMul(mT(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, z + 1.2), mS(1.3 * g)))); }
 }
 // ---------------------------------------------------------------- collateral side channels around the block (they widen; they never reopen it)
 function collatPaths() {
@@ -222,19 +225,21 @@ function collatPaths() {
   return [P1, P2];
 }
 function collatMesh(col) {
-  return cached('col' + Math.round(col * 8), () => { const c = Math.round(col * 8) / 8, mb = new MB(); collatPaths().forEach((pts, k) => tubeInto(mb, smoothPath(pts, 2), (k ? 3.4 : 4.0) + c * (k ? 3.6 : 4.6), null, 12, false)); return computeNormals(mb.build()); });
+  return cached('col' + Math.round(col * 48), () => { const c = Math.round(col * 48) / 48, mb = new MB(); collatPaths().forEach((pts, k) => tubeInto(mb, smoothPath(pts, 2), (k ? 3.4 : 4.0) + c * (k ? 3.6 : 4.6), null, 12, false)); return computeNormals(mb.build()); });
 }
 function drawCollat(cam, xf, col) { drawMesh(cam, collatMesh(col), { ramp: MR.col, back: MR.colIn, id: newId(P.AR0), amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.4, clip: [0, 0, 1, 0], cutCol: CX_.med, cutW: 0.9 }, xf); }
 function drawCollatFlow(cam, xf, t, k) {
   if (k <= 0) return;
-  const m = rbcMat();
+  const m = rbcMat(), clk = flowClock(t, 0.33);                       // the same pulse drives the side channels
   collatPaths().forEach((pts, pi) => {
-    const n = Math.round(7 * k), L = pts.length - 1;
+    const n = 7, L = pts.length - 1;
     for (let i = 0; i < n; i++) {
-      const u = ((t * 0.32 + i / n + pi * 0.37) % 1), f = u * L, j = Math.floor(f), h = f - j, a = pts[j], b = pts[Math.min(L, j + 1)];
-      drawRBC(cam, xf, lerp(a[0], b[0], h), lerp(a[1], b[1], h), -3, t + i, 0.5, m, 0.7);
+      const g = smooth(clamp(7 * k - i, 0, 1)); if (g < 0.05) continue;
+      const u = ((clk + i / n + pi * 0.37) % 1), f = u * L, j = Math.floor(f), h = f - j, a = pts[j], b = pts[Math.min(L, j + 1)];
+      drawRBC(cam, xf, lerp(a[0], b[0], h), lerp(a[1], b[1], h), -3, t + i, 0.5, m, 0.7 * g);
     }
   });
-  const r = mulberry(53);                                              // below the block: fewer, slower cells
-  for (let i = 0; i < Math.round(10 * k); i++) { const x = AR.XO + AR.WO + 8 + ((t * 16 * k + r() * 200) % (AR.L / 2 - AR.XO - AR.WO - 12)); drawRBC(cam, xf, x, (r() * 2 - 1) * AR.RL * 0.7, -(0.2 + r() * 0.5) * AR.RL, r() * TAU + t, r() - 0.5, m); }
+  const r = mulberry(53), clk2 = flowClock(t, 0.024), span = AR.L / 2 - AR.XO - AR.WO - 12;   // below the block: fewer, slower cells
+  for (let i = 0; i < 10; i++) { const r0 = r(), y0 = (r() * 2 - 1) * AR.RL * 0.7, z0 = -(0.2 + r() * 0.5) * AR.RL, rot = r() * TAU, tl = r() - 0.5, g = smooth(clamp(10 * k - i, 0, 1)); if (g < 0.05) continue;
+    const x = AR.XO + AR.WO + 8 + ((r0 * 200 + clk2 * span * 6) % span); drawRBC(cam, xf, x, y0, z0, rot + t, tl, m, g); }
 }

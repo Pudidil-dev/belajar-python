@@ -703,7 +703,7 @@ const BPM = 80, BEAT = 60 / BPM, BAR = 4 * BEAT, E8 = BEAT / 2, S16 = BEAT / 4, 
 const SC_T = []; for (let i = 0; i <= 21; i++) SC_T.push(i * 3);
 const SCENE_NAMES = ['WALKING', 'THE PATIENT STOPS', 'ENTER THE LEG', 'NORMAL REFERENCE', 'CHRONIC HIGH GLUCOSE', 'ENDOTHELIAL DYSFUNCTION',
   'PLAQUE FORMATION', 'CHRONIC PROGRESSION', 'STENOSIS', 'OCCLUSION', 'COLLATERAL BYPASS', 'WALKING INCREASES DEMAND', 'REST RELIEVES THE SYMPTOM',
-  'CT ANGIOGRAPHY', 'CONTRAST CIRCULATION', 'PELVIS-TO-FOOT FILLING', 'CTA RECONSTRUCTION', 'STENOSIS ON CTA', 'OCCLUSION ON CTA',
+  'CT ANGIOGRAPHY', 'CONTRAST CIRCULATION', 'SCAN IMAGES', 'CTA RECONSTRUCTION', 'STENOSIS ON CTA', 'OCCLUSION ON CTA',
   'NORMAL VERSUS DIABETIC PAD', 'FINAL DIAGNOSTIC IMAGE'];
 function sceneIndex(t) { let i = 0; while (i + 1 < SC_T.length - 1 && t >= SC_T[i + 1]) i++; return i; }
 const T = i => SC_T[i];                      // scene start, 0-based
@@ -1249,7 +1249,10 @@ const PART = {};
 const keep = (f, y0, above) => (x, y, z) => Math.max(f(x, y, z), above ? y0 - y : y - y0);   // the part above (or below) y0
 const iso = (f, b, attr, h) => isoMesh(f, b[0], b[1], b[2], b[3], b[4], b[5], h || PVS, attr);
 const SD = {
-  pelvis: (x, y, z) => sdB(x, y, z, -4, 30, 0, 104, 110, 168, 40),
+  pelvis: (x, y, z) => {                                            // waist to crotch, padded hips, the seat behind
+    const core = sdB(x, y, z, -4, 44, 0, 94, 96, 146, 60), hips = Math.min(sdE(x, y, z, -8, -6, 90, 90, 98, 84), sdE(x, y, z, -8, -6, -90, 90, 98, 84));
+    return smin(smin(core, hips, 46), sdE(x, y, z, -46, 14, 0, 88, 104, 148), 44);
+  },
   torso: (x, y, z) => { const belly = sdE(x, y, z, 8, 120, 0, 118, 150, 160), chest = sdE(x, y, z, 14, 300, 0, 112, 150, 182), sh = sdB(x, y, z, 0, 390, 0, 86, 50, 196, 46); return smin(smin(belly, chest, 40), sh, 50); },
   head: (x, y, z) => Math.min(sdC(x, y, z, -4, 0, 0, 0, 90, 0, 54, 50), sdE(x, y, z, 6, 170, 0, 98, 118, 86)),
   uarm: (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -300, 0, 52, 40),
@@ -1263,105 +1266,238 @@ const calfAttr = (x, y, z) => clamp(-sdE(x, y, z, -44, -140, 0, 70, 118, 70) / 3
 const hairAttr = (x, y, z) => (y > 185 || (x < -30 && y > 120)) && sdE(x, y, z, 6, 170, 0, 98, 118, 86) < 4 ? 1 : 0;
 function buildParts() {
   if (PART.pelvis) return;
-  PART.pelvis = iso(SD.pelvis, [-120, -110, -185, 120, 170, 185]);
-  PART.torso = iso(SD.torso, [-140, -20, -215, 150, 470, 215]);
-  PART.head = iso(SD.head, [-120, -20, -100, 130, 290, 100], hairAttr);
-  PART.sleeve = iso(keep(SD.uarm, -160, true), [-60, -320, -60, 60, 50, 60]);
+  PART.pelvis = iso(SD.pelvis, [-150, -120, -190, 125, 175, 190], null, 10);       // big smooth parts on a coarser grid
+  PART.torso = iso(SD.torso, [-140, -20, -215, 150, 470, 215], null, 11);
+  PART.head = iso(SD.head, [-120, -20, -100, 130, 290, 100], hairAttr, 9);
+  PART.sleeve = iso(keep(SD.uarm, -160, true), [-60, -320, -60, 60, 50, 60], null, 8);
   PART.uarmSkin = iso(keep(SD.uarm, -160, false), [-60, -320, -60, 60, 50, 60]);
   PART.farm = iso(SD.farm, [-50, -460, -50, 60, 40, 50]);
-  PART.thighShorts = iso(keep(SD.thigh, -300, true), [-100, -460, -100, 110, 60, 100]);
-  PART.thighSkin = iso(keep(SD.thigh, -300, false), [-100, -460, -100, 110, 60, 100]);
+  PART.thighShorts = iso(keep(SD.thigh, -300, true), [-100, -460, -100, 110, 60, 100], null, 9);
+  PART.thighSkin = iso(keep(SD.thigh, -300, false), [-100, -460, -100, 110, 60, 100], null, 7);
   PART.shinSkin = iso(keep(SD.shin, -330, true), [-110, -440, -80, 80, 40, 80], calfAttr);
   PART.sock = iso(keep(SD.shin, -330, false), [-110, -440, -80, 80, 40, 80]);
-  PART.shoe = iso(keep(SD.foot, -70, true), [-90, -90, -60, 220, 30, 60]);
+  PART.shoe = iso(keep(SD.foot, -70, true), [-90, -90, -60, 220, 30, 60], null, 7);
   PART.sole = iso(keep(SD.foot, -70, false), [-90, -90, -60, 220, 30, 60]);
 }
 // which meshes make each rig part, and their materials
 const PART_MESH = { pelvis: [['pelvis', 'shorts']], torso: [['torso', 'shirt']], head: [['head', 'skin']], uarm: [['sleeve', 'shirt'], ['uarmSkin', 'skin']], farm: [['farm', 'skin']],
   thigh: [['thighShorts', 'shorts'], ['thighSkin', 'skin']], shin: [['shinSkin', 'skin'], ['sock', 'sock']], foot: [['shoe', 'shoe'], ['sole', 'sole']] };
 const OL = { skin: P.SK0, shirt: hexc('#0E1620'), shorts: hexc('#04070A'), sock: hexc('#4A5058'), shoe: hexc('#0C0F12'), sole: hexc('#5A6066') };
-// ---------------------------------------------------------------- the gait (heel strikes on the beat)
-// right heel strikes at 0.0, 1.5, 3.0, 4.5 s; left at 0.75, 2.25, 3.75 s → one step per beat
+// ---------------------------------------------------------------- the walk: footfalls → rolling feet → leg IK
+// Planned from where the feet land, like a real walk. Each heel strike has a time and a place; a foot that carries
+// weight stays put on the floor while it rolls (heel → flat → toes); the swinging foot travels on a smooth arc to its
+// next landing; the hips glide along a smooth path, rise over the standing leg and sink when both feet are down, sway
+// toward the standing foot and turn with the leading leg; knees and hips follow by IK. Nothing slides or floats, and
+// nothing stops and starts between steps.
+// For the score: right heel strikes at 0.0, 1.5, 3.0, 4.5 s; left at 0.75, 2.25, 3.75 s → one step per beat
 const STEPS = [0, 0.75, 1.5, 2.25, 3.0, 3.75, 4.5];
 const AMP_K = [[0, 1], [1.6, 1], [2.25, 0.86], [3.0, 0.7], [3.75, 0.5], [4.5, 0.3], [4.85, 0]];
-function gaitPhase(t) {                            // right-leg phase (0 = right heel strike)
-  if (t <= 0) return t / 1.5;
-  for (let i = 0; i + 1 < STEPS.length; i++) if (t < STEPS[i + 1]) return i * 0.5 + 0.5 * (t - STEPS[i]) / (STEPS[i + 1] - STEPS[i]);
-  return (STEPS.length - 1) * 0.5;
-}
 function gaitAmp(t) { for (let i = 0; i + 1 < AMP_K.length; i++) if (t < AMP_K[i + 1][0]) return lerp(AMP_K[i][1], AMP_K[i + 1][1], smooth(seg(t, AMP_K[i][0], AMP_K[i + 1][0]))); return 0; }
-const bumpW = (x, c, w) => { let d = ((x - c) % 1 + 1.5) % 1 - 0.5; return Math.exp(-(d * d) / (w * w)); };
-function legAngles(ph, amp) {                      // degrees: hip flexion (+ forward), knee flexion, ankle dorsiflexion
-  const p = ((ph % 1) + 1) % 1;
-  return { hip: amp * (6 + 19 * Math.cos(TAU * p)), knee: amp * (4 + 14 * bumpW(p, 0.12, 0.07) + 52 * bumpW(p, 0.72, 0.11)), ankle: amp * (4 * Math.sin(TAU * (p - 0.1)) - 12 * bumpW(p, 0.6, 0.06)) };
-}
-// ---------------------------------------------------------------- posing
 const D2R = Math.PI / 180;
+const FOOT_H = 84, PIV_HEEL = [-30, -84, 0], PIV_TOE = [150, -84, 0], HS_PITCH = 13 * D2R, TO_PITCH = -34 * D2R, TOE_OUT = 6 * D2R, LEG_A = 440, LEG_B = 420;
+const footRot = (side, pitch) => mMul(mRy(side === 'R' ? -TOE_OUT : TOE_OUT), mRz(pitch));
+const dirApply = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[4] * v[0] + M[5] * v[1] + M[6] * v[2], M[8] * v[0] + M[9] * v[1] + M[10] * v[2]];
+const herm = (p0, m0, p1, m1, s) => { const s2 = s * s, s3 = s2 * s; return (2 * s3 - 3 * s2 + 1) * p0 + (s3 - 2 * s2 + s) * m0 + (-2 * s3 + 3 * s2) * p1 + (s3 - s2) * m1; };
+// a monotone cubic through [t, v] keys (Fritsch–Carlson): smooth, no overshoot, no stops between keys; flat outside
+function monoCubic(keys) {
+  const n = keys.length, d = [], m = [];
+  for (let i = 0; i + 1 < n; i++) d.push((keys[i + 1][1] - keys[i][1]) / (keys[i + 1][0] - keys[i][0]));
+  for (let i = 0; i < n; i++) m.push(i === 0 ? d[0] : i === n - 1 ? d[n - 2] : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
+  for (let i = 0; i + 1 < n; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], r = a * a + b * b;
+    if (r > 9) { const k = 3 / Math.sqrt(r); m[i] = k * a * d[i]; m[i + 1] = k * b * d[i]; }
+  }
+  return t => {
+    if (t <= keys[0][0]) return keys[0][1]; if (t >= keys[n - 1][0]) return keys[n - 1][1];
+    let i = 0; while (keys[i + 1][0] < t) i++;
+    const h = keys[i + 1][0] - keys[i][0]; return herm(keys[i][1], m[i] * h, keys[i + 1][1], m[i + 1] * h, (t - keys[i][0]) / h);
+  };
+}
+// a walk: falls [{side: 'R' | 'L', t: heel strike, x: the ankle's x with the foot flat}], the hips' x through keys [t, x]
+function gaitPlan(falls, hipKeys, o) {
+  o = Object.assign({ stand: 940, sway: 15, yaw: 4.5, list: 2.2, ds: 0.24, vRef: 680 }, o || {});
+  const F = falls.map(f => Object.assign({ z: f.side === 'R' ? 92 : -92 }, f)).sort((a, b) => a.t - b.t);
+  F.forEach((f, i) => {
+    f.next = F.slice(i + 1).find(g => g.side === f.side) || null;
+    const oth = F.slice(i + 1).find(g => g.side !== f.side) || null; f.oth = oth;
+    if (f.next && oth) { f.to = oth.t + o.ds * (oth.t - f.t); f.flat = f.t + 0.13 * (f.to - f.t); f.ho = f.t + 0.6 * (f.to - f.t); }
+    else { f.to = null; f.flat = f.t + 0.16; f.ho = null; }
+  });
+  const hipX = monoCubic(hipKeys), rot = footRot;
+  // the foot on the floor: it turns about the heel after the strike, lies flat, then turns about the ball of the foot
+  const planted = (f, t) => {
+    let pitch = 0, piv = null;
+    if (t < f.flat) { pitch = HS_PITCH * (1 - smooth(seg(t, f.t, f.flat))); piv = PIV_HEEL; }
+    else if (f.ho !== null && t > f.ho) { const u = seg(t, f.ho, f.to); pitch = TO_PITCH * u * u; piv = PIV_TOE; }
+    const M = rot(f.side, pitch), flatA = [f.x, FOOT_H, f.z], W = piv ? add3(flatA, dirApply(rot(f.side, 0), piv)) : null;
+    return { A: piv ? sub3(W, dirApply(M, piv)) : flatA, M, pitch, piv, W, side: f.side, sign: piv === PIV_TOE ? -1 : 1 };
+  };
+  // the swinging foot: a Hermite arc from the toe-off (leaving with the roll's speed) to the next heel strike
+  const swing = (f, t) => {
+    const g = f.next, D = g.t - f.to, s = clamp((t - f.to) / D, 0, 1);
+    const a0 = planted(f, f.to), ab = planted(f, f.to - 1e-3), v0 = mul3(sub3(a0.A, ab.A), D / 1e-3), a1 = planted(g, g.t);
+    const v1 = [0.35 * (a1.A[0] - a0.A[0]), -50, 0];
+    const A = [herm(a0.A[0], v0[0], a1.A[0], v1[0], s), herm(a0.A[1], v0[1], a1.A[1], v1[1], s) + 30 * Math.pow(Math.sin(Math.PI * s), 2), lerp(a0.A[2], a1.A[2], smooth(s))];
+    const pitch = herm(TO_PITCH, TO_PITCH / (f.to - f.ho) * D, HS_PITCH, 0, s);
+    return { A, M: rot(f.side, pitch), pitch };
+  };
+  const bySide = { R: F.filter(f => f.side === 'R'), L: F.filter(f => f.side === 'L') };
+  // the foot at time t, and how much it bears weight (c: 1 on the floor; in swing it lets go and takes over gradually)
+  const footAt = (side, t) => {
+    let f = null; for (const g of bySide[side]) if (g.t <= t) f = g;
+    if (!f) return Object.assign(planted(bySide[side][0], bySide[side][0].t), { c: 1 });
+    // swinging: it bears nothing, but as it nears its landing the hips already settle to where that leg will reach
+    if (f.to !== null && t >= f.to && f.next) { const s = (t - f.to) / (f.next.t - f.to); return Object.assign(swing(f, t), { c: 0, land: planted(f.next, f.next.t).A, cl: smooth(clamp((s - 0.55) / 0.45, 0, 1)) }); }
+    // on the floor; once the other foot is down (double support) this one hands its weight over until its toes leave
+    // (meanwhile the toe roll adapts so the toes stay on the floor while the knee starts to bend)
+    return Object.assign(planted(f, t), { c: f.to !== null && f.oth && t > f.oth.t ? 1 - smooth(seg(t, f.oth.t, f.to)) : 1 });
+  };
+  // the hips ride as high as the weight-bearing legs reach (an inverted pendulum: highest over the standing foot,
+  // lower when both feet are down), a soft minimum over the feet so the height never jumps
+  const LR = 857, hipH = (t, x, R, L) => {
+    const terms = [o.stand];
+    for (const F_ of [R, L]) {
+      const P_ = F_.land || F_.A, k = F_.land ? F_.cl : F_.c, dx = x - P_[0];
+      terms.push(P_[1] + Math.sqrt(Math.max(0, LR * LR - dx * dx)) + (1 - k) * 300);
+    }
+    const m = Math.min(...terms); let sum = 0; for (const v of terms) sum += Math.exp(-(v - m) / 6); return m - 6 * Math.log(sum);
+  };
+  // single support (one foot down): w 0..1 bump, side +1 the right foot is down, −1 the left (for the sway and the dip)
+  const ev = []; F.forEach(f => { ev.push({ t: f.t, k: 'hs', f }); if (f.to !== null) ev.push({ t: f.to, k: 'to', f }); }); ev.sort((a, b) => a.t - b.t);
+  const support = t => {
+    let e = null, nx = null; for (const x of ev) { if (x.t <= t) e = x; else { nx = x; break; } }
+    if (!e || e.k !== 'to' || !nx) return { w: 0, side: 0 };
+    return { w: (1 - Math.cos(TAU * clamp((t - e.t) / (nx.t - e.t), 0, 1))) / 2, side: e.f.side === 'R' ? -1 : 1 };
+  };
+  const speed = t => (hipX(t + 0.02) - hipX(t - 0.02)) / 0.04;
+  // the reach limit has sharp corners at every heel strike and toe-off; the hips follow a path below it whose vertical
+  // acceleration stays within about 0.6 g: a morphological opening with parabolas (an infimal convolution rounds the
+  // dips, a supremal one with a slightly sharper parabola then rounds the crests), so the path is smooth and never
+  // out of the legs' reach
+  const T0 = F[0].t, T1 = F[F.length - 1].t + 3, YN = Math.round((T1 - T0) * 240) + 1, yc = new Float32Array(YN), ye = new Float32Array(YN), yy = new Float32Array(YN), ACE = 4000, ACD = 6000, WN = 96;
+  for (let i = 0; i < YN; i++) { const t = T0 + i / 240; yc[i] = hipH(t, hipX(t), footAt('R', t), footAt('L', t)); }
+  for (let i = 0; i < YN; i++) { let m = 1e9; for (let j = Math.max(0, i - WN); j <= Math.min(YN - 1, i + WN); j++) { const d = (i - j) / 240, v = yc[j] + 0.5 * ACE * d * d; if (v < m) m = v; } ye[i] = m; }
+  for (let i = 0; i < YN; i++) { let m = -1e9; for (let j = Math.max(0, i - WN); j <= Math.min(YN - 1, i + WN); j++) { const d = (i - j) / 240, v = ye[j] - 0.5 * ACD * d * d; if (v > m) m = v; } yy[i] = m; }
+  const yAt = t => { const f = clamp((t - T0) * 240, 0, YN - 1), i = Math.floor(f), j = Math.min(YN - 1, i + 1); return lerp(yy[i], yy[j], f - i); };
+  const sample = t => {
+    const a = clamp(speed(t) / o.vRef, 0, 1), sp = support(t), R = footAt('R', t), L = footAt('L', t), Rl = footAt('R', t - 0.08), Ll = footAt('L', t - 0.08);
+    const d = clamp((R.A[0] - L.A[0]) / 600, -1, 1), dLag = clamp((Rl.A[0] - Ll.A[0]) / 600, -1, 1);
+    const y = yAt(t);
+    return { p: [hipX(t), y, 0], a, d, dLag, sway: o.sway * a * sp.w * sp.side, yaw: o.yaw * a * d, list: -o.list * a * sp.w * sp.side, feet: { R, L } };
+  };
+  return { sample, at: t => [hipX(t), yAt(t)], falls: F };
+}
+// scenes 1-2: an unhurried walk whose steps shorten as the calf starts to hurt, then a last short step and a stop
+const WALK = gaitPlan([
+  { side: 'R', t: -1.5, x: -1080 }, { side: 'L', t: -0.75, x: -540 }, { side: 'R', t: 0, x: 0 }, { side: 'L', t: 0.75, x: 540 }, { side: 'R', t: 1.5, x: 1080 },
+  { side: 'L', t: 2.25, x: 1590 }, { side: 'R', t: 3.0, x: 2060 }, { side: 'L', t: 3.75, x: 2460 }, { side: 'R', t: 4.5, x: 2780 },
+  { side: 'L', t: 5.0, x: 2660 },                                       // the last, short step: the left foot comes up just behind the right
+], [[-1.5, -1296], [-0.75, -756], [0, -216], [0.75, 324], [1.5, 864], [2.25, 1386], [3.0, 1872], [3.75, 2300], [4.5, 2652], [5.25, 2700], [5.6, 2705], [99, 2705]]);
+// scene 12: walking again at an even pace (right heel strikes on 33.0 and 34.5 s, left on 33.75 and 35.25 s)
+const WALK12 = (() => { const f = [], k = []; for (let i = -2; i <= 6; i++) { const t = 33 + 0.75 * i, x = 520 * i; f.push({ side: i % 2 === 0 ? 'R' : 'L', t, x }); k.push([t, x - 208]); } return gaitPlan(f, k); })();
+// ---------------------------------------------------------------- posing
+// breathing: a slow sine with a quicker in-breath; heavier and faster when he is in pain or out of breath
+const breathe = (t, per) => { const u = ((t / per) % 1 + 1) % 1; return u < 0.42 ? Math.sin(Math.PI * u / 0.84) : Math.cos(Math.PI * (u - 0.42) / 1.16); };
+// an orthonormal frame at O with local −y toward Tg and local x toward `side` (the bones are modelled along −y)
+function frameTo(O, Tg, side) { const yA = norm3(sub3(O, Tg)), zA = norm3(cross3(side, yA)), xA = cross3(yA, zA); return [xA[0], yA[0], zA[0], O[0], xA[1], yA[1], zA[1], O[1], xA[2], yA[2], zA[2], O[2]]; }
 // pose → world matrices of every part. P0: root (hip midpoint) world position; facing: rotation about y.
-// q: {ph, amp, bend (torso forward, deg), hold (0..1 right hand to the calf), relax (0..1), lie (0..1 supine on the table)}
+// q: {g (a walk sample: the hips and both feet; the legs then follow by IK), t (seconds: breathing and idle motion),
+// hold (0..1: the right hand to the calf; or holdLeg / holdTorso / holdArm separately, so the knees, the back and the
+// arms move one after the other), effort (0..1: heavy breathing), bend (torso forward, deg)}.
+// Without g (reference poses) the legs stand straight under the hips.
 function patientPose(P0, facing, q) {
-  const root = q.rootM || mMul(mT(P0[0], P0[1], P0[2]), mRy(facing));
-  const out = [];
-  const amp = q.amp || 0, R = legAngles(q.ph || 0, amp), L = legAngles((q.ph || 0) + 0.5, amp);
-  const hold = q.hold || 0, bob = -8 * amp * Math.cos(2 * TAU * (q.ph || 0));
-  const pel = mMul(root, mT(0, bob, 0));
+  const out = [], g = q.g || null, hold = q.hold || 0;
+  const hLeg = q.holdLeg !== undefined ? q.holdLeg : hold, hTor = q.holdTorso !== undefined ? q.holdTorso : hold, hArm = q.holdArm !== undefined ? q.holdArm : hold;
+  const tt = q.t || 0, eff = q.effort || 0, walk = g ? g.a : 0, br = breathe(tt, lerp(3.6, 1.9, eff)) * lerp(1, 2.2, eff) * (1 - 0.6 * walk);
+  // the hips: from the walk (sway, turn, dip) or standing; standing still the weight drifts slowly from foot to foot;
+  // holding the calf they sink and move back while both feet stay where they are (the knees bend by IK)
+  const idle = (1 - walk) * (1 - hLeg), drift = idle * 7 * Math.sin(TAU * tt / 5.3);
+  let pel;
+  if (g) pel = mMul(mT(g.p[0] - 55 * hLeg, g.p[1] - 70 * hLeg, g.p[2] + g.sway + drift), mMul(mRy(g.yaw * D2R), mRx(g.list * D2R)));
+  else pel = mMul(q.rootM || mMul(mT(P0[0], P0[1], P0[2]), mRy(facing)), mT(0, -hLeg * 40, drift));
   out.push(['pelvis', pel]);
-  // legs: hip (about z), knee, ankle; right leg at +z
-  const leg = (A, zs, extra) => {
-    const hipF = (A.hip + (extra.hip || 0)) * D2R, kn = (A.knee + (extra.knee || 0)) * D2R, an = (A.ankle + (extra.ankle || 0)) * D2R;
-    const th = mMul(pel, mMul(mT(0, 0, zs), mRz(hipF)));
-    const sh = mMul(th, mMul(mT(0, -440, 0), mRz(-kn)));
-    const ft = mMul(sh, mMul(mT(0, -420, 0), mRz(an)));
+  const fwd = norm3(sub3(mApply(pel, [1, 0, 0]), mApply(pel, [0, 0, 0])));
+  const legIK = (side, zs) => {
+    const H = mApply(pel, [0, 0, zs]);
+    let A, M;
+    if (g) {
+      const ft = g.feet[side]; A = ft.A; M = ft.M;
+      // out of reach while rolling over the heel or the toes: roll a little further, the pivot stays on the floor
+      if (ft.piv && Math.hypot(A[0] - H[0], A[1] - H[1], A[2] - H[2]) > LEG_A + LEG_B - 2) {
+        const at = pt => sub3(ft.W, dirApply(footRot(side, pt), ft.piv)), lim = ft.sign * 70 * D2R;
+        let lo = ft.pitch, hi = lim;
+        for (let k = 0; k < 16; k++) { const m = (lo + hi) / 2, Am = at(m); if (Math.hypot(Am[0] - H[0], Am[1] - H[1], Am[2] - H[2]) > LEG_A + LEG_B - 2) lo = m; else hi = m; }
+        A = at(hi); M = footRot(side, hi);
+      }
+    }
+    else {
+      const R0 = q.rootM || mMul(mT(P0[0], P0[1], P0[2]), mRy(facing)), rot0 = [R0[0], R0[1], R0[2], 0, R0[4], R0[5], R0[6], 0, R0[8], R0[9], R0[10], 0];
+      A = mApply(R0, [side === 'R' ? 40 * hLeg : -30 * hLeg, -(LEG_A + LEG_B) + 2, zs]);
+      M = mMul(rot0, mMul(mRy((side === 'R' ? -1 : 1) * (q.armsUp ? 3 : 1) * TOE_OUT), mRz(q.armsUp ? -24 * D2R : 0)));   // lying: the feet fall outward, relaxed
+    }
+    const dv = sub3(A, H), d = clamp(Math.hypot(dv[0], dv[1], dv[2]), 120, LEG_A + LEG_B - 0.5), u = norm3(dv);
+    const pole = add3(fwd, [0, 0, zs > 0 ? 0.08 : -0.08]), pl = norm3(sub3(pole, mul3(u, dot3(pole, u))));
+    const x = (LEG_A * LEG_A - LEG_B * LEG_B + d * d) / (2 * d), h = Math.sqrt(Math.max(0, LEG_A * LEG_A - x * x));
+    const K = add3(add3(H, mul3(u, x)), mul3(pl, h)), Ac = add3(H, mul3(u, d));
+    const th = frameTo(H, K, fwd), sh = frameTo(K, Ac, fwd), ft = mMul(mT(Ac[0], Ac[1], Ac[2]), M);
     out.push(['thigh', th], ['shin', sh], ['foot', ft]);
     return { th, sh, ft };
   };
-  // holding the calf: weight on the left leg (knee bent), the right leg a little forward with the knee bent
-  const right = leg(R, 92, { hip: 18 * hold, knee: 34 * hold }), left = leg(L, -92, { hip: 22 * hold, knee: 26 * hold });
-  // torso: forward bend — when holding, as deep as needed for the right hand to reach the calf
-  let bendDeg = q.bend || 0;
-  if (hold > 0) {
-    const tgt = mApply(right.sh, [-58, -110, 4]);
-    let need = 40;
-    for (; need < 88; need += 2) { const tr = mMul(pel, mMul(mT(-6, 140, 0), mRz(-need * D2R))), sh = mApply(tr, [0, 372, 214]); if (Math.hypot(tgt[0] - sh[0], tgt[1] - sh[1], tgt[2] - sh[2]) < 640) break; }
-    bendDeg = lerp(bendDeg, need, hold);
+  const right = legIK('R', 92), left = legIK('L', -92);
+  // the torso: a slight forward lean when walking, the shoulders turning against the hips, breathing;
+  // when holding, bent as deep as the right hand needs to reach the calf (solved continuously)
+  const dS = g ? g.d : 0, dL = g ? g.dLag : 0, list = g ? g.list : 0;
+  let bendDeg = (q.bend || 0) + walk * (3 + 1.2 * Math.abs(dS)) - 0.9 * br;
+  const calfBack = mApply(right.sh, [-58, -110, 4]);
+  if (hTor > 0) {
+    const shoulderAt = deg => mApply(mMul(pel, mMul(mT(-6, 140, 0), mRz(-deg * D2R))), [0, 372, 214]);
+    let lo = 20, hi = 96;
+    for (let k = 0; k < 18; k++) { const m = (lo + hi) / 2, s = shoulderAt(m); if (Math.hypot(calfBack[0] - s[0], calfBack[1] - s[1], calfBack[2] - s[2]) > 600) lo = m; else hi = m; }
+    bendDeg = lerp(bendDeg, (lo + hi) / 2 - 1.6 * br, hTor);
   }
-  const bend = bendDeg * D2R;
-  const tor = mMul(pel, mMul(mT(-6, 140, 0), mRz(-bend)));
+  const twist = -8 * walk * dS, roll = -list * 0.9;
+  const tor = mMul(pel, mMul(mT(-6, 140, 0), mMul(mRy((twist - (g ? g.yaw : 0) * 0.2) * D2R), mMul(mRx(roll * D2R), mRz(-bendDeg * D2R)))));
   out.push(['torso', tor]);
-  out.push(['head', mMul(tor, mT(4, 440, 0))]);
-  // arms: swing opposite to the legs (forward kinematics); while holding, two-bone IK takes the hands to
-  // the back of the right calf (right hand) and to the front of the left thigh (left hand)
-  const swing = 18 * amp * Math.cos(TAU * (q.ph || 0));
-  const fkArm = (zs, sw) => {
-    const shF = -sw * D2R, el = (14 + 8 * amp) * D2R, ab = 6 * D2R;
-    const ua = mMul(tor, mMul(mT(0, 372, zs), mMul(mRx(zs > 0 ? -ab : ab), mRz(shF))));
+  out.push(['head', mMul(tor, mMul(mT(4, 440, 0), mMul(mRy(-twist * 0.6 * D2R), mRz(Math.min(30, bendDeg * 0.25) * D2R))))]);
+  // arms: they swing against the legs a moment late, the elbows bending more as each arm comes forward
+  const rise = 3 * br;
+  const fkArm = (zs, side) => {
+    const sw = -side * (1 + 18 * walk) * dL, fwdness = clamp(-side * dL, 0, 1);
+    const el = (12 + 6 * walk + 14 * walk * fwdness + 3 * (1 - walk) * Math.sin(TAU * tt / 4.1 + zs)) * D2R, ab = (7 + 2 * walk) * D2R;
+    const ua = mMul(tor, mMul(mT(0, 372 + rise, zs), mMul(mRx(zs > 0 ? -ab : ab), mRz(sw * D2R))));
     const fa = mMul(ua, mMul(mT(0, -300, 0), mRz(el)));
     return { ua, fa };
   };
-  const armR = fkArm(214, -swing), armL = fkArm(-214, swing);
-  if (hold > 0) {
-    const ikArm = (fk, target, pole) => {
-      const A = mApply(fk.ua, [0, 0, 0]), hand0 = mApply(fk.fa, [8, -320, 0]);
-      const T = [lerp(hand0[0], target[0], hold), lerp(hand0[1], target[1], hold), lerp(hand0[2], target[2], hold)];
+  let armR = fkArm(214, 1), armL = fkArm(-214, -1);
+  if (q.armsUp) {                                                    // on the CT table: both arms raised above the head, elbows bent
+    const up = (zs, side) => { const ua = mMul(tor, mMul(mT(0, 372 + rise, zs), mMul(mRx((zs > 0 ? -1 : 1) * 16 * D2R), mRz(168 * D2R)))); return { ua, fa: mMul(ua, mMul(mT(0, -300, 0), mMul(mRx((zs > 0 ? 1 : -1) * 34 * D2R), mRz(28 * D2R)))) }; };
+    armR = up(214, 1); armL = up(-214, -1);
+  }
+  if (hArm > 0) {
+    // two-bone IK; the hand travels on an arc (out to the side, then in), not a straight line, and rubs the calf a little
+    const ikArm = (fk, target, pole, outw) => {
+      const A = mApply(fk.ua, [0, 0, 0]), hand0 = mApply(fk.fa, [8, -320, 0]), e = hArm;
+      const T = add3(lerp3(hand0, target, e), mul3(outw, 150 * Math.sin(Math.PI * e)));
       const a = 300, b = 345, dv = sub3(T, A), d = clamp(Math.hypot(dv[0], dv[1], dv[2]), 40, a + b - 1), u = norm3(dv);
       const pl = norm3(sub3(pole, mul3(u, dot3(pole, u))));
       const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
-      const E = add3(add3(A, mul3(u, x)), mul3(pl, h));
-      const frame = (O, Tg, side) => {                         // local −y toward the target, local x toward "side"
-        const yA = norm3(sub3(O, Tg)); let zA = norm3(cross3(side, yA)); const xA = cross3(yA, zA);
-        return [xA[0], yA[0], zA[0], O[0], xA[1], yA[1], zA[1], O[1], xA[2], yA[2], zA[2], O[2]];
-      };
-      const fwd = mApply(tor, [1, 0, 0]), o0 = mApply(tor, [0, 0, 0]), F = norm3(sub3(fwd, o0));
-      return { ua: frame(A, E, F), fa: frame(E, T, F) };
+      const E = add3(add3(A, mul3(u, x)), mul3(pl, h)), Tc = add3(A, mul3(u, d));
+      const F = norm3(sub3(mApply(tor, [1, 0, 0]), mApply(tor, [0, 0, 0])));
+      return { ua: frameTo(A, E, F), fa: frameTo(E, Tc, F) };
     };
-    const calfBack = mApply(right.sh, [-58, -110, 4]), thighFront = mApply(left.th, [74, -380, 0]);
-    const back = norm3(sub3(mApply(tor, [-1, 0, 0]), mApply(tor, [0, 0, 0])));
-    const ir = ikArm(armR, calfBack, add3(mul3(back, 1), [0, 0, 0.6])), il = ikArm(armL, thighFront, add3(mul3(back, 1), [0, 0, -0.4]));
+    const rub = smooth(clamp((hArm - 0.85) / 0.15, 0, 1)) * 14 * Math.sin(TAU * tt * 1.15);
+    const thighFront = mApply(left.th, [74, -380, 0]), calfT = mApply(right.sh, [-58, -110 + rub, 4]);
+    const back = norm3(sub3(mApply(tor, [-1, 0, 0]), mApply(tor, [0, 0, 0]))), latR = norm3(sub3(mApply(pel, [0, 0, 1]), mApply(pel, [0, 0, 0])));
+    const ir = ikArm(armR, calfT, add3(back, [0, 0, 0.6]), add3(mul3(latR, 0.8), mul3(back, 0.4)));
+    const il = ikArm(armL, thighFront, add3(back, [0, 0, -0.4]), add3(mul3(latR, -0.6), mul3(back, 0.2)));
     out.push(['uarm', ir.ua], ['farm', ir.fa], ['uarm', il.ua], ['farm', il.fa]);
   } else out.push(['uarm', armR.ua], ['farm', armR.fa], ['uarm', armL.ua], ['farm', armL.fa]);
   return { parts: out, right, left };
 }
-// draw the patient; o: {pain (0..1: the calf glows orange), alpha (screen door), glassLeg (0..1: the right thigh and shin turn see-through),
+// kept for the scenes: with a walk sample the IK already keeps both feet planted
+const plantedPose = (root, q) => patientPose(root, 0, q);
+// draw the patient; o: {socks (shoes off), pain (0..1: the calf glows orange), alpha (screen door), glassLeg (0..1: the right thigh and shin turn see-through),
 // skipParts (names), skipXf (part matrices, e.g. pose.right.sh), fog}
 function drawPatient(cam, pose, o) {
   o = o || {};
@@ -1371,7 +1507,8 @@ function drawPatient(cam, pose, o) {
   for (const [name, xf] of pose.parts) {
     if (o.skipParts && o.skipParts.includes(name)) continue;
     if (o.skipXf && o.skipXf.includes(xf)) continue;
-    for (const [mesh, mt] of PART_MESH[name]) {
+    for (const [mesh, mt0] of PART_MESH[name]) {
+      const mt = o.socks && name === 'foot' ? 'sock' : mt0;              // shoes off on the CT table
       const m = { ramp: RP[mt], id: ids[mt], amb: 0.32, dif: 0.68, rim: 0.26, fog: o.fog };
       if (mt === 'skin') Object.assign(m, { spec: 0.12, cap: 0.86 });
       if (mesh === 'head') m.mix = { ramp: RP.hair, f: a => a };
@@ -1405,27 +1542,6 @@ function drawFloor(cam, fog) {
   const [x0, x1, z0, z1] = FLOOR_Q;
   drawMesh(cam, FLOOR(), { ramp: [0], back: [0], unlit: true, id: 0, fog, pixFn: (u, v) => { const x = x0 + u * (x1 - x0), z = z0 + v * (z1 - z0); return FLOOR_C[(Math.floor(x / 320) + Math.floor(z / 320)) & 1]; } });
 }
-// ---------------------------------------------------------------- walking without foot slide
-// the root moves so the planted (lowest) foot stays still on the floor; precomputed once at 240 Hz
-function walkTable(phF, ampF, t0, t1) {
-  const dt = 1 / 240, n = Math.round((t1 - t0) / dt) + 1, X = new Float32Array(n), Y = new Float32Array(n);
-  const solePts = (pose) => [pose.right, pose.left].map(s => [mApply(s.ft, [-20, -86, 0]), mApply(s.ft, [160, -86, 0])]);
-  let x = 0, prev = null;
-  for (let i = 0; i < n; i++) {
-    const t = t0 + i * dt, q = { ph: phF(t), amp: ampF(t) };
-    const pose = patientPose([0, 0, 0], 0, q), sp = solePts(pose);
-    const lowR = Math.min(sp[0][0][1], sp[0][1][1]), lowL = Math.min(sp[1][0][1], sp[1][1][1]);
-    const st = lowR <= lowL ? 0 : 1, footX = (sp[st][0][0] + sp[st][1][0]) / 2;
-    if (prev && prev.st === st) x += -(footX - prev.footX);
-    prev = { st, footX };
-    X[i] = x; Y[i] = -Math.min(lowR, lowL);
-  }
-  return { t0, dt, X, Y, at: t => { const f = clamp((t - t0) / dt, 0, n - 1), i = Math.floor(f), k = f - i, j = Math.min(n - 1, i + 1); return [lerp(X[i], X[j], k), lerp(Y[i], Y[j], k)]; } };
-}
-const WALK = walkTable(gaitPhase, gaitAmp, -0.5, 6.5);
-// scene 12: walking again at an even pace (right heel strikes on 33.0 and 34.5 s, left on 33.75 and 35.25 s)
-const PH12 = t => (t - 33) / 1.5, AMP12 = () => 0.82;
-const WALK12 = walkTable(PH12, AMP12, 32.5, 36.6);
 
 // ---- 11_leg.js
 // ============================================================================
@@ -1660,9 +1776,9 @@ function drawVessel(cam, st, xf, o) {
   drawMesh(cam, M.cut, { ramp: [0], back: [0], id: newId(CX_.ol), unlit: true, pixFn: (u, v) => cutPix(-AR.L / 2 + u * AR.L, -AR.RO + v * 2 * AR.RO, st) }, xf);
 }
 // ---------------------------------------------------------------- blood
-function cellField(st, n, seed) {
-  const r = mulberry(seed || 7), cells = [];
-  for (let i = 0; i < n; i++) cells.push({ eta: (r() * 2 - 1) * 0.78, zz: 0.15 + r() * 0.6, ph: r(), rot: r() * TAU, tilt: (r() - 0.5) * 1.4, spin: 0.5 + r() });
+const CELLS = {};
+function cellField(st, n, seed) {                  // the cells are fixed per seed; the transit-time map follows the channel every frame
+  const ck = n + ':' + seed, cells = CELLS[ck] || (CELLS[ck] = (() => { const r = mulberry(seed || 7), c = []; for (let i = 0; i < n; i++) c.push({ eta: (r() * 2 - 1) * 0.78, zz: 0.15 + r() * 0.6, ph: r(), rot: r() * TAU, tilt: (r() - 0.5) * 1.4, spin: 0.5 + r() }); return c; })());
   const L = AR.L, N = 200, tau = new Float32Array(N + 1); let acc = 0;
   for (let i = 0; i <= N; i++) { const x = -L / 2 - 20 + (L + 40) * i / N, k = Math.max(0.08, chanAt(x, { g: st.g || 0, xc: st.xc, w: st.w })[0]); tau[i] = acc; acc += k * k; }
   return { cells, tau, total: acc, N };
@@ -1679,7 +1795,8 @@ function drawCells(cam, xf, st, F, t, o) {
     const c = F.cells[i], x = xAtTau(F, (c.ph + clk) % 1);
     if (x < -AR.L / 2 + 4 || x > AR.L / 2 - 4) continue;
     const ch = chanAt(x, st), k = ch[0]; if (k < 0.12) continue;
-    const rr = AR.RL * k, y = ch[1] + c.eta * Math.max(0, rr - RBC_R * 0.8), z = -c.zz * Math.max(1, rr - RBC_R);
+    const eta = clamp(c.eta + 0.07 * Math.sin(t * (0.6 + c.spin) + i * 1.7), -0.85, 0.85);      // cells drift across the stream a little
+    const rr = AR.RL * k, y = ch[1] + eta * Math.max(0, rr - RBC_R * 0.8), z = -c.zz * Math.max(1, rr - RBC_R);
     drawRBC(cam, xf, x, y, z, c.rot + t * 0.6 * c.spin, c.tilt + 0.4 * Math.sin(t * c.spin + i), m);
   }
 }
@@ -1701,24 +1818,26 @@ function gluSprite(cam, xf, x, y, z, rot) {
   const hex = (rad, col) => { const pts = []; for (let k = 0; k < 6; k++) { const a = rot + k * TAU / 6; pts.push(sx + rad * Math.cos(a), sy + rad * Math.sin(a)); } poly(pts, col); };
   hex(r + 1, hexc('#5A4A12')); hex(r, hexc('#F5E27A')); hex(r * 0.42, hexc('#3A1420'));
 }
-function drawGlucose(cam, xf, st, t, n) {
-  const r = mulberry(17);
+function drawGlucose(cam, xf, st, t, n) {          // carried by the same pulsing plasma as the cells, jiggling as it goes
+  const r = mulberry(17), clk = flowClock(t, 0.075);
   for (let i = 0; i < n; i++) {
-    const p0 = r(), eta = (r() * 2 - 1) * 0.85, zz = 0.1 + r() * 0.7, x = -AR.L / 2 + ((p0 * AR.L + t * 22) % AR.L), ch = chanAt(x, st);
+    const p0 = r(), eta0 = (r() * 2 - 1) * 0.85, zz = 0.1 + r() * 0.7, sp = 0.8 + 0.4 * r(), x = -AR.L / 2 + (((p0 + clk * sp) % 1 + 1) % 1) * AR.L, ch = chanAt(x, st);
     if (ch[0] < 0.15) continue;
-    const rr = AR.RL * ch[0]; gluSprite(cam, xf, x, ch[1] + eta * (rr - 2), -zz * Math.max(1, rr - 2), t * 0.8 + i);
+    const eta = clamp(eta0 + 0.05 * Math.sin(t * 5.3 + i * 2.1) + 0.03 * Math.sin(t * 8.9 + i), -0.9, 0.9), rr = AR.RL * ch[0];
+    gluSprite(cam, xf, x + 0.6 * Math.sin(t * 7.1 + i), ch[1] + eta * (rr - 2), -zz * Math.max(1, rr - 2), t * (0.6 + 0.5 * sp) + i);
   }
 }
 // white cells, lipid particles, the macrophage / foam cell
-function drawWBC(cam, xf, x, y, z, s) {
-  drawMesh(cam, MICRO().wbc, { ramp: MR.wbc, id: newId(hexc('#3A3450')), amb: 0.36, dif: 0.62, rim: 0.3, spec: 0.3, mix: { ramp: MR.nuc, f: a => a } }, mMul(xf, mMul(mT(x, y, z), mS(5.4 * (s || 1)))));
+function drawWBC(cam, xf, x, y, z, s, roll, flat) {   // roll: angle rolled along the wall; flat: 0..1 flattened as it sticks
+  const k = 5.4 * (s || 1), f = flat || 0;
+  drawMesh(cam, MICRO().wbc, { ramp: MR.wbc, id: newId(hexc('#3A3450')), amb: 0.36, dif: 0.62, rim: 0.3, spec: 0.3, mix: { ramp: MR.nuc, f: a => a } }, mMul(xf, mMul(mT(x, y + 0.5 * k * f * 0.18, z), mMul(mS(k * (1 + 0.1 * f), k * (1 - 0.18 * f), k), mRz(roll || 0)))));
 }
 function drawLDL(cam, xf, x, y, z) { drawMesh(cam, MICRO().sph, { ramp: MR.ldl, id: newId(hexc('#4A3204')), amb: 0.4, dif: 0.6, spec: 0.5 }, mMul(xf, mMul(mT(x, y, z), mS(1.6)))); }
 function drawFoam(cam, xf, x, y, k) {             // k: 0 macrophage → 1 foam cell full of lipid droplets
   const z = 0.6, mm = mMul(xf, mMul(mT(x, y, z - 2), mS(6.2, 5.2, 4)));
   drawMesh(cam, MICRO().sph, { ramp: MR.mac, id: newId(hexc('#3A2E20')), amb: 0.38, dif: 0.6, rim: 0.25, mix: { ramp: MR.foam, f: () => 0.25 * k } }, mm);
-  const r = mulberry(5);
-  for (let i = 0; i < Math.round(8 * k); i++) { const a = r() * TAU, d = Math.sqrt(r()) * 4; drawMesh(cam, MICRO().sph, { ramp: MR.foam, id: 0, amb: 0.4, dif: 0.6, spec: 0.6 }, mMul(xf, mMul(mT(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, z + 1.2), mS(1.3)))); }
+  const r = mulberry(5);                          // the droplets swell in one after another
+  for (let i = 0; i < 8; i++) { const a = r() * TAU, d = Math.sqrt(r()) * 4, g = smooth(clamp(8 * k - i, 0, 1)); if (g < 0.05) continue; drawMesh(cam, MICRO().sph, { ramp: MR.foam, id: 0, amb: 0.4, dif: 0.6, spec: 0.6 }, mMul(xf, mMul(mT(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, z + 1.2), mS(1.3 * g)))); }
 }
 // ---------------------------------------------------------------- collateral side channels around the block (they widen; they never reopen it)
 function collatPaths() {
@@ -1727,21 +1846,23 @@ function collatPaths() {
   return [P1, P2];
 }
 function collatMesh(col) {
-  return cached('col' + Math.round(col * 8), () => { const c = Math.round(col * 8) / 8, mb = new MB(); collatPaths().forEach((pts, k) => tubeInto(mb, smoothPath(pts, 2), (k ? 3.4 : 4.0) + c * (k ? 3.6 : 4.6), null, 12, false)); return computeNormals(mb.build()); });
+  return cached('col' + Math.round(col * 48), () => { const c = Math.round(col * 48) / 48, mb = new MB(); collatPaths().forEach((pts, k) => tubeInto(mb, smoothPath(pts, 2), (k ? 3.4 : 4.0) + c * (k ? 3.6 : 4.6), null, 12, false)); return computeNormals(mb.build()); });
 }
 function drawCollat(cam, xf, col) { drawMesh(cam, collatMesh(col), { ramp: MR.col, back: MR.colIn, id: newId(P.AR0), amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.4, clip: [0, 0, 1, 0], cutCol: CX_.med, cutW: 0.9 }, xf); }
 function drawCollatFlow(cam, xf, t, k) {
   if (k <= 0) return;
-  const m = rbcMat();
+  const m = rbcMat(), clk = flowClock(t, 0.33);                       // the same pulse drives the side channels
   collatPaths().forEach((pts, pi) => {
-    const n = Math.round(7 * k), L = pts.length - 1;
+    const n = 7, L = pts.length - 1;
     for (let i = 0; i < n; i++) {
-      const u = ((t * 0.32 + i / n + pi * 0.37) % 1), f = u * L, j = Math.floor(f), h = f - j, a = pts[j], b = pts[Math.min(L, j + 1)];
-      drawRBC(cam, xf, lerp(a[0], b[0], h), lerp(a[1], b[1], h), -3, t + i, 0.5, m, 0.7);
+      const g = smooth(clamp(7 * k - i, 0, 1)); if (g < 0.05) continue;
+      const u = ((clk + i / n + pi * 0.37) % 1), f = u * L, j = Math.floor(f), h = f - j, a = pts[j], b = pts[Math.min(L, j + 1)];
+      drawRBC(cam, xf, lerp(a[0], b[0], h), lerp(a[1], b[1], h), -3, t + i, 0.5, m, 0.7 * g);
     }
   });
-  const r = mulberry(53);                                              // below the block: fewer, slower cells
-  for (let i = 0; i < Math.round(10 * k); i++) { const x = AR.XO + AR.WO + 8 + ((t * 16 * k + r() * 200) % (AR.L / 2 - AR.XO - AR.WO - 12)); drawRBC(cam, xf, x, (r() * 2 - 1) * AR.RL * 0.7, -(0.2 + r() * 0.5) * AR.RL, r() * TAU + t, r() - 0.5, m); }
+  const r = mulberry(53), clk2 = flowClock(t, 0.024), span = AR.L / 2 - AR.XO - AR.WO - 12;   // below the block: fewer, slower cells
+  for (let i = 0; i < 10; i++) { const r0 = r(), y0 = (r() * 2 - 1) * AR.RL * 0.7, z0 = -(0.2 + r() * 0.5) * AR.RL, rot = r() * TAU, tl = r() - 0.5, g = smooth(clamp(10 * k - i, 0, 1)); if (g < 0.05) continue;
+    const x = AR.XO + AR.WO + 8 + ((r0 * 200 + clk2 * span * 6) % span); drawRBC(cam, xf, x, y0, z0, rot + t, tl, m, g); }
 }
 
 // ---- 13_tree.js
@@ -1769,12 +1890,12 @@ function art(name, pts, parent) { ART[name] = { name, pts: pts.map(p => [p[0], p
 function side(sx, tag, L) {           // sx = -1 right leg, +1 left leg (mirrored, then varied)
   const X = x => x * -sx;             // centrelines written for the right leg (x negative)
   const P = (x, y, z, r) => [X(x), y, z, r];
-  art(tag + 'CIA', [P(0, 1030, -30, 5), P(-45, 962, -34, 5), P(-60, 926, -30, 4.6)], 'AO');
-  art(tag + 'IIA', [P(-60, 926, -30, 2.6), P(-58, 884, -58, 2.3), P(-48, 852, -80, 1.9)], tag + 'CIA');
-  art(tag + 'EIA', [P(-60, 926, -30, 4.2), P(-80, 892, -10, 4), P(-88, 860, 0, 4)], tag + 'CIA');
-  art(tag + 'CFA', [P(-88, 860, 0, 4), P(-90, 815, 5, 4)], tag + 'EIA');
-  art(tag + 'PFA', [P(-90, 815, 5, 3.2), P(-101, 790, -10, 3), P(-108, 720, -25, 2.7), P(-105, 640, -32, 2.2), P(-99, 588, -36, 1.6)], tag + 'CFA');
-  art(tag + 'SFA', [P(-90, 815, 5, 3.2), P(-83, 760, 8, 3.1), P(-76, 690, 4, 3), P(-71, 625, -6, 3), P(-72, 570, -25, 3)], tag + 'CFA');
+  art(tag + 'CIA', [P(0, 1030, -26, 5), P(-36, 962, -22, 5), P(-42, 926, 4, 4.6)], 'AO');
+  art(tag + 'IIA', [P(-42, 926, 4, 2.6), P(-50, 884, -40, 2.3), P(-42, 852, -66, 1.9)], tag + 'CIA');
+  art(tag + 'EIA', [P(-42, 926, 4, 4.2), P(-72, 892, 16, 4), P(-88, 860, 26, 4)], tag + 'CIA');
+  art(tag + 'CFA', [P(-88, 860, 26, 4), P(-90, 815, 18, 4)], tag + 'EIA');
+  art(tag + 'PFA', [P(-90, 815, 18, 3.2), P(-98, 790, -8, 3), P(-94, 720, -42, 2.7), P(-92, 640, -46, 2.2), P(-92, 588, -46, 1.6)], tag + 'CFA');
+  art(tag + 'SFA', [P(-90, 815, 18, 3.2), P(-83, 760, 10, 3.1), P(-76, 690, 4, 3), P(-71, 625, -6, 3), P(-72, 570, -25, 3)], tag + 'CFA');
   art(tag + 'POP', [P(-72, 570, -25, 3), P(-75, 520, -40, 2.9), P(-78, 480, -45, 2.8), P(-80, 445, -42, 2.7)], tag + 'SFA');
   art(tag + 'ATA', [P(-80, 445, -42, 1.7), P(-92, 430, -20, 1.6), P(-96, 400, 5, 1.6), P(-98, 300, 15, 1.5), P(-96, 180, 20, 1.4), P(-92, 82, 30, 1.4),
     P(-88, 50, 55, 1.3), P(-80, 30, 100, 1.2), P(-75, 22, 140, 1.1)], tag + 'POP');
@@ -1784,10 +1905,10 @@ function side(sx, tag, L) {           // sx = -1 right leg, +1 left leg (mirrore
   art(tag + 'PERc', [P(-95, 118, -18, 0.8), P(-96, 104, 2, 0.75), P(-93, 96, 22, 0.7)], tag + 'PER');          // perforating branch toward the ATA
   // genicular collaterals around the knee (pre-existing small channels; they enlarge where the popliteal is blocked)
   art(tag + 'GEN1', [P(-71, 608, -10, 1.0), P(-60, 585, 2, 1.0), P(-55, 545, 0, 1.0), P(-58, 505, -12, 1.0), P(-66, 478, -30, 1.0), P(-76, 466, -40, 1.0)], tag + 'SFA');
-  art(tag + 'GEN2', [P(-100, 600, -35, 0.9), P(-104, 565, -28, 0.9), P(-98, 530, -18, 0.9), P(-96, 500, -26, 0.9), P(-88, 474, -38, 0.9), P(-80, 462, -43, 0.9)], tag + 'PFA');
+  art(tag + 'GEN2', [P(-93, 600, -45, 0.9), P(-104, 565, -32, 0.9), P(-104, 530, -26, 0.9), P(-96, 500, -26, 0.9), P(-88, 474, -38, 0.9), P(-80, 462, -43, 0.9)], tag + 'PFA');
   art(tag + 'GEN3', [P(-73, 560, -32, 0.75), P(-82, 538, -58, 0.75), P(-84, 510, -60, 0.75), P(-80, 482, -52, 0.75), P(-79, 470, -46, 0.75)], tag + 'POP');
 }
-art('AO', [[0, 1180, -40, 9], [0, 1100, -36, 9], [0, 1030, -30, 8.6]], null);
+art('AO', [[0, 1180, -30, 9], [0, 1100, -28, 9], [0, 1030, -26, 8.6]], null);
 side(-1, 'R'); side(1, 'L');
 // arc length from the aortic inlet along the tree (how far the contrast front must travel)
 function arcLengths() {
@@ -1947,15 +2068,22 @@ function drawTreeCTA(cam, T, o) {
   if (T.cal) drawMesh(cam, T.cal, { ramp: [P.CA2, P.CA3, P.CA4, P.CA4], id: newId(hexc('#101010')), amb: 0.6, dif: 0.5, spec: 0.3, fog: o.fog }, o.xf);
 }
 // ---------------------------------------------------------------- bones (ivory): femur, tibia, fibula, patella, foot, pelvis
+// centre-lines [x, y, z, radius] for the right leg (mirrored for the left), shared by the 3D bones and the axial CT
+// images: the femoral neck runs out to the trochanter, the shaft angles back in toward the knee (lateral to the SFA,
+// which stays medial and a little in front of it), the tibia in front of the posterior tibial and peroneal arteries
+const BONE_CTRL = {
+  femur: [[-92, 868, -12, 20], [-118, 846, -10, 16], [-122, 815, -12, 15], [-112, 700, -16, 13], [-98, 585, -12, 13], [-86, 525, -4, 16], [-80, 495, 0, 23]],
+  tibia: [[-78, 470, 0, 23], [-74, 440, 4, 18], [-70, 330, 8, 12], [-68, 120, 8, 10], [-64, 82, 10, 15]],
+  fibula: [[-106, 452, -10, 7], [-106, 400, -12, 5.5], [-108, 200, -12, 4.5], [-108, 82, -8, 8]],
+};
 function buildBonesMesh() {
   const mb = new MB();
   for (const sx of [-1, 1]) {
     const X = p => [p[0] * -sx, p[1], p[2], p[3]];
     const tube = ctrl => { const c = ctrl.map(X), pts = smoothPath(c.map(q => q.slice(0, 3)), 6), L = pts.length - 1; tubeInto(mb, pts, (i, u) => { const f = u * (c.length - 1), j = Math.min(c.length - 2, Math.floor(f)); return lerp(c[j][3], c[j + 1][3], f - j); }, null, 12, true); };
-    tube([[-92, 868, -12, 20], [-104, 840, -10, 14], [-86, 800, -6, 14], [-70, 600, 0, 12], [-68, 520, 0, 15], [-72, 492, 2, 22]]);                 // femur
+    tube(BONE_CTRL.femur);
     ellipsoidInto(mb, [92 * sx, 868, -12], 24, 24, 24, 12, 8);                                                                                     // femoral head
-    tube([[-74, 470, 0, 23], [-72, 440, 4, 18], [-70, 330, 8, 12], [-68, 120, 8, 10], [-64, 82, 10, 15]]);                                           // tibia
-    tube([[-104, 452, -10, 7], [-104, 400, -12, 5.5], [-106, 200, -12, 4.5], [-108, 82, -8, 8]]);                                                    // fibula
+    tube(BONE_CTRL.tibia); tube(BONE_CTRL.fibula);
     ellipsoidInto(mb, [74 * sx, 505, 36], 13, 18, 8, 10, 7);                                                                                       // patella
     ellipsoidInto(mb, [68 * sx, 34, -18], 20, 24, 24, 10, 7);                                                                                      // heel
     for (let r = 0; r < 4; r++) tube([[-70 + (r - 1.5) * 9, 30, 70, 5], [-70 + (r - 1.5) * 11, 10, 158, 3.5]]);                                       // metatarsal rays
@@ -1993,27 +2121,33 @@ function ghostBody(cam, xf, parts, o) {
 
 // ---- 14_ct.js
 // ============================================================================
-// THE CT ROOM (scene 14), from the CTA film's scanner: a generic CT gantry (no
-// brand), its table, the patient supine under a sheet with the right forearm
-// on an arm board and an IV cannula in the antecubital vein, the power
-// injector on its stand with the tubing. Patient frame (mm): x = the
-// patient's left, y = superior, z = anterior (room "up"); the head lies in
-// the gantry (never seen). CTA only images: nothing is threaded into the legs.
+// THE CT ROOM (scenes 14 and 16), set up the way a leg-artery CT angiogram is
+// done: the same patient lies on his back on the table, head first, both arms
+// raised above his head, shoes off, a strap over the knees; an IV cannula in
+// the right elbow vein is connected to a dual-syringe power injector on its
+// pedestal beside the gantry. The gantry (generic, no brand) has its control
+// panels, the lit bore ring, the X-ray lamp and the positioning laser, which
+// draws a red line across whatever passes through its plane. The table slides
+// him into the bore until his belly lies in the scan plane; during the scan it
+// carries him on through while the images are taken from the belly to the feet.
+// His head is inside the bore from the start (it is never seen).
+// Patient frame (mm), fixed to the table: x = the patient's left, y = toward
+// his head, z = up. The room (gantry, pedestal, injector, floor) moves by G:
+// the gantry's scan plane sits at y = G on the patient; its front faces −y.
 // ============================================================================
-const GAN = { y: 24, rIn: 330, rOut: 640, half: 210, rRot: 470, floor: -700 };
+const GAN = { y: 0, rIn: 330, rOut: 640, half: 210, floor: -700 };
 function gantrySDF(x, y, z) {
-  const hx = 640, hz = 700, R = 280, re = 46, cz = 0;
-  const qx = Math.abs(x) - (hx - R), qz = Math.abs(z - cz) - (hz - R);
+  const hx = 640, hz = 700, R = 280, re = 46;
+  const qx = Math.abs(x) - (hx - R), qz = Math.abs(z) - (hz - R);
   const d2 = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - R;
-  const dy = Math.abs(y - GAN.y) - GAN.half, q0 = d2 + re, q1 = dy + re;
+  const dy = Math.abs(y) - GAN.half, q0 = d2 + re, q1 = dy + re;
   let d = Math.hypot(Math.max(q0, 0), Math.max(q1, 0)) + Math.min(Math.max(q0, q1), 0) - re;
   d = smax(d, -(Math.hypot(x, z) - GAN.rIn), 26);
   return Math.max(d, GAN.floor - z);
 }
-function buildGantryHousing() { return isoMesh(gantrySDF, -700, GAN.y - GAN.half - 40, GAN.floor - 10, 700, GAN.y + GAN.half + 40, 730, 20); }
-function buildGantryBase() { const mb = new MB(); boxInto(mb, [0, GAN.y, GAN.floor + 20], [1400, 560, 40]); return computeNormals(mb.build()); }
+function buildGantryHousing() { return isoMesh(gantrySDF, -700, -GAN.half - 40, GAN.floor - 10, 700, GAN.half + 40, 730, 26); }
 function ringInto(mb, r0, r1, y0, y1, n) {
-  const P_ = (r, a, y) => [r * Math.sin(a), GAN.y + y, r * Math.cos(a)];
+  const P_ = (r, a, y) => [r * Math.sin(a), y, r * Math.cos(a)];
   for (let k = 0; k < n; k++) {
     const A = k / n * TAU, B = (k + 1) / n * TAU, sa = Math.sin(A), ca = Math.cos(A), sb = Math.sin(B), cb = Math.cos(B);
     const q = (pts, ns) => { const i = pts.map((p, j) => mb.v(p[0], p[1], p[2], ns[j][0], ns[j][1], ns[j][2])); mb.quad(i[0], i[1], i[2], i[3]); };
@@ -2023,95 +2157,104 @@ function ringInto(mb, r0, r1, y0, y1, n) {
     q([P_(r0, A, y1), P_(r1, A, y1), P_(r1, B, y1), P_(r0, B, y1)], [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]]);
   }
 }
-function buildBoreTrim() { const mb = new MB(); ringInto(mb, GAN.rIn - 4, GAN.rIn + 18, -GAN.half - 6, -GAN.half + 6, 64); return mb.build(); }
-const ARM = { sh: [-200, -250, -36], el: [-366, -488, -92], wr: [-522, -696, -92], hand: [-566, -756, -90] };
-const CANNULA = { tip: [-378, -500, -63], hub: [-407, -541, -47] };
-function bodySDF(x, y, z) {
-  const ax = Math.abs(x);
-  let d = sdB(x, y, z, 0, -430, -42, 158, 215, 92, 70);                                       // chest and abdomen
-  d = smin(d, sdC(x, y, z, -168, -232, -44, 168, -232, -44, 60), 40);                        // shoulders
-  d = smin(d, sdE(x, y, z, 0, -690, -48, 166, 120, 92), 40);                                 // hips
-  d = smin(d, sdC(ax, y, z, 92, -740, -52, 104, -1530, -58, 78, 50), 46);                    // legs, the sheet bridging between them
-  d = smin(d, sdE(ax, y, z, 104, -1585, 2, 40, 34, 58), 16);                                 // feet tenting the sheet
-  d = smin(d, sdC(x, y, z, 205, -250, -34, 232, -770, -32, 48, 38), 24);                     // the left arm under the sheet
-  d = smin(d, sdC(x, y, z, -200, -250, -36, -290, -380, -66, 50, 44), 22);                    // the right upper arm in its sleeve
-  d += 1.6 * Math.sin(y * 0.045 + Math.sin(x * 0.02) * 2) * (z > -60 ? 1 : 0.3);             // soft folds in the sheet
-  return Math.max(d, TABLE_Z - z);
+// the front face (toward the patient's head, +y): the lit ring round the bore, two control panels, the laser slot, the lamp
+function buildGantryFront() {
+  const F = -GAN.half;
+  const ring = new MB(); ringInto(ring, GAN.rIn - 4, GAN.rIn + 22, F - 6, F + 6, 72);
+  const panel = new MB(); for (const sx of [-1, 1]) boxInto(panel, [sx * 470, F - 8, 60], [120, 14, 150]);
+  const keys = new MB(); for (const sx of [-1, 1]) for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) boxInto(keys, [sx * 470 + (c - 0.5) * 42, F - 17, 100 - r * 40], [26, 6, 18]);
+  const slot = new MB(); boxInto(slot, [0, F - 6, GAN.rIn + 70], [260, 8, 10]);
+  const lamp = new MB(); ellipsoidInto(lamp, [0, F - 6, 640], 26, 10, 14, 12, 6);
+  return { ring: ring.build(), panel: computeNormals(panel.build()), keys: computeNormals(keys.build()), slot: computeNormals(slot.build()), lamp: computeNormals(lamp.build()) };
 }
-const TABLE_Z = -132;
-function buildBody() { return isoMesh(bodySDF, -290, -1680, -140, 290, -150, 80, 15); }
-function buildForearm() {
-  const mb = new MB();
-  tubeInto(mb, smoothPath([lerp3(ARM.sh, ARM.el, 0.5), ARM.el, lerp3(ARM.el, ARM.wr, 0.5), ARM.wr], 6), (i, u) => u < 0.45 ? lerp(42, 38, u / 0.45) : lerp(38, 27, (u - 0.45) / 0.55), null, 20, true);
-  ellipsoidInto(mb, ARM.hand, 36, 44, 15, 14, 10, (x, y, z) => 1 + 0.1 * Math.max(0, -z));
-  return computeNormals(mb.build());
-}
-function buildArmBoard() {
-  const mb = new MB(); boxInto(mb, [0, 0, 0], [120, 420, 18]);
-  const m = mb.build(), R = mMul(mT(-450, -615, -110), mRotAxis([0, 0, 0], [0, 0, 1], -0.62));
-  for (let i = 0; i < m.nv; i++) { const q = mApply(R, [m.p[3 * i], m.p[3 * i + 1], m.p[3 * i + 2]]); m.p[3 * i] = q[0]; m.p[3 * i + 1] = q[1]; m.p[3 * i + 2] = q[2]; }
-  return computeNormals(m);
-}
-const TABLE = { z: TABLE_Z, y0: -1900, y1: 280 };
+// ---------------------------------------------------------------- the patient on the table
+const TABLE_Z = -132, MATTRESS = 24;
+// body frame (forward x, up y, right z) → patient frame (x = left, y = head, z = up), lying on the mattress
+const CT_ROOT = [0, 0, -1, 0, 0, 1, 0, -690, 1, 0, 0, TABLE_Z + MATTRESS + 86];
+const ctPose = t => patientPose(null, 0, { rootM: CT_ROOT, armsUp: 1, t: t || 0 });
+// the IV cannula in the right elbow vein (raised arm) — the contrast's route in scene 15 starts here
+const CANNULA = (() => { const p = ctPose(0), el = mApply(p.parts.find(q => q[0] === 'farm')[1], [10, -40, 0]); return { tip: el, hub: add3(el, [-6, 30, 18]) }; })();
+const TABLE = { y0: -2100, y1: 620 };
 function buildTable() {
-  const mb = new MB();
-  boxInto(mb, [0, (TABLE.y0 + TABLE.y1) / 2, TABLE.z - 22], [470, TABLE.y1 - TABLE.y0, 44]);
-  boxInto(mb, [0, -1250, (TABLE.z - 44 + GAN.floor) / 2], [300, 700, TABLE.z - 44 - GAN.floor]);
-  boxInto(mb, [0, -1250, GAN.floor + 30], [560, 900, 60]);
-  // the head holder (a cradle)
-  tubeInto(mb, [[0, -20, TABLE.z + 6], [0, 120, TABLE.z + 6]], 46, null, 18, true);
-  return computeNormals(mb.build());
+  const top = new MB(); boxInto(top, [0, (TABLE.y0 + TABLE.y1) / 2, TABLE_Z - 16], [440, TABLE.y1 - TABLE.y0, 32]);
+  const pad = new MB(); boxInto(pad, [0, (TABLE.y0 + TABLE.y1) / 2 + 20, TABLE_Z + MATTRESS / 2], [400, TABLE.y1 - TABLE.y0 - 60, MATTRESS]);
+  // the knee strap: a flat band (60 mm wide) over both knees, down to the table edges
+  const strap = new MB(), arc = smoothPath([[-214, -1140, TABLE_Z + 14], [-190, -1140, -24], [-156, -1140, 46], [-92, -1140, 74], [-28, -1140, 56], [0, -1140, 44], [28, -1140, 56], [92, -1140, 74], [156, -1140, 46], [190, -1140, -24], [214, -1140, TABLE_Z + 14]], 3);
+  for (let i = 0; i + 1 < arc.length; i++) {
+    const a = arc[i], b = arc[i + 1], d = norm3(sub3(b, a)), n = [-d[2], 0, d[0]];
+    const v = [[a[0], a[1] - 30, a[2]], [a[0], a[1] + 30, a[2]], [b[0], b[1] + 30, b[2]], [b[0], b[1] - 30, b[2]]].map(p => strap.v(p[0] + n[0] * 3, p[1], p[2] + n[2] * 3, n[0], 0, n[2]));
+    strap.quad(v[0], v[1], v[2], v[3]); strap.quad(v[0], v[3], v[2], v[1]);
+  }
+  return { top: computeNormals(top.build()), pad: computeNormals(pad.build()), strap: strap.build() };
 }
-const INJ = { head: [-590, -560, 40], tip: [-574, -560, -46] };
+// the pedestal (room-fixed, in front of the gantry) and the injector beside it
+function buildPedestal() { const mb = new MB(); boxInto(mb, [0, -1250, (TABLE_Z - 40 + GAN.floor) / 2], [340, 1000, TABLE_Z - 40 - GAN.floor]); boxInto(mb, [0, -1250, GAN.floor + 25], [520, 1180, 50]); return computeNormals(mb.build()); }
+const INJ = { x: -700, y: -980, head: [-700, -980, 120] };
 function buildInjector() {
   const mb = new MB();
-  tubeInto(mb, [[-600, -560, GAN.floor], [-600, -560, -30]], 14, null, 10, true);
-  ellipsoidInto(mb, [-600, -560, GAN.floor + 12], 150, 150, 24, 20, 6, (x, y, z) => 1);
-  // a rounded injector head (superellipsoid look) with a dark front panel
-  ellipsoidInto(mb, INJ.head, 70, 105, 58, 20, 14, (x, y, z) => 1 / Math.pow(Math.pow(Math.abs(x), 4) + Math.pow(Math.abs(y), 4) + Math.pow(Math.abs(z), 4), 0.25));
-  boxInto(mb, add3(INJ.head, [-58, 0, 14]), [8, 120, 52]);
+  tubeInto(mb, [[INJ.x, INJ.y, GAN.floor], [INJ.x, INJ.y, 60]], 18, null, 10, true);
+  ellipsoidInto(mb, [INJ.x, INJ.y, GAN.floor + 14], 170, 170, 26, 20, 6, () => 1);
+  ellipsoidInto(mb, INJ.head, 80, 110, 66, 20, 14, (x, y, z) => 1 / Math.pow(Math.pow(Math.abs(x), 4) + Math.pow(Math.abs(y), 4) + Math.pow(Math.abs(z), 4), 0.25));
+  boxInto(mb, add3(INJ.head, [-70, 0, 20]), [8, 130, 60]);
   return computeNormals(mb.build());
 }
-function buildSyringe() { const mb = new MB(); tubeInto(mb, [[-577, -560, -12], [-574, -560, -52]], 26, null, 16, true); return computeNormals(mb.build()); }
-const IV_LINE = smoothPath([INJ.tip, [-560, -566, -84], [-520, -570, -96], [-470, -560, -70], [-436, -552, -52], CANNULA.hub], 5);
-function buildTubing() { const mb = new MB(); tubeInto(mb, IV_LINE, 3.4, (i, u) => u, 8); return computeNormals(mb.build()); }
-function buildCannula() {
-  const mb = new MB();
-  tubeInto(mb, [CANNULA.hub, lerp3(CANNULA.hub, CANNULA.tip, 0.5), CANNULA.tip], 1.3, null, 8, true);
-  ellipsoidInto(mb, CANNULA.hub, 7, 9, 6, 12, 8);
-  boxInto(mb, add3(CANNULA.hub, [0, 2, -4]), [24, 18, 3]);
-  return computeNormals(mb.build());
+// two syringes pointing down at the front of the head: contrast (white-blue) and saline (clear)
+function buildSyringes() { const a = new MB(), b = new MB(); tubeInto(a, [[INJ.x + 40, INJ.y - 30, 110], [INJ.x + 52, INJ.y - 30, 20]], 22, null, 14, true); tubeInto(b, [[INJ.x + 40, INJ.y + 34, 110], [INJ.x + 52, INJ.y + 34, 20]], 22, null, 14, true); return { con: computeNormals(a.build()), sal: computeNormals(b.build()) }; }
+// the tubing: from the syringe tip (room) down to the table edge (table), along it into the bore and up to the
+// cannula at the raised elbow (patient); rebuilt each frame because the table moves and the tube hangs between them
+function tubingMesh(G) {
+  const tip = [INJ.x + 54, INJ.y - 30 + G, 10], edge = [-215, Math.min(-200, INJ.y + G + 260), TABLE_Z + 8], mid = lerp3(tip, edge, 0.5);
+  const sag = [mid[0], mid[1], Math.min(tip[2], edge[2]) - 140];
+  const pts = smoothPath([tip, lerp3(tip, sag, 0.6), sag, lerp3(sag, edge, 0.6), edge, [-212, edge[1] + 260, TABLE_Z + 10], [-200, 140, TABLE_Z + 14], add3(CANNULA.hub, [-30, -20, -10]), CANNULA.hub], 18);
+  const mb = new MB(); tubeInto(mb, pts, 3.4, (i, u) => u, 6); return computeNormals(mb.build());
 }
 const FLOOR_TEX = makeTex(64, 64, (x, y) => (x % 16 === 0 || y % 16 === 0) ? P.N3 : P.N2);
-function buildFloor() { return quadMesh([-3000, -3200, GAN.floor], [6000, 0, 0], [0, 6000, 0]); }
-const CTR = {
-  mw: [P.MW0, P.MW1, P.MW2, P.MW3, P.MW4], md: [P.MD0, P.MD1, P.MD2, P.MD3], sheet: [P.SH0, P.SH1, P.SH2, P.SH3, P.SH4], skin: [P.SK0, P.SK1, P.SK2, P.SK3, P.SK4],
-};
-const CTA_ROOM = () => cached('ctroom', () => ({ housing: buildGantryHousing(), gbase: buildGantryBase(), trim: buildBoreTrim(), body: buildBody(), forearm: buildForearm(), board: buildArmBoard(),
-  table: buildTable(), inj: buildInjector(), syr: buildSyringe(), tubing: buildTubing(), cannula: buildCannula(), floor: buildFloor() }));
+function buildCTFloor() { return quadMesh([-3200, -3200, GAN.floor], [6400, 0, 0], [0, 6400, 0]); }
+const CTR = { mw: [P.MW0, P.MW1, P.MW2, P.MW3, P.MW4], md: [P.MD0, P.MD1, P.MD2, P.MD3] };
+const CTA_ROOM = () => cached('ctroom2', () => Object.assign({ housing: buildGantryHousing(), front: buildGantryFront(), pedestal: buildPedestal(), inj: buildInjector(), syr: buildSyringes(), floor: buildCTFloor() }, buildTable()));
 const CTM = (ramp, ol, x) => Object.assign({ ramp, id: newId(ol) }, x || {});
-// the room with the table slid in by dy (the gantry and the floor move toward the feet in the patient frame);
-// inj (0..1): how far the contrast has run down the tubing
-function drawCTRoom(cam, dy, inj, fog) {
-  const R = CTA_ROOM(), xfR = mT(0, -dy, 0);
-  fog = fog || [900, 5200, P.N2];
+// G: the scan plane's place on the patient (mm along his body: −1580 the soles, −690 the hips, −460 the belly, 0 the neck);
+// o: {inj (0..1 contrast down the tube), t (breathing), xray (the lamp lit), fog, laser (draw the laser line)}
+function drawCTRoom(cam, G, o) {
+  o = o || {};
+  const R = CTA_ROOM(), xfR = mT(0, G, 0), fog = o.fog || [900, 6200, P.N2], inj = o.inj || 0;
   drawMesh(cam, R.floor, { ramp: [0], back: [0], tex: FLOOR_TEX, unlit: true, id: 0, fog }, xfR);
-  drawMesh(cam, R.table, CTM(CTR.mw, P.MW0, { fog }));
-  drawMesh(cam, R.body, CTM(CTR.sheet, P.SH0, { fog, back: CTR.md }));
-  drawMesh(cam, R.forearm, CTM(CTR.skin, P.SK0, { fog, spec: 0.1 }));
-  drawMesh(cam, R.board, CTM(CTR.md, P.MD0, { fog }));
-  drawMesh(cam, R.gbase, CTM(CTR.mw, P.MW0, { fog }), xfR);
+  drawMesh(cam, R.pedestal, CTM(CTR.mw, P.MW0, { fog }), xfR);
+  const pid0 = OBJN;                                                   // the laser marks what lies on the table
+  drawMesh(cam, R.top, CTM(CTR.mw, P.MW0, { fog }));
+  drawMesh(cam, R.pad, CTM([hexc('#1C232C'), hexc('#2A3440'), hexc('#3C4A58'), hexc('#566676')], hexc('#0C1014'), { fog }));
+  const pose = ctPose(o.t);
+  drawPatient(cam, pose, { socks: 1, fog });
+  const pid1 = OBJN;
+  drawMesh(cam, R.strap, CTM([hexc('#141A20'), hexc('#24303A'), hexc('#38485A')], hexc('#06080A'), { fog }));
   drawMesh(cam, R.housing, CTM(CTR.mw, P.MW0, { back: CTR.md, fog, spec: 0.35, cap: 0.82 }), xfR);
-  drawMesh(cam, R.trim, CTM([P.MW2, P.MW3, P.MW4, P.CY3], P.MW0, { fog }), xfR);
-  drawMesh(cam, R.inj, CTM(CTR.mw, P.MW0, { fog }));
-  drawMesh(cam, R.syr, CTM([P.CO0, P.CO1, P.CO2, P.CO3], P.CO0, { fog, alpha: 0.85 }));
-  drawMesh(cam, R.tubing, { ramp: CTR.mw, mix: { ramp: [P.CO1, P.CO2, P.CO3], f: u => u < inj ? 1 : 0 }, id: newId(P.MW0), fog });
-  drawMesh(cam, R.cannula, CTM([P.MW1, P.MW2, P.MW3, P.CY2], P.MD1, {}));
+  drawMesh(cam, R.front.ring, CTM([P.CY1, P.CY2, P.CY3, P.CY4], P.CY0, { fog, amb: 0.7, dif: 0.3 }), xfR);
+  drawMesh(cam, R.front.panel, CTM(CTR.md, P.MD0, { fog }), xfR);
+  drawMesh(cam, R.front.keys, CTM([hexc('#2C6A7A'), P.CY1, P.CY2, P.CY3], P.MD0, { fog, amb: 0.6 }), xfR);
+  drawMesh(cam, R.front.slot, CTM([P.MD0, P.MD1], P.MD0, { fog }), xfR);
+  drawMesh(cam, R.front.lamp, CTM(o.xray ? [P.PL1, P.PL2, P.PL3, P.PL4] : [P.MW1, P.MW2, P.MW3], P.MD0, { fog, amb: o.xray ? 0.9 : 0.4 }), xfR);
+  drawMesh(cam, R.inj, CTM(CTR.mw, P.MW0, { fog }), xfR);
+  const plunger = 1 - 0.35 * inj;
+  drawMesh(cam, R.syr.con, CTM([P.CO0, P.CO1, P.CO2, P.CO3], P.CO0, { fog, alpha: 0.9 }), mMul(xfR, mMul(mT(INJ.x + 46, INJ.y - 30, 65), mMul(mS(1, 1, plunger), mT(-INJ.x - 46, -INJ.y + 30, -65)))));
+  drawMesh(cam, R.syr.sal, CTM([P.MW2, P.MW3, P.MW4], P.MW1, { fog, glass: [0.3, 0.9, 1.5] }), xfR);
+  drawMesh(cam, tubingMesh(G), { ramp: CTR.mw, mix: { ramp: [P.CO1, P.CO2, P.CO3], f: u => u < inj ? 1 : 0 }, id: newId(P.MW0), fog });
+  if (o.laser) ctLaser(cam, G - GAN.half - 12, pid0, pid1);
+}
+// the positioning laser: a thin red line where its plane (y = Y on the patient) meets the patient and the table
+function ctLaser(cam, Y, id0, id1) {
+  const RED = hexc('#FF4A3A'), GLOW = hexc('#B83028');
+  for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+    const i = py * W + px, iz = ZB[i]; if (iz <= 0) continue;
+    const id = IDB[i]; if (id < id0 || id >= id1) continue;
+    const cz = 1 / iz, cx = (px + 0.5 - CX) * cz / cam.F, cy = (CY - py - 0.5) * cz / cam.F;
+    const wy = cam.eye[1] + cam.r[1] * cx + cam.u[1] * cy + cam.f[1] * cz, d = Math.abs(wy - Y);
+    if (d < 4 + cz * 0.0016) buf[i] = RED; else if (d < 9 + cz * 0.004) buf[i] = mixc(buf[i], GLOW, 0.45);
+  }
 }
 
 // ---- 15_circ.js
 // ============================================================================
-// THE CONTRAST'S ROUTE (scene 15), from the CTA film's anatomy: the arm vein,
+// THE CONTRAST'S ROUTE (scene 15), from the CTA film's anatomy: the arm vein (from the raised arm),
 // the superior vena cava, the right heart (steel blue), the pulmonary arteries
 // branching through the see-through lungs, the pulmonary veins back to the
 // left heart (red), the aorta — and here the descending aorta continues down
@@ -2132,8 +2275,9 @@ function circ(ctrl, r, a0, a1, kind, opt) { const pts = smoothPath(ctrl, (opt &&
 const HEART = { RA: [-24, -335, 18], RV: [4, -362, 40], LA: [10, -328, -22], LV: [32, -372, 10] };
 const LUNG = { R: [-98, -338, -2], L: [96, -344, -2] };
 function buildCirc() {
-  // the arm vein (cannula tip upward), axillary, subclavian, brachiocephalic, superior vena cava
-  circ([CANNULA.tip, [-346, -456, -64], [-302, -392, -60], [-256, -332, -52], [-206, -292, -30], [-146, -252, 2], [-84, -246, 6], [-42, -258, 12], [-23, -282, 16], [-22, -318, 18]], 6, 6.6, 10.4, 'vein', { step: 4 });
+  // the arm vein from the cannula in the raised right elbow down the upper arm, axillary, subclavian, brachiocephalic,
+  // superior vena cava
+  circ([CANNULA.tip, [-140, 40, 0], [-176, -60, -14], [-196, -150, -22], [-170, -212, -12], [-120, -236, 0], [-70, -244, 8], [-38, -260, 12], [-23, -282, 16], [-22, -318, 18]], 6, 6.6, 10.4, 'vein', { step: 4 });
   // pulmonary trunk and the two pulmonary arteries
   circ([[12, -342, 50], [16, -320, 44], [18, -306, 26]], 9, 12.0, 12.25, 'pa');
   const rpa = circ([[18, -306, 26], [-18, -306, 20], [-56, -312, 10], [-74, -320, 4]], 7, 12.25, 12.6, 'pa');
@@ -2285,8 +2429,272 @@ function hermite(keys, t) {
   }
   const k = keys[keys.length - 1]; return k[1] + k[2] * (t - k[0]);
 }
+// a camera through keys {t, e (eye), g (target)}: each coordinate on a monotone cubic, so the camera eases in at the
+// first key and out at the last but never stops at the keys between (no stop-and-go)
+function camSpline(keys, t, fov, up) {
+  const f = k => monoCubic(keys.map(q => [q.t, k < 3 ? q.e[k] : q.g[k - 3]])), v = [0, 1, 2, 3, 4, 5].map(k => f(k)(t));
+  return camLook([v[0], v[1], v[2]], [v[3], v[4], v[5]], up || [0, 1, 0], fov || 34);
+}
+// a slow float for held shots (a few units, periods of several seconds), so a hold never freezes
+const floatOff = (t, a) => [a * Math.sin(TAU * t / 7.3), 0.6 * a * Math.sin(TAU * t / 5.1 + 1.1), 0.4 * a * Math.sin(TAU * t / 6.2 + 2.3)];
+function floatCam(c, t, a) { const o = floatOff(t, a), fov = 2 * Math.atan((H / 2) / c.F) * 180 / Math.PI; return camLook(add3(c.eye, o), add3(c.tg, mul3(o, 0.6)), [0, 1, 0], fov); }
 // background: a calm vertical gradient in navy (drawn before the 3D pass), stepped so it stays pixel-flat
 function skyBG(top, bot) { for (let y = 0; y < H; y++) { const k = y / (H - 1), c = mixc(top, bot, Math.round(k * 6) / 6); buf.fill(c, y * W, (y + 1) * W); } }
+
+// ---- 18_ctimg.js
+// ============================================================================
+// THE CT IMAGES (scenes 16-17): this patient's axial slices, computed from the
+// same body, bones and arteries as the 3D views, quickly enough to draw a new
+// slice every frame (an analytic cross-section: the body parts as radial
+// profiles, the bones and vessels as circles); the frontal topogram; the
+// console screen; the slabs that stack into the 3D reconstruction.
+// Grey levels follow CT conventions: air black, fat dark grey, muscle mid grey,
+// bone cortex near white, contrast-filled arteries bright, calcium brightest;
+// the veins are still grey (arterial phase); the occluded popliteal segment
+// has no bright lumen, only its wall; collaterals are small bright dots.
+// Image frame: tree mm (x toward the patient's LEFT, z anterior), shown the
+// radiological way (the patient's right on the left, anterior up).
+// ============================================================================
+const CTG = { air: hexc('#000000'), skin: hexc('#5C5C5C'), fat: hexc('#2E2E2E'), fat2: hexc('#383838'), mus: hexc('#787878'), mus2: hexc('#6C6C6C'),
+  bowel: hexc('#5E5E5E'), gas: hexc('#0A0A0A'), cort: hexc('#EDEDED'), marrow: hexc('#8A8A8A'), spongy: hexc('#B6B6B6'), spongy2: hexc('#A4A4A4'), lum: hexc('#D6D6D6'), lum2: hexc('#B4B4B4'),
+  wall: hexc('#848484'), plq: hexc('#646464'), cal: hexc('#FFFFFF'), vein: hexc('#8E8E8E'), occ: hexc('#5A5A5A') };
+// ---------------------------------------------------------------- the body as radial profiles per level
+const CTS = { y0: 0, y1: 1200, dy: 10, NA: 36 };
+const CT_PARTS = () => cached('ctparts', () => {
+  // body frame (forward x, up y, right z, hips at y 0) → tree frame: x = −z, y = y + 920, z = x; parts of the standing patient
+  const parts = [];
+  const legs = [['R', 92], ['L', -92]];
+  for (const [, zs] of legs) {
+    parts.push({ y: [-470, 70], c: yb => [lerp(6, 0, clamp(-yb / 440, 0, 1)), zs], f: (x, y, z) => SD.thigh(x, y, z - zs) });
+    parts.push({ y: [-880, -420], c: yb => [-6, zs], f: (x, y, z) => SD.shin(x, y + 440, z - zs) });
+    parts.push({ y: [-950, -800], c: yb => [30, zs], f: (x, y, z) => SD.foot(x, y + 860, z - zs) });
+  }
+  parts.push({ y: [-130, 190], c: () => [-14, 0], f: (x, y, z) => SD.pelvis(x, y, z) });
+  parts.push({ y: [40, 620], c: () => [0, 0], f: (x, y, z) => SD.torso(x + 6, Math.max(y - 140, 70), z) });   // the belly keeps its width down to the hips
+  return parts;
+});
+// one level: for each part present, its centre (tree x, z) and NA radii
+const CT_LEVELS = () => cached('ctlevels', () => {
+  const L = [];
+  for (let Y = CTS.y0; Y <= CTS.y1; Y += CTS.dy) {
+    const yb = Y - 920, list = [];
+    for (const p of CT_PARTS()) {
+      if (yb < p.y[0] || yb > p.y[1]) continue;
+      const c = p.c(yb); if (p.f(c[0], yb, c[1]) > 0) continue;
+      const R = new Float32Array(CTS.NA);
+      for (let k = 0; k < CTS.NA; k++) {
+        const a = k / CTS.NA * TAU, dx = Math.cos(a), dz = Math.sin(a);
+        let lo = 0, hi = 320; if (p.f(c[0] + dx * hi, yb, c[1] + dz * hi) <= 0) { R[k] = hi; continue; }
+        for (let it = 0; it < 16; it++) { const m = (lo + hi) / 2; if (p.f(c[0] + dx * m, yb, c[1] + dz * m) <= 0) lo = m; else hi = m; }
+        R[k] = lo;
+      }
+      // stored in tree coordinates: centre (x = −z_b, z = x_b); body angle a ↦ tree direction (−sin a, cos a)
+      list.push({ cx: -c[1], cz: c[0], R });
+    }
+    L.push(list);
+  }
+  return L;
+});
+// depth inside the body at tree (x, z) on a level (≤ 0 outside)
+function ctDepth(list, x, z) {
+  let best = -1e9;
+  for (const p of list) {
+    const tx = x - p.cx, tz = z - p.cz, d = Math.hypot(tx, tz);
+    // tree direction (tx, tz) = (−sin a, cos a) → a = atan2(−tx, tz)
+    let a = Math.atan2(-tx, tz); if (a < 0) a += TAU;
+    const f = a / TAU * CTS.NA, i = Math.floor(f) % CTS.NA, j = (i + 1) % CTS.NA, r = lerp(p.R[i], p.R[j], f - Math.floor(f));
+    const dep = r - d; if (dep > best) best = dep;
+  }
+  return best;
+}
+// ---------------------------------------------------------------- bones per level (circles: cortex ring + marrow)
+const CT_BONE_TUBES = (() => {
+  const T = [];
+  for (const sx of [-1, 1]) {
+    const X = p => [p[0] * -sx, p[1], p[2], p[3]];
+    T.push(BONE_CTRL.femur.map(X), BONE_CTRL.tibia.map(X), BONE_CTRL.fibula.map(X));                                                           // the 3D bones' centre-lines
+  }
+  return T;
+})();
+function ctBones(Y) {
+  const out = [];
+  for (const tube of CT_BONE_TUBES) for (let i = 0; i + 1 < tube.length; i++) {
+    const a = tube[i], b = tube[i + 1]; if ((Y - a[1]) * (Y - b[1]) > 0 || a[1] === b[1]) continue;
+    const u = (Y - a[1]) / (b[1] - a[1]); out.push([lerp(a[0], b[0], u), lerp(a[2], b[2], u), lerp(a[3], b[3], u), 0]);
+  }
+  for (const sx of [-1, 1]) {
+    // the ends of bones are spongy (bright through and through), the shafts have marrow inside a cortex
+    const hd = 24 * 24 - (Y - 868) * (Y - 868); if (hd > 0) out.push([92 * sx, -12, Math.sqrt(hd), 1]);                                    // femoral heads
+    const pt = 1 - ((Y - 505) / 18) ** 2; if (pt > 0) out.push([74 * sx, 36, 11 * Math.sqrt(pt), 1]);                                       // patellae
+    const hl = 1 - ((Y - 34) / 24) ** 2; if (hl > 0) out.push([68 * sx, -18, 21 * Math.sqrt(hl), 1]);                                       // heels (calcaneus)
+  }
+  if (Y > 995 && Y < 1200) out.push([0, -78, 21, 1]);                                                                                      // lumbar vertebral bodies
+  return out;
+}
+// the pelvic ring (same shape as the 3D bones), sampled per level into a small bitmap at 4 mm
+const CT_PELVIS = () => cached('ctpelvis', () => {
+  const pel = (x, y, z) => {
+    const ax = Math.abs(x), bladeOuter = sdE(ax, y, z, 54, 978, -30, 50, 60, 50), bladeInner = sdE(ax, y, z, 52, 982, -26, 43, 54, 43);
+    const blade = Math.max(bladeOuter, -bladeInner, -(y - 912), -(ax - 44), z - 22);
+    const acet = Math.max(sdE(ax, y, z, 90, 868, -12, 30, 30, 30), -sdE(ax, y, z, 92, 868, -6, 24, 24, 26));
+    const ramus = Math.max(sdE(ax, y, z, 50, 852, 10, 40, 30, 18), -sdE(ax, y, z, 52, 852, 10, 22, 16, 30), -(y - 822));
+    return Math.min(blade, acet, ramus, sdE(x, y, z, 0, 935, -82, 34, 70, 18));
+  };
+  const M = {};
+  for (let Y = 820; Y <= 1040; Y += CTS.dy) { const g = new Float32Array(76 * 46); for (let j = 0; j < 46; j++) for (let i = 0; i < 76; i++) g[j * 76 + i] = pel(-150 + i * 4, Y, -120 + j * 4); M[Y] = g; }
+  return M;
+});
+function ctPelvisAt(Y, x, z) {
+  if (Y < 820 || Y > 1040) return 1;
+  const g = CT_PELVIS()[Math.round(Y / CTS.dy) * CTS.dy]; if (!g) return 1;
+  const fi = (x + 150) / 4, fj = (z + 120) / 4; if (fi < 0 || fj < 0 || fi >= 75 || fj >= 45) return 1;
+  const i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, a = g[j * 76 + i], b = g[j * 76 + i + 1], c = g[(j + 1) * 76 + i], d = g[(j + 1) * 76 + i + 1];
+  return lerp(lerp(a, b, u), lerp(c, d, u), v);
+}
+// ---------------------------------------------------------------- vessels per level
+// [x, z, r, kind]: kind 'a' artery (k: residual lumen, cal: calcium), 'v' vein; from the same centre-lines (ART, LES, MEDCAL)
+function ctVessels(Y, sc) {
+  sc = sc || 1; const out = [];
+  for (const name in ART) {
+    const pts = ART[name].pts;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i], b = pts[i + 1]; if ((Y - a[1]) * (Y - b[1]) > 0 || a[1] === b[1]) continue;
+      const u = (Y - a[1]) / (b[1] - a[1]), x = lerp(a[0], b[0], u), z = lerp(a[2], b[2], u), r = lerp(a[3], b[3], u) * sc;
+      const gen = isGen(name), k = gen ? 1 : lumenK(name, Y), mc = MEDCAL[name], cal = (mc && Y > mc[0] && Y < mc[1]) || (name === 'RSFA' && Math.abs(Y - LES.L1.yc) < 18);
+      out.push({ x, z, r: gen && name[0] === 'R' ? r * 1.6 : r, k, cal, name });
+      // the companion vein: beside and a little behind the big arteries (grey, not yet filled with contrast)
+      if (!gen && r > 2.2 * sc && !/IIA|PER|AO/.test(name)) { const med = x < 0 ? 1 : -1; out.push({ x: x + med * r * 1.5, z: z - r * 0.9, r: r * 1.25, vein: true }); }
+      if (name === 'AO') out.push({ x: x - 26, z: z + 4, r: r * 1.15, vein: true });                       // the inferior vena cava, on the right of the aorta
+    }
+  }
+  return out;
+}
+// ---------------------------------------------------------------- one pixel of an axial slice
+// Y: level (tree mm); x, z: tree mm; ves: ctVessels(Y); lv: the body level list; o: {soft: 0..1 soft tissue shown}
+function ctPix(Y, x, z, lv, ves, bones, o) {
+  const soft = o && o.soft !== undefined ? o.soft : 1;
+  for (const v of ves) {
+    const d = Math.hypot(x - v.x, z - v.z); if (d > v.r) continue;
+    if (v.vein) return soft > 0.5 ? CTG.vein : 0;
+    const lr = v.r * 0.82 * v.k;
+    if (v.cal) { const a = Math.atan2(z - v.z, x - v.x); if (d > v.r * 0.72 && (Math.abs(Math.sin(a)) > 0.86 || (v.name === 'RSFA' && a > -2.6 && a < -1.1))) return CTG.cal; }
+    if (v.k <= 0.01) return d > v.r * 0.75 ? CTG.wall : CTG.occ;                     // occluded: the wall, no bright lumen
+    // the open channel: at the SFA stenosis it sits off-centre, pushed away from the plaque (posteromedial, LES.L1.side)
+    const ec = v.name === 'RSFA' && v.k < 0.95 ? v.r * (1 - v.k) * 0.55 : 0, ldx = x - (v.x - LES.L1.side[0] * ec), ldz = z - (v.z - LES.L1.side[2] * ec);
+    if (Math.hypot(ldx, ldz) < lr) return v.name && v.name[0] === 'R' && /POP|TPT|ATA|PTA|PER/.test(v.name) && Y < 490 ? CTG.lum2 : CTG.lum;   // refilled below the block: a little fainter
+    return soft > 0.5 ? (v.k < 0.95 ? CTG.plq : CTG.wall) : 0;
+  }
+  for (const b of bones) {
+    const d = Math.hypot(x - b[0], z - b[1]); if (d >= b[2]) continue;
+    if (d > b[2] - 3.4) return CTG.cort;
+    return b[3] ? (hash2(Math.floor(x / 2.5), Math.floor(z / 2.5)) < 0.3 ? CTG.spongy2 : CTG.spongy) : (soft > 0.5 ? CTG.marrow : CTG.cort);
+  }
+  if (Y >= 820 && Y <= 1040) { const pv = ctPelvisAt(Y, x, z); if (pv < 0) return pv > -3.5 ? CTG.cort : (hash2(Math.floor(x / 2.5), Math.floor(z / 2.5)) < 0.3 ? CTG.spongy2 : CTG.spongy); }
+  if (soft <= 0) return 0;
+  const dep = ctDepth(lv, x, z); if (dep <= 0) return 0;
+  if (dep < 2.4) return CTG.skin;
+  const h = hash2(Math.floor(x / 3), Math.floor(z / 3));
+  if (dep < 9 + 3 * h) return h < 0.5 ? CTG.fat : CTG.fat2;
+  if (Y > 960 && dep > 22 && z > -40) return h < 0.12 ? CTG.gas : CTG.bowel;      // abdomen: bowel loops with a little gas
+  return hash2(Math.floor(x / 4) + 7, Math.floor(z / 5)) < 0.14 ? CTG.fat2 : (h < 0.5 ? CTG.mus : CTG.mus2);
+}
+function ctLevel(Y) { const L = CT_LEVELS(), i = clamp(Math.round((Y - CTS.y0) / CTS.dy), 0, L.length - 1); return L[i]; }
+// draw an axial slice at level Y into a screen box (x0, y0, w, h), covering `span` mm across, centred at (cx, cz)
+function drawSlice(Y, x0, y0, w, h, span, cx, cz, o) {
+  const lv = ctLevel(Y), ves = ctVessels(Y), bones = ctBones(Y), mm = span / w;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const x = cx + (i + 0.5 - w / 2) * mm, z = cz - (j + 0.5 - h / 2) * mm, c = ctPix(Y, x, z, lv, ves, bones, o);
+    pset(x0 + i, y0 + j, c || CTG.air);
+  }
+}
+// the slice's natural centre and width: the abdomen is one wide section, the legs two
+const sliceFrame = Y => Y > 940 ? { cx: 0, cz: -10, span: 420 } : { cx: 0, cz: 0, span: 420 };
+// ---------------------------------------------------------------- the topogram (a frontal scout image, taken before the contrast)
+const TOPO = { w: 66, h: 236, x0: -270, x1: 270, y0: 1240, y1: 0 };
+const TOPO_IMG = () => cached('topo', () => {
+  const img = new Uint32Array(TOPO.w * TOPO.h);
+  for (let j = 0; j < TOPO.h; j++) {
+    const Y = lerp(TOPO.y0, TOPO.y1, (j + 0.5) / TOPO.h), lv = ctLevel(Y), bones = ctBones(Y);
+    for (let i = 0; i < TOPO.w; i++) {
+      const x = lerp(TOPO.x0, TOPO.x1, (i + 0.5) / TOPO.w);
+      let th = 0, bn = 0;
+      for (let k = 0; k < 24; k++) { const z = -180 + k * 15; if (ctDepth(lv, x, z) > 0) th += 15; }
+      for (const b of bones) { const dx = Math.abs(x - b[0]); if (dx < b[2]) bn += 2 * Math.sqrt(b[2] * b[2] - dx * dx); }
+      if (Y >= 820 && Y <= 1040) for (let k = 0; k < 24; k++) if (ctPelvisAt(Y, x, -120 + k * 7.5) < 0) bn += 7.5;
+      const v = clamp(0.06 + th / 420 * 0.55 + bn / 40 * 0.42, 0, 1), q = Math.round(v * 12) / 12, g = Math.round(lerp(8, 236, q));
+      img[j * TOPO.w + i] = (255 << 24) | (g << 16) | (g << 8) | g;
+    }
+  }
+  return img;
+});
+// ---------------------------------------------------------------- the slabs of the 3D reconstruction (scene 17)
+// precomputed slice textures (bones and contrast only, or with the soft tissue), sampled by the renderer's pixFn
+const SLABS = { n: 34, y0: 1150, y1: 30, w: 84, h: 64, x0: -240, x1: 240, z0: -180, z1: 180 };
+const SLAB_TEX = () => cached('slabtex', () => {
+  const out = [];
+  for (let s = 0; s < SLABS.n; s++) {
+    const Y = lerp(SLABS.y0, SLABS.y1, s / (SLABS.n - 1)), lv = ctLevel(Y), ves = ctVessels(Y, TREE_RK), bones = ctBones(Y);
+    const full = new Uint32Array(SLABS.w * SLABS.h), hard = new Uint32Array(SLABS.w * SLABS.h);
+    for (let j = 0; j < SLABS.h; j++) for (let i = 0; i < SLABS.w; i++) {
+      const x = lerp(SLABS.x0, SLABS.x1, (i + 0.5) / SLABS.w), z = lerp(SLABS.z0, SLABS.z1, (j + 0.5) / SLABS.h);
+      full[j * SLABS.w + i] = ctPix(Y, x, z, lv, ves, bones, { soft: 1 }) || 0; hard[j * SLABS.w + i] = ctPix(Y, x, z, lv, ves, bones, { soft: 0 }) || 0;
+    }
+    out.push({ Y, full, hard });
+  }
+  return out;
+});
+const SLAB_MESH = () => cached('slabmesh', () => quadMesh([SLABS.x0, 0, SLABS.z0], [SLABS.x1 - SLABS.x0, 0, 0], [0, 0, SLABS.z1 - SLABS.z0]));
+// k: how many slabs are in place (0..n, fractional: the next one is dropping in); soft: 1 soft tissue shown → 0 only bone and contrast
+function drawSlabs(cam, k, soft, fade) {
+  const T = SLAB_TEX(), M = SLAB_MESH();
+  for (let s = 0; s < T.length; s++) {
+    const a = clamp(k - s, 0, 1); if (a <= 0) continue;
+    const S = T[s], drop = (1 - eout(a)) * 120, al = (1 - fade) * (0.35 + 0.65 * a);
+    const pix = (u, v, x, y) => {
+      const i = Math.min(SLABS.w - 1, Math.floor(u * SLABS.w)), j = Math.min(SLABS.h - 1, Math.floor(v * SLABS.h)), q = j * SLABS.w + i;
+      const c = S.hard[q]; if (c) return c;                                 // bone and contrast stay
+      const f = S.full[q]; if (!f) return 0;
+      return (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16 < soft * 0.55 * al ? f : 0;   // the soft tissue as a thinning screen door
+    };
+    drawMesh(cam, M, { ramp: [0], back: [0], unlit: true, id: 0, pixFn: pix, alpha: al < 0.99 ? al : undefined }, mT(0, S.Y + drop, 0));
+  }
+}
+// ---------------------------------------------------------------- the console screen (scene 16)
+const CON = { x0: 18, y0: 266, x1: 342, y1: 552 };
+function drawConsole(t, scanY, nThumb, glow) {
+  const { x0, y0, x1, y1 } = CON;
+  // the monitor: bezel, screen, a soft reflection
+  rect(x0 - 6, y0 - 6, x1 + 6, y1 + 8, hexc('#1A1E24')); rect(x0 - 4, y0 - 4, x1 + 4, y1 + 4, hexc('#2A3038')); rect(x0, y0, x1, y1, hexc('#0A0F15'));
+  rect(x0 - 6, y1 + 8, x1 + 6, y1 + 10, hexc('#101317'));
+  // the top bar: a patient symbol, the scan progress, the radiation lamp (on while scanning)
+  rect(x0, y0, x1, y0 + 12, hexc('#141C26'));
+  rect(x0 + 6, y0 + 3, x0 + 9, y0 + 6, P.SUB); rect(x0 + 5, y0 + 7, x0 + 10, y0 + 10, P.SUB);
+  const prog = clamp((1150 - scanY) / 1120, 0, 1);
+  rect(x0 + 16, y0 + 5, x1 - 22, y0 + 8, hexc('#24303C')); rect(x0 + 16, y0 + 5, Math.round(lerp(x0 + 16, x1 - 22, prog)), y0 + 8, P.ACC);
+  const on = glow > 0 && Math.floor(t * 4) % 2 === 0;
+  const lx = x1 - 12, ly = y0 + 6; for (let j = -4; j <= 4; j++) for (let i = -4; i <= 4; i++) { const r = Math.hypot(i, j); if (r <= 4.2) { const a = Math.atan2(j, i); pset(lx + i, ly + j, r < 1.4 ? hexc('#0A0F15') : (Math.floor((a + Math.PI) / (Math.PI / 3)) % 2 === 0 ? (on ? P.WARN : hexc('#5A4A20')) : hexc('#0A0F15'))); } }
+  // the topogram with the scan range (orange box) and the table position (a cyan line moving down)
+  const tx = x0 + 6, ty = y0 + 18, img = TOPO_IMG();
+  rect(tx - 1, ty - 1, tx + TOPO.w + 1, ty + TOPO.h + 1, hexc('#2A3440'));
+  for (let j = 0; j < TOPO.h; j++) for (let i = 0; i < TOPO.w; i++) pset(tx + i, ty + j, img[j * TOPO.w + i]);
+  const yOf = Y => ty + Math.round((TOPO.y0 - Y) / (TOPO.y0 - TOPO.y1) * TOPO.h);
+  const ya = yOf(1150), yb = yOf(25);
+  rect(tx, ya, tx + TOPO.w, ya + 1, P.WARN); rect(tx, yb, tx + TOPO.w, yb + 1, P.WARN); rect(tx, ya, tx + 1, yb + 1, P.WARN); rect(tx + TOPO.w - 1, ya, tx + TOPO.w, yb + 1, P.WARN);
+  const ys = yOf(scanY); if (ys > ya && ys < yb) { rect(tx - 3, ys, tx + TOPO.w + 3, ys + 1, P.ACC); rect(tx - 4, ys - 1, tx - 2, ys + 2, P.ACC); }
+  // the axial image, the newest slice at the table position
+  const vx = tx + TOPO.w + 8, vy = ty, vw = x1 - 6 - vx, vh = 186, F = sliceFrame(scanY);
+  rect(vx - 1, vy - 1, vx + vw + 1, vy + vh + 1, hexc('#2A3440'));
+  drawSlice(scanY, vx, vy, vw, vh, F.span, F.cx, F.cz);
+  // the images already taken, as small thumbnails along the bottom (each arrives with the score's chime)
+  const tw = 34, th = 30, gap = 4, n = Math.floor(nThumb), ty2 = vy + vh + 8, levels = [1100, 980, 860, 700, 520, 330];
+  for (let k = 0; k < Math.min(6, n + 1); k++) {
+    const a = k < n ? 1 : nThumb - n; if (a <= 0.02) continue;
+    const bx = vx + k * (tw + gap), by = ty2 + Math.round((1 - eout(a)) * 10), Y = levels[k], Fk = sliceFrame(Y);
+    rect(bx - 1, by - 1, bx + tw + 1, by + th + 1, hexc('#2A3440'));
+    if (a < 1) { rect(bx, by, bx + tw, by + th, hexc('#06090D')); continue; }
+    drawSlice(Y, bx, by, tw, th, Fk.span, Fk.cx, Fk.cz);
+  }
+}
 
 // ---- 20_scenes.js
 // ============================================================================
@@ -2300,16 +2708,21 @@ function skyBG(top, bot) { for (let y = 0; y < H; y++) { const k = y / (H - 1), 
 const ph = (t, a, b, e) => (e || smooth)(seg(t, a, b));
 const lin = x => x;
 const camAB = (e0, t0, e1, t1, f, fov, up) => camLook(lerp3(e0, e1, f), lerp3(t0, t1, f), up || [0, 1, 0], fov || 34);
-const qg = (x, n) => Math.round(clamp(x, 0, 1) * n) / n;            // quantised disease state (cached meshes)
+const qg = (x, n) => Math.round(clamp(x, 0, 1) * n) / n;            // disease state on a fine grid (finer than a frame's change: it grows smoothly)
 let G_T = 0;                                                          // the frame's time (for overlays that blink on the grid)
 // ---------------------------------------------------------------- 01-02: walking, slowing, stopping, holding the calf
 const PT_HOLD_END = 6.0, FOG_W = [2400, 9000, P.N2];
+// the stop and the reach for the calf as overlapping actions: the knees give first, the back bends, the arm follows
 function walkState(t) {
-  const tt = Math.min(t, 6), w = WALK.at(tt), hold = ph(tt, EV.hold - 0.1, EV.hold + 0.7);
-  return { root: [w[0], w[1], 0], q: { ph: gaitPhase(tt), amp: gaitAmp(tt), hold } };
+  const tt = Math.min(t, 6), g = WALK.sample(tt);
+  const holdLeg = ph(tt, EV.hold + 0.1, EV.hold + 0.8, eio), holdTorso = ph(tt, EV.hold + 0.2, EV.hold + 1.0, eio), holdArm = ph(tt, EV.hold + 0.3, EV.hold + 1.1, eio);
+  return { root: g.p, q: { g, holdLeg, holdTorso, holdArm, t, effort: ph(t, EV.slow, EV.hold + 0.6) } };
 }
+// a camera operator follows the walker smoothly: the hips speed up and slow down within every step, the camera
+// tracks their running average (a Gaussian over about half a second), so the body breathes inside the frame
+function smoothX(tab, t, lo, hi) { let s = 0, w = 0; for (let k = -7; k <= 7; k++) { const g = Math.exp(-k * k / 24); s += g * tab.at(clamp(t + k * 0.05, lo, hi))[0]; w += g; } return s / w; }
 function walkCam(t) {
-  const w = WALK.at(Math.min(t, 6))[0];
+  const w = smoothX(WALK, Math.min(t, 6), -0.5, 6);
   const A = { e: [w + 300, 780, 2900], g: [w + 160, 640, 0] };                // lateral tracking, lead room ahead of him
   const B = { e: [w + 120, 480, 1450], g: [w + 10, 330, 92] };                 // closer: the right calf
   const f = ph(t, 3.4, 5.6, eio);
@@ -2327,22 +2740,21 @@ function painMarks(cam, pose, k, t) {
   }
 }
 function sWalk(t) {
-  const s = walkState(t), cam = walkCam(t), pose = patientPose(s.root, 0, s.q), pain = ph(t, EV.pain - 0.3, EV.pain + 0.75);
+  const s = walkState(t), cam = walkCam(t), pose = plantedPose(s.root, s.q), pain = ph(t, EV.pain - 0.3, EV.pain + 0.75);
   skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: pain * 0.85, fog: FOG_W });
   r3dOutlines();
   painMarks(cam, pose, ph(t, EV.pain, EV.pain + 0.4, lin), t);
 }
 // ---------------------------------------------------------------- 03: into the leg (skin → muscle → arteries → the thigh artery)
-function holdPose() { const s = walkState(PT_HOLD_END); return patientPose(s.root, 0, s.q); }
+function holdPose(t) { const s = walkState(PT_HOLD_END); return plantedPose(s.root, Object.assign({}, s.q, { t: t === undefined ? PT_HOLD_END : t })); }
 function legCam(t, pose) {
   // the calf (where it hurts) → up along the artery → into the thigh artery at the site of the later stenosis (L1)
   const K = mApply(pose.right.sh, [0, 0, 0]), A = treeToWorld(pose, [-76, 690, 4]), c0 = walkCam(PT_HOLD_END);
   const k1 = { e: add3(K, [-640, 40, 560]), g: add3(K, [-60, -170, 0]) };
   const o2 = [-300, 30, 280], k2 = { e: add3(A, o2), g: A };
   const u = t - EV.reveal;
-  if (u < 1.2) return camAB(c0.eye, c0.tg, k1.e, k1.g, eio(u / 1.2), 34);
-  if (u < 2.25) return camAB(k1.e, k1.g, k2.e, k2.g, eio((u - 1.2) / 1.05), 34);
+  if (u < 2.25) return camSpline([{ t: 0, e: c0.eye, g: c0.tg }, { t: 1.2, e: k1.e, g: k1.g }, { t: 2.25, e: k2.e, g: k2.g }], u, 34);   // one glide: down to the calf, up the thigh
   // the dive: the distance shrinks on a log scale (an even push), so the red artery already fills the frame
   // when the crossfade into its lumen starts (EV.cut4 - 0.25): red blends into pink, never the navy room
   const s = eio(clamp((u - 2.25) / 0.75, 0, 1)), o4 = [0, 6, 40];   // ends in front of the SFA, the profunda off to the side
@@ -2354,7 +2766,7 @@ function sLeg(t) {
   // world, so the crossfade into the lumen blends red into red (navy straight into red or pink would pass
   // through a muddy purple)
   const warm = ph(t, EV.dive + 0.2, EV.cut4, eio), via = (a, b) => warm < 0.5 ? mixc(a, SKY_DARK, 2 * warm) : mixc(SKY_DARK, b, 2 * warm - 1);
-  const bot = via(P.N2, MSKY_BOT), pose = holdPose(), cam = legCam(t, pose), fog = [600, 6000, bot];
+  const bot = via(P.N2, MSKY_BOT), pose = holdPose(t), cam = legCam(t, holdPose()), fog = [600, 6000, bot];
   skyBG(via(P.K0, MSKY_TOP), bot); drawFloor(cam, fog);
   // the right leg turns to glass and stays; the rest of the body dissolves pixel by pixel; then the muscle clears
   const glass = ph(t, EV.reveal, EV.reveal + 0.75), bodyA = 1 - ph(t, EV.reveal + 0.2, EV.muscle + 0.2), musA = 1 - ph(t, EV.artery - 0.2, EV.artery + 0.5) * 0.85;
@@ -2372,9 +2784,9 @@ const FIELD = {};
 const fieldOf = (st, n, seed) => { const k = JSON.stringify(st) + n + seed; return FIELD[k] || (FIELD[k] = cellField(st, n, seed)); };
 const MSKY_TOP = hexc('#14070C'), MSKY_BOT = hexc('#2A0C14'), MSKY = () => skyBG(MSKY_TOP, MSKY_BOT), SKY_DARK = hexc('#050506');
 function microState(t) {                                              // the wall through the disease story: one segment, one state at a time
-  if (t < EV.ldl[0]) return { g: 0, xc: AR.XS, w: AR.WS, sick: t < EV.push6 ? 0 : qg(ph(t, EV.sick - 0.3, EV.sick + 0.9), 6) };
-  if (t < EV.grow8) return { g: qg(0.35 * ph(t, EV.foam - 0.2, EV.grow8), 12), xc: AR.XS, w: AR.WS, sick: 1 };
-  if (t < EV.comp9) return { g: qg(lerp(0.35, 1, ph(t, EV.grow8, EV.comp9 - 0.2)), 16), cal: qg(ph(t, EV.calc[0] - 0.2, EV.calc[1] + 0.3), 4), xc: AR.XS, w: AR.WS, sick: 1 };
+  if (t < EV.ldl[0]) return { g: 0, xc: AR.XS, w: AR.WS, sick: t < EV.push6 ? 0 : qg(ph(t, EV.sick - 0.3, EV.sick + 0.9), 90) };
+  if (t < EV.grow8) return { g: qg(0.35 * ph(t, EV.foam - 0.2, EV.grow8), 240), xc: AR.XS, w: AR.WS, sick: 1 };
+  if (t < EV.comp9) return { g: qg(lerp(0.35, 1, ph(t, EV.grow8, EV.comp9 - 0.2)), 240), cal: qg(ph(t, EV.calc[0] - 0.2, EV.calc[1] + 0.3), 90), xc: AR.XS, w: AR.WS, sick: 1 };
   return { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1 };
 }
 const vxf = (t, xf) => mMul(xf || MICRO_XF, mS(1, pulseScale(t), pulseScale(t)));
@@ -2387,14 +2799,20 @@ function normalCam(t) {
   return base;
 }
 function sNormal(t) {                                                  // 04-08
-  const st = microState(t), cam = normalCam(t), xf = vxf(t), close = t >= EV.push6 && t < EV.pull7 + 0.6;
+  const st = microState(t), cam = floatCam(normalCam(t), t, 1.4), xf = vxf(t), close = t >= EV.push6 && t < EV.pull7 + 0.6;
   MSKY(); drawVessel(cam, st, xf);
-  drawCells(cam, xf, st, fieldOf({ g: qg(st.g, 4), xc: st.xc, w: st.w }, 70, 3), t, { rate: 0.075, count: close ? 30 : 70 });
+  drawCells(cam, xf, st, cellField({ g: st.g, xc: st.xc, w: st.w }, 70, 3), t, { rate: 0.075, count: close ? 30 : 70 });
   // white cells roll along the dysfunctional lining and stick
-  if (t >= EV.push6 && t < EV.grow8 + 1) EV.wbc.forEach((e, i) => { const stop = st.xc - 20 + i * 26, x = t < e ? stop - (e - t) * 40 : stop; drawWBC(cam, xf, x, wallSurfY(x, st) + 6, -9 - i * 3); });
+  // white cells roll along the wall (turning as they roll), slow down, flatten a little and stick
+  if (t >= EV.push6 && t < EV.grow8 + 1) EV.wbc.forEach((e, i) => {
+    const stop = st.xc - 20 + i * 26, tau = e - t, T = 0.6, v = 40, x = tau <= 0 ? stop : tau <= T ? stop - v * tau * tau / (2 * T) : stop - v * T / 2 - v * (tau - T);
+    drawWBC(cam, xf, x, wallSurfY(x, st) + 6, -9 - i * 3, 1, -(x - stop) / 5.4, smooth(clamp(-tau / 0.5, 0, 1)));
+  });
   // lipid slips under the lining into the wall; a macrophage takes it up and becomes a foam cell
   if (t >= EV.ldl[0] - 0.4 && t < EV.comp9) {
-    EV.ldl.forEach((e, i) => { if (t < e - 0.35) return; for (let j = 0; j < 3; j++) { const x = st.xc - 18 + i * 12 + j * 5, ws = wallSurfY(x, st), f = ph(t, e - 0.35, e + 0.25); drawLDL(cam, xf, x, lerp(ws + 6, ws - 2.4 - j * 1.1, f), lerp(-4, 0.4, f)); } });
+    EV.ldl.forEach((e, i) => { if (t < e - 0.6) return; for (let j = 0; j < 3; j++) {           // lipid drifts in on a curve and slips under the lining
+      const x0 = st.xc - 18 + i * 12 + j * 5, f = ph(t, e - 0.6 + 0.06 * j, e + 0.3, eio), x = x0 - 7 * (1 - f) + 1.2 * Math.sin(Math.PI * f) * Math.sin(t * 6 + j), ws = wallSurfY(x, st);
+      drawLDL(cam, xf, x, lerp(ws + 7, ws - 2.4 - j * 1.1, f) + 1.6 * Math.sin(Math.PI * f), lerp(-5, 0.4, f)); } });
     if (t >= EV.ldl[1]) { const x = st.xc + 6; drawFoam(cam, xf, x, (-AR.RI + wallSurfY(x, st)) / 2, ph(t, EV.foam - 0.2, EV.foam + 0.4)); }
   }
   r3dOutlines();
@@ -2403,7 +2821,7 @@ function sNormal(t) {                                                  // 04-08
 }
 // 09: normal and narrowed, side by side, same scale
 function sCompare(t) {
-  const x0 = AR.XS, cam = camLook([0, microAt(x0) + 5, 500], [0, microAt(x0), -10], [0, 1, 0], 36);
+  const x0 = AR.XS, cam = floatCam(camLook([0, microAt(x0) + 5, lerp(520, 490, ph(t, EV.comp9, EV.comp9 + 3, lin))], [0, microAt(x0), -10], [0, 1, 0], 36), t, 2);
   const stN = { g: 0, xc: AR.XS, w: AR.WS }, stS = { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1 };
   const slide = ph(t, EV.comp9, EV.comp9 + 0.5, eout), pS = mS(1, pulseScale(t), pulseScale(t));
   const xfN = mMul(mT(-44 - 80 * (1 - slide), 0, 0), mMul(MICRO_XF, pS)), xfS = mMul(mT(44 * slide, 0, 0), mMul(MICRO_XF, pS));
@@ -2421,21 +2839,22 @@ function sCompare(t) {
 const OCC_ST = { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1, occ: { xc: AR.XO, w: AR.WO } };
 function occCam(t) {
   const c0 = microCam(AR.XS, 270, 0), c1 = microCam(AR.XO - 20, 270, 0), c2 = microCam(AR.XO - 32, 175, 0), c3 = microCam(AR.XO - 8, 360, 10, 10);
-  if (t < EV.pull11) { const a = camAB(c0.eye, c0.tg, c1.eye, c1.tg, ph(t, EV.pan10, EV.pan10 + 1.0, eio), 36); return camAB(a.eye, a.tg, c2.eye, c2.tg, ph(t, EV.block10, EV.block10 + 0.75, eio), 36); }
-  return camAB(c2.eye, c2.tg, c3.eye, c3.tg, ph(t, EV.pull11, EV.pull11 + 1.0, eio), 36);
+  // the pan down the artery runs straight into the slow push to the block (one move, no pause between), then a float
+  if (t < EV.pull11) return floatCam(camSpline([{ t: EV.pan10, e: c0.eye, g: c0.tg }, { t: EV.pan10 + 0.95, e: c1.eye, g: c1.tg }, { t: EV.block10 + 0.75, e: c2.eye, g: c2.tg }], t, 36), t, 1.4);
+  return floatCam(camAB(c2.eye, c2.tg, c3.eye, c3.tg, ph(t, EV.pull11, EV.pull11 + 1.0, eio), 36), t, 1.4);
 }
 function sOcclusion(t) {
   const cam = occCam(t), xf = vxf(t);
   MSKY(); drawVessel(cam, OCC_ST, xf);
-  if (t >= EV.pull11) drawCollat(cam, xf, t < EV.colGrow ? 0 : qg(ph(t, EV.colGrow, EV.colFlow), 8));
+  if (t >= EV.pull11) drawCollat(cam, xf, t < EV.colGrow ? 0 : ph(t, EV.colGrow, EV.colFlow + 0.4, eio));
   drawStagnant(cam, xf, OCC_ST, t, 56);
   drawCollatFlow(cam, xf, t, t > EV.colFlow ? ph(t, EV.colFlow, EV.colFlow + 0.6) : 0);
   r3dOutlines();
 }
 // ---------------------------------------------------------------- 12: walking again — the working calf needs more than the blocked arteries deliver
-function demandCam(t) { const x = WALK12.at(t)[0]; return camLook([x + 200, 440, 1750], [x + 110, 340, 92], [0, 1, 0], 32); }
+function demandCam(t) { const x = smoothX(WALK12, t, 32.5, 36.6); return camLook([x + 200, 440, 1750], [x + 110, 340, 92], [0, 1, 0], 32); }
 function sDemand(t) {
-  const w = WALK12.at(t), pose = patientPose([w[0], w[1], 0], 0, { ph: PH12(t), amp: AMP12() }), cam = demandCam(t);
+  const g = WALK12.sample(t), pose = patientPose(g.p, 0, { g, t, effort: ph(t, EV.cut12, EV.rest13) }), cam = demandCam(t);
   const pain = clamp(0.35 + 0.2 * EV.steps12.filter(e => t >= e).length, 0, 1), pulse = Math.max(0, Math.sin(TAU * ((t - EV.cut12) / 0.75))) ** 2;
   skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawLeg(cam, pose, { muscle: 1, bone: 0, art: 1, pain, pulse, fog: FOG_W });
@@ -2444,44 +2863,86 @@ function sDemand(t) {
 }
 // ---------------------------------------------------------------- 13: rest — demand falls; the arteries stay as they are
 function sRest(t) {
-  const s = walkState(PT_HOLD_END), relax = ph(t, EV.relax - 0.4, EV.relax + 1.3, eio);
-  const pose = patientPose(s.root, 0, Object.assign({}, s.q, { hold: 1 - relax })), cam = walkCam(5.0);
+  // straightening up: the hand lets go first, then the back rises, the knees last; he keeps breathing hard, then calms
+  const s = walkState(PT_HOLD_END), q = Object.assign({}, s.q, { t, effort: 1 - ph(t, EV.relax, EV.rest13 + 3, lin),
+    holdArm: 1 - ph(t, EV.relax - 0.4, EV.relax + 0.5, eio), holdTorso: 1 - ph(t, EV.relax - 0.25, EV.relax + 1.1, eio), holdLeg: 1 - ph(t, EV.relax - 0.1, EV.relax + 1.25, eio) });
+  const pose = plantedPose(s.root, q), c5 = walkCam(5.0), cam = floatCam(camLook(lerp3(c5.eye, add3(c5.tg, mul3(sub3(c5.eye, c5.tg), 0.9)), ph(t, EV.rest13, EV.rest13 + 3, lin)), c5.tg, [0, 1, 0], 32), t, 6);
   skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: 0.85 * (1 - ph(t, EV.relax, EV.rest13 + 2.9)), fog: FOG_W });
   r3dOutlines();
 }
-// ---------------------------------------------------------------- 14: CT angiography (head first into the gantry, contrast into the arm vein)
-function ctDY(t) { return lerp(0, 620, ph(t, EV.ct14, EV.tableStop, eio)); }
+// ---------------------------------------------------------------- 14: CT angiography — head first, the table glides into the gantry
+// the scan plane's place on the patient (patient-frame y): his head and raised arms are already in the bore; the
+// table glides on until his belly lies in the plane (tree level 1150, where the scan begins); the laser line runs
+// down his body as he passes it
+const ctG = t => lerp(-80, 1150 - 1610, ph(t, EV.ct14 + 0.1, EV.tableStop, eio));
+function ctCam(t) {
+  // fixed in the room at the foot end of the table, a slow push toward the gantry as he glides in
+  const u = ph(t, EV.ct14, EV.ct14 + 3, eio), G = ctG(t);
+  return camLook([lerp(-1180, -980, u), G + lerp(-2350, -2120, u), lerp(900, 780, u)], [lerp(-70, -40, u), G + lerp(-760, -640, u), -60], [0, 0, 1], 40);
+}
 function sCT(t) {
-  const dy = ctDY(t), drift = ph(t, EV.ct14, EV.ct14 + 3, lin);
-  // a camera fixed in the room (it moves with the gantry in the patient frame): the patient slides in toward it
-  const G = 24 - dy, cam = camLook([-1450 + 160 * drift, G - 2650, 1350], [-120, G - 420, -60], [0, 0, 1], 36);
-  skyBG(P.K0, P.N2); drawCTRoom(cam, dy, t >= EV.inject ? ph(t, EV.inject, EV.inject + 0.6, lin) : 0);
+  const G = ctG(t), cam = ctCam(t);
+  skyBG(P.K0, P.N2);
+  drawCTRoom(cam, G, { t, inj: t >= EV.inject ? ph(t, EV.inject, EV.inject + 0.7, lin) : 0, laser: 1 });
   r3dOutlines();
 }
 // ---------------------------------------------------------------- 15: the contrast's route: arm vein → heart → lungs → heart → aorta → down toward the legs
 function sCirc(t) {
   const u = ph(t, EV.circ15, EV.circ15 + 3, eio);
-  const cam = camLook([lerp(-70, 40, u), lerp(-360, -560, u), lerp(1150, 1300, u)], [lerp(-50, 30, u), lerp(-360, -560, u), 0], [0, 1, 0], 38);
+  const cam = camLook([lerp(-70, 40, u), lerp(-300, -560, u), lerp(1200, 1300, u)], [lerp(-50, 30, u), lerp(-300, -560, u), 0], [0, 1, 0], 38);
   skyBG(P.K0, P.N2); drawCirc(cam, t);
 }
-// ---------------------------------------------------------------- 16-21: the arterial tree
+// ---------------------------------------------------------------- 16: the scan, seen from the control room — the images appear on the console
+// the helical scan runs from the belly to the feet at a steady table speed (the table carries him on through the
+// bore while the X-ray tube turns); each new axial image shows on the screen, the earlier ones line up below
+const SCAN = { t0: EV.fill16 + 0.05, t1: EV.fill16 + 2.85, y0: 1150, y1: 25 };
+const scanY = t => lerp(SCAN.y0, SCAN.y1, clamp((t - SCAN.t0) / (SCAN.t1 - SCAN.t0), 0, 1));
+const THUMB_T = [0, 0.375, 0.75, 1.125, 1.5, 1.875].map(d => EV.fill16 + d);            // with the score's chimes
 const FOG_T = [2200, 6000, P.N2];
-function sFill(t) {                                                    // 16: pelvis to foot, the front moving down both legs
-  const u = t - EV.fill16, front = 120 + 640 * u;
-  const yc = lerp(1000, 330, ph(t, EV.fill16, EV.fill16 + 2.75, eio)), z = lerp(1350, 1750, ph(t, EV.fill16, EV.fill16 + 2.9));
-  const c = camLook([-150, yc + 110, z], [-45, yc, 0], [0, 1, 0], 34);
+const WIN = { x0: 22, y0: 62, x1: 338, y1: 238 };
+function sScan(t) {
+  // through the control-room window: the gantry, the table carrying the patient on through as the scan runs
+  const Y = scanY(t), G = Y - 1610, cam = camLook([2900, G - 1350, 1050], [0, G - 650, -680], [0, 0, 1], 30);   // aimed low: the room shows in the window
   skyBG(P.K0, P.N2);
-  ghostBody(c, null, ['torso', 'pelvis', 'R', 'L'], { fog: FOG_T });
-  drawTreeExpl(c, TREE(), { front, fog: FOG_T });
+  drawCTRoom(cam, G, { t, inj: 1, xray: t >= SCAN.t0 && t < SCAN.t1 + 0.1, fog: [1800, 7000, P.N2] });
   r3dOutlines();
+  // the control room: the wall around the window, a faint reflection on the glass, the desk below the monitor
+  const wall = hexc('#0B121B'), wall2 = hexc('#101A26');
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const inWin = x >= WIN.x0 && x < WIN.x1 && y >= WIN.y0 && y < WIN.y1;
+    if (!inWin) buf[y * W + x] = ((x >> 3) + (y >> 3)) % 7 === 0 ? wall2 : wall;
+    else if (((x + y * 2 + Math.floor(t * 18)) % 97) < 3 + (x > 200 ? 2 : 0)) buf[y * W + x] = mixc(buf[y * W + x], P.ST4, 0.18);
+  }
+  rect(WIN.x0 - 3, WIN.y0 - 3, WIN.x1 + 3, WIN.y0, hexc('#3A4654')); rect(WIN.x0 - 3, WIN.y1, WIN.x1 + 3, WIN.y1 + 3, hexc('#2A3440'));
+  rect(WIN.x0 - 3, WIN.y0, WIN.x0, WIN.y1, hexc('#34404C')); rect(WIN.x1, WIN.y0, WIN.x1 + 3, WIN.y1, hexc('#2A3440'));
+  rect(0, 566, W, H, hexc('#141B24')); rect(0, 566, W, 568, hexc('#2C3846'));
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 13; k++) rect(86 + k * 14 + r * 3, 584 + r * 10, 97 + k * 14 + r * 3, 591 + r * 10, hexc('#232D3A'));   // keyboard
+  rect(296, 590, 312, 606, hexc('#232D3A')); rect(303, 590, 305, 596, hexc('#3A4654'));                                                       // mouse
+  // the console screen: topogram with the scan line, the newest axial image, the images taken so far
+  const n = THUMB_T.reduce((a, e) => a + clamp((t - e) / 0.22, 0, 1), 0);
+  drawConsole(t, Y, n, 1);
 }
+// ---------------------------------------------------------------- 17: the reconstruction — the slices stack into a volume, the soft tissue falls away, the arteries remain
 function ctaRotCam(ang, dist, yc) { return camLook([-10 + dist * Math.sin(ang), yc + 60, dist * Math.cos(ang)], [-10, yc, 0], [0, 1, 0], 34); }
 const CTA_FAR = () => ctaRotCam(0.3, 1720, 560);
 const CTA_SKY = () => skyBG(hexc('#05070A'), hexc('#0E1218'));
-function sCTA(t) {                                                     // 17: the reconstruction turns slowly; both legs, aorta to feet
-  const c = ctaRotCam(lerp(-0.32, 0.3, ph(t, EV.cta17, EV.cta17 + 3, lin)), lerp(1380, 1720, ph(t, EV.cta17, EV.cta17 + 1.2, eout)), 560);
-  CTA_SKY(); drawBones(c, { ramp: RT.vr, glass: [0.08, 0.6, 1.6] }); drawTreeCTA(c, TREE()); r3dOutlines();
+const RECON = { stack: [EV.cta17, EV.cta17 + 1.1], soft: [EV.cta17 + 0.85, EV.cta17 + 1.6], vr: [EV.cta17 + 1.35, EV.cta17 + 2.0] };
+function reconCam(t) {
+  // from a high three-quarter view (the slabs read as a stack) down to the level CTA view, turning all the way
+  const far = CTA_FAR(), a0 = -0.55, e0 = 0.42, d0 = 2050, tg0 = [-10, 600, 0];
+  const k0 = { t: EV.cta17, e: add3(tg0, [d0 * Math.cos(e0) * Math.sin(a0), d0 * Math.sin(e0), d0 * Math.cos(e0) * Math.cos(a0)]), g: tg0 };
+  const k1 = { t: EV.cta17 + 1.6, e: add3([-10, 580, 0], [1900 * Math.cos(0.18) * Math.sin(-0.05), 1900 * Math.sin(0.18), 1900 * Math.cos(0.18) * Math.cos(-0.05)]), g: [-10, 580, 0] };
+  return camSpline([k0, k1, { t: EV.zoom18, e: far.eye, g: far.tg }], t, 34);
+}
+function sCTA(t) {
+  const c = reconCam(t), kStack = SLABS.n * smooth(seg(t, RECON.stack[0], RECON.stack[1])), soft = 1 - ph(t, RECON.soft[0], RECON.soft[1]), vr = ph(t, RECON.vr[0], RECON.vr[1]);
+  if (vr < 1) { CTA_SKY(); drawSlabs(c, kStack, soft, 0); r3dOutlines(); }
+  if (vr > 0) {
+    if (vr < 1) { SPARE[1].set(buf.subarray(0, W * H)); r3dBegin(); }
+    CTA_SKY(); drawBones(c, { ramp: RT.vr, glass: [0.08, 0.6, 1.6] }); drawTreeCTA(c, TREE()); r3dOutlines();
+    if (vr < 1) mixInto(buf, SPARE[1].subarray(0, W * H), 1 - vr);
+  }
 }
 const L1W = [-76, 690, 4], L2W = [-75, 520, -40];
 // a slow orbit-and-drift around a target after a camera move has landed (keeps a held CTA view alive)
@@ -2528,7 +2989,7 @@ function drawScene(t) {
   else if (i === 12) sRest(t);
   else if (i === 13) sCT(t);
   else if (i === 14) sCirc(t);
-  else if (i === 15) sFill(t);
+  else if (i === 15) sScan(t);
   else if (i === 16) sCTA(t);
   else if (i === 17) sCTAStenosis(t);
   else if (i === 18) sCTAOcclusion(t);
@@ -2562,12 +3023,12 @@ function engineInit() { buildParts(); }
 // marks stay inside x 16..313 and y 67..507.
 // ============================================================================
 const SAFE = { l: 16, r: 344, rb: 313, t: 67, b: 507 };
-// stepped open / close factor: n steps over d seconds at each end
+// open / close factor: eased over d seconds at each end (whole pixels: sizes are rounded where it is used, so the
+// edges stay crisp while they move smoothly; n is ignored, kept so older calls read the same)
 function stepK(t, t0, t1, n, d) {
   if (t < t0 || t >= t1) return 0;
-  n = n || 4; d = d || 0.2;
-  const a = Math.min(1, Math.floor((t - t0) / (d / n) + 1) / n), b = t1 - t < d ? Math.ceil((t1 - t) / (d / n)) / n : 1;
-  return Math.min(a, b);
+  d = d || 0.2;
+  return Math.min(eout(clamp((t - t0) / d, 0, 1)), eout(clamp((t1 - t) / d, 0, 1)));
 }
 // ---------------------------------------------------------------- the time cue (chronic exposure, progression over time)
 function hourglass(cx, cy, f, k) {
@@ -2617,7 +3078,7 @@ function demandBars(t) {
 // ---------------------------------------------------------------- the CTA viewer (scenes 17-19)
 const VIEW = { x0: 20, y0: 112, x1: 340, y1: 515 };
 function viewerFrame(t) {
-  const k = stepK(t, EV.cta17, EV.comp20, 4, 0.2); if (k <= 0) return;
+  const k = stepK(t, EV.cta17 + 1.6, EV.comp20, 4, 0.3); if (k <= 0) return;      // once the slices have become the 3D view
   const { x0, y0, x1, y1 } = VIEW, L = Math.round(17 * k), c = P.SUB;
   for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
     rect(Math.min(x, x + sx * L), y - (sy < 0 ? 1 : 0), Math.max(x, x + sx * L), y + (sy > 0 ? 2 : 1) - (sy < 0 ? 1 : 0), c);
@@ -2680,7 +3141,7 @@ function drawUI(t) {
 // touches the animation. Style: white pixel letters on a dark dithered band at
 // the top with a thin cyan edge; the two key terms (STENOSIS / OCCLUSION) are
 // bigger with an orange edge; the final title stays to the last frame. Bands
-// open and close in stepped wipes — no fades, no blur.
+// slide open and closed with an ease, letters type in — no fades, no blur.
 // ============================================================================
 const TXT = { y: 75, sc: 2, lh: 20, padX: 11, padY: 6, maxW: 293 };
 const L_ = k => (LABELS[k] === undefined ? '' : String(LABELS[k]));
@@ -2705,7 +3166,7 @@ function caption(s, t0, t1, t, o) {
   const k = stepK(t, t0, t1, 4, 0.2);
   band(x0, y0, bw, bh, k, key ? P.WARN : P.ACC);
   if (k < 1) return;
-  const n = Math.ceil(clamp((t - t0 - 0.2) / 0.25, 0, 1) * 6) / 6;     // the letters wipe in, left to right, in 6 steps
+  const n = clamp((t - t0 - 0.2) / 0.3, 0, 1);                         // the letters type in, left to right
   lines.forEach((ln, i) => {
     const lx = Math.round(x0 + 2 + (bw - 2 - textW(f, ln, sc, key)) / 2), ly = y0 + TXT.padY + i * lh;
     text(f, ln, lx, ly, { sc, c: P.INK, ol: null, shadow: P.SH, sd: 1, bold: key, n: Math.ceil(ln.length * n) });
@@ -2745,8 +3206,8 @@ function overlays(t) {
   label(L_('s12demand'), BARS.lx, BARS.y - 4, EV.cut12 + 0.6, EV.rest13 + 2.85, t, { left: true, c: P.WARN, maxW: BARS.x - BARS.lx - 10 });
   label(L_('s12supply'), BARS.lx, BARS.y + BARS.gap - 4, EV.cut12 + 0.6, EV.rest13 + 2.85, t, { left: true, c: P.ACC, maxW: BARS.x - BARS.lx - 10 });
   // orientation of the CTA display: the patient's right is on the viewer's left
-  label(L_('s17right'), VIEW.x0 + 20, VIEW.y0 + 9, EV.cap17, EV.comp20, t);
-  label(L_('s17left'), VIEW.x1 - 20, VIEW.y0 + 9, EV.cap17, EV.comp20, t);
+  label(L_('s17right'), VIEW.x0 + 20, VIEW.y0 + 9, EV.cta17 + 1.75, EV.comp20, t);
+  label(L_('s17left'), VIEW.x1 - 20, VIEW.y0 + 9, EV.cta17 + 1.75, EV.comp20, t);
   // the comparison and the final title
   label(L_('s20normal'), CX - 90, 135, EV.cap20, DUR + 1, t, { sc: 2, maxW: 166, accent: P.ACC });
   label(L_('s20pad'), CX + 90, 135, EV.cap20 + 0.375, DUR + 1, t, { sc: 2, maxW: 166, accent: P.WARN });

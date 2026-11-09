@@ -8,12 +8,12 @@
 // marks stay inside x 16..313 and y 67..507.
 // ============================================================================
 const SAFE = { l: 16, r: 344, rb: 313, t: 67, b: 507 };
-// stepped open / close factor: n steps over d seconds at each end
+// open / close factor: eased over d seconds at each end (whole pixels: sizes are rounded where it is used, so the
+// edges stay crisp while they move smoothly; n is ignored, kept so older calls read the same)
 function stepK(t, t0, t1, n, d) {
   if (t < t0 || t >= t1) return 0;
-  n = n || 4; d = d || 0.2;
-  const a = Math.min(1, Math.floor((t - t0) / (d / n) + 1) / n), b = t1 - t < d ? Math.ceil((t1 - t) / (d / n)) / n : 1;
-  return Math.min(a, b);
+  d = d || 0.2;
+  return Math.min(eout(clamp((t - t0) / d, 0, 1)), eout(clamp((t1 - t) / d, 0, 1)));
 }
 // ---------------------------------------------------------------- the time cue (chronic exposure, progression over time)
 function hourglass(cx, cy, f, k) {
@@ -63,7 +63,7 @@ function demandBars(t) {
 // ---------------------------------------------------------------- the CTA viewer (scenes 17-19)
 const VIEW = { x0: 20, y0: 112, x1: 340, y1: 515 };
 function viewerFrame(t) {
-  const k = stepK(t, EV.cta17, EV.comp20, 4, 0.2); if (k <= 0) return;
+  const k = stepK(t, EV.cta17 + 1.6, EV.comp20, 4, 0.3); if (k <= 0) return;      // once the slices have become the 3D view
   const { x0, y0, x1, y1 } = VIEW, L = Math.round(17 * k), c = P.SUB;
   for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
     rect(Math.min(x, x + sx * L), y - (sy < 0 ? 1 : 0), Math.max(x, x + sx * L), y + (sy > 0 ? 2 : 1) - (sy < 0 ? 1 : 0), c);

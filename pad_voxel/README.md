@@ -5,11 +5,44 @@ style of our earlier CTA film.
 - **The symptom:** a man walks, slows, stops and holds his right calf. The view passes through the skin and muscle to the arteries and dives into the thigh artery.
 - **The disease in the wall:** a normal artery; years of high glucose; a damaged lining; plaque building inside the wall; calcification and narrowing.
 - **The consequences:** a stenosis (a narrow but open channel with a faster jet) and, farther down, an occlusion (no passage, the wall outline intact) bypassed by collateral side channels; walking raises the calf's demand above the limited supply, and rest lowers it again while the lesions stay.
-- **The diagnosis:** CT angiography, with contrast traveling from the arm vein through the heart and lungs to the legs; the ivory 3D reconstruction; the stenosis and the occlusion on CTA. The film ends on a normal leg tree beside this patient's: **Diabetic Peripheral Arterial Disease**.
+- **The diagnosis:** CT angiography as it is really done: he lies on the table and glides into the scanner, the contrast travels from the arm vein through the heart and lungs to the legs, the scan images appear on the console, the slices stack into the ivory 3D reconstruction; the stenosis and the occlusion on CTA. The film ends on a normal leg tree beside this patient's: **Diabetic Peripheral Arterial Disease**.
 
 Not a loop: the film ends on the diagnosis. English placeholder labels, all in one editable file, and a clean version without text. No narration: the soundtrack is a quiet bed for an Azerbaijani voice-over to be added later. Music and SFX are delivered separately.
 
 ![Storyboard: one frame per scene](docs/storyboard.png)
+
+## Version 3 (revision 2): natural motion and a realistic CT sequence
+
+The client's second note: the movement looked robotic; the CT part should show the patient lying on the table as it
+slowly moves into the scanner, then the scan images appearing on the screen and the 3D reconstruction of the vessels,
+closer to real life, still pixel art. What changed (details and measurements: `docs/REVISION_ANALYSIS.md`, frames
+before/after: `docs/revision2_before_after.png`):
+
+- **The walk** is planned from footfalls, the way people walk:
+  - each heel strike has a time and a place;
+  - the foot on the floor rolls heel → flat → toes without sliding;
+  - the swinging foot moves on a smooth arc;
+  - the hips ride the legs' reach, sway toward the standing foot, turn and dip; knees and hips follow by IK;
+  - the shoulders turn against the hips; the arms swing a moment late with the elbows bending.
+  Measured on the hips: v2 peaked at 474 m/s² and jerked backward at every step; v3 stays within 12 m/s² and never goes backward.
+- **Stopping, holding, resting:** a last short step, then overlapping actions — the knees give, the back bends, the hand reaches round to the calf on an arc and rubs it — with heavy breathing, and gentle weight shifts when he stands.
+- **Cameras** glide through their keys without stop-and-go. Held shots float very slowly; the walking camera follows the hips' running average.
+- **The artery scenes:**
+  - disease grows continuously;
+  - cells and glucose ride the same pulsing flow;
+  - white cells roll, slow down and stick;
+  - lipid drifts in on a curve;
+  - collaterals widen smoothly.
+- **Graphics:** panels slide open with an ease and letters type in, instead of stepping.
+- **CT, scene 14:** the patient lies on his back, head first (his head is in the bore, never seen), arms raised, shoes off, a strap over the knees. The table glides slowly into the gantry while the red positioning laser crosses his body; then the dual-syringe injector starts and contrast runs down the tube to the cannula in his right elbow.
+- **CT, scene 16 (new):** the control room. Through the window, the table carries him through the gantry during the helical scan. On the console:
+  - the topogram with the scan range and a moving scan line;
+  - each new axial image, with the arterial-phase greys: aorta, pelvis, thighs with the narrowed calcified SFA, knees with the popliteal artery without contrast and its collaterals, calves;
+  - thumbnails arriving with the score's chimes.
+
+  All images are computed from the same anatomy and lesion map as the 3D views.
+- **CT, scene 17:** the slices drop into place as slabs and build the volume; the soft tissue falls away; the arteries and bones remain and become the turning 3D reconstruction.
+- **Anatomy corrected along the way:** the femur shaft now lies lateral to the femoral artery, and the iliac vessels pass in front of the hip joint (the axial images showed them overlapping before).
 
 ## Version 2 (revision)
 
@@ -77,8 +110,8 @@ node tools/export.js --rerender                     # render the pictures again 
 ```
 Each frame is drawn **once**: the clean frame first, then the text on top of a copy, so both versions come from the
 same pixels. The pictures are kept in `build/` with a fingerprint of the sources, so another mix later only
-re-muxes (seconds). In a sandbox test on 4 cores, both text versions with two mixes took 7 min 43 s (about 95 MB per
-MP4; 8 min 45 s with another job running beside it); all eight MP4s take only a few seconds more (re-muxing). All audio versions share **one common gain** (`tools/master.py`), so
+re-muxes (seconds). In a sandbox test on 4 cores, both text versions with two mixes took 7 min 46 s (about 105 MB
+per MP4); all eight MP4s take only a few seconds more (re-muxing). All audio versions share **one common gain** (`tools/master.py`), so
 the music-only and SFX-only stems sit exactly as loud as they do in the full mix and sum back to it.
 
 ### Translating the labels (Azerbaijani)
@@ -134,17 +167,17 @@ lacks a letter. Bar labels step down a size if they are too wide.
 
 - **Shot list:** `镜头表.md` passes the skill's `storyboard_lint` (green): 21 shots, 63 s, no text-led shots.
 - **Film gate** (the skill's `film_gate.py`, run on a sandbox test export `Diabetic_PAD_CTA_Labeled.mp4` at 1080×1920 / 60 fps — the MP4 itself is not in the repository): all three gates green.
-  - Fast-motion frames 26.4 % (red below 3.5 %).
+  - Fast-motion frames 27.1 % (red below 3.5 %).
   - No empty frames; 0 % blue-purple frames.
-  - Worst 30-s window (31–61 s): 20.2 %.
-  - 16 shots (14 cuts, 1 crossfade), average 3.9 s.
-  - Push-ins 2.9 per minute, green (v1 had a yellow notice at 8.6).
+  - Worst 30-s window (31–61 s): 17.9 %.
+  - 14 shots (12 cuts, 1 crossfade), average 4.5 s; the longest still stretch 0.8 s.
+  - Push-ins 2.9 per minute, green.
 - **Export check** (the same sandbox test): every MP4 is 1080×1920, yuv420p, BT.709, 60 fps, exactly 3,780 frames, 63.000 s; the mixes carry AAC 48 kHz stereo and the _Silent versions have no audio track.
 - **Motion and colour** (`tools/qa_motion.js`, every frame at 30 fps):
   - no frame is more than 30 % blue-purple;
   - hard jumps only at the planned cuts (24, 27, 33 and 39 s);
-  - the dive into the artery (8.25–9.2 s) blends red into red: the background darkens and warms to the artery world's maroon before the crossfade, so it never passes through a muddy purple;
-  - holds: two short ones (0.8 s at 37.9 s, 1.0 s at 52.3 s) and the final diagnostic image (from 57.9 s), where both trees only turn slowly while the lesion marks and the title come in on the beat.
+  - no hold anywhere before the final diagnostic image, which holds from 57.9 s while both trees turn slowly and the lesion marks and the title come in on the beat;
+  - the walk, measured on the hips: peak acceleration 12 m/s² (v2: 474 m/s²), never moving backward (v2: up to 3.5 m/s backward at every step); planted feet do not slide (0.0 mm).
 - **Sync** (`tools/sync_qa.js`):
   - all 87 event times on the 80-BPM eighth-note grid, drawn within 8.3 ms (half a frame);
   - all 72 SFX start exactly on a picture event;
@@ -152,6 +185,7 @@ lacks a letter. Bar labels step down a size if they are too wide.
 - **Audio** (`tools/master.py`; the score and SFX are unchanged from v1):
   - full mix −22.00 LUFS, true peak −5.7 dBTP, no limiting needed;
   - music stem −23.9 LUFS, SFX stem −24.8 LUFS.
+- **Anatomy in the CT images:** no artery crosses a bone at any level from the feet to the aorta (checked every 5 mm).
 - **Player:** `tools/smoke.js` (headless Chromium) plays and seeks `index.html` with no errors.
 
 ## Self-review against the six failure modes (huashu-art-motion)
@@ -162,11 +196,11 @@ lacks a letter. Bar labels step down a size if they are too wide.
    - the camera grammar changes with the story: lateral tracking, slow and fast pushes, holds, pull-backs, cuts, and soft crossfades at changes of world;
    - every push is answered by a pull-back or a lateral move;
    - the film ends on an action (both trees turning while the lesions light up), not a centred quote card.
-2. **Copying a demo:** nothing from the skill's demos, sample specs or style samples is used. The renderer, the CT room, the contrast route and the red-cell model come from our own earlier CTA film; every other model (patient, leg, artery cut face, arterial tree, lesions) is built in code for this film.
-3. **No concrete object:** every scene is a concrete thing doing something: the man walking, the calf, the wall, cells, plaque, the scanner, the contrast, the two trees.
+2. **Copying a demo:** nothing from the skill's demos, sample specs or style samples is used. The renderer, the gantry shape, the contrast route and the red-cell model come from our own earlier CTA film; every other model (patient and his walk, leg, artery cut face, arterial tree, lesions, the CT table set-up, the console and the CT images) is built in code for this film.
+3. **No concrete object:** every scene is a concrete thing doing something: the man walking, the calf, the wall, cells, plaque, the table gliding into the scanner, the contrast, the console's images, the stacking slices, the two trees.
 4. **Dead or empty background:**
    - the subject fills most of the frame;
-   - the backdrop changes with each world (floor, the vessel interior, the CT room, the black CTA viewer, glass bodies behind the trees);
+   - the backdrop changes with each world (floor, the vessel interior, the CT room, the control room, the black CTA viewer, glass bodies behind the trees);
    - the film gate finds no empty frames.
 5. **Real material drawn in code:** not applicable. No footage or photographs were provided, and the client asked for the style of the CTA film.
 6. **AI-looking result:**
@@ -192,17 +226,18 @@ single agent only; watch it once at normal speed before publishing.
   - `07_r3d.js`: perspective, z-buffer, per-vertex lighting, palette ramps with Bayer dither, glass, fog, procedural cut faces, 1-px outlines.
   - `08_geo.js`: tubes, ellipsoids, rings, boxes, quads.
   - `09_sdf.js`: signed-distance shapes turned into smooth meshes.
-  - `17_cam.js`: camera paths and the sky gradient.
+  - `17_cam.js`: camera paths (smooth splines through keys, slow floats) and the sky gradient.
 - **Models:**
-  - `10_patient.js`: smooth body parts on a skeleton, a gait with heel strikes on the beat, stance-foot locking, the calf-holding pose with two-bone IK.
+  - `10_patient.js`: smooth body parts; the walk planned from footfalls (rolling feet, hips by reach and acceleration limits, legs by IK), the stop and the calf hold as overlapping actions with arm IK, breathing, the lying pose for the CT.
   - `11_leg.js`: the right leg's layers: glass skin, muscles that glow where they hurt, arteries with the lesions.
   - `12_micro.js`: the artery cut lengthwise:
     - in 3D: the lining, red cells on streamlines (faster in the narrowing) pulsing at 80 per minute, white cells, the foam cell, collaterals;
     - in 2D pixel art on the cut face: the wall's layers, plaque, calcium, the occlusion.
   - `13_tree.js`: the arterial tree, the lesion map, the CTA look, the bones and the glass body.
-  - `14_ct.js`: the CT room.
+  - `14_ct.js`: the CT room: gantry with panels, lit ring, lamp and positioning laser; table, strap, injector, tubing; the patient head first with raised arms.
   - `15_circ.js`: the contrast's route through the heart and lungs.
-  - `16_axial.js`: the axial CTA slice.
+  - `16_axial.js`: the axial close-up inset of the stenosis (scene 18).
+  - `18_ctimg.js`: the CT images: analytic axial slices of this patient (body, bones, vessels, lesions), the topogram, the console screen, the slabs of the reconstruction.
 - **Film and output:**
   - `20_scenes.js`: the 21 scenes, cameras and crossfades.
   - `24_ui.js`: graphics kept in the clean version.

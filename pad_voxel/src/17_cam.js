@@ -34,5 +34,14 @@ function hermite(keys, t) {
   }
   const k = keys[keys.length - 1]; return k[1] + k[2] * (t - k[0]);
 }
+// a camera through keys {t, e (eye), g (target)}: each coordinate on a monotone cubic, so the camera eases in at the
+// first key and out at the last but never stops at the keys between (no stop-and-go)
+function camSpline(keys, t, fov, up) {
+  const f = k => monoCubic(keys.map(q => [q.t, k < 3 ? q.e[k] : q.g[k - 3]])), v = [0, 1, 2, 3, 4, 5].map(k => f(k)(t));
+  return camLook([v[0], v[1], v[2]], [v[3], v[4], v[5]], up || [0, 1, 0], fov || 34);
+}
+// a slow float for held shots (a few units, periods of several seconds), so a hold never freezes
+const floatOff = (t, a) => [a * Math.sin(TAU * t / 7.3), 0.6 * a * Math.sin(TAU * t / 5.1 + 1.1), 0.4 * a * Math.sin(TAU * t / 6.2 + 2.3)];
+function floatCam(c, t, a) { const o = floatOff(t, a), fov = 2 * Math.atan((H / 2) / c.F) * 180 / Math.PI; return camLook(add3(c.eye, o), add3(c.tg, mul3(o, 0.6)), [0, 1, 0], fov); }
 // background: a calm vertical gradient in navy (drawn before the 3D pass), stepped so it stays pixel-flat
 function skyBG(top, bot) { for (let y = 0; y < H; y++) { const k = y / (H - 1), c = mixc(top, bot, Math.round(k * 6) / 6); buf.fill(c, y * W, (y + 1) * W); } }

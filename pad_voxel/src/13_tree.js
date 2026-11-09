@@ -23,12 +23,12 @@ function art(name, pts, parent) { ART[name] = { name, pts: pts.map(p => [p[0], p
 function side(sx, tag, L) {           // sx = -1 right leg, +1 left leg (mirrored, then varied)
   const X = x => x * -sx;             // centrelines written for the right leg (x negative)
   const P = (x, y, z, r) => [X(x), y, z, r];
-  art(tag + 'CIA', [P(0, 1030, -30, 5), P(-45, 962, -34, 5), P(-60, 926, -30, 4.6)], 'AO');
-  art(tag + 'IIA', [P(-60, 926, -30, 2.6), P(-58, 884, -58, 2.3), P(-48, 852, -80, 1.9)], tag + 'CIA');
-  art(tag + 'EIA', [P(-60, 926, -30, 4.2), P(-80, 892, -10, 4), P(-88, 860, 0, 4)], tag + 'CIA');
-  art(tag + 'CFA', [P(-88, 860, 0, 4), P(-90, 815, 5, 4)], tag + 'EIA');
-  art(tag + 'PFA', [P(-90, 815, 5, 3.2), P(-101, 790, -10, 3), P(-108, 720, -25, 2.7), P(-105, 640, -32, 2.2), P(-99, 588, -36, 1.6)], tag + 'CFA');
-  art(tag + 'SFA', [P(-90, 815, 5, 3.2), P(-83, 760, 8, 3.1), P(-76, 690, 4, 3), P(-71, 625, -6, 3), P(-72, 570, -25, 3)], tag + 'CFA');
+  art(tag + 'CIA', [P(0, 1030, -26, 5), P(-36, 962, -22, 5), P(-42, 926, 4, 4.6)], 'AO');
+  art(tag + 'IIA', [P(-42, 926, 4, 2.6), P(-50, 884, -40, 2.3), P(-42, 852, -66, 1.9)], tag + 'CIA');
+  art(tag + 'EIA', [P(-42, 926, 4, 4.2), P(-72, 892, 16, 4), P(-88, 860, 26, 4)], tag + 'CIA');
+  art(tag + 'CFA', [P(-88, 860, 26, 4), P(-90, 815, 18, 4)], tag + 'EIA');
+  art(tag + 'PFA', [P(-90, 815, 18, 3.2), P(-98, 790, -8, 3), P(-94, 720, -42, 2.7), P(-92, 640, -46, 2.2), P(-92, 588, -46, 1.6)], tag + 'CFA');
+  art(tag + 'SFA', [P(-90, 815, 18, 3.2), P(-83, 760, 10, 3.1), P(-76, 690, 4, 3), P(-71, 625, -6, 3), P(-72, 570, -25, 3)], tag + 'CFA');
   art(tag + 'POP', [P(-72, 570, -25, 3), P(-75, 520, -40, 2.9), P(-78, 480, -45, 2.8), P(-80, 445, -42, 2.7)], tag + 'SFA');
   art(tag + 'ATA', [P(-80, 445, -42, 1.7), P(-92, 430, -20, 1.6), P(-96, 400, 5, 1.6), P(-98, 300, 15, 1.5), P(-96, 180, 20, 1.4), P(-92, 82, 30, 1.4),
     P(-88, 50, 55, 1.3), P(-80, 30, 100, 1.2), P(-75, 22, 140, 1.1)], tag + 'POP');
@@ -38,10 +38,10 @@ function side(sx, tag, L) {           // sx = -1 right leg, +1 left leg (mirrore
   art(tag + 'PERc', [P(-95, 118, -18, 0.8), P(-96, 104, 2, 0.75), P(-93, 96, 22, 0.7)], tag + 'PER');          // perforating branch toward the ATA
   // genicular collaterals around the knee (pre-existing small channels; they enlarge where the popliteal is blocked)
   art(tag + 'GEN1', [P(-71, 608, -10, 1.0), P(-60, 585, 2, 1.0), P(-55, 545, 0, 1.0), P(-58, 505, -12, 1.0), P(-66, 478, -30, 1.0), P(-76, 466, -40, 1.0)], tag + 'SFA');
-  art(tag + 'GEN2', [P(-100, 600, -35, 0.9), P(-104, 565, -28, 0.9), P(-98, 530, -18, 0.9), P(-96, 500, -26, 0.9), P(-88, 474, -38, 0.9), P(-80, 462, -43, 0.9)], tag + 'PFA');
+  art(tag + 'GEN2', [P(-93, 600, -45, 0.9), P(-104, 565, -32, 0.9), P(-104, 530, -26, 0.9), P(-96, 500, -26, 0.9), P(-88, 474, -38, 0.9), P(-80, 462, -43, 0.9)], tag + 'PFA');
   art(tag + 'GEN3', [P(-73, 560, -32, 0.75), P(-82, 538, -58, 0.75), P(-84, 510, -60, 0.75), P(-80, 482, -52, 0.75), P(-79, 470, -46, 0.75)], tag + 'POP');
 }
-art('AO', [[0, 1180, -40, 9], [0, 1100, -36, 9], [0, 1030, -30, 8.6]], null);
+art('AO', [[0, 1180, -30, 9], [0, 1100, -28, 9], [0, 1030, -26, 8.6]], null);
 side(-1, 'R'); side(1, 'L');
 // arc length from the aortic inlet along the tree (how far the contrast front must travel)
 function arcLengths() {
@@ -201,15 +201,22 @@ function drawTreeCTA(cam, T, o) {
   if (T.cal) drawMesh(cam, T.cal, { ramp: [P.CA2, P.CA3, P.CA4, P.CA4], id: newId(hexc('#101010')), amb: 0.6, dif: 0.5, spec: 0.3, fog: o.fog }, o.xf);
 }
 // ---------------------------------------------------------------- bones (ivory): femur, tibia, fibula, patella, foot, pelvis
+// centre-lines [x, y, z, radius] for the right leg (mirrored for the left), shared by the 3D bones and the axial CT
+// images: the femoral neck runs out to the trochanter, the shaft angles back in toward the knee (lateral to the SFA,
+// which stays medial and a little in front of it), the tibia in front of the posterior tibial and peroneal arteries
+const BONE_CTRL = {
+  femur: [[-92, 868, -12, 20], [-118, 846, -10, 16], [-122, 815, -12, 15], [-112, 700, -16, 13], [-98, 585, -12, 13], [-86, 525, -4, 16], [-80, 495, 0, 23]],
+  tibia: [[-78, 470, 0, 23], [-74, 440, 4, 18], [-70, 330, 8, 12], [-68, 120, 8, 10], [-64, 82, 10, 15]],
+  fibula: [[-106, 452, -10, 7], [-106, 400, -12, 5.5], [-108, 200, -12, 4.5], [-108, 82, -8, 8]],
+};
 function buildBonesMesh() {
   const mb = new MB();
   for (const sx of [-1, 1]) {
     const X = p => [p[0] * -sx, p[1], p[2], p[3]];
     const tube = ctrl => { const c = ctrl.map(X), pts = smoothPath(c.map(q => q.slice(0, 3)), 6), L = pts.length - 1; tubeInto(mb, pts, (i, u) => { const f = u * (c.length - 1), j = Math.min(c.length - 2, Math.floor(f)); return lerp(c[j][3], c[j + 1][3], f - j); }, null, 12, true); };
-    tube([[-92, 868, -12, 20], [-104, 840, -10, 14], [-86, 800, -6, 14], [-70, 600, 0, 12], [-68, 520, 0, 15], [-72, 492, 2, 22]]);                 // femur
+    tube(BONE_CTRL.femur);
     ellipsoidInto(mb, [92 * sx, 868, -12], 24, 24, 24, 12, 8);                                                                                     // femoral head
-    tube([[-74, 470, 0, 23], [-72, 440, 4, 18], [-70, 330, 8, 12], [-68, 120, 8, 10], [-64, 82, 10, 15]]);                                           // tibia
-    tube([[-104, 452, -10, 7], [-104, 400, -12, 5.5], [-106, 200, -12, 4.5], [-108, 82, -8, 8]]);                                                    // fibula
+    tube(BONE_CTRL.tibia); tube(BONE_CTRL.fibula);
     ellipsoidInto(mb, [74 * sx, 505, 36], 13, 18, 8, 10, 7);                                                                                       // patella
     ellipsoidInto(mb, [68 * sx, 34, -18], 20, 24, 24, 10, 7);                                                                                      // heel
     for (let r = 0; r < 4; r++) tube([[-70 + (r - 1.5) * 9, 30, 70, 5], [-70 + (r - 1.5) * 11, 10, 158, 3.5]]);                                       // metatarsal rays
