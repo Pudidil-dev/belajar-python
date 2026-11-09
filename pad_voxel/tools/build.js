@@ -14,7 +14,7 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>How Diabetes Damages Leg Arteries</title>
-<meta name="description" content="How diabetes damages the leg arteries (diabetic peripheral arterial disease): a 63-second 3D voxel pixel-art medical animation — calf pain on walking, the artery wall from normal to plaque, stenosis, occlusion and collaterals, demand versus supply, CT angiography and the final diagnosis — with a restrained cinematic-electronic score. Press T to show or hide the labels.">
+<meta name="description" content="How diabetes damages the leg arteries (diabetic peripheral arterial disease): a 63-second 3D pixel-art medical animation in the style of the CTA film — calf pain on walking, the artery wall from normal to plaque, stenosis, occlusion and collaterals, demand versus supply, CT angiography and the final diagnosis — with a restrained cinematic-electronic score. Press T to show or hide the labels.">
 <style>
 :root { --bg: #05070d; --panel: #0b1020; --line: #1e2949; --ink: #e9eef6; --sub: #9aa7bd; --accent: #8fe9f5; }
 * { box-sizing: border-box; }
@@ -41,7 +41,7 @@ body { display: flex; flex-direction: column; min-height: 100%; }
 </head>
 <body>
 <div id="stage">
-  <canvas id="screen" width="540" height="960" role="img" aria-label="3D voxel animation with short English labels: a man walks, slows and holds his right calf; inside the leg the thigh artery is followed from a normal wall through high glucose, a damaged lining and plaque to a calcified narrowing (stenosis) and a blocked segment (occlusion) with collateral side channels; walking raises the calf's demand above the blood supply and rest lowers it; a CT angiography scan shows the narrowing and the block; the final image compares a normal leg artery tree with this patient's diabetic peripheral arterial disease."></canvas>
+  <canvas id="screen" width="360" height="640" role="img" aria-label="3D pixel-art medical animation with short English labels: a man walks, slows and holds his right calf; inside the leg the thigh artery is followed from a normal wall through high glucose, a damaged lining and plaque to a calcified narrowing (stenosis) and a blocked segment (occlusion) with collateral side channels; walking raises the calf's demand above the blood supply and rest lowers it; a CT angiography scan shows the narrowing and the block; the final image compares a normal leg artery tree with this patient's diabetic peripheral arterial disease."></canvas>
   <div id="loading">LOADING…</div>
 </div>
 <div id="bar">

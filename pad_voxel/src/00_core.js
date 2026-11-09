@@ -1,17 +1,18 @@
 'use strict';
 // ============================================================================
-// HOW DIABETES DAMAGES LEG ARTERIES — core: pixel buffer, palette, 2-D
-// rasterisers, masks, easing. Everything draws into one 540x960 Uint32 buffer
-// (crisp pixels, no anti-aliasing), shown exactly 2x nearest-neighbour
-// (1080x1920) by the player and the export. The voxel renderer (07_vox.js)
-// draws 3-D models into the same buffer.
+// PAD — core: pixel buffer, palette, rasterisers, masks, easing, 2D camera.
+// Everything draws into one 360x640 Uint32 buffer (crisp pixels, no AA),
+// shown exactly 3x nearest-neighbour (1080x1920) by the player / export.
+// W, H and buf can be swapped temporarily (withCanvas) to draw a world into a
+// larger square buffer, e.g. for a camera roll.
 // ============================================================================
 const FPS = 60, DUR = 63, NF = 3780;
-let W = 540, H = 960, CX = 270, CY = 480;
-const MAXPIX = 540 * 960;
+let W = 360, H = 640, CX = 180, CY = 320;
+const MAXPIX = 640 * 640;
 let buf = new Uint32Array(W * H);
 const SPARE = [new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX), new Uint32Array(MAXPIX)];
-const FEEDBUF = SPARE[1], TMPBUF = SPARE[3], TMP2 = SPARE[4];
+const FEEDBUF = SPARE[1].subarray(0, 360 * 640), TMPBUF = SPARE[3].subarray(0, 360 * 640), TMP2 = SPARE[4].subarray(0, 360 * 640);
+// draw into a w x h buffer (taken from SPARE[0]) and return it
 function withCanvas(w, h, fn) {
   const oW = W, oH = H, oCX = CX, oCY = CY, oBuf = buf;
   W = w; H = h; CX = w / 2; CY = h / 2; buf = SPARE[0].subarray(0, w * h);
@@ -24,10 +25,35 @@ function hexc(h) {
 }
 const P = {};
 const PAL_HEX = {
-  // ground: deep navy (hue ~210°), floor tiles a little lighter
-  K0: '#04080F', BG: '#0D1B2A', N1: '#122338', N2: '#182E47', N3: '#203B58', N4: '#2A4B6D', N5: '#3A6187',
-  // UI / text
-  INK: '#F4F8FF', SUB: '#A7BCD4', SH: '#03070D', BOX: '#08121F', C6: '#FFFFFF', ACC: '#46C6E6', WARN: '#F0A93B', PAIN: '#FF8A3D',
+  // ground: deep navy and midnight blue (hue <= 218, out of the blue-purple band)
+  K0: '#060A12', BG: '#101827', N1: '#131E30', N2: '#18283D', N3: '#1E3249', N4: '#2A4058', N5: '#36506A',
+  // steel blue (veins, the right heart, the CT room), cyan (X-rays, the scanner's electronics)
+  ST0: '#1A2A3A', ST1: '#2C4458', ST2: '#42627C', ST3: '#62849C', ST4: '#8EAAC0', ST5: '#BCD0DC',
+  CY0: '#1C4650', CY1: '#347E8C', CY2: '#6BC7D7', CY3: '#A6E4EC', CY4: '#E0F8FA',
+  // arterial red (arteries, the left heart, the vessel wall), blood inside the lumen
+  AR0: '#3A1218', AR1: '#62202A', AR2: '#93343A', AR3: '#D45A59', AR4: '#E8877C', AR5: '#F4B4A4',
+  BL0: '#2E0C14', BL1: '#4E1620', BL2: '#74222C', BL3: '#9A3038',
+  // iodinated contrast (the educational amber of the concentration; it does not glow)
+  IO0: '#4A3416', IO1: '#86622A', IO2: '#BC8F42', IO3: '#E7B969', IO4: '#F4D89E', IO5: '#FFF0CE',
+  // bone, the CT image greys, the bright CT high-attenuation tone
+  BO0: '#4E4B42', BO1: '#7C786A', BO2: '#B9B5A7', BO3: '#D8D5C8',
+  G0: '#07090C', G1: '#15191E', G2: '#262B31', G3: '#3A4047', G4: '#535A61', G5: '#727980', G6: '#969DA2', G7: '#BCC2C4', G8: '#E9F1F0',
+  // skin, the patient's sheet, lungs
+  SK0: '#4E3028', SK1: '#83564A', SK2: '#B17E68', SK3: '#D6A68A', SK4: '#EDC8AE',
+  SH0: '#2E4256', SH1: '#4C6A84', SH2: '#7896AE', SH3: '#A8C0D0', SH4: '#D2E0E8',
+  LU0: '#4A3442', LU1: '#7E5A68', LU2: '#B08A94', LU3: '#D8B8BE',
+  // the scanner: white housing, dark machinery
+  MW0: '#3E4650', MW1: '#6E7882', MW2: '#A2ACB4', MW3: '#CED6DC', MW4: '#EEF2F4', MD0: '#10161E', MD1: '#1C242E', MD2: '#2C3642', MD3: '#404C58',
+  SH: '#02050C', INK: '#F4F8FF',
+  // this film: the text / UI layer, plaque, calcium, contrast (white-blue teaching colour), pain, muscle
+  SUB: '#A7BCD4', BOX: '#08121F', C6: '#FFFFFF', ACC: '#46C6E6', WARN: '#F0A93B', PAIN: '#FF8A3D',
+  PL0: '#5A3208', PL1: '#A0600E', PL2: '#E08A1F', PL3: '#F0A93B', PL4: '#FFD27A',
+  CA0: '#5C646C', CA1: '#B8C0C8', CA2: '#DCE2E8', CA3: '#F2F4F6', CA4: '#FFFFFF',
+  CO0: '#4A7FA6', CO1: '#8DBBDC', CO2: '#CDEBFF', CO3: '#E8F6FF', CO4: '#FFFFFF',
+  OC0: '#3A1A08', OC1: '#6E3410', OC2: '#A85418', OC3: '#D9782A', OC4: '#F0A060',
+  MU0: '#3E1A1A', MU1: '#6E2F2C', MU2: '#9C4A42', MU3: '#B9675A', MU4: '#D38E7E',
+  PA0: '#6A2106', PA1: '#B4400E', PA2: '#FF8A3D', PA3: '#FFB077', PA4: '#FFD9B8',
+  CU0: '#3A2410', CU1: '#7A4E24', CU2: '#B8803E', CU3: '#E0B070',
 };
 for (const k in PAL_HEX) P[k] = hexc(PAL_HEX[k]);
 
@@ -190,13 +216,32 @@ function dashLine(x0, y0, x1, y1, c, on, off, phase) {
     line(lerp(x0, x1, a / L), lerp(y0, y1, a / L), lerp(x0, x1, b / L), lerp(y0, y1, b / L), c);
   }
 }
-// Kurzgesagt-style pixel glow: stacked dithered discs in darker tints
+// soft glow: a smooth radial blend toward c1 (and c2 in the core), no dither sparkle
+function mixc(a, b, k) { // blend two packed colours, k in 0..1
+  const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  return (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+}
 function glow(cx, cy, r, c1, c2, lv) {
   lv = lv === undefined ? 1 : lv; if (lv <= 0 || r <= 0) return;
-  disc(cx, cy, r, c1, 0.28 * lv);
-  disc(cx, cy, r * 0.62, c1, 0.55 * lv);
-  if (c2 !== undefined && c2 !== null) disc(cx, cy, r * 0.32, c2, 0.6 * lv);
+  const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r)), x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / r; if (d >= 1) continue;
+    const i = y * W + x, u = 1 - d;
+    let c = mixc(buf[i], c1, 0.55 * lv * u * u);
+    if (c2 !== undefined && c2 !== null && d < 0.35) c = mixc(c, c2, 0.5 * lv * (1 - d / 0.35));
+    buf[i] = c;
+  }
 }
+// blend a whole buffer into buf (k = weight of src) — smooth crossfades
+function mixInto(dst, src, k) {
+  if (k <= 0) return; const ki = Math.round(clamp(k, 0, 1) * 256), kj = 256 - ki;
+  for (let i = 0; i < dst.length; i++) {
+    const a = dst[i], b = src[i]; if (a === b) continue;
+    dst[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
+  }
+}
+// tint the whole frame toward colour c by k (a calm dim, no dither)
+function tintAll(c, k) { if (k <= 0) return; for (let i = 0; i < buf.length; i++) buf[i] = mixc(buf[i], c, k); }
 function darken(lv, x0, y0, x1, y1, c) { // dithered dim overlay
   rect(x0 === undefined ? 0 : x0, y0 === undefined ? 0 : y0, x1 === undefined ? W : x1, y1 === undefined ? H : y1, c === undefined ? P.K0 : c, lv);
 }
@@ -356,16 +401,22 @@ function dissolve(a, b, k, out) {
   out = out || buf;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; out[i] = bay(x, y) < k ? b[i] : a[i]; }
 }
-// Mode-7-style affine blit (the SNES trick): sample src (sw x sh) rotated by ang about its centre,
-// scaled by k, into the screen buffer around (dx, dy). Nearest neighbour, no blending.
-function rotBlit(src, sw, sh, ang, k, dx, dy) {
-  const c = Math.cos(ang), s = Math.sin(ang), hx = sw / 2, hy = sh / 2;
-  for (let y = 0; y < H; y++) {
-    const ry = y + 0.5 - dy;
-    for (let x = 0; x < W; x++) {
-      const rx = x + 0.5 - dx;
-      const iu = Math.floor((rx * c + ry * s) / k + hx), iv = Math.floor((-rx * s + ry * c) / k + hy);
-      if (iu >= 0 && iv >= 0 && iu < sw && iv < sh) buf[y * W + x] = src[iv * sw + iu];
-    }
+
+
+// draw fn at opacity lv (a smooth see-through / fade); TMP2 keeps the pixels underneath
+function withDither(lv, fn) {
+  if (lv >= 1) { fn(); return; }
+  if (lv <= 0) return;
+  TMP2.set(buf);
+  fn();
+  const ki = Math.round(lv * 256), kj = 256 - ki;
+  for (let i = 0; i < buf.length; i++) {
+    const a = TMP2[i], b = buf[i]; if (a === b) continue;
+    buf[i] = (0xff000000 | (((((a >>> 16) & 255) * kj + ((b >>> 16) & 255) * ki) >> 8) << 16) | (((((a >>> 8) & 255) * kj + ((b >>> 8) & 255) * ki) >> 8) << 8) | ((((a & 255) * kj + (b & 255) * ki) >> 8))) >>> 0;
   }
+}
+// a translucent box (for labels over busy pictures)
+function tintRect(x0, y0, x1, y1, c, k) {
+  const a = Math.max(0, Math.round(x0)), b = Math.min(W, Math.round(x1)), p = Math.max(0, Math.round(y0)), q = Math.min(H, Math.round(y1));
+  for (let y = p; y < q; y++) for (let x = a; x < b; x++) { const i = y * W + x; buf[i] = mixc(buf[i], c, k); }
 }

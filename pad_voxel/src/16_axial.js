@@ -29,7 +29,7 @@ function axialSample(x, y) {
 function drawAxial(x0, y0, size, k) {
   if (k <= 0) return;
   const s = Math.round(size * (k < 1 ? Math.max(0.15, Math.floor(k * 4) / 4) : 1)), xa = Math.round(x0 + (size - s) / 2), ya = Math.round(y0 + (size - s) / 2);
-  rect(xa - 4, ya - 4, xa + s + 4, ya + s + 4, P.SH); rect(xa - 3, ya - 3, xa + s + 3, ya + s + 3, P.N4); rect(xa - 2, ya - 2, xa + s + 2, ya + s + 2, P.K0);
+  rect(xa - 3, ya - 3, xa + s + 3, ya + s + 3, P.SH); rect(xa - 2, ya - 2, xa + s + 2, ya + s + 2, P.N4); rect(xa - 1, ya - 1, xa + s + 1, ya + s + 1, P.K0);
   if (k < 1) return;
   const mm = 32 / s;
   for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) pset(xa + i, ya + j, axialSample((i + 0.5) * mm - 16, (j + 0.5) * mm - 16));

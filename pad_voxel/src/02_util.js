@@ -1,12 +1,13 @@
 'use strict';
 // ============================================================================
-// Shared helpers: noise, splines, wobble, pops, seeded RNG, 3-vectors.
+// Shared helpers: noise, splines, wobble, pops, IK, vectors.
 // Colour code (fixed for the whole film; colours are educational conventions):
-// deep navy ground; cyan normal artery walls (they do not mean venous blood);
-// yellow-orange wall-based plaque; opaque white calcium; muted red blood cells;
-// white-blue illustrative contrast (it does not glow in the body); red-orange
-// disease highlights; muted muscle with an orange overlay for the working,
-// painful muscle; grayscale for CTA images.
+// deep navy ground; arteries red (the wall), blood dark red, veins and the
+// right heart steel blue; contrast a white-blue teaching colour inside the
+// blood (it does not glow); plaque yellow-orange inside the wall; calcium
+// opaque white with a dark rim; the occluded segment orange-brown; muscle
+// red-brown, orange where it works and hurts; bone ivory; CTA images in
+// ivory-grey; the scanner white with dark machinery.
 // ============================================================================
 // 2-D value noise in [0,1)
 function vn2(x, y, s) {
@@ -33,7 +34,7 @@ function spline(pts, n, closed) {
   if (!closed) out.push(pts[2 * (m - 1)], pts[2 * (m - 1) + 1]);
   return out;
 }
-// periodic wobble: every environmental motion repeats exactly every 63 s (seamless loop)
+// periodic wobble (period = the film's length)
 const LOOPW = k => TAU * k / DUR;
 function wob(t, k, ph) { return Math.sin(LOOPW(k) * t + ph); }
 // UI switch (renders a scene without its captions)
@@ -56,6 +57,7 @@ const mul3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm3 = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 // seeded RNG (deterministic paths)
 function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function gaussR(r) { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }

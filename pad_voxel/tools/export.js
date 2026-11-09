@@ -1,7 +1,7 @@
 'use strict';
-// Export. The picture is rendered ONCE per frame: each of the 3780 frames of the 540x960 voxel canvas is drawn
+// Export. The picture is rendered ONCE per frame: each of the 3780 frames of the 360x640 pixel canvas is drawn
 // without text (the clean version), copied, and then the text layer is drawn on top (the labeled version);
-// both streams go to ffmpeg, scaled exactly 2x nearest-neighbour to 1080x1920 @ 60 fps, H.264 yuv420p BT.709.
+// both streams go to ffmpeg, scaled exactly 3x nearest-neighbour to 1080x1920 @ 60 fps, H.264 yuv420p BT.709.
 // The soundtrack is synthesised in three renders (full mix, music only, SFX only) and mastered with one common
 // gain (-22 LUFS full mix: room for a voice-over), then every variant is muxed:
 //

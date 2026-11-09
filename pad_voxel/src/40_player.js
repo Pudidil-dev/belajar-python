@@ -1,6 +1,6 @@
 'use strict';
 // ============================================================================
-// PLAYER: 540x960 canvas shown with nearest-neighbour scaling, controls
+// PLAYER: 360x640 canvas shown with nearest-neighbour scaling, controls
 // outside the composition. Audio starts on the first user gesture; the audio
 // clock drives the picture, so pause / resume / seek never duplicate sounds.
 // ============================================================================

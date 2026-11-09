@@ -1,9 +1,9 @@
 'use strict';
 // ============================================================================
-// SDF MODELLING: organic shapes (brain lobes and gyri, the heart, lungs, head,
-// the body under its sheet, the gantry housing) are written as signed
-// distance functions — smooth unions of ellipsoids, capsules and boxes, with
-// carved fissures and surface folds — and turned into meshes by marching
+// SDF MODELLING (from the CTA film's engine): organic shapes (the patient's
+// body parts, the calf muscles, the heart and lungs, the body under its sheet,
+// the gantry housing) are written as signed distance functions — smooth unions
+// of ellipsoids, capsules and boxes — and turned into meshes by marching
 // tetrahedra. Normals come from the field's gradient, so shading is smooth.
 // ============================================================================
 // approximate ellipsoid distance (Quilez): centre (cx,cy,cz), radii (rx,ry,rz)
@@ -25,7 +25,7 @@ function sdB(x, y, z, cx, cy, cz, hx, hy, hz, r) {
 }
 function smin(a, b, k) { const h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1); return b + (a - b) * h - k * h * (1 - h); }
 function smax(a, b, k) { return -smin(-a, -b, k); }
-// smooth 3-D value noise in [-1, 1] (for folds and gyri)
+// smooth 3-D value noise in [-1, 1] (for surface folds)
 function vn3(x, y, z) {
   const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), fx = x - i, fy = y - j, fz = z - k;
   const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);

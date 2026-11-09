@@ -1,73 +1,62 @@
 'use strict';
 // ============================================================================
-// THE PATIENT (one middle-aged man; body mm). Rigid voxel parts on a small
-// skeleton, like a voxel game character: pelvis, torso, head, upper arms,
-// forearms with hands, thighs, shins, feet. Model space: forward +x, up +y,
-// the patient's RIGHT side +z (the camera sits on his right: the symptomatic
-// right leg is always the near leg). He is framed from the neck down; the face
-// is never shown. Grey-blue T-shirt, dark knee-length shorts, white socks,
-// grey trainers.
+// THE PATIENT (one middle-aged man; body mm), drawn like the CTA film: every
+// body part is a smooth mesh (marching tetrahedra over signed-distance
+// shapes) shaded with dithered palette ramps and soft rim light. The rig:
+// rigid parts on a small skeleton, a gait with heel strikes on the beat,
+// stance-foot locking, the calf-holding pose with two-bone IK. Model space:
+// forward +x, up +y, the patient's RIGHT side +z (the camera sits on his
+// right: the symptomatic right leg is always the near leg). He is framed from
+// the neck down; the face is never shown. Grey-blue T-shirt, dark knee-length
+// shorts, white socks, grey trainers.
 // ============================================================================
-const M_SKIN = mat('skin', ['#4A2C20', '#8A5A44', '#C08466', '#DDA383', '#F2C7A8'], { speck: 0.03 });
-const M_SHIRT = mat('shirt', ['#1D2B3A', '#2F4558', '#4A6680', '#6788A3', '#93B0C6'], { speck: 0.03 });
-const M_SHORTS = mat('shorts', ['#101418', '#1C232B', '#2C3540', '#3E4956', '#566270'], { speck: 0.03 });
-const M_SOCK = mat('sock', ['#6E747C', '#A9AFB6', '#D4D9DE', '#E9EDF0', '#FFFFFF']);
-const M_SHOE = mat('shoe', ['#22262C', '#3B4149', '#59616B', '#7A838E', '#A2ABB5'], { speck: 0.03 });
-const M_SOLE = mat('sole', ['#6C7076', '#A4A9AE', '#D2D6DA', '#E6E9EC', '#F6F7F8']);
-const M_HAIR = mat('hair', ['#121010', '#262120', '#3E3634', '#5A504C', '#7D726C']);
-const M_PAIN = mat('pain', ['#6A2106', '#B4400E', '#FF8A3D', '#FFB077', '#FFD9B8'], { ol: 0 });
-const M_FLOOR = mat('floor', ['#0A1522', '#0F1E2E', '#142638', '#192E43', '#1F3650'], { ol: 0 });
-const M_FLOOR2 = mat('floor2', ['#0B1625', '#112133', '#162A3E', '#1C3349', '#223C55'], { ol: 0 });
-const PVS = 7;                                    // body voxel size (mm)
+const RP = {
+  skin: [P.SK0, P.SK1, P.SK2, P.SK3, P.SK4],
+  shirt: ['#1A2633', '#2B4052', '#41607A', '#5F829E', '#8EAEC6'].map(hexc),
+  shorts: ['#0A0E12', '#151C24', '#222C37', '#33404D', '#485666'].map(hexc),
+  sock: ['#6E747C', '#A9AFB6', '#D4D9DE', '#F0F3F5'].map(hexc),
+  shoe: ['#1A1E24', '#2D333B', '#465059', '#66717D', '#8A95A1'].map(hexc),
+  sole: ['#8E949A', '#BEC3C8', '#E2E5E8', '#F6F7F8'].map(hexc),
+  hair: ['#120E14', '#21191F', '#33262A', '#4A3733'].map(hexc),
+  pain: [P.PA0, P.PA1, P.PA2, P.PA3, P.PA4],
+};
+const PVS = 6;                                    // meshing grid (mm)
 // ---------------------------------------------------------------- parts (local frames: joint at origin)
-function partGrid(x0, y0, z0, x1, y1, z1, fn) { const g = new VoxGrid(x0, y0, z0, x1, y1, z1, PVS); g.paint(x0, y0, z0, x1, y1, z1, fn); return g; }
 const PART = {};
+const keep = (f, y0, above) => (x, y, z) => Math.max(f(x, y, z), above ? y0 - y : y - y0);   // the part above (or below) y0
+const iso = (f, b, attr, h) => isoMesh(f, b[0], b[1], b[2], b[3], b[4], b[5], h || PVS, attr);
+const SD = {
+  pelvis: (x, y, z) => sdB(x, y, z, -4, 30, 0, 104, 110, 168, 40),
+  torso: (x, y, z) => { const belly = sdE(x, y, z, 8, 120, 0, 118, 150, 160), chest = sdE(x, y, z, 14, 300, 0, 112, 150, 182), sh = sdB(x, y, z, 0, 390, 0, 86, 50, 196, 46); return smin(smin(belly, chest, 40), sh, 50); },
+  head: (x, y, z) => Math.min(sdC(x, y, z, -4, 0, 0, 0, 90, 0, 54, 50), sdE(x, y, z, 6, 170, 0, 98, 118, 86)),
+  uarm: (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -300, 0, 52, 40),
+  farm: (x, y, z) => Math.min(sdC(x, y, z, 0, 0, 0, 0, -250, 0, 38, 28), sdB(x, y, z, 6, -320, 0, 16, 62, 40, 10), sdC(x, y, z, 18, -270, 22, 34, -330, 26, 11, 9)),
+  thigh: (x, y, z) => sdC(x, y, z, 6, 0, 0, 0, -440, 0, 90, 58),
+  shin: (x, y, z) => smin(sdC(x, y, z, 6, 0, 0, 4, -420, 0, 52, 30), sdE(x, y, z, -30, -130, 0, 50, 120, 48), 30),
+  foot: (x, y, z) => smin(sdE(x, y, z, -20, -40, 0, 60, 44, 48), sdE(x, y, z, 110, -52, 0, 104, 32, 50), 30),
+};
+// the calf (back of the shin) as a 0..1 attribute: where the working, painful muscle glows
+const calfAttr = (x, y, z) => clamp(-sdE(x, y, z, -44, -140, 0, 70, 118, 70) / 30, 0, 1);
+const hairAttr = (x, y, z) => (y > 185 || (x < -30 && y > 120)) && sdE(x, y, z, 6, 170, 0, 98, 118, 86) < 4 ? 1 : 0;
 function buildParts() {
-  // pelvis / shorts (origin: midpoint of the hip joints)
-  PART.pelvis = voxMesh(partGrid(-120, -110, -185, 120, 170, 185, (x, y, z) => sdB(x, y, z, -4, 30, 0, 104, 110, 168, 40) < 0 ? M_SHORTS : 0));
-  // torso (origin: lower back pivot, 140 above the hips)
-  PART.torso = voxMesh(partGrid(-140, -20, -215, 150, 470, 215, (x, y, z) => {
-    const belly = sdE(x, y, z, 8, 120, 0, 118, 150, 160), chest = sdE(x, y, z, 14, 300, 0, 112, 150, 182), sh = sdB(x, y, z, 0, 390, 0, 86, 50, 196, 46);
-    return smin(smin(belly, chest, 40), sh, 50) < 0 ? M_SHIRT : 0;
-  }));
-  // neck and head (origin: base of the neck); hair on the back and top, no face
-  PART.head = voxMesh(partGrid(-120, -20, -100, 130, 290, 100, (x, y, z) => {
-    const neck = sdC(x, y, z, -4, 0, 0, 0, 90, 0, 54, 50), head = sdE(x, y, z, 6, 170, 0, 98, 118, 86);
-    if (Math.min(neck, head) >= 0) return 0;
-    if (head < 0 && (y > 185 || (x < -30 && y > 120))) return M_HAIR;
-    return M_SKIN;
-  }));
-  // upper arm (origin: shoulder joint), sleeve to 150 below
-  PART.uarm = voxMesh(partGrid(-60, -320, -60, 60, 50, 60, (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -300, 0, 52, 40) < 0 ? (y > -160 ? M_SHIRT : M_SKIN) : 0));
-  // forearm + hand (origin: elbow)
-  PART.farm = voxMesh(partGrid(-50, -460, -50, 60, 40, 50, (x, y, z) => {
-    const fa = sdC(x, y, z, 0, 0, 0, 0, -250, 0, 38, 28), palm = sdB(x, y, z, 6, -320, 0, 16, 62, 40, 10), thumb = sdC(x, y, z, 18, -270, 22, 34, -330, 26, 11, 9);
-    return Math.min(fa, palm, thumb) < 0 ? M_SKIN : 0;
-  }));
-  // thigh (origin: hip joint): shorts to 300 below, then skin to the knee
-  PART.thigh = voxMesh(partGrid(-100, -460, -100, 110, 60, 100, (x, y, z) => {
-    const d = sdC(x, y, z, 6, 0, 0, 0, -440, 0, 90, 58);
-    if (d >= 0) return 0;
-    return y > -300 ? M_SHORTS : M_SKIN;
-  }));
-  // shin (origin: knee): calf belly behind (−x), white sock from the ankle up
-  PART.shin = voxMesh(partGrid(-110, -440, -80, 80, 40, 80, (x, y, z) => {
-    const bone = sdC(x, y, z, 6, 0, 0, 4, -420, 0, 52, 30), calf = sdE(x, y, z, -30, -130, 0, 50, 120, 48);
-    if (smin(bone, calf, 30) >= 0) return 0;
-    return y < -330 ? M_SOCK : M_SKIN;
-  }));
-  // the calf region of the shin skin (for the orange highlight)
-  PART.calf = voxMesh(partGrid(-110, -300, -80, 80, 0, 80, (x, y, z) => {
-    const bone = sdC(x, y, z, 6, 0, 0, 4, -420, 0, 52, 30), calf = sdE(x, y, z, -30, -130, 0, 50, 120, 48);
-    return smin(bone, calf, 30) < 0 && sdE(x, y, z, -44, -140, 0, 70, 118, 70) < 0 ? M_PAIN : 0;
-  }));
-  // foot (origin: ankle): trainer with a white sole
-  PART.foot = voxMesh(partGrid(-90, -90, -60, 220, 30, 60, (x, y, z) => {
-    const d = smin(sdE(x, y, z, -20, -40, 0, 60, 44, 48), sdE(x, y, z, 110, -52, 0, 104, 32, 50), 30);
-    if (d >= 0) return 0;
-    return y < -70 ? M_SOLE : M_SHOE;
-  }));
+  if (PART.pelvis) return;
+  PART.pelvis = iso(SD.pelvis, [-120, -110, -185, 120, 170, 185]);
+  PART.torso = iso(SD.torso, [-140, -20, -215, 150, 470, 215]);
+  PART.head = iso(SD.head, [-120, -20, -100, 130, 290, 100], hairAttr);
+  PART.sleeve = iso(keep(SD.uarm, -160, true), [-60, -320, -60, 60, 50, 60]);
+  PART.uarmSkin = iso(keep(SD.uarm, -160, false), [-60, -320, -60, 60, 50, 60]);
+  PART.farm = iso(SD.farm, [-50, -460, -50, 60, 40, 50]);
+  PART.thighShorts = iso(keep(SD.thigh, -300, true), [-100, -460, -100, 110, 60, 100]);
+  PART.thighSkin = iso(keep(SD.thigh, -300, false), [-100, -460, -100, 110, 60, 100]);
+  PART.shinSkin = iso(keep(SD.shin, -330, true), [-110, -440, -80, 80, 40, 80], calfAttr);
+  PART.sock = iso(keep(SD.shin, -330, false), [-110, -440, -80, 80, 40, 80]);
+  PART.shoe = iso(keep(SD.foot, -70, true), [-90, -90, -60, 220, 30, 60]);
+  PART.sole = iso(keep(SD.foot, -70, false), [-90, -90, -60, 220, 30, 60]);
 }
+// which meshes make each rig part, and their materials
+const PART_MESH = { pelvis: [['pelvis', 'shorts']], torso: [['torso', 'shirt']], head: [['head', 'skin']], uarm: [['sleeve', 'shirt'], ['uarmSkin', 'skin']], farm: [['farm', 'skin']],
+  thigh: [['thighShorts', 'shorts'], ['thighSkin', 'skin']], shin: [['shinSkin', 'skin'], ['sock', 'sock']], foot: [['shoe', 'shoe'], ['sole', 'sole']] };
+const OL = { skin: P.SK0, shirt: hexc('#0E1620'), shorts: hexc('#04070A'), sock: hexc('#4A5058'), shoe: hexc('#0C0F12'), sole: hexc('#5A6066') };
 // ---------------------------------------------------------------- the gait (heel strikes on the beat)
 // right heel strikes at 0.0, 1.5, 3.0, 4.5 s; left at 0.75, 2.25, 3.75 s → one step per beat
 const STEPS = [0, 0.75, 1.5, 2.25, 3.0, 3.75, 4.5];
@@ -149,28 +138,47 @@ function patientPose(P0, facing, q) {
   } else out.push(['uarm', armR.ua], ['farm', armR.fa], ['uarm', armL.ua], ['farm', armL.fa]);
   return { parts: out, right, left };
 }
-// draw the patient; o: {pain (0..1 orange calf), alpha, skipParts (names), skipXf (part matrices, e.g. pose.right.sh)}
+// draw the patient; o: {pain (0..1: the calf glows orange), alpha (screen door), glassLeg (0..1: the right thigh and shin turn see-through),
+// skipParts (names), skipXf (part matrices, e.g. pose.right.sh), fog}
 function drawPatient(cam, pose, o) {
   o = o || {};
-  if (!PART.pelvis) buildParts();
+  buildParts();
+  const ids = {}; for (const k in OL) ids[k] = newId(OL[k]);
+  const glassXf = o.glassLeg > 0 ? [pose.right.th, pose.right.sh] : [];
   for (const [name, xf] of pose.parts) {
     if (o.skipParts && o.skipParts.includes(name)) continue;
     if (o.skipXf && o.skipXf.includes(xf)) continue;
-    drawVox(cam, PART[name], xf, { alpha: o.alpha });
+    for (const [mesh, mt] of PART_MESH[name]) {
+      const m = { ramp: RP[mt], id: ids[mt], amb: 0.32, dif: 0.68, rim: 0.26, fog: o.fog };
+      if (mt === 'skin') Object.assign(m, { spec: 0.12, cap: 0.86 });
+      if (mesh === 'head') m.mix = { ramp: RP.hair, f: a => a };
+      if (mesh === 'shinSkin' && o.pain > 0 && xf === pose.right.sh) m.mix = { ramp: RP.pain, f: a => a * o.pain };
+      if (o.alpha !== undefined && o.alpha < 1) { m.alpha = o.alpha; m.ao = 3; }
+      if (glassXf.includes(xf)) { const g = o.glassLeg; Object.assign(m, { id: 0, glass: [lerp(1, 0.1, g), lerp(1, 0.88, g), 1.7] }); }
+      drawMesh(cam, PART[mesh], m, xf);
+    }
   }
-  if (o.pain > 0) drawVox(cam, PART.calf, pose.right.sh, { alpha: o.pain, depthBias: 2e-6 });
 }
-// contact shadows under the feet (flat dark ellipses on the floor)
+// contact shadows under the feet (flat dark ellipses on the floor, drawn before the patient)
 function footShadows(cam, pose) {
   for (const s of [pose.right, pose.left]) {
     const p = mApply(s.ft, [60, -80, 0]), h = Math.max(0, p[1]);
-    const c = proj(cam, [p[0], 1, p[2]]); if (!c) continue;
-    const k = 1 - clamp(h / 120, 0, 0.8), rx = 150 * c[2] * cam.F * 0.012 * k + 10 * k;
-    ellipse(c[0], c[1], rx * 1.8, rx * 0.45, P.K0, 0.55 * k);
+    const c = project(cam, [p[0], 1, p[2]]); if (!c) continue;
+    const k = 1 - clamp(h / 120, 0, 0.8), rx = 160 * c[2] * cam.F * k;
+    for (let y = Math.floor(c[1] - rx * 0.3); y <= c[1] + rx * 0.3; y++) for (let x = Math.floor(c[0] - rx); x <= c[0] + rx; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H) continue; const dx = (x + 0.5 - c[0]) / rx, dy = (y + 0.5 - c[1]) / (rx * 0.3), q = dx * dx + dy * dy; if (q > 1) continue;
+      buf[y * W + x] = mixc(buf[y * W + x], P.K0, 0.55 * k * (1 - q));
+    }
   }
 }
-// the floor: big dark tiles (they give the walk its speed)
-const FLOOR = () => cached('floor', () => { const g = new VoxGrid(-2000, -20, -900, 7000, 0, 900, 50); g.paint(-2000, -20, -900, 7000, 0, 900, (x, y, z) => ((Math.floor(x / 300) + Math.floor(z / 300)) & 1) ? M_FLOOR : M_FLOOR2); return voxMesh(g); });
+// the floor: a large plane of dark tiles (they show the walking speed), procedural so the edges stay crisp at any distance
+const FLOOR_Q = [-2500, 7500, -1500, 1500];
+const FLOOR = () => cached('floor', () => { const [x0, x1, z0, z1] = FLOOR_Q; return quadMesh([x0, 0, z0], [x1 - x0, 0, 0], [0, 0, z1 - z0]); });
+const FLOOR_C = [hexc('#0E1A28'), hexc('#122133')];
+function drawFloor(cam, fog) {
+  const [x0, x1, z0, z1] = FLOOR_Q;
+  drawMesh(cam, FLOOR(), { ramp: [0], back: [0], unlit: true, id: 0, fog, pixFn: (u, v) => { const x = x0 + u * (x1 - x0), z = z0 + v * (z1 - z0); return FLOOR_C[(Math.floor(x / 320) + Math.floor(z / 320)) & 1]; } });
+}
 // ---------------------------------------------------------------- walking without foot slide
 // the root moves so the planted (lowest) foot stays still on the floor; precomputed once at 240 Hz
 function walkTable(phF, ampF, t0, t1) {

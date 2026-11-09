@@ -1,7 +1,9 @@
 'use strict';
 // ============================================================================
 // THE ARTERIAL TREE AND THE LESION MAP (world mm: y up from the floor, x toward
-// the patient's LEFT, z forward). Calibres are drawn 2.3x real so the small
+// the patient's LEFT, z forward), drawn as smooth tubes like the CTA film.
+// Calibres are drawn 2.3x real (3.9x in the whole-tree views, 4.6x in the
+// final comparison) so the small
 // arteries stay visible on a phone (a stated drawing convention).
 //   aorta → common iliac → internal + external iliac → common femoral →
 //   profunda femoris + superficial femoral (SFA) → popliteal (POP) →
@@ -15,7 +17,7 @@
 //       track) calcification of the tibial arteries; the PTA stays open
 // Left leg: milder disease (calcified tibials, one mild ATA stenosis).
 // ============================================================================
-const EXG = 2.3;
+const EXG = 2.3, HIPY_T = 920;
 const ART = {};                       // name → {pts:[[x,y,z,r]...], parent, at (arc length where it leaves the parent)}
 function art(name, pts, parent) { ART[name] = { name, pts: pts.map(p => [p[0], p[1], p[2], p[3] * EXG]), parent }; }
 function side(sx, tag, L) {           // sx = -1 right leg, +1 left leg (mirrored, then varied)
@@ -78,129 +80,167 @@ function lumenK(name, y) {
 }
 // collateral calibre growth (0 = thin pre-existing channel, 1 = enlarged)
 const isGen = n => /GEN/.test(n);
-// ---------------------------------------------------------------- materials
-const M_WALL = mat('wall', ['#0B3442', '#17627A', '#2E97B4', '#46C6E6', '#9AE6F6'], { speck: 0.08 });
-const M_WALLG = mat('wallGhost', ['#0B3442', '#17627A', '#2E97B4', '#46C6E6', '#9AE6F6'], { ol: 0 });
-const M_PLQ = mat('plaque', ['#5A3208', '#A0600E', '#E08A1F', '#F0A93B', '#FFD27A'], { speck: 0.2 });
-const M_CAL = mat('calcium', ['#7D858F', '#B8C0C8', '#DCE2E8', '#F2F4F6', '#FFFFFF'], { speck: 0.1 });
-const M_OCC = mat('occlusion', ['#3A1A08', '#6E3410', '#A85418', '#D9782A', '#F0A060'], { speck: 0.25 });
-const M_BLD = mat('lumenBlood', ['#3A0C14', '#6A1824', '#A8323E', '#C9505A', '#E07E86']);
-const M_CON = mat('contrast', ['#4A7FA6', '#8DBBDC', '#CDEBFF', '#E8F6FF', '#FFFFFF']);
-const M_HOT = mat('diseaseHi', ['#5A1408', '#A3260E', '#E4572E', '#FF8A5C', '#FFC2A6']);
-// CTA grayscale (lumen with contrast, calcium brightest, bone mid grey)
-const M_CTL = mat('ctaLumen', ['#5C5C5C', '#8E8E8E', '#BDBDBD', '#D9D9D9', '#EFEFEF']);
-const M_CTC = mat('ctaCalcium', ['#9A9A9A', '#D0D0D0', '#F4F4F4', '#FFFFFF', '#FFFFFF'], { olc: '#202020' });
-const M_BONE = mat('bone', ['#1E2730', '#3B4652', '#5E6976', '#808A96', '#A6AFB8'], { speck: 0.12 });
-const M_CTB = mat('ctaBone', ['#202020', '#3A3A3A', '#565656', '#727272', '#909090'], { speck: 0.12 });
-// ---------------------------------------------------------------- building the grids
-// opts.normal: the teaching model (no lesions); opts.legs: ['R'] / ['L'] / ['R','L']; opts.aorta; opts.rk: extra calibre factor
-function buildTree(o) {
-  o = o || {};
-  const vs = o.vs || 2, legs = o.legs || ['R', 'L'], RK = o.rk || 1;
-  const xmin = legs.includes('R') ? -135 : -20, xmax = legs.includes('L') ? 135 : 20;
-  const wall = new VoxGrid(xmin, 0, -100, xmax, o.aorta === false ? 940 : 1190, 160, vs);
-  const lum = new VoxGrid(xmin, 0, -100, xmax, o.aorta === false ? 940 : 1190, 160, vs);
-  lum.aux = new Float32Array(lum.d.length).fill(-1);
+// ---------------------------------------------------------------- ramps
+const RT = {
+  wall: [hexc('#2A1020'), hexc('#561C2C'), hexc('#8E3038'), P.AR3, hexc('#F0A48C')],
+  blood: [P.BL0, P.BL1, P.BL2, P.BL3, P.AR2],
+  con: [P.CO0, P.CO1, P.CO2, P.CO3, P.CO4],
+  plq: [P.PL0, P.PL1, P.PL2, P.PL3, P.PL4],
+  occ: [P.OC0, P.OC1, P.OC2, P.OC3, P.OC4],
+  cal: [P.CA1, P.CA2, P.CA3, P.CA4],
+  hot: [hexc('#5A1408'), hexc('#A3260E'), hexc('#E4572E'), hexc('#FF8A5C'), hexc('#FFC2A6')],
+  vr: [hexc('#24282E'), hexc('#4E5458'), hexc('#868A88'), hexc('#BEBCB0'), hexc('#F4F1E6')],
+  bone: [P.BO0, P.BO1, P.BO2, P.BO3],
+  ghost: [hexc('#141F2C'), hexc('#1C2C3E'), hexc('#263C52'), hexc('#324E68'), hexc('#42627E')],
+};
+// ---------------------------------------------------------------- sampling a vessel (Catmull-Rom), with radius and arrival distance
+function vesselSamples(a, step) {
+  const c = a.pts, n = c.length, out = [];
+  for (let i = 0; i + 1 < n; i++) {
+    const p0 = c[Math.max(0, i - 1)], p1 = c[i], p2 = c[i + 1], p3 = c[Math.min(n - 1, i + 2)];
+    const L = Math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]), m = Math.max(1, Math.ceil(L / (step || 3)));
+    for (let k = 0; k < m; k++) {
+      const t = k / m, t2 = t * t, t3 = t2 * t, q = [];
+      for (let d = 0; d < 3; d++) q.push(0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t3));
+      q.push(lerp(p1[3], p2[3], t), a.s0 + a.cum[i] + t * L); out.push(q);
+    }
+  }
+  const e = c[n - 1]; out.push([e[0], e[1], e[2], e[3], a.s0 + a.cum[n - 1]]);
+  return out;
+}
+// per-sample lesion state for this patient's map (normal: the teaching model)
+function lesionAt(name, y, normal) {
+  if (normal) return { k: 1, occ: false };
+  if (name === 'RPOP' && y < LES.L2.y0 && y > LES.L2.y1) return { k: 0, occ: true };
+  return { k: lumenK(name, y), occ: false };
+}
+const ECC = norm3([-0.6, 0, 0.8]);
+// the arrival distance of the contrast at a sample (the popliteal below the block and the collaterals fill later)
+function arrivalAt(name, q, normal) { let s = q[4] + (isGen(name) ? 140 : 0); if (!normal && name[0] === 'R' && q[1] < LES.L2.y1 + 2 && !/CIA|IIA|EIA|CFA|PFA|SFA/.test(name)) s += 160; return s; }
+// ---------------------------------------------------------------- the tree meshes. o: {legs: ['R','L'], aorta, normal, rk}
+function buildTreeMeshes(o) {
+  const legs = o.legs || ['R', 'L'], RK = o.rk || 1, normal = !!o.normal;
+  const W_ = new MB(), LU = new MB(), PQ = new MB(), OC = new MB(), CA = new MB();
   for (const k in ART) {
     const a = ART[k], tag = k[0];
-    if (k !== 'AO' && !legs.includes(tag)) continue;
-    if (k === 'AO' && o.aorta === false) continue;
-    const name = k, gen = isGen(name), occl = !o.normal && name === 'RPOP';
-    const lr = y => o.normal ? 1 : lumenK(name, y);
-    // the eccentric L1 plaque pushes the channel toward the front-outer side
-    const ecc = (y, r, k) => (!o.normal && name === 'RSFA' && Math.abs(y - LES.L1.yc) < 40) ? (1 - k) * 0.42 * r : 0;
-    const EC = norm3([-0.6, 0, 0.8]);
-    // collaterals: thin pre-existing channels; on the right leg they enlarge (collat 0..1) around the block
-    const gk = gen ? ((!o.normal && tag === 'R') ? (o.collat === undefined ? 1 : o.collat) : 0) : 1;
-    const calib = p => (gen ? p * lerp(0.55, 1, gk) : p) * RK;
-    const pts = a.pts.map(p => [p[0], p[1], p[2], calib(p[3])]);
-    wall.tube(pts, (s, x, y, z, d, r, cur, dx, dy, dz) => {
-      if (cur && cur !== M_WALL) return 0;
-      if (occl && y < LES.L2.y0 && y > LES.L2.y1) return d > r * 0.72 ? M_WALL : (hash3(Math.round(x / 2), Math.round(y / 2), Math.round(z / 2)) < 0.14 ? M_CAL : M_OCC);
-      if (d > r * 0.72) {                                                 // the wall itself (media / adventitia)
-        if (!o.normal && MEDCAL[name] && y > MEDCAL[name][0] && y < MEDCAL[name][1] && (Math.floor(y / 6) % 3 === 0) && hash3(Math.round(x), Math.round(y / 3), Math.round(z)) < 0.55) return M_CAL;   // medial calcification: its own layer
-        return M_WALL;
+    if (k === 'AO' ? o.aorta === false : !legs.includes(tag)) continue;
+    const gen = isGen(k), gk = gen ? (!normal && tag === 'R' ? 1 : 0.55) : 1;
+    const S = vesselSamples(a, 3), n = S.length, sides = a.pts[0][3] * RK > 6 ? 14 : 10;
+    const r = i => S[i][3] * gk * RK, st = S.map(q => lesionAt(k, q[1], normal));
+    // the wall (outer surface; the lesions narrow the channel inside it, not the wall)
+    tubeInto(W_, S.map(q => q.slice(0, 3)), i => r(i), i => arrivalAt(k, S[i], normal), sides, false);
+    ellipsoidInto(W_, S[0].slice(0, 3), r(0), r(0), r(0), sides, 6, null, () => arrivalAt(k, S[0], normal));
+    // the open channel in runs (it stops at the occlusion), shifted toward one side where L1's plaque is eccentric
+    let i = 0;
+    while (i < n) {
+      if (st[i].occ) { i++; continue; }
+      let j = i; while (j + 1 < n && !st[j + 1].occ) j++;
+      if (j > i) {
+        const P_ = [], R_ = [];
+        for (let q = i; q <= j; q++) { const kk = st[q].k, ri = r(q) * 0.74, e = (!normal && k === 'RSFA') ? (1 - kk) * 0.42 * ri : 0; P_.push(add3(S[q].slice(0, 3), mul3(ECC, e))); R_.push(Math.max(0.35, ri * kk)); }
+        tubeInto(LU, P_, q => R_[q], q => arrivalAt(k, S[i + q], normal), sides, true);
       }
-      const k = lr(y); if (k >= 0.98) return 0;
-      const e = ecc(y, r * 0.74, k), qx = dx - EC[0] * e, qy = dy - EC[1] * e, qz = dz - EC[2] * e, dq = Math.sqrt(qx * qx + qy * qy + qz * qz);
-      if (dq <= r * 0.74 * k) return 0;                                   // the open channel
-      const cal = hash3(Math.round(x / 2), Math.round(y / 2), Math.round(z / 2)) < (name === 'RSFA' ? 0.26 : 0.1) && d > r * 0.45;
-      return cal ? M_CAL : M_PLQ;                                         // plaque (with calcium) inside the wall
-    });
-    // lumen column (separate grid so it can show through a see-through wall); aux = arc length from the aorta
-    const lumPts = a.pts.map(p => [p[0], p[1], p[2], calib(p[3]) * 0.74]);
-    lum.tube(lumPts, (s, x, y, z, d, r, cur, dx, dy, dz) => {
-      const k = lr(y); if (k <= 0.001) return 0;
-      const e = ecc(y, r, k), qx = dx - EC[0] * e, qy = dy - EC[1] * e, qz = dz - EC[2] * e;
-      if (Math.sqrt(qx * qx + qy * qy + qz * qz) > r * k) return 0;
-      const seg = Math.floor(s), h = s - seg, arc = a.s0 + lerp(a.cum[seg], a.cum[Math.min(seg + 1, a.cum.length - 1)], h);
-      const i = Math.floor((x - lum.ox) / lum.vs), j = Math.floor((y - lum.oy) / lum.vs), kk = Math.floor((z - lum.oz) / lum.vs), id = lum.idx(i, j, kk);
-      const v = arc + (gen ? 140 : 0);
-      if (lum.aux[id] < 0 || v < lum.aux[id]) lum.aux[id] = v;
-      return M_BLD;
-    }, Math.max(...a.pts.map(p => p[3])) * 0.3);
+      i = j + 1;
+    }
+    if (normal) continue;
+    // plaque: a sleeve between the narrowed channel and the wall (drawn see-through so the channel shows inside it)
+    i = 0;
+    while (i < n) {
+      if (st[i].k > 0.97 || st[i].occ) { i++; continue; }
+      let j = i; while (j + 1 < n && st[j + 1].k <= 0.97 && !st[j + 1].occ) j++;
+      if (j > i) tubeInto(PQ, S.slice(i, j + 1).map(q => q.slice(0, 3)), q => r(i + q) * 0.78, null, sides, true);
+      i = j + 1;
+    }
+    // the occluded segment: solid, orange-brown, inside the intact wall
+    const oi = []; st.forEach((s_, q) => { if (s_.occ) oi.push(q); });
+    if (oi.length > 1) tubeInto(OC, S.slice(oi[0], oi[oi.length - 1] + 1).map(q => q.slice(0, 3)), q => r(oi[0] + q) * 0.8, null, sides, true);
+    // calcium: opaque white nodules — rail-track rows in the media of the tibial arteries, clusters in L1 and in the block
+    const T = (q) => norm3(sub3(S[Math.min(n - 1, q + 1)].slice(0, 3), S[Math.max(0, q - 1)].slice(0, 3)));
+    for (let q = 0; q < n; q++) {
+      const y = S[q][1], med = MEDCAL[k] && y > MEDCAL[k][0] && y < MEDCAL[k][1] && Math.floor(y / 7) % 2 === 0;
+      const l1 = k === 'RSFA' && Math.abs(y - LES.L1.yc) < 26 && hash2(q, 7) < 0.45, l2 = st[q].occ && hash2(q, 11) < 0.25;
+      if (!med && !l1 && !l2) continue;
+      const t_ = T(q), nn = norm3(cross3(t_, [0, 0, 1])), bb = cross3(t_, nn), rr = r(q);
+      const ang = med ? [0, Math.PI] : [hash2(q, 3) * TAU];
+      for (const an of ang) {
+        const dir = add3(mul3(nn, Math.cos(an)), mul3(bb, Math.sin(an))), rad = med ? rr * 0.22 : rr * (0.2 + 0.1 * hash2(q, 5));
+        const c = add3(S[q].slice(0, 3), mul3(dir, (l2 ? 0.45 : 0.86) * rr));
+        ellipsoidInto(CA, c, rad, rad * 0.8, rad, 8, 5, null, () => 0);
+      }
+    }
   }
-  // the popliteal below the occlusion is refilled by the collaterals: its arrival distance is via them
-  if (!o.normal) for (let id = 0; id < lum.d.length; id++) {
-    if (!lum.d[id]) continue;
-    const j = Math.floor(id / lum.nx) % lum.ny, y = lum.oy + (j + 0.5) * lum.vs, i = id % lum.nx, x = lum.ox + (i + 0.5) * lum.vs;
-    if (x < 0 && y < LES.L2.y1 + 2 && y > 20) lum.aux[id] += 160;          // right leg, distal to the block: later (via collaterals)
+  const fin = mb => { const m = mb.build(); return m.nv ? computeNormals(m) : null; };
+  return { wall: fin(W_), lum: fin(LU), plq: fin(PQ), occ: fin(OC), cal: fin(CA) };
+}
+// whole-tree views draw the calibres 1.7x more again (3.9x real; the two-tree comparison 2x, 4.6x real) so the tibial arteries stay readable on a phone
+const TREE_RK = 1.7, CMP_RK = 2.0;
+const TREE = () => cached('tree', () => buildTreeMeshes({ rk: TREE_RK }));
+const TREE_N = () => cached('treeN', () => buildTreeMeshes({ normal: true, legs: ['R'], aorta: false, rk: CMP_RK }));
+const TREE_R = () => cached('treeR', () => buildTreeMeshes({ legs: ['R'], aorta: false, rk: CMP_RK }));
+const TREE_NN = () => cached('treeNN', () => buildTreeMeshes({ normal: true, rk: TREE_RK }));
+// ---------------------------------------------------------------- drawing the tree
+// explanatory look: a red see-through wall, the channel as a column (blood red, white-blue behind the contrast front),
+// the plaque a see-through yellow sleeve, the block orange-brown, calcium white; o: {xf, front, hot: [{y0,y1,k}], fog, wallGlass}
+function drawTreeExpl(cam, T, o) {
+  o = o || {};
+  const front = o.front === undefined ? 1e9 : o.front, xf = o.xf, fog = o.fog;
+  const lumId = newId(P.BL0);
+  if (T.lum) drawMesh(cam, T.lum, { ramp: RT.blood, id: lumId, amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.5, mix: { ramp: RT.con, f: a => smooth(clamp((front - a) / 60, 0, 1)) }, fog }, xf);
+  if (T.occ) drawMesh(cam, T.occ, { ramp: RT.occ, id: newId(P.OC0), amb: 0.3, dif: 0.7, rim: 0.25, fog, mix: o.hot && o.hot[1] ? { ramp: RT.hot, f: () => o.hot[1].k } : undefined }, xf);
+  if (T.cal) drawMesh(cam, T.cal, { ramp: RT.cal, id: newId(P.CA0), amb: 0.45, dif: 0.6, rim: 0.2, spec: 0.4, fog }, xf);
+  if (T.plq) {
+    const hl = o.hot && o.hot[0] ? o.hot[0].k : 0;
+    drawMesh(cam, T.plq, { ramp: RT.plq, id: 0, glass: [0.18, 0.9, 1.4], amb: 0.35, dif: 0.6, fog, mix: hl ? { ramp: RT.hot, f: () => hl } : undefined, clipFn: hl ? null : undefined }, xf);
   }
-  return { wall, lum };
+  if (T.wall) drawMesh(cam, T.wall, { ramp: RT.wall, id: 0, glass: o.wallGlass || [0.0, 0.6, 2.8], amb: 0.3, dif: 0.65, rim: 0.35, spec: 0.3, fog }, xf);
 }
-// mesh with the arrival distance per face (lumen) so the contrast front can be drawn
-function meshWithArc(g) {
-  const M = voxMesh(g); if (!g.aux) return M;
-  const fk = new Float32Array(M.nf);
-  for (let q = 0; q < M.nf; q++) {
-    const x = M.fc[3 * q], y = M.fc[3 * q + 1], z = M.fc[3 * q + 2], d = M.fd[q], dv = DIRV[d];
-    const i = Math.floor((x - dv[0] * 0.25 * g.vs - g.ox) / g.vs), j = Math.floor((y - dv[1] * 0.25 * g.vs - g.oy) / g.vs), k = Math.floor((z - dv[2] * 0.25 * g.vs - g.oz) / g.vs);
-    fk[q] = g.aux[g.idx(clamp(i, 0, g.nx - 1), clamp(j, 0, g.ny - 1), clamp(k, 0, g.nz - 1))];
-  }
-  M.fk = fk; return M;
+// CTA look: the contrast-filled channel in ivory (a volume rendering), calcium brighter white with a dark rim; no wall, no soft plaque
+function drawTreeCTA(cam, T, o) {
+  o = o || {};
+  if (T.lum) drawMesh(cam, T.lum, { ramp: RT.vr, id: newId(P.G1), amb: 0.24, dif: 0.62, rim: 0.4, spec: 0.5, fog: o.fog }, o.xf);
+  if (T.cal) drawMesh(cam, T.cal, { ramp: [P.CA2, P.CA3, P.CA4, P.CA4], id: newId(hexc('#101010')), amb: 0.6, dif: 0.5, spec: 0.3, fog: o.fog }, o.xf);
 }
-// meshes: wall shell (faces wherever a wall cube meets anything that is not wall), the disease inside it
-// (plaque, calcium, occlusion: faces toward the lumen space and toward the wall), and the lumen cast
-function treeMeshes(t) {
-  return {
-    wall: voxMesh(t.wall, { emit: m => m === M_WALL, solidFn: m => m === M_WALL }),
-    wallAll: voxMesh(t.wall),
-    inner: voxMesh(t.wall, { emit: m => m !== M_WALL, solidFn: m => m !== M_WALL && m > 0 }),
-    lum: meshWithArc(t.lum),
-  };
-}
-// whole-tree views draw the calibres 1.5x more again (3.45x real) so the tibial arteries stay readable on a phone
-const TREE_RK = 1.5;
-const TREE = () => cached('tree', () => treeMeshes(buildTree({ rk: TREE_RK })));
-const TREE_N = () => cached('treeN', () => treeMeshes(buildTree({ normal: true, legs: ['R'], aorta: false, rk: TREE_RK })));
-const TREE_R = () => cached('treeR', () => treeMeshes(buildTree({ legs: ['R'], aorta: false, rk: TREE_RK })));
-// ---------------------------------------------------------------- bones (for the CTA display and the leg)
-function buildBones(vs) {
-  const g = new VoxGrid(-150, 0, -110, 150, 1080, 170, vs || 4);
+// ---------------------------------------------------------------- bones (ivory): femur, tibia, fibula, patella, foot, pelvis
+function buildBonesMesh() {
+  const mb = new MB();
   for (const sx of [-1, 1]) {
-    const X = x => x * -sx;
-    g.tube([[X(-92), 868, -12, 22], [X(-104), 840, -10, 15], [X(-86), 800, -6, 15], [X(-70), 600, 0, 13], [X(-68), 520, 0, 16], [X(-72), 492, 2, 24]], M_BONE);     // femur
-    g.paint(X(-92) - 26, 846, -36, X(-92) + 26, 892, 14, (x, y, z) => Math.hypot(x - X(-92), y - 868, z + 12) < 24 ? M_BONE : 0);                                     // femoral head
-    g.tube([[X(-74), 470, 0, 25], [X(-72), 440, 4, 20], [X(-70), 330, 8, 13], [X(-68), 120, 8, 11], [X(-64), 82, 10, 16]], M_BONE);                                     // tibia
-    g.tube([[X(-104), 452, -10, 8], [X(-104), 400, -12, 6], [X(-106), 200, -12, 5], [X(-108), 82, -8, 9]], M_BONE);                                                     // fibula
-    g.paint(X(-74) - 14, 485, 26, X(-74) + 14, 525, 46, (x, y, z) => sdE(x, y, z, X(-74), 505, 36, 13, 18, 8) < 0 ? M_BONE : 0);                                          // patella
-    g.paint(X(-70) - 40, 0, -50, X(-70) + 40, 80, 175, (x, y, z) => {                                                                                                     // foot: heel, arch, metatarsal rays
-      const heel = sdE(x, y, z, X(-68), 34, -18, 20, 26, 26), arch = sdC(x, y, z, X(-68), 46, 0, X(-72), 26, 96, 18, 13);
-      let rays = 1e9; for (let r = 0; r < 4; r++) rays = Math.min(rays, sdC(x, y, z, X(-70) + (r - 1.5) * 9 * (sx < 0 ? -1 : 1), 24, 92, X(-70) + (r - 1.5) * 11 * (sx < 0 ? -1 : 1), 10, 158, 4.5, 3.5));
-      return Math.min(heel, arch, rays) < 0 ? M_BONE : 0;
-    });
+    const X = p => [p[0] * -sx, p[1], p[2], p[3]];
+    const tube = ctrl => { const c = ctrl.map(X), pts = smoothPath(c.map(q => q.slice(0, 3)), 6), L = pts.length - 1; tubeInto(mb, pts, (i, u) => { const f = u * (c.length - 1), j = Math.min(c.length - 2, Math.floor(f)); return lerp(c[j][3], c[j + 1][3], f - j); }, null, 12, true); };
+    tube([[-92, 868, -12, 20], [-104, 840, -10, 14], [-86, 800, -6, 14], [-70, 600, 0, 12], [-68, 520, 0, 15], [-72, 492, 2, 22]]);                 // femur
+    ellipsoidInto(mb, [92 * sx, 868, -12], 24, 24, 24, 12, 8);                                                                                     // femoral head
+    tube([[-74, 470, 0, 23], [-72, 440, 4, 18], [-70, 330, 8, 12], [-68, 120, 8, 10], [-64, 82, 10, 15]]);                                           // tibia
+    tube([[-104, 452, -10, 7], [-104, 400, -12, 5.5], [-106, 200, -12, 4.5], [-108, 82, -8, 8]]);                                                    // fibula
+    ellipsoidInto(mb, [74 * sx, 505, 36], 13, 18, 8, 10, 7);                                                                                       // patella
+    ellipsoidInto(mb, [68 * sx, 34, -18], 20, 24, 24, 10, 7);                                                                                      // heel
+    for (let r = 0; r < 4; r++) tube([[-70 + (r - 1.5) * 9, 30, 70, 5], [-70 + (r - 1.5) * 11, 10, 158, 3.5]]);                                       // metatarsal rays
   }
-  // pelvis: two curved iliac blades, the sacrum, the acetabular rims and the pubic / ischial rami around the obturator openings
-  g.paint(-150, 820, -110, 150, 1040, 70, (x, y, z) => {
-    const ax = Math.abs(x);
-    const bladeOuter = sdE(ax, y, z, 54, 978, -30, 50, 60, 50), bladeInner = sdE(ax, y, z, 52, 982, -26, 43, 54, 43);
-    const blade = Math.max(bladeOuter, -bladeInner, -(y - 912), -(ax - 44), z - 22);             // the flaring lateral wall of the bowl (iliac blade)
-    const acet = Math.max(sdE(ax, y, z, 90, 868, -12, 30, 30, 30), -sdE(ax, y, z, 92, 868, -6, 24, 24, 26));   // cup around the femoral head
+  const pel = (x, y, z) => {
+    const ax = Math.abs(x), bladeOuter = sdE(ax, y, z, 54, 978, -30, 50, 60, 50), bladeInner = sdE(ax, y, z, 52, 982, -26, 43, 54, 43);
+    const blade = Math.max(bladeOuter, -bladeInner, -(y - 912), -(ax - 44), z - 22);
+    const acet = Math.max(sdE(ax, y, z, 90, 868, -12, 30, 30, 30), -sdE(ax, y, z, 92, 868, -6, 24, 24, 26));
     const ramus = Math.max(sdE(ax, y, z, 50, 852, 10, 40, 30, 18), -sdE(ax, y, z, 52, 852, 10, 22, 16, 30), -(y - 822));
-    const sacrum = sdE(x, y, z, 0, 935, -82, 34, 70, 18);
-    const d = Math.min(blade, acet, ramus, sacrum);
-    return d < 0 ? M_BONE : 0;
-  });
-  return g;
+    return Math.min(blade, acet, ramus, sdE(x, y, z, 0, 935, -82, 34, 70, 18));
+  };
+  const pm = isoMesh(pel, -150, 815, -110, 150, 1045, 70, 6);
+  const m = computeNormals(mb.build());
+  return { long: m, pelvis: pm };
 }
-const BONES = () => cached('bones', () => voxMesh(buildBones(4)));
+const BONES = () => cached('bones', buildBonesMesh);
+function drawBones(cam, o) {
+  o = o || {}; const B = BONES(), m = { ramp: o.ramp || RT.bone, id: 0, glass: o.glass || [0.08, 0.7, 1.6], amb: 0.4, dif: 0.6, fog: o.fog, noZ: true };   // a backdrop behind the vessels
+  drawMesh(cam, B.long, m, o.xf); drawMesh(cam, B.pelvis, m, o.xf);
+}
+// ---------------------------------------------------------------- a standing body silhouette (glass) behind the trees
+const TB = [0, 0, -1, 0, 0, 1, 0, HIPY_T, 1, 0, 0, 0];   // body frame (forward x, up y, right z; hips at the origin) → tree frame
+function ghostBody(cam, xf, parts, o) {
+  buildParts(); o = o || {};
+  const base = xf ? mMul(xf, TB) : TB, list = [];
+  if (parts.includes('torso')) list.push(['torso', mMul(base, mT(-6, 140, 0))]);
+  if (parts.includes('pelvis')) list.push(['pelvis', base]);
+  for (const [tag, zs] of [['R', 92], ['L', -92]]) if (parts.includes(tag)) {
+    const th = mMul(base, mT(0, 0, zs)), sh = mMul(th, mT(0, -440, 0)), ft = mMul(sh, mT(0, -420, 0));
+    list.push(['thighShorts', th], ['thighSkin', th], ['shinSkin', sh], ['sock', sh], ['shoe', ft], ['sole', ft]);
+  }
+  const m = { ramp: RT.ghost, id: 0, glass: o.glass || [0.22, 0.9, 1.5], amb: 0.42, dif: 0.5, rim: 0.3, fog: o.fog, noZ: true };   // a backdrop: the vessels draw over it
+  for (const [n, mm] of list) drawMesh(cam, PART[n], m, mm);
+}
