@@ -154,7 +154,10 @@ function drawPatient(cam, pose, o) {
       if (mesh === 'head') m.mix = { ramp: RP.hair, f: a => a };
       if (mesh === 'shinSkin' && o.pain > 0 && xf === pose.right.sh) m.mix = { ramp: RP.pain, f: a => a * o.pain };
       if (o.alpha !== undefined && o.alpha < 1) { m.alpha = o.alpha; m.ao = 3; }
-      if (glassXf.includes(xf)) { const g = o.glassLeg; Object.assign(m, { id: 0, glass: [lerp(1, 0.1, g), lerp(1, 0.88, g), 1.7] }); }
+      if (glassXf.includes(xf)) {                                    // glassK fades the glass out (the camera dives through it)
+        const g = o.glassLeg, k = o.glassK === undefined ? 1 : o.glassK; if (k <= 0) continue;
+        Object.assign(m, { id: 0, glass: [lerp(1, 0.1, g) * k, lerp(1, 0.88, g) * k, 1.7] });
+      }
       drawMesh(cam, PART[mesh], m, xf);
     }
   }

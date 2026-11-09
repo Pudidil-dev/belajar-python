@@ -77,9 +77,8 @@ node tools/export.js --rerender                     # render the pictures again 
 ```
 Each frame is drawn **once**: the clean frame first, then the text on top of a copy, so both versions come from the
 same pixels. The pictures are kept in `build/` with a fingerprint of the sources, so another mix later only
-re-muxes (seconds). A frame takes about 0.1 s to draw on one core (a 30 fps preview of the whole film took 3 min 11 s in
-a 4-core sandbox), so the full 60 fps export renders 3,780 frames once and takes on the order of 10 minutes; all
-eight MP4s take only a few seconds more than two (re-muxing). All audio versions share **one common gain** (`tools/master.py`), so
+re-muxes (seconds). In a sandbox test on 4 cores, both text versions with two mixes took 7 min 43 s (about 95 MB per
+MP4; 8 min 45 s with another job running beside it); all eight MP4s take only a few seconds more (re-muxing). All audio versions share **one common gain** (`tools/master.py`), so
 the music-only and SFX-only stems sit exactly as loud as they do in the full mix and sum back to it.
 
 ### Translating the labels (Azerbaijani)
@@ -134,12 +133,18 @@ lacks a letter. Bar labels step down a size if they are too wide.
 ## QA (numbers, not a substitute for watching it)
 
 - **Shot list:** `镜头表.md` passes the skill's `storyboard_lint` (green): 21 shots, 63 s, no text-led shots.
-- **Film gate** (the skill's `film_gate.py` on a 720×1280 / 30 fps preview of the whole film made by `tools/proxy.js`; not in the repository): all three gates green.
-  - Fast-motion frames 25.2 % (red below 3.5 %).
+- **Film gate** (the skill's `film_gate.py`, run on a sandbox test export `Diabetic_PAD_CTA_Labeled.mp4` at 1080×1920 / 60 fps — the MP4 itself is not in the repository): all three gates green.
+  - Fast-motion frames 26.4 % (red below 3.5 %).
   - No empty frames; 0 % blue-purple frames.
-  - Worst 30-s window (31–61 s): 19.9 %.
-  - 17 shots (15 cuts, 1 crossfade), average 3.7 s.
-  - Push-ins 4.8 per minute, green (v1 had a yellow notice at 8.6).
+  - Worst 30-s window (31–61 s): 20.2 %.
+  - 16 shots (14 cuts, 1 crossfade), average 3.9 s.
+  - Push-ins 2.9 per minute, green (v1 had a yellow notice at 8.6).
+- **Export check** (the same sandbox test): every MP4 is 1080×1920, yuv420p, BT.709, 60 fps, exactly 3,780 frames, 63.000 s; the mixes carry AAC 48 kHz stereo and the _Silent versions have no audio track.
+- **Motion and colour** (`tools/qa_motion.js`, every frame at 30 fps):
+  - no frame is more than 30 % blue-purple;
+  - hard jumps only at the planned cuts (24, 27, 33 and 39 s);
+  - the dive into the artery (8.25–9.2 s) blends red into red: the background darkens and warms to the artery world's maroon before the crossfade, so it never passes through a muddy purple;
+  - holds: two short ones (0.8 s at 37.9 s, 1.0 s at 52.3 s) and the final diagnostic image (from 57.9 s), where both trees only turn slowly while the lesion marks and the title come in on the beat.
 - **Sync** (`tools/sync_qa.js`):
   - all 87 event times on the 80-BPM eighth-note grid, drawn within 8.3 ms (half a frame);
   - all 72 SFX start exactly on a picture event;
@@ -190,7 +195,7 @@ single agent only; watch it once at normal speed before publishing.
   - `17_cam.js`: camera paths and the sky gradient.
 - **Models:**
   - `10_patient.js`: smooth body parts on a skeleton, a gait with heel strikes on the beat, stance-foot locking, the calf-holding pose with two-bone IK.
-  - `11_leg.js`: the right leg's layers: glass skin, muscles that glow where they hurt, bones, arteries with the lesions.
+  - `11_leg.js`: the right leg's layers: glass skin, muscles that glow where they hurt, arteries with the lesions.
   - `12_micro.js`: the artery cut lengthwise:
     - in 3D: the lining, red cells on streamlines (faster in the narrowing) pulsing at 80 per minute, white cells, the foam cell, collaterals;
     - in 2D pixel art on the cut face: the wall's layers, plaque, calcium, the occlusion.

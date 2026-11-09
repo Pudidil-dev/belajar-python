@@ -29,7 +29,7 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 
 ### S03 · 0:06–0:09 · ENTER THE LEG
 **Camera:** fast push: behind the knee, then up along the artery, then a dive into its lumen.
-**Prompt:** The right leg turns to dithered glass; inside it the red-brown calf muscles (gastrocnemius, soleus) and the red arteries (popliteal, anterior tibial, tibioperoneal trunk, posterior tibial, peroneal) with faint bones; the muscle fades in turn. The camera rises along the superficial femoral artery in the thigh and dives into it at the site of the future stenosis; a soft dithered crossfade into scene 4.
+**Prompt:** The right leg turns to dithered glass; inside it the red-brown calf muscles (gastrocnemius, soleus) and the red arteries (popliteal, anterior tibial, tibioperoneal trunk, posterior tibial, peroneal); the muscle fades in turn. The camera rises along the superficial femoral artery in the thigh and dives in close to it at the site of the future stenosis while the glass skin falls away and the background darkens, then warms to the blood-maroon of the artery world; a soft crossfade (red into red) into scene 4.
 
 ### S04 · 0:09–0:12 · NORMAL REFERENCE
 **Camera:** hold (a short settle after the dive).

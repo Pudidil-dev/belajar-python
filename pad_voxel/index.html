@@ -1377,7 +1377,10 @@ function drawPatient(cam, pose, o) {
       if (mesh === 'head') m.mix = { ramp: RP.hair, f: a => a };
       if (mesh === 'shinSkin' && o.pain > 0 && xf === pose.right.sh) m.mix = { ramp: RP.pain, f: a => a * o.pain };
       if (o.alpha !== undefined && o.alpha < 1) { m.alpha = o.alpha; m.ao = 3; }
-      if (glassXf.includes(xf)) { const g = o.glassLeg; Object.assign(m, { id: 0, glass: [lerp(1, 0.1, g), lerp(1, 0.88, g), 1.7] }); }
+      if (glassXf.includes(xf)) {                                    // glassK fades the glass out (the camera dives through it)
+        const g = o.glassLeg, k = o.glassK === undefined ? 1 : o.glassK; if (k <= 0) continue;
+        Object.assign(m, { id: 0, glass: [lerp(1, 0.1, g) * k, lerp(1, 0.88, g) * k, 1.7] });
+      }
       drawMesh(cam, PART[mesh], m, xf);
     }
   }
@@ -2336,21 +2339,28 @@ function legCam(t, pose) {
   // the calf (where it hurts) → up along the artery → into the thigh artery at the site of the later stenosis (L1)
   const K = mApply(pose.right.sh, [0, 0, 0]), A = treeToWorld(pose, [-76, 690, 4]), c0 = walkCam(PT_HOLD_END);
   const k1 = { e: add3(K, [-640, 40, 560]), g: add3(K, [-60, -170, 0]) };
-  const k2 = { e: add3(A, [-300, 30, 280]), g: A };
-  const k3 = { e: add3(A, [-22, 6, 20]), g: add3(A, [6, -16, -4]) };
+  const o2 = [-300, 30, 280], k2 = { e: add3(A, o2), g: A };
   const u = t - EV.reveal;
   if (u < 1.2) return camAB(c0.eye, c0.tg, k1.e, k1.g, eio(u / 1.2), 34);
   if (u < 2.25) return camAB(k1.e, k1.g, k2.e, k2.g, eio((u - 1.2) / 1.05), 34);
-  return camAB(k2.e, k2.g, k3.e, k3.g, ein((u - 2.25) / 0.75), 34);
+  // the dive: the distance shrinks on a log scale (an even push), so the red artery already fills the frame
+  // when the crossfade into its lumen starts (EV.cut4 - 0.25): red blends into pink, never the navy room
+  const s = eio(clamp((u - 2.25) / 0.75, 0, 1)), o4 = [0, 6, 40];   // ends in front of the SFA, the profunda off to the side
+  const d = Math.exp(lerp(Math.log(Math.hypot(...o2)), Math.log(Math.hypot(...o4)), s));
+  return camLook(add3(A, mul3(norm3(lerp3(norm3(o2), norm3(o4), s)), d)), lerp3(A, add3(A, [6, -16, -4]), s), [0, 1, 0], 34);
 }
 function sLeg(t) {
-  const pose = holdPose(), cam = legCam(t, pose), fog = [600, 6000, P.N2];
-  skyBG(P.K0, P.N2); drawFloor(cam, fog);
+  // during the dive the navy background darkens to black and then warms to the blood-maroon of the artery
+  // world, so the crossfade into the lumen blends red into red (navy straight into red or pink would pass
+  // through a muddy purple)
+  const warm = ph(t, EV.dive + 0.2, EV.cut4, eio), via = (a, b) => warm < 0.5 ? mixc(a, SKY_DARK, 2 * warm) : mixc(SKY_DARK, b, 2 * warm - 1);
+  const bot = via(P.N2, MSKY_BOT), pose = holdPose(), cam = legCam(t, pose), fog = [600, 6000, bot];
+  skyBG(via(P.K0, MSKY_TOP), bot); drawFloor(cam, fog);
   // the right leg turns to glass and stays; the rest of the body dissolves pixel by pixel; then the muscle clears
   const glass = ph(t, EV.reveal, EV.reveal + 0.75), bodyA = 1 - ph(t, EV.reveal + 0.2, EV.muscle + 0.2), musA = 1 - ph(t, EV.artery - 0.2, EV.artery + 0.5) * 0.85;
   drawLeg(cam, pose, { muscle: musA, bone: 0, art: 1, pain: 0.55 * (1 - ph(t, EV.artery, EV.dive)), fog });
   if (bodyA > 0.02) drawPatient(cam, pose, { alpha: bodyA, skipXf: [pose.right.th, pose.right.sh, pose.right.ft], fog });
-  drawPatient(cam, pose, { glassLeg: glass, skipParts: ['pelvis', 'torso', 'head', 'uarm', 'farm'], skipXf: [pose.left.th, pose.left.sh, pose.left.ft], fog });
+  drawPatient(cam, pose, { glassLeg: glass, glassK: 1 - ph(t, EV.dive + 0.15, EV.dive + 0.4), skipParts: ['pelvis', 'torso', 'head', 'uarm', 'farm'], skipXf: [pose.left.th, pose.left.sh, pose.left.ft], fog });
   r3dOutlines();
 }
 // ---------------------------------------------------------------- 04-11: the artery, cut lengthwise; blood flows down the screen
@@ -2360,7 +2370,7 @@ function microCam(x, dist, side, tgx) { return camLook([side || 0, microAt(x) + 
 function pulseScale(t) { const b = (t / BEAT) % 1; return 1 + 0.012 * Math.max(0, Math.sin(TAU * b)) ** 2; }
 const FIELD = {};
 const fieldOf = (st, n, seed) => { const k = JSON.stringify(st) + n + seed; return FIELD[k] || (FIELD[k] = cellField(st, n, seed)); };
-const MSKY = () => skyBG(hexc('#14070C'), hexc('#2A0C14'));
+const MSKY_TOP = hexc('#14070C'), MSKY_BOT = hexc('#2A0C14'), MSKY = () => skyBG(MSKY_TOP, MSKY_BOT), SKY_DARK = hexc('#050506');
 function microState(t) {                                              // the wall through the disease story: one segment, one state at a time
   if (t < EV.ldl[0]) return { g: 0, xc: AR.XS, w: AR.WS, sick: t < EV.push6 ? 0 : qg(ph(t, EV.sick - 0.3, EV.sick + 0.9), 6) };
   if (t < EV.grow8) return { g: qg(0.35 * ph(t, EV.foam - 0.2, EV.grow8), 12), xc: AR.XS, w: AR.WS, sick: 1 };
