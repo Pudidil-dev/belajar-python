@@ -1242,6 +1242,11 @@ const RP = {
   sole: ['#8E949A', '#BEC3C8', '#E2E5E8', '#F6F7F8'].map(hexc),
   hair: ['#120E14', '#21191F', '#33262A', '#4A3733'].map(hexc),
   pain: [P.PA0, P.PA1, P.PA2, P.PA3, P.PA4],
+  // small details that make the clothes read: the folded hems of the sleeves and shorts, the ribbed sock tops, the laces
+  shirtHem: ['#131C27', '#213243', '#334E66', '#4B6C88', '#7495AF'].map(hexc),
+  shortsHem: ['#11171D', '#1F2933', '#303D4B', '#465666', '#607386'].map(hexc),
+  sockRib: ['#5C626A', '#8A9098', '#AEB4BA', '#CACFD4'].map(hexc),
+  lace: ['#8E949A', '#BEC3C8', '#E2E5E8', '#F6F7F8'].map(hexc),
 };
 const PVS = 6;                                    // meshing grid (mm)
 // ---------------------------------------------------------------- parts (local frames: joint at origin)
@@ -1256,7 +1261,19 @@ const SD = {
   torso: (x, y, z) => { const belly = sdE(x, y, z, 8, 120, 0, 118, 150, 160), chest = sdE(x, y, z, 14, 300, 0, 112, 150, 182), sh = sdB(x, y, z, 0, 390, 0, 86, 50, 196, 46); return smin(smin(belly, chest, 40), sh, 50); },
   head: (x, y, z) => Math.min(sdC(x, y, z, -4, 0, 0, 0, 90, 0, 54, 50), sdE(x, y, z, 6, 170, 0, 98, 118, 86)),
   uarm: (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -300, 0, 52, 40),
-  farm: (x, y, z) => Math.min(sdC(x, y, z, 0, 0, 0, 0, -250, 0, 38, 28), sdB(x, y, z, 6, -320, 0, 16, 62, 40, 10), sdC(x, y, z, 18, -270, 22, 34, -330, 26, 11, 9)),
+  farm: (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -252, 0, 38, 27),
+  // the right hand, relaxed (wrist at the origin, fingers toward −y, the palm facing −z, the thumb on the +x side):
+  // a palm, four fingers of two segments each curling toward the palm, and the thumb. The left hand is its mirror.
+  hand: (x, y, z) => {
+    let f = 1e9;
+    for (const [fx, L] of [[33, 68], [14, 76], [-5, 70], [-24, 54]]) {
+      const l1 = L * 0.55, l2 = L * 0.45, c1 = 0.3, c2 = 0.95, my = -88 - l1 * Math.cos(c1), mz = -l1 * Math.sin(c1);
+      f = Math.min(f, sdC(x, y, z, fx, -84, 0, fx, my, mz, 9, 8.4), sdC(x, y, z, fx, my, mz, fx, my - l2 * Math.cos(c2), mz - l2 * Math.sin(c2), 8.4, 7.4));
+    }
+    const palm = sdB(x, y, z, 5, -48, 0, 38, 44, 12.5, 11);
+    const thumb = Math.min(sdC(x, y, z, 36, -26, -3, 56, -58, -12, 11.5, 10), sdC(x, y, z, 56, -58, -12, 59, -88, -22, 10, 8.6));
+    return smin(smin(palm, f, 5), thumb, 7);
+  },
   thigh: (x, y, z) => sdC(x, y, z, 6, 0, 0, 0, -440, 0, 90, 58),
   shin: (x, y, z) => smin(sdC(x, y, z, 6, 0, 0, 4, -420, 0, 52, 30), sdE(x, y, z, -30, -130, 0, 50, 120, 48), 30),
   foot: (x, y, z) => smin(sdE(x, y, z, -20, -40, 0, 60, 44, 48), sdE(x, y, z, 110, -52, 0, 104, 32, 50), 30),
@@ -1269,19 +1286,29 @@ function buildParts() {
   PART.pelvis = iso(SD.pelvis, [-150, -120, -190, 125, 175, 190], null, 10);       // big smooth parts on a coarser grid
   PART.torso = iso(SD.torso, [-140, -20, -215, 150, 470, 215], null, 11);
   PART.head = iso(SD.head, [-120, -20, -100, 130, 290, 100], hairAttr, 9);
-  PART.sleeve = iso(keep(SD.uarm, -160, true), [-60, -320, -60, 60, 50, 60], null, 8);
+  const band = (f, y0, y1, grow) => (x, y, z) => Math.max(f(x, y, z) - grow, y0 - y, y - y1);   // a slightly raised band between two heights
+  PART.sleeve = iso(keep(SD.uarm, -146, true), [-60, -320, -60, 60, 50, 60], null, 8);
+  PART.sleeveHem = iso(band(SD.uarm, -161, -146, 2.5), [-64, -170, -64, 64, -138, 64], null, 7);
   PART.uarmSkin = iso(keep(SD.uarm, -160, false), [-60, -320, -60, 60, 50, 60]);
-  PART.farm = iso(SD.farm, [-50, -460, -50, 60, 40, 50]);
-  PART.thighShorts = iso(keep(SD.thigh, -300, true), [-100, -460, -100, 110, 60, 100], null, 9);
+  PART.farm = iso(SD.farm, [-50, -300, -50, 50, 40, 50], null, 7);
+  PART.handR = iso(SD.hand, [-46, -182, -58, 76, 12, 26], null, 5);
+  PART.handL = iso((x, y, z) => SD.hand(x, y, -z), [-46, -182, -26, 76, 12, 58], null, 5);
+  PART.thighShorts = iso(keep(SD.thigh, -284, true), [-100, -460, -100, 110, 60, 100], null, 9);
+  PART.shortsHem = iso(band(SD.thigh, -301, -284, 3), [-100, -312, -100, 112, -276, 100], null, 8);
   PART.thighSkin = iso(keep(SD.thigh, -300, false), [-100, -460, -100, 110, 60, 100], null, 7);
   PART.shinSkin = iso(keep(SD.shin, -330, true), [-110, -440, -80, 80, 40, 80], calfAttr);
-  PART.sock = iso(keep(SD.shin, -330, false), [-110, -440, -80, 80, 40, 80]);
+  PART.sockRib = iso(band(SD.shin, -352, -329, 2.5), [-70, -360, -60, 70, -322, 60], null, 7);
+  PART.sock = iso(keep(SD.shin, -350, false), [-110, -440, -80, 80, 40, 80]);
   PART.shoe = iso(keep(SD.foot, -70, true), [-90, -90, -60, 220, 30, 60], null, 7);
+  PART.lace = iso((x, y, z) => Math.max(SD.foot(x, y, z) - 2.5, sdB(x, y, z, 62, -20, 0, 40, 40, 21, 6)), [10, -70, -34, 116, 16, 34], null, 7);
   PART.sole = iso(keep(SD.foot, -70, false), [-90, -90, -60, 220, 30, 60]);
 }
 // which meshes make each rig part, and their materials
-const PART_MESH = { pelvis: [['pelvis', 'shorts']], torso: [['torso', 'shirt']], head: [['head', 'skin']], uarm: [['sleeve', 'shirt'], ['uarmSkin', 'skin']], farm: [['farm', 'skin']],
-  thigh: [['thighShorts', 'shorts'], ['thighSkin', 'skin']], shin: [['shinSkin', 'skin'], ['sock', 'sock']], foot: [['shoe', 'shoe'], ['sole', 'sole']] };
+// [mesh, material, outline group (when it shares its neighbour's outline)]
+const PART_MESH = { pelvis: [['pelvis', 'shorts']], torso: [['torso', 'shirt']], head: [['head', 'skin']],
+  uarm: [['sleeve', 'shirt'], ['sleeveHem', 'shirtHem', 'shirt'], ['uarmSkin', 'skin']], farm: [['farm', 'skin']], handR: [['handR', 'skin']], handL: [['handL', 'skin']],
+  thigh: [['thighShorts', 'shorts'], ['shortsHem', 'shortsHem', 'shorts'], ['thighSkin', 'skin']], shin: [['shinSkin', 'skin'], ['sockRib', 'sockRib', 'sock'], ['sock', 'sock']],
+  foot: [['shoe', 'shoe'], ['lace', 'lace', 'shoe'], ['sole', 'sole']] };
 const OL = { skin: P.SK0, shirt: hexc('#0E1620'), shorts: hexc('#04070A'), sock: hexc('#4A5058'), shoe: hexc('#0C0F12'), sole: hexc('#5A6066') };
 // ---------------------------------------------------------------- the walk: footfalls → rolling feet → leg IK
 // Planned from where the feet land, like a real walk. Each heel strike has a time and a place; a foot that carries
@@ -1491,8 +1518,12 @@ function patientPose(P0, facing, q) {
     const back = norm3(sub3(mApply(tor, [-1, 0, 0]), mApply(tor, [0, 0, 0]))), latR = norm3(sub3(mApply(pel, [0, 0, 1]), mApply(pel, [0, 0, 0])));
     const ir = ikArm(armR, calfT, add3(back, [0, 0, 0.6]), add3(mul3(latR, 0.8), mul3(back, 0.4)));
     const il = ikArm(armL, thighFront, add3(back, [0, 0, -0.4]), add3(mul3(latR, -0.6), mul3(back, 0.2)));
-    out.push(['uarm', ir.ua], ['farm', ir.fa], ['uarm', il.ua], ['farm', il.fa]);
-  } else out.push(['uarm', armR.ua], ['farm', armR.fa], ['uarm', armL.ua], ['farm', armL.fa]);
+    armR = ir; armL = il;
+  }
+  out.push(['uarm', armR.ua], ['farm', armR.fa], ['uarm', armL.ua], ['farm', armL.fa]);
+  // the hands: palms toward the thighs when the arms hang; turned to lie on the calf and on the thigh when he holds them
+  const pron = -Math.PI / 2 * smooth(hArm), wrist = mMul(mT(0, -250, 0), mRy(pron));
+  out.push(['handR', mMul(armR.fa, wrist)], ['handL', mMul(armL.fa, wrist)]);
   return { parts: out, right, left };
 }
 // kept for the scenes: with a walk sample the IK already keeps both feet planted
@@ -1507,9 +1538,10 @@ function drawPatient(cam, pose, o) {
   for (const [name, xf] of pose.parts) {
     if (o.skipParts && o.skipParts.includes(name)) continue;
     if (o.skipXf && o.skipXf.includes(xf)) continue;
-    for (const [mesh, mt0] of PART_MESH[name]) {
-      const mt = o.socks && name === 'foot' ? 'sock' : mt0;              // shoes off on the CT table
-      const m = { ramp: RP[mt], id: ids[mt], amb: 0.32, dif: 0.68, rim: 0.26, fog: o.fog };
+    for (const [mesh, mt0, grp] of PART_MESH[name]) {
+      if (o.socks && mesh === 'lace') continue;                          // shoes off on the CT table
+      const mt = o.socks && name === 'foot' ? 'sock' : mt0;
+      const m = { ramp: RP[mt], id: ids[o.socks && name === 'foot' ? 'sock' : (grp || mt)], amb: 0.32, dif: 0.68, rim: 0.26, fog: o.fog };
       if (mt === 'skin') Object.assign(m, { spec: 0.12, cap: 0.86 });
       if (mesh === 'head') m.mix = { ramp: RP.hair, f: a => a };
       if (mesh === 'shinSkin' && o.pain > 0 && xf === pose.right.sh) m.mix = { ramp: RP.pain, f: a => a * o.pain };
@@ -1649,7 +1681,7 @@ const MR = {
   rbc: [P.BL1, P.BL2, P.AR2, P.AR3, P.AR4], wbc: ['#5A5470', '#8C86A4', '#C2BCD6', '#E6E2F2', '#FAF8FF'].map(hexc),
   nuc: ['#2E1E48', '#4E3878', '#6E56A0', '#9078C0'].map(hexc), ldl: ['#6A4A06', '#B08A18', '#F0C030', '#FFE08A'].map(hexc),
   mac: ['#5E4E3A', '#8E7A5E', '#BCA888', '#DCCCB0', '#F2E8D6'].map(hexc), foam: ['#7A5A10', '#C09A30', '#F0D060', '#FFF0A8'].map(hexc),
-  col: ['#5A2030', '#94404E', '#C86A74', '#EC9EA0', '#FFD0D0'].map(hexc), colIn: ['#3A1420', '#5A2030', '#7A3040'].map(hexc),
+  col: ['#5A2030', '#94404E', '#C86A74', '#EC9EA0', '#FFD0D0'].map(hexc), colIn: ['#4E1A28', '#7E3242', '#AC5260'].map(hexc),
 };
 const CX_ = {}; for (const [k, v] of Object.entries({
   ol: '#1E0C10', adv: '#A87460', adv2: '#B98670', advF: '#DDB094', advN: '#4E2E28',
@@ -1853,9 +1885,9 @@ function drawCollatFlow(cam, xf, t, k) {
   if (k <= 0) return;
   const m = rbcMat(), clk = flowClock(t, 0.33);                       // the same pulse drives the side channels
   collatPaths().forEach((pts, pi) => {
-    const n = 7, L = pts.length - 1;
+    const n = 11, L = pts.length - 1;
     for (let i = 0; i < n; i++) {
-      const g = smooth(clamp(7 * k - i, 0, 1)); if (g < 0.05) continue;
+      const g = smooth(clamp(n * k - i, 0, 1)); if (g < 0.05) continue;
       const u = ((clk + i / n + pi * 0.37) % 1), f = u * L, j = Math.floor(f), h = f - j, a = pts[j], b = pts[Math.min(L, j + 1)];
       drawRBC(cam, xf, lerp(a[0], b[0], h), lerp(a[1], b[1], h), -3, t + i, 0.5, m, 0.7 * g);
     }
@@ -1952,6 +1984,8 @@ const RT = {
   wall: [hexc('#2A1020'), hexc('#561C2C'), hexc('#8E3038'), P.AR3, hexc('#F0A48C')],
   blood: [P.BL0, P.BL1, P.BL2, P.BL3, P.AR2],
   con: [P.CO0, P.CO1, P.CO2, P.CO3, P.CO4],
+  conD: [hexc('#2C567C'), P.CO0, hexc('#6FA3C8'), P.CO1, hexc('#B4D8F0')],      // the lumen between two flow pulses
+  conB: [P.CO1, P.CO2, P.CO3, P.CO4, P.CO4],                                    // a flow pulse
   plq: [P.PL0, P.PL1, P.PL2, P.PL3, P.PL4],
   occ: [P.OC0, P.OC1, P.OC2, P.OC3, P.OC4],
   cal: [P.CA1, P.CA2, P.CA3, P.CA4],
@@ -1984,7 +2018,51 @@ function lesionAt(name, y, normal) {
 const ECC = norm3([-0.6, 0, 0.8]);
 // the arrival distance of the contrast at a sample (the popliteal below the block and the collaterals fill later)
 function arrivalAt(name, q, normal) { let s = q[4] + (isGen(name) ? 140 : 0); if (!normal && name[0] === 'R' && q[1] < LES.L2.y1 + 2 && !/CIA|IIA|EIA|CFA|PFA|SFA/.test(name)) s += 160; return s; }
-// ---------------------------------------------------------------- the tree meshes. o: {legs: ['R','L'], aorta, normal, rk}
+// ---------------------------------------------------------------- flow through the right leg's tree (scenes 20-21)
+// every sample of every vessel gets the time the blood needs to reach it from the groin (seconds, at drawing speeds),
+// so pulses can travel down the lumen at the local speed: brisk in open arteries, slower behind the stenosis, slowest
+// through the collaterals and below the block, which is fed only by them. The class (0 full, 1 reduced, 2 weak) dims
+// the pulses. Stored in the lumen's vertex attribute as class * 1000 + time.
+const FLOW_V = { open: 380, sfa: 250, post: 150, col: 105, low: 95 };
+function flowField(normal) {
+  const F = {}, S_ = n => vesselSamples(ART[n], 3);
+  const nearest = (S, p) => { let b = 0, bd = 1e9; S.forEach((q, i) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]); if (d < bd) { bd = d; b = i; } }); return b; };
+  const rule = (n, y) => {                                              // [speed, class] of a sample
+    if (isGen(n)) return [FLOW_V.col, 2];
+    if (normal) return [FLOW_V.open, 0];
+    if (/CIA|IIA|EIA|CFA|PFA/.test(n)) return [FLOW_V.open, 0];
+    if (/SFA/.test(n)) return y > LES.L1.y0 ? [FLOW_V.sfa, 0] : [FLOW_V.post, 1];
+    if (/POP/.test(n) && y >= LES.L2.y1) return [FLOW_V.post, 1];
+    return [FLOW_V.low, 2];
+  };
+  const run = (n, i0, i1, tau0) => {                                    // march along samples i0 → i1 (either direction)
+    const S = S_(n), f = F[n] || (F[n] = { tau: new Float32Array(S.length), cls: new Uint8Array(S.length) }), st = i1 >= i0 ? 1 : -1;
+    let tau = tau0;
+    for (let i = i0; i !== i1 + st; i += st) { const r = rule(n, S[i][1]); if (i !== i0) tau += Math.abs(S[i][4] - S[i - st][4]) / r[0]; f.tau[i] = tau; f.cls[i] = r[1]; }
+  };
+  const start = n => { const a = ART[n], par = a.parent && F[a.parent] ? a.parent : null; return par ? F[par].tau[nearest(S_(par), a.pts[0])] : 0; };
+  const whole = n => run(n, 0, S_(n).length - 1, start(n));
+  for (const n of ['RCIA', 'RIIA', 'REIA', 'RCFA', 'RPFA', 'RSFA']) whole(n);
+  if (normal) { for (const n of ['RPOP', 'RATA', 'RTPT', 'RPTA', 'RPER', 'RPERc', 'RGEN1', 'RGEN2', 'RGEN3']) whole(n); return F; }
+  // this patient: the popliteal down to the block, the collaterals round it, then the popliteal below the block from
+  // where the collaterals rejoin it (the stub between the block and that point fills backward)
+  const P_ = S_('RPOP'), top = P_.findIndex(q => q[1] < LES.L2.y0);
+  run('RPOP', 0, Math.max(0, top - 1), start('RPOP'));
+  for (const n of ['RGEN1', 'RGEN2', 'RGEN3']) whole(n);
+  const gEnd = n => { const f = F[n]; return f.tau[f.tau.length - 1]; }, tj = Math.min(gEnd('RGEN1'), gEnd('RGEN2'), gEnd('RGEN3')), g1 = ART.RGEN1.pts, j = nearest(P_, g1[g1.length - 1]);
+  run('RPOP', j, P_.length - 1, tj); run('RPOP', j, top, tj);
+  for (const n of ['RATA', 'RTPT', 'RPTA', 'RPER', 'RPERc']) whole(n);
+  return F;
+}
+const FLOW = { n: null, p: null };
+const flowAttr = (normal, name, i) => { const k = normal ? 'n' : 'p', F = FLOW[k] || (FLOW[k] = flowField(normal)), f = F[name]; return f ? f.cls[i] * 1000 + f.tau[i] : 0; };
+// a pulse train along the transit time: bright while u (the phase within one period) is inside the pulse
+const FLOW_PER = 0.27, FLOW_AMP = [1, 0.62, 0.4];
+function flowPulse(a, T) {
+  const cls = Math.min(2, Math.floor(a / 1000)), u = (((a - cls * 1000 - T) / FLOW_PER) % 1 + 1) % 1;
+  return FLOW_AMP[cls] * smooth(clamp(u / 0.07, 0, 1)) * (1 - smooth(clamp((u - 0.3) / 0.08, 0, 1)));
+}
+// ---------------------------------------------------------------- the tree meshes. o: {legs: ['R','L'], aorta, normal, rk, flow}
 function buildTreeMeshes(o) {
   const legs = o.legs || ['R', 'L'], RK = o.rk || 1, normal = !!o.normal;
   const W_ = new MB(), LU = new MB(), PQ = new MB(), OC = new MB(), CA = new MB();
@@ -2005,7 +2083,7 @@ function buildTreeMeshes(o) {
       if (j > i) {
         const P_ = [], R_ = [];
         for (let q = i; q <= j; q++) { const kk = st[q].k, ri = r(q) * 0.74, e = (!normal && k === 'RSFA') ? (1 - kk) * 0.42 * ri : 0; P_.push(add3(S[q].slice(0, 3), mul3(ECC, e))); R_.push(Math.max(0.35, ri * kk)); }
-        tubeInto(LU, P_, q => R_[q], q => arrivalAt(k, S[i + q], normal), sides, true);
+        const i0 = i; tubeInto(LU, P_, q => R_[q], q => o.flow ? flowAttr(normal, k, i0 + q) : arrivalAt(k, S[i0 + q], normal), sides, true);
       }
       i = j + 1;
     }
@@ -2042,17 +2120,19 @@ function buildTreeMeshes(o) {
 // whole-tree views draw the calibres 1.7x more again (3.9x real; the two-tree comparison 2x, 4.6x real) so the tibial arteries stay readable on a phone
 const TREE_RK = 1.7, CMP_RK = 2.0;
 const TREE = () => cached('tree', () => buildTreeMeshes({ rk: TREE_RK }));
-const TREE_N = () => cached('treeN', () => buildTreeMeshes({ normal: true, legs: ['R'], aorta: false, rk: CMP_RK }));
-const TREE_R = () => cached('treeR', () => buildTreeMeshes({ legs: ['R'], aorta: false, rk: CMP_RK }));
+const TREE_N = () => cached('treeN', () => buildTreeMeshes({ normal: true, legs: ['R'], aorta: false, rk: CMP_RK, flow: true }));
+const TREE_R = () => cached('treeR', () => buildTreeMeshes({ legs: ['R'], aorta: false, rk: CMP_RK, flow: true }));
 const TREE_NN = () => cached('treeNN', () => buildTreeMeshes({ normal: true, rk: TREE_RK }));
 // ---------------------------------------------------------------- drawing the tree
 // explanatory look: a red see-through wall, the channel as a column (blood red, white-blue behind the contrast front),
-// the plaque a see-through yellow sleeve, the block orange-brown, calcium white; o: {xf, front, hot: [{y0,y1,k}], fog, wallGlass}
+// the plaque a see-through yellow sleeve, the block orange-brown, calcium white; o: {xf, front, hot: [{y0,y1,k}], fog, wallGlass,
+// flow: {T} (the comparison trees: pulses travel down the lumen with the flow clock T)}
 function drawTreeExpl(cam, T, o) {
   o = o || {};
   const front = o.front === undefined ? 1e9 : o.front, xf = o.xf, fog = o.fog;
   const lumId = newId(P.BL0);
-  if (T.lum) drawMesh(cam, T.lum, { ramp: RT.blood, id: lumId, amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.5, mix: { ramp: RT.con, f: a => smooth(clamp((front - a) / 60, 0, 1)) }, fog }, xf);
+  if (T.lum && o.flow) drawMesh(cam, T.lum, { ramp: RT.conD, id: lumId, amb: 0.34, dif: 0.64, rim: 0.3, spec: 0.5, mix: { ramp: RT.conB, f: a => flowPulse(a, o.flow.T) }, fog }, xf);   // pulses travelling with the blood
+  else if (T.lum) drawMesh(cam, T.lum, { ramp: RT.blood, id: lumId, amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.5, mix: { ramp: RT.con, f: a => smooth(clamp((front - a) / 60, 0, 1)) }, fog }, xf);
   if (T.occ) drawMesh(cam, T.occ, { ramp: RT.occ, id: newId(P.OC0), amb: 0.3, dif: 0.7, rim: 0.25, fog, mix: o.hot && o.hot[1] ? { ramp: RT.hot, f: () => o.hot[1].k } : undefined }, xf);
   if (T.cal) drawMesh(cam, T.cal, { ramp: RT.cal, id: newId(P.CA0), amb: 0.45, dif: 0.6, rim: 0.2, spec: 0.4, fog }, xf);
   if (T.plq) {
@@ -2358,14 +2438,15 @@ function drawCirc(cam, t) {
 
 // ---- 16_axial.js
 // ============================================================================
-// THE AXIAL CTA SLICE (scene 18): a grey source-image crop through the right
-// SFA at the level of L1, drawn as a pixel image. Grey levels follow CT
+// THE AXIAL CTA INSETS (scenes 18 and 19): grey source-image crops through the
+// right SFA at the level of L1 and through the right popliteal artery at the
+// block, drawn as pixel images. Grey levels follow CT
 // conventions: calcium brightest, then the contrast-filled lumen, muscle and
 // non-calcified plaque mid grey, fat dark, air black. The lumen is small and
 // eccentric but open; the plaque sits in the wall; calcium is a bright arc.
 // ============================================================================
 const AXG = { air: '#000000', fat: '#303030', skin: '#5A5A5A', mus: '#767676', mus2: '#6C6C6C', fas: '#545454', cort: '#EEEEEE', marrow: '#8E8E8E',
-  wall: '#828282', plq: '#686868', cal: '#FFFFFF', lum: '#CFCFCF', vein: '#8C8C8C' };
+  wall: '#828282', plq: '#686868', cal: '#FFFFFF', lum: '#CFCFCF', vein: '#8C8C8C', occ: '#5C5C5C', spongy: '#B2B2B2', spongy2: '#A0A0A0', fat2: '#3A3A3A' };
 const AXC = {}; for (const k in AXG) AXC[k] = hexc(AXG[k]);
 // crop of 32 mm around the SFA (mm coordinates centred on the artery); px = size / 46 per mm
 function axialSample(x, y) {
@@ -2384,13 +2465,30 @@ function axialSample(x, y) {
   if (x > 14 && y < -8) return AXC.fat;
   return hash2(Math.floor(x * 1.3), Math.floor(y * 1.3)) < 0.15 ? AXC.mus2 : AXC.mus;
 }
-function drawAxial(x0, y0, size, k) {
+// the same kind of crop through the right popliteal artery at the block (scene 19), behind the knee: the femur's
+// condyle in front (up), the popliteal vein behind the artery, the fat of the popliteal fossa round the vessels.
+// The artery keeps its wall and its calcium but has no bright channel; the collaterals are small bright dots.
+function axialSampleOcc(x, y) {
+  const fem = Math.hypot(x + 21, y + 21); if (fem < 16) return fem > 13 ? AXC.cort : (hash2(Math.floor(x * 1.2), Math.floor(y * 1.2)) < 0.3 ? AXC.spongy2 : AXC.spongy);
+  const vein = Math.hypot(x - 9.5, y - 5.5); if (vein < 5.6) return AXC.vein;
+  const r = Math.hypot(x, y);
+  if (r < 6.2) {
+    const a = Math.atan2(y, x);
+    if (r > 4.5 && ((a > -2.9 && a < -2.0) || (a > 0.3 && a < 1.0))) return AXC.cal;
+    if (Math.hypot(x - 1.3, y + 1.5) < 1.0 || Math.hypot(x + 2.1, y - 1.7) < 0.8) return AXC.cal;
+    return r > 5.3 ? AXC.wall : AXC.occ;
+  }
+  for (const [cx, cy, cr] of [[-10.5, 6.5, 1.6], [7.5, -9.5, 1.4], [-3.5, 11.8, 1.2]]) if (Math.hypot(x - cx, y - cy) < cr) return AXC.lum;
+  if (Math.hypot(x - 2, y - 2) < 14.5) return hash2(Math.floor(x * 0.9), Math.floor(y * 0.9)) < 0.14 ? AXC.fat2 : AXC.fat;
+  return hash2(Math.floor(x * 1.3), Math.floor(y * 1.3)) < 0.15 ? AXC.mus2 : AXC.mus;
+}
+function drawAxial(x0, y0, size, k, sample) {
   if (k <= 0) return;
   const s = Math.round(size * (k < 1 ? Math.max(0.15, Math.floor(k * 4) / 4) : 1)), xa = Math.round(x0 + (size - s) / 2), ya = Math.round(y0 + (size - s) / 2);
   rect(xa - 3, ya - 3, xa + s + 3, ya + s + 3, P.SH); rect(xa - 2, ya - 2, xa + s + 2, ya + s + 2, P.N4); rect(xa - 1, ya - 1, xa + s + 1, ya + s + 1, P.K0);
   if (k < 1) return;
   const mm = 32 / s;
-  for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) pset(xa + i, ya + j, axialSample((i + 0.5) * mm - 16, (j + 0.5) * mm - 16));
+  for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) pset(xa + i, ya + j, (sample || axialSample)((i + 0.5) * mm - 16, (j + 0.5) * mm - 16));
 }
 
 // ---- 17_cam.js
@@ -2681,10 +2779,21 @@ function drawConsole(t, scanY, nThumb, glow) {
   const ya = yOf(1150), yb = yOf(25);
   rect(tx, ya, tx + TOPO.w, ya + 1, P.WARN); rect(tx, yb, tx + TOPO.w, yb + 1, P.WARN); rect(tx, ya, tx + 1, yb + 1, P.WARN); rect(tx + TOPO.w - 1, ya, tx + TOPO.w, yb + 1, P.WARN);
   const ys = yOf(scanY); if (ys > ya && ys < yb) { rect(tx - 3, ys, tx + TOPO.w + 3, ys + 1, P.ACC); rect(tx - 4, ys - 1, tx - 2, ys + 2, P.ACC); }
+  // the levels of the two lesions, marked on the topogram once the scan has passed them (the right leg is on the viewer's left)
+  for (const Y of [LES.L1.yc, 519]) if (scanY < Y) { const ym = yOf(Y), xm = tx + Math.round((ART.RSFA.pts[2][0] - TOPO.x0) / (TOPO.x1 - TOPO.x0) * TOPO.w); rect(xm - 4, ym - 1, xm + 5, ym, P.WARN); rect(xm - 4, ym + 1, xm + 5, ym + 2, P.WARN); rect(xm - 5, ym - 1, xm - 4, ym + 2, P.WARN); rect(xm + 5, ym - 1, xm + 6, ym + 2, P.WARN); }
+  // a lesion on an axial image: an orange ring round the right thigh artery at the stenosis, round the right popliteal at the block
+  const lesionRing = (Y, bx0, by0, w, h, F, r) => {
+    const name = Math.abs(Y - LES.L1.yc) < 62 ? 'RSFA' : (Math.abs(Y - 519) < 62 ? 'RPOP' : null); if (!name) return;   // shown a little before and after, long enough to be seen
+    const v = ctVessels(Y).find(q => q.name === name); if (!v) return;
+    const mm = F.span / w, cx = Math.round(bx0 + w / 2 + (v.x - F.cx) / mm), cy = Math.round(by0 + h / 2 - (v.z - F.cz) / mm);
+    ring(cx, cy, r, r > 5 ? 2 : 1.3, P.WARN);
+    if (r > 5) for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) rect(Math.min(cx + ax * (r + 2), cx + ax * (r + 6)) - (ax ? 0 : 1), Math.min(cy + ay * (r + 2), cy + ay * (r + 6)) - (ay ? 0 : 1), Math.max(cx + ax * (r + 2), cx + ax * (r + 6)) + 1, Math.max(cy + ay * (r + 2), cy + ay * (r + 6)) + 1, P.WARN);
+  };
   // the axial image, the newest slice at the table position
   const vx = tx + TOPO.w + 8, vy = ty, vw = x1 - 6 - vx, vh = 186, F = sliceFrame(scanY);
   rect(vx - 1, vy - 1, vx + vw + 1, vy + vh + 1, hexc('#2A3440'));
   drawSlice(scanY, vx, vy, vw, vh, F.span, F.cx, F.cz);
+  lesionRing(scanY, vx, vy, vw, vh, F, 10 + (Math.floor(t * 8) % 2));
   // the images already taken, as small thumbnails along the bottom (each arrives with the score's chime)
   const tw = 34, th = 30, gap = 4, n = Math.floor(nThumb), ty2 = vy + vh + 8, levels = [1100, 980, 860, 700, 520, 330];
   for (let k = 0; k < Math.min(6, n + 1); k++) {
@@ -2693,7 +2802,99 @@ function drawConsole(t, scanY, nThumb, glow) {
     rect(bx - 1, by - 1, bx + tw + 1, by + th + 1, hexc('#2A3440'));
     if (a < 1) { rect(bx, by, bx + tw, by + th, hexc('#06090D')); continue; }
     drawSlice(Y, bx, by, tw, th, Fk.span, Fk.cx, Fk.cz);
+    lesionRing(Y, bx, by, tw, th, Fk, 4);
   }
+}
+
+// ---- 19_park.js
+// ============================================================================
+// THE EVENING PARK (scenes 1-3, 12-13): 2D pixel-art layers standing in the 3D
+// world behind the walker, so they slide past at their own speeds as the camera
+// tracks him (parallax): stars and a crescent moon (at infinity), a far skyline
+// with a few lit windows, a line of trees, the lawn beyond the path with its
+// kerb. All of it is dark, hazy and low in contrast — a backdrop that gives
+// the walk a place and a speed; the lit figure in front stays the subject.
+// World: x along the walk, y up, z toward the camera; the path is |z| < 1500.
+// ============================================================================
+const PK = {}; for (const [k, v] of Object.entries({
+  lawn: '#0D1A22', lawn2: '#0F1F28', lawn3: '#0B171E', kerb: '#213245', kerbS: '#172432',
+  tree: '#132435', treeL: '#1B3247', treeD: '#0F1D2B', trunk: '#101E2C',
+  bld: '#101C2C', bld2: '#121F31', win: '#2E445A', winL: '#7E9AB2',
+  moon: '#CCDAE4', moonS: '#9FB4C4', halo: '#1E3249', halo2: '#2A4058',
+})) PK[k] = hexc(v);
+const PARK = { lawnZ: -1500, treeZ: -90000, skyZ: -700000 };
+// ---------------------------------------------------------------- the pictures (world mm on each layer's plane)
+function parkSkyline(X, Y) {
+  const cw = 30000, i = Math.floor(X / cw), fx = X - i * cw, h1 = hash2(i, 1), h2 = hash2(i, 2), h3 = hash2(i, 3);
+  const w = cw * (0.5 + 0.42 * h1), x0 = (cw - w) * h3, lx = fx - x0, H = 13000 + 50000 * h2 * h2;
+  if (lx < 0 || lx > w) return 0;
+  const top = h2 > 0.5 && (lx < w * 0.2 || lx > w * 0.8) ? H * 0.84 : H;                     // taller ones step in at the top
+  if (Y > top) return h2 > 0.72 && Math.abs(lx - w * 0.5) < 420 && Y < H + 9000 ? PK.bld : 0;   // a mast
+  const inx = lx % 3300, iny = Y % 3900;
+  if (inx > 950 && inx < 2500 && iny > 1300 && iny < 2950 && lx > 1600 && lx < w - 1600 && Y < top - 2600) {
+    const hw = hash2(i * 31 + Math.floor(lx / 3300), Math.floor(Y / 3900)); if (hw < 0.09) return PK.win; if (hw < 0.115) return PK.winL;
+  }
+  return i & 1 ? PK.bld : PK.bld2;
+}
+const TREE_CW = 6500, TREE_CELL = {};                                  // one tree per cell: [x, crown radius, crown height] or null (a gap)
+function treeCell(i) {
+  let c = TREE_CELL[i];
+  if (c === undefined) { const h1 = hash2(i, 11), h2 = hash2(i, 12), r = 1900 + 1500 * h2; c = TREE_CELL[i] = hash2(i, 13) < 0.16 ? null : [(i + 0.5 + 0.5 * (h1 - 0.5)) * TREE_CW, r, 2500 + 2900 * h1 + r * 0.2]; }
+  return c;
+}
+const TREE_LOBE = [[0, 0, 1], [-0.58, -0.36, 0.7], [0.56, -0.3, 0.72]];  // a crown of three lobes
+function parkTrees(X, Y) {
+  if (Y > 9700) return 0;
+  const i0 = Math.floor(X / TREE_CW);
+  let c = Y < 2300 && Y < 1500 + 480 * Math.sin(X / 2100) + 260 * Math.sin(X / 700 + 1.3) ? PK.treeD : 0;      // low shrubs under the trees
+  for (let i = i0 - 1; i <= i0 + 1; i++) {
+    const tc = treeCell(i); if (!tc) continue;
+    const cx = tc[0], r = tc[1], cy = tc[2], ax = X - cx;
+    if (ax > 1.6 * r || ax < -1.6 * r || Y > cy + r) continue;
+    for (let l = 0; l < 3; l++) {
+      const L = TREE_LOBE[l], dx = ax - L[0] * r, dy = Y - cy - L[1] * r, rr = r * L[2];
+      if (dx * dx + dy * dy < rr * rr) { const lit = (dx * 0.5 + dy * 0.86) / rr; c = lit > 0.52 ? PK.treeL : lit < -0.35 ? PK.treeD : PK.tree; }   // moonlit from the upper right
+    }
+    if (!c && ax < 190 && ax > -190 && Y < cy) c = PK.trunk;
+  }
+  return c;
+}
+function parkLawn(X, Z) {
+  if (Z > PARK.lawnZ - 90) return Z > PARK.lawnZ - 60 ? PK.kerb : PK.kerbS;                    // the kerb along the path
+  const h = hash2(Math.floor(X / 520), Math.floor(Z / 520));
+  return h < 0.2 ? PK.lawn2 : h > 0.86 ? PK.lawn3 : PK.lawn;
+}
+// ---------------------------------------------------------------- the layers as big quads
+const PARK_M = () => cached('park', () => ({
+  lawn: quadMesh([-150000, 0, PARK.lawnZ], [450000, 0, 0], [0, 0, -148500]),
+  trees: quadMesh([-200000, 0, PARK.treeZ], [500000, 0, 0], [0, 10000, 0]),
+  sky: quadMesh([-1500000, 0, PARK.skyZ], [3000000, 0, 0], [0, 80000, 0]),
+}));
+const PARK_STARS = (() => { const r = mulberry(91), s = []; for (let i = 0; i < 64; i++) { const az = (r() - 0.5) * 0.9, el = 0.03 + r() * 0.3; s.push({ d: [Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)], b: r(), ph: r() * TAU, w: 0.5 + r() }); } return s; })();
+const PARK_MOON = (() => { const az = 0.07, el = 0.182; return [Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)]; })();
+// o: {fog (for the lawn), fade (0..1: the park dissolves pixel by pixel), t}
+function drawPark(cam, o) {
+  o = o || {};
+  const fade = o.fade || 0; if (fade >= 1) return;
+  const t = o.t || 0, far = d => project(cam, [cam.eye[0] + d[0] * 1e7, cam.eye[1] + d[1] * 1e7, cam.eye[2] + d[2] * 1e7]);
+  // stars (they twinkle slowly) and the moon: at infinity, so they hold still while everything nearer slides past
+  const tones = [P.ST1, P.ST2, P.ST3, P.ST4];
+  PARK_STARS.forEach((s, i) => {
+    if (hash2(i, 5) < fade) return;
+    const p = far(s.d); if (!p) return;
+    const lv = clamp(Math.floor(s.b * 2.4 + 1.1 + 0.9 * Math.sin(t * s.w + s.ph)), 0, 3), x = Math.round(p[0]), y = Math.round(p[1]);
+    pset(x, y, tones[lv]); if (s.b > 0.86 && lv === 3) { pset(x - 1, y, P.ST2); pset(x + 1, y, P.ST2); pset(x, y - 1, P.ST2); pset(x, y + 1, P.ST2); }
+  });
+  const m = far(PARK_MOON);
+  if (m && fade < 0.6) {
+    const x = Math.round(m[0]), y = Math.round(m[1]), sky = buf[clamp(y, 0, H - 1) * W + clamp(x - 30, 0, W - 1)];
+    disc(x, y, 17, PK.halo, 0.22); disc(x, y, 12, PK.halo2, 0.3); disc(x, y, 7.5, PK.moon); disc(x + 1.5, y + 2, 5, PK.moonS, 0.35);
+    disc(x - 4, y - 2.5, 6.6, sky);                                    // the crescent's shadow side
+  }
+  const M = PARK_M(), mat = pix => ({ ramp: [0], back: [0], unlit: true, id: 0, pixFn: fade > 0 ? (u, v, x, y) => (bay(x, y) < fade ? 0 : pix(u, v)) : pix });
+  drawMesh(cam, M.sky, mat((u, v) => parkSkyline(-1500000 + u * 3000000, v * 80000)));
+  drawMesh(cam, M.trees, mat((u, v) => parkTrees(-200000 + u * 500000, v * 10000)));
+  drawMesh(cam, M.lawn, Object.assign(mat((u, v) => parkLawn(-150000 + u * 450000, PARK.lawnZ - v * 148500)), { fog: o.fog }));
 }
 
 // ---- 20_scenes.js
@@ -2741,7 +2942,7 @@ function painMarks(cam, pose, k, t) {
 }
 function sWalk(t) {
   const s = walkState(t), cam = walkCam(t), pose = plantedPose(s.root, s.q), pain = ph(t, EV.pain - 0.3, EV.pain + 0.75);
-  skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
+  skyBG(P.K0, P.N2); drawPark(cam, { fog: FOG_W, t }); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: pain * 0.85, fog: FOG_W });
   r3dOutlines();
   painMarks(cam, pose, ph(t, EV.pain, EV.pain + 0.4, lin), t);
@@ -2767,13 +2968,16 @@ function sLeg(t) {
   // through a muddy purple)
   const warm = ph(t, EV.dive + 0.2, EV.cut4, eio), via = (a, b) => warm < 0.5 ? mixc(a, SKY_DARK, 2 * warm) : mixc(SKY_DARK, b, 2 * warm - 1);
   const bot = via(P.N2, MSKY_BOT), pose = holdPose(t), cam = legCam(t, holdPose()), fog = [600, 6000, bot];
-  skyBG(via(P.K0, MSKY_TOP), bot); drawFloor(cam, fog);
+  skyBG(via(P.K0, MSKY_TOP), bot);
+  drawPark(cam, { fog: [lerp(2400, 600, ph(t, EV.reveal, EV.reveal + 1)), lerp(9000, 6000, ph(t, EV.reveal, EV.reveal + 1)), bot], fade: ph(t, EV.reveal + 0.15, EV.muscle + 0.35), t });   // the park dissolves as we enter the leg
+  drawFloor(cam, fog);
   // the right leg turns to glass and stays; the rest of the body dissolves pixel by pixel; then the muscle clears
   const glass = ph(t, EV.reveal, EV.reveal + 0.75), bodyA = 1 - ph(t, EV.reveal + 0.2, EV.muscle + 0.2), musA = 1 - ph(t, EV.artery - 0.2, EV.artery + 0.5) * 0.85;
   drawLeg(cam, pose, { muscle: musA, bone: 0, art: 1, pain: 0.55 * (1 - ph(t, EV.artery, EV.dive)), fog });
   if (bodyA > 0.02) drawPatient(cam, pose, { alpha: bodyA, skipXf: [pose.right.th, pose.right.sh, pose.right.ft], fog });
-  drawPatient(cam, pose, { glassLeg: glass, glassK: 1 - ph(t, EV.dive + 0.15, EV.dive + 0.4), skipParts: ['pelvis', 'torso', 'head', 'uarm', 'farm'], skipXf: [pose.left.th, pose.left.sh, pose.left.ft], fog });
+  drawPatient(cam, pose, { glassLeg: glass, glassK: 1 - ph(t, EV.dive + 0.15, EV.dive + 0.4), skipParts: ['pelvis', 'torso', 'head', 'uarm', 'farm', 'handR', 'handL'], skipXf: [pose.left.th, pose.left.sh, pose.left.ft], fog });
   r3dOutlines();
+  sLeg.last = { cam, A: treeToWorld(holdPose(), [-76, 690, 4]) };     // for the 2D reticle on the dive site
 }
 // ---------------------------------------------------------------- 04-11: the artery, cut lengthwise; blood flows down the screen
 const MICRO_XF = mRz(-Math.PI / 2);                                   // model +x (downstream) → screen down
@@ -2825,6 +3029,7 @@ function sCompare(t) {
   const stN = { g: 0, xc: AR.XS, w: AR.WS }, stS = { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1 };
   const slide = ph(t, EV.comp9, EV.comp9 + 0.5, eout), pS = mS(1, pulseScale(t), pulseScale(t));
   const xfN = mMul(mT(-44 - 80 * (1 - slide), 0, 0), mMul(MICRO_XF, pS)), xfS = mMul(mT(44 * slide, 0, 0), mMul(MICRO_XF, pS));
+  sCompare.last = { cam, xfN, xfS };                                   // for the 2D cross-section insets
   MSKY(); drawVessel(cam, stN, xfN); drawVessel(cam, stS, xfS);
   drawCells(cam, xfN, stN, fieldOf(stN, 90, 5), t, { rate: 0.075 });
   drawCells(cam, xfS, stS, fieldOf({ g: 1, xc: AR.XS, w: AR.WS }, 34, 6), t, { rate: 0.075 });   // less flow overall; faster in the throat
@@ -2850,13 +3055,14 @@ function sOcclusion(t) {
   drawStagnant(cam, xf, OCC_ST, t, 56);
   drawCollatFlow(cam, xf, t, t > EV.colFlow ? ph(t, EV.colFlow, EV.colFlow + 0.6) : 0);
   r3dOutlines();
+  sOcclusion.last = { cam, xf };                                       // for the 2D inset, the flow arrows and the locator
 }
 // ---------------------------------------------------------------- 12: walking again — the working calf needs more than the blocked arteries deliver
 function demandCam(t) { const x = smoothX(WALK12, t, 32.5, 36.6); return camLook([x + 200, 440, 1750], [x + 110, 340, 92], [0, 1, 0], 32); }
 function sDemand(t) {
   const g = WALK12.sample(t), pose = patientPose(g.p, 0, { g, t, effort: ph(t, EV.cut12, EV.rest13) }), cam = demandCam(t);
   const pain = clamp(0.35 + 0.2 * EV.steps12.filter(e => t >= e).length, 0, 1), pulse = Math.max(0, Math.sin(TAU * ((t - EV.cut12) / 0.75))) ** 2;
-  skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
+  skyBG(P.K0, P.N2); drawPark(cam, { fog: FOG_W, t }); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawLeg(cam, pose, { muscle: 1, bone: 0, art: 1, pain, pulse, fog: FOG_W });
   drawPatient(cam, pose, { glassLeg: 1, fog: FOG_W });
   r3dOutlines();
@@ -2867,7 +3073,7 @@ function sRest(t) {
   const s = walkState(PT_HOLD_END), q = Object.assign({}, s.q, { t, effort: 1 - ph(t, EV.relax, EV.rest13 + 3, lin),
     holdArm: 1 - ph(t, EV.relax - 0.4, EV.relax + 0.5, eio), holdTorso: 1 - ph(t, EV.relax - 0.25, EV.relax + 1.1, eio), holdLeg: 1 - ph(t, EV.relax - 0.1, EV.relax + 1.25, eio) });
   const pose = plantedPose(s.root, q), c5 = walkCam(5.0), cam = floatCam(camLook(lerp3(c5.eye, add3(c5.tg, mul3(sub3(c5.eye, c5.tg), 0.9)), ph(t, EV.rest13, EV.rest13 + 3, lin)), c5.tg, [0, 1, 0], 32), t, 6);
-  skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
+  skyBG(P.K0, P.N2); drawPark(cam, { fog: FOG_W, t }); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: 0.85 * (1 - ph(t, EV.relax, EV.rest13 + 2.9)), fog: FOG_W });
   r3dOutlines();
 }
@@ -2962,6 +3168,7 @@ function sCTAOcclusion(t) {                                            // 19: do
   CTA_SKY(); drawBones(c, { ramp: RT.vr, glass: [0.04, 0.4, 1.6] }); drawTreeCTA(c, TREE()); r3dOutlines();
   const g = ph(t, EV.cutoff19, EV.cutoff19 + 0.5);                     // the blocked segment keeps its wall: a faint cyan outline of its course
   if (g > 0 && TREE().occ) drawMesh(c, TREE().occ, { ramp: [P.CY0, P.CY1, P.CY2, P.CY3], id: 0, glass: [0.02 * g, 0.9 * g, 2.4], amb: 0.4, dif: 0.5 });
+  sCTAOcclusion.last = c;                                              // for the axial inset's slice line
 }
 // 20-21: the normal teaching model (left) and this patient's right leg (right): same scale, same angle, turning together
 function sCompareTrees(t) {
@@ -2971,8 +3178,11 @@ function sCompareTrees(t) {
   const hot = [{ k: stepK(t, EV.hl21[0], DUR + 1, 3, 0.15) }, { k: stepK(t, EV.hl21[1], DUR + 1, 3, 0.15) }];
   skyBG(P.K0, P.N2);
   ghostBody(c, xL, ['R'], { fog: FOG_T }); ghostBody(c, xR, ['R'], { fog: FOG_T });
-  drawTreeExpl(c, TREE_N(), { xf: xL, fog: FOG_T });
-  drawTreeExpl(c, TREE_R(), { xf: xR, hot, fog: FOG_T });
+  // the blood's pulses travel down both trees (80 a minute, with the score): all the way in the normal leg; in this
+  // patient's leg slower past the narrowing, stopped at the block, a weak trickle round it and below
+  const flow = { T: t + 0.07 * Math.sin(TAU * t / BEAT) };
+  drawTreeExpl(c, TREE_N(), { xf: xL, fog: FOG_T, flow });
+  drawTreeExpl(c, TREE_R(), { xf: xR, hot, fog: FOG_T, flow });
   r3dOutlines();
   sCompareTrees.last = { c, xL, xR };
 }
@@ -3017,8 +3227,11 @@ function engineInit() { buildParts(); }
 // ============================================================================
 // GRAPHIC OVERLAYS — part of the picture, so the clean (text-free) version
 // keeps them: the time cue (hourglass), the demand / supply bars, the CTA
-// viewer frame, the axial inset with its slice line, the divider of the
-// comparison and the lesion marks of the final image. No numbers anywhere.
+// viewer frame, the axial insets with their slice lines, the divider of the
+// comparison and the lesion marks of the final image; and the 2D explanatory
+// layer over the 3D scenes: the locator (where in the leg we are), the dive
+// reticle, the artery's cross-sections beside its lengthwise cut, the flow
+// arrows in the collaterals, the contrast's route as icons. No numbers anywhere.
 // Safe area for short-video apps (native px; ×3 on export): text and key
 // marks stay inside x 16..313 and y 67..507.
 // ============================================================================
@@ -3096,6 +3309,14 @@ function axialInset(t) {
   drawAxial(AXI.x, AXI.y, AXI.s, k);
   if (k >= 1) frame(AXI.x - 2, AXI.y - 2, AXI.x + AXI.s + 2, AXI.y + AXI.s + 2, P.WARN);
 }
+// the axial slice through the block (scene 19): the same box, a slice line across the blocked segment
+function axialInsetOcc(t) {
+  const c = sCTAOcclusion.last; if (!c || t < EV.cutoff19 || t >= EV.comp20) return;
+  const k = stepK(t, EV.cutoff19, EV.comp20, 4, 0.2), a = project(c, [L2W[0] - 15, L2W[1], L2W[2]]), b = project(c, [L2W[0] + 15, L2W[1], L2W[2]]);
+  if (a && b && k >= 1) { lineW(a[0], a[1], b[0], b[1], 2, P.WARN); dashLine(Math.max(a[0], b[0]) + 2, (a[0] > b[0] ? a[1] : b[1]), AXI.x, AXI.y + 6, P.WARN, 2, 2, 0); }
+  drawAxial(AXI.x, AXI.y, AXI.s, k, axialSampleOcc);
+  if (k >= 1) frame(AXI.x - 2, AXI.y - 2, AXI.x + AXI.s + 2, AXI.y + AXI.s + 2, P.WARN);
+}
 // ---------------------------------------------------------------- comparison (scenes 20-21)
 function divider(t) {
   const k = stepK(t, EV.comp20 + 0.25, DUR + 1, 4, 0.2); if (k <= 0) return;
@@ -3111,9 +3332,20 @@ function lesionMarks(t) {
     const a = project(S.c, mApply(S.xR, [-34, yTop, 0])), b = project(S.c, mApply(S.xR, [-34, yBot, 0])); if (!a || !b) return;
     const x = Math.round(Math.max(a[0], b[0])) + 2, ya = Math.round(a[1]), yb = Math.round(b[1]), L = Math.round(6 * k);
     rect(x, ya, x + 2, yb, P.PAIN); rect(x - L, ya, x + 2, ya + 2, P.PAIN); rect(x - L, yb - 2, x + 2, yb, P.PAIN);
+    return [x + 2, Math.round((ya + yb) / 2)];
   };
-  br(LES.L1.y0 + 6, LES.L1.y1 - 6, stepK(t, EV.hl21[0], DUR + 1, 3, 0.15));
-  br(LES.L2.y0 + 6, LES.L2.y1 - 6, stepK(t, EV.hl21[1], DUR + 1, 3, 0.15));
+  // the 2D cross-section of the finding (the same pictures as beside the artery in scenes 9-10): a small disc that pops in
+  const icon = (at, kind, k, accent) => {
+    if (!at || k <= 0) return;
+    const R = Math.max(2, Math.round(9 * k)), cx = at[0] + 13, cy = at[1];
+    rect(at[0] + 1, cy, cx - R - 1, cy + 1, accent); disc(cx + 1, cy + 1, R + 2.5, P.SH); disc(cx, cy, R + 2.5, accent); disc(cx, cy, R + 1.2, XS_BG);
+    if (k >= 1) drawXsec(cx, cy, R, kind);
+  };
+  const k1 = stepK(t, EV.hl21[0], DUR + 1, 3, 0.15), k2 = stepK(t, EV.hl21[1], DUR + 1, 3, 0.15);
+  icon(br(LES.L1.y0 + 6, LES.L1.y1 - 6, k1), 'sten', k1, P.PAIN);
+  icon(br(LES.L2.y0 + 6, LES.L2.y1 - 6, k2), 'occ', k2, P.PAIN);
+  const nA = project(S.c, mApply(S.xL, [-34, LES.L1.yc, 0]));           // the same level on the normal artery: an open ring
+  if (nA) icon([Math.round(nA[0]) + 4, Math.round(nA[1])], 'normal', k1, P.ACC);
   if (t >= EV.hl21[2]) for (const g of ['RGEN1', 'RGEN2']) {
     const pts = ART[g].pts, n = 26;
     for (let i = 0; i < n; i++) {
@@ -3123,13 +3355,211 @@ function lesionMarks(t) {
     }
   }
 }
+// ============================================================================
+// THE 2D EXPLANATORY LAYER over the 3D scenes (pixel art, no text): where we
+// are, what the cut looks like end-on, which way the blood goes.
+// ============================================================================
+// a pixel bitmap from rows of characters, one colour per character (missing / 0 = transparent)
+function bmp(rows, x, y, sc, pal) {
+  for (let j = 0; j < rows.length; j++) for (let i = 0; i < rows[j].length; i++) { const c = pal[rows[j][i]]; if (c) rect(x + i * sc, y + j * sc, x + (i + 1) * sc, y + (j + 1) * sc, c); }
+}
+// a small arrowhead at (x, y) pointing along (dx, dy)
+function chevron(x, y, dx, dy, s, c) {
+  const l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, nx = -uy, ny = ux;
+  const tx = x + ux * s, ty = y + uy * s, ax = x - ux * s * 0.6 + nx * s, ay = y - uy * s * 0.6 + ny * s, bx = x - ux * s * 0.6 - nx * s, by = y - uy * s * 0.6 - ny * s;
+  lineW(ax + 1, ay + 1, tx + 1, ty + 1, 2, P.SH); lineW(bx + 1, by + 1, tx + 1, ty + 1, 2, P.SH);
+  lineW(ax, ay, tx, ty, 2, c); lineW(bx, by, tx, ty, 2, c);
+}
+// ---------------------------------------------------------------- the locator (scenes 4-8 and 10): where in the leg the close-up is
+// a small pixel picture of his right leg, side view as he walked (shorts, skin, sock, shoe — drawn from the same
+// shapes as the 3D model), the artery in red, and a cyan marker at the level the camera looks at: the thigh for the
+// stenosis, behind the knee for the block
+const LOC = { x: 16, y: 388, w: 40, h: 112, s: 0.1, ox: 10.5, oy: 5 };   // s: px per mm; (ox, oy): the hip joint in the box
+const LOC_IMG = () => cached('locimg', () => {
+  const w = LOC.w, h = LOC.h, img = new Uint32Array(w * h), ins = new Uint8Array(w * h);
+  const col = yb => yb > -300 ? RP.shorts[3] : yb > -770 ? RP.skin[3] : yb > -862 ? RP.sock[2] : yb > -930 ? RP.shoe[3] : RP.sole[2];
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const x = (i + 0.5 - LOC.ox) / LOC.s, y = -(j + 0.5 - LOC.oy) / LOC.s;
+    if (Math.min(SD.thigh(x, y, 0), SD.shin(x, y + 440, 0), SD.foot(x, y + 860, 0)) < 0) { ins[j * w + i] = 1; img[j * w + i] = col(y); }
+  }
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (!ins[j * w + i]) {                   // a dark outline round the silhouette
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = i + a, y = j + b; if (x >= 0 && y >= 0 && x < w && y < h && ins[y * w + x]) { img[j * w + i] = P.SH; break; } }
+  }
+  return img;
+});
+// the artery's place in the box at tree height y (common femoral → superficial femoral → popliteal → posterior tibial)
+function locArtery(y) {
+  for (const n of ['RCFA', 'RSFA', 'RPOP', 'RTPT', 'RPTA']) {
+    const p = ART[n].pts;
+    for (let i = 0; i + 1 < p.length; i++) if ((y - p[i][1]) * (y - p[i + 1][1]) <= 0 && p[i][1] !== p[i + 1][1]) { const u = (y - p[i][1]) / (p[i + 1][1] - p[i][1]); return [LOC.x + LOC.ox + lerp(p[i][2], p[i + 1][2], u) * LOC.s, LOC.y + LOC.oy + (920 - y) * LOC.s]; }
+  }
+  return null;
+}
+function locator(t) {
+  const k = Math.max(stepK(t, EV.cap4 - 0.1, EV.comp9, 4, 0.3), stepK(t, EV.pan10, EV.pull11, 4, 0.3)); if (k <= 0) return;
+  const { w, h, y } = LOC, x = LOC.x - Math.round((1 - k) * (w + 20));                           // slides in from the left edge
+  rect(x + 2, y + 2, x + w + 2, y + h + 2, P.SH, 0.6); rect(x, y, x + w, y + h, P.BOX, 0.92); frame(x - 1, y - 1, x + w + 1, y + h + 1, P.N5);
+  const img = LOC_IMG(), dx = x - LOC.x;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const c = img[j * w + i]; if (c) pset(x + i, y + j, c); }
+  let q = null; for (let yy = 872; yy >= 26; yy -= 6) { const p = locArtery(yy); if (p && q) line(q[0] + dx, q[1], p[0] + dx, p[1], P.AR3); q = p; }
+  // the marker: the level the camera looks at (model x along the artery ↔ height in the leg)
+  const mx = t < EV.pan10 ? AR.XS : -occCam(t).tg[1], ly = lerp(LES.L1.yc, 519, clamp((mx - AR.XS) / (AR.XO - AR.XS), 0, 1)), m = locArtery(ly);
+  if (m) {
+    const b = (t / BEAT) % 1, r = 3.6 + 1.6 * Math.max(0, 1 - b * 2.5), mxp = m[0] + dx, my = Math.round(m[1]);
+    rect(x + 1, my, Math.round(mxp - r), my + 1, P.ACC); rect(Math.round(mxp + r) + 1, my, x + w - 1, my + 1, P.ACC);     // a level line across the box
+    ring(mxp, m[1] + 0.5, r, 1.5, P.ACC); pset(mxp, m[1], P.INK);
+  }
+}
+// scene 3: a cyan reticle on the thigh artery where the camera is about to dive in — the place the locator then marks
+function diveReticle(t) {
+  if (t < EV.artery || t >= EV.dive + 0.45 || !sLeg.last) return;
+  const p = project(sLeg.last.cam, sLeg.last.A); if (!p) return;
+  const k = stepK(t, EV.artery, EV.dive + 0.45, 4, 0.25), b = (t / BEAT) % 1, r = (14 + 4 * Math.max(0, 1 - b * 3)) * k, x = Math.round(p[0]), y = Math.round(p[1]);
+  if (r < 3) return;
+  ring(x + 1, y + 1, r, 1.6, P.SH); ring(x, y, r, 1.6, P.ACC);
+  for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = r + 3, e = r + 8; rect(Math.round(x + Math.min(ax * a, ax * e)) - (ax ? 0 : 1), Math.round(y + Math.min(ay * a, ay * e)) - (ay ? 0 : 1), Math.round(x + Math.max(ax * a, ax * e)) + 1, Math.round(y + Math.max(ay * a, ay * e)) + 1, P.ACC); }
+}
+// ---------------------------------------------------------------- 2D cross-sections of the artery (the wall layers of the cut face, seen end-on)
+// y, z: model units from the vessel's axis; kind: 'normal' | 'sten' | 'occ'; px: model units per screen pixel
+const XS_CAL = { sten: [[-13.5, 9.5, 3.4], [-5, 17, 2.6], [-17.5, -1.5, 2.3]], occ: [[-8, 5, 3.6], [7, -9, 3.0], [10, 9, 2.5], [-3, -13, 2.3]] };
+function xsecPix(y, z, kind, px) {
+  const r = Math.hypot(y, z), th = Math.atan2(z, y), fine = px < 1.7, e = Math.max(0.55, 0.62 * px);
+  if (r > AR.RO) return 0;
+  if (r > AR.RO - Math.max(0.6, 0.95 * px)) return CX_.ol;
+  if (r > AR.RM) {                                                       // adventitia: wavy collagen
+    if (fine && ((r + 0.8 * Math.sin(th * 7)) % 1.7 + 1.7) % 1.7 < 0.45) return CX_.advF;
+    return hash2(Math.floor(th * 9), Math.floor(r / 1.3)) < 0.3 ? CX_.adv2 : CX_.adv;
+  }
+  if (r > AR.RIEL + e) {                                                 // media: rings of smooth muscle with nuclei
+    if (fine && hash2(Math.floor(th * 11), Math.floor(r / 2.2)) < 0.24 && (r % 2.2) > 0.9 && (r % 2.2) < 1.7) return CX_.medN;
+    return Math.floor((r - AR.RIEL) / 1.7) & 1 ? CX_.med2 : CX_.med;
+  }
+  if (r > AR.RI - e) return CX_.iel;                                     // the internal elastic lamina: a bright ring
+  for (const [cy, cz, cr] of XS_CAL[kind] || []) {                       // calcium: white nodules with a dark rim
+    const q = ((y - cy) / cr) ** 2 + ((z - cz) / cr) ** 2; if (q < 1) return q > (fine ? 0.62 : 0.3) ? CX_.calO : (y - cy + z - cz > cr * 0.5 ? CX_.calD : CX_.cal);
+  }
+  if (kind === 'occ') {                                                  // the block: organised fibrous material, no channel
+    if (fine && ((z + 0.8 * Math.sin(y * 0.3)) % 2.6 + 2.6) % 2.6 < 0.6) return CX_.occ2;
+    return hash2(Math.floor(y / 1.7), Math.floor(z / 1.7)) < 0.08 ? CX_.occD : CX_.occ;
+  }
+  const sten = kind === 'sten', rho = AR.RL * (sten ? 0.36 : 1), s = sten ? 0.42 * AR.RL : 0, d = Math.hypot(y - s * 0.74, z + s * 0.67);
+  if (d < rho) {                                                         // the open channel: blood
+    const gy = Math.floor(y / 3.4), gz = Math.floor(z / 3.4), cx = (gy + 0.5) * 3.4 + (hash2(gy, gz) - 0.5), cz = (gz + 0.5) * 3.4 + (hash2(gz, gy + 5) - 0.5);
+    if (fine && hash2(gy + 3, gz + 7) < 0.36 && Math.hypot(y - cx, z - cz) < 1.25) return P.BL2;
+    return d > rho - Math.max(0.9, px) ? P.AR4 : P.AR3;
+  }
+  if (d < rho + Math.max(0.95, 0.9 * px) || !sten) return CX_.endo;      // the lining
+  const u = d - rho, v = AR.RI - r;
+  if (u < 4.2) return ((th * 9 + u) % 2 + 2) % 2 < 0.7 ? CX_.cap2 : CX_.cap;   // fibrous cap
+  if (v > 1.4) {                                                         // lipid core with cholesterol clefts
+    if (fine && ((y * 0.6 + z) % 5.2 + 5.2) % 5.2 < 0.45 && hash2(Math.floor((y * 0.6 + z) / 5.2), 3) < 0.6) return CX_.clef;
+    const n = hash2(Math.floor(y / 2.2), Math.floor(z / 2.2));
+    return n < 0.22 ? CX_.core2 : n > 0.9 ? CX_.coreD : CX_.core;
+  }
+  return CX_.fib;
+}
+function drawXsec(cx, cy, R, kind) {
+  const px = AR.RO / (R + 0.5);
+  for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) { const c = xsecPix(i * px, j * px, kind, px); if (c) pset(cx + i, cy + j, c); }
+}
+// a square inset that opens from its centre; accent: the colour of its border (cyan: normal, orange: diseased)
+const XSB = 66, XS_BG = hexc('#14070C');
+function xsecInset(bx, by, kind, k, accent) {
+  if (k <= 0) return;
+  const ss = Math.max(4, Math.round(XSB * k)), x0 = Math.round(bx + (XSB - ss) / 2), y0 = Math.round(by + (XSB - ss) / 2);
+  rect(x0, y0, x0 + ss + 4, y0 + ss + 4, P.SH, 0.6); rect(x0 - 2, y0 - 2, x0 + ss + 2, y0 + ss + 2, accent); rect(x0, y0, x0 + ss, y0 + ss, XS_BG);
+  if (k >= 1) drawXsec(bx + XSB / 2, by + XSB / 2, XSB / 2 - 4, kind);
+}
+// a slice mark across a vessel between two screen points, with end ticks; kl: 0..1 drawn from the middle outward
+function sliceMark(xa, xb, y, kl, c) {
+  if (kl <= 0) return;
+  const m = (xa + xb) / 2, a = Math.round(lerp(m, xa, kl)), b = Math.round(lerp(m, xb, kl));
+  dashLine(a, y + 1, b, y + 1, P.SH, 3, 2, 0); dashLine(a, y, b, y, c, 3, 2, 0);
+  if (kl >= 1) { rect(a - 1, y - 3, a + 1, y + 4, c); rect(b - 1, y - 3, b + 1, y + 4, c); }
+}
+// scene 9: both arteries cut across at the same level — the open ring beside the narrowed one
+function xsecCompare(t) {
+  const S = sCompare.last, t0 = EV.jet; if (!S || t < t0 || t >= EV.pan10) return;                 // with the jet: long enough on screen to be read
+  const kl = clamp((t - t0) / 0.25, 0, 1) * clamp((EV.pan10 - t) / 0.2, 0, 1), k = stepK(t, t0 + 0.2, EV.pan10, 4, 0.25), by = 418;
+  for (const [xf, kind, accent, bx, inner] of [[S.xfN, 'normal', P.ACC, 110, 1], [S.xfS, 'sten', P.WARN, 184, -1]]) {
+    const a = project(S.cam, mApply(xf, [AR.XS, -AR.RO - 2, 1])), b = project(S.cam, mApply(xf, [AR.XS, AR.RO + 2, 1])); if (!a || !b) continue;
+    const xa = Math.min(a[0], b[0]), xb = Math.max(a[0], b[0]), y = Math.round((a[1] + b[1]) / 2), xi = Math.round(inner > 0 ? xb + 3 : xa - 3);
+    sliceMark(xa - 2, xb + 2, y, kl, accent);
+    if (k >= 1) dashLine(xi, y + 5, xi, by - 3, accent, 2, 2, 0);          // the leader runs down the gap between the two arteries
+    xsecInset(bx, by, kind, k, accent);
+  }
+}
+// scene 10: the blocked segment cut across — no channel left inside the wall
+function xsecBlock(t) {
+  const S = sOcclusion.last, t0 = EV.block10; if (!S || t < t0 || t >= EV.pull11) return;           // with the key term and its low accent
+  const kl = clamp((t - t0) / 0.25, 0, 1) * clamp((EV.pull11 - t) / 0.2, 0, 1), k = stepK(t, t0 + 0.2, EV.pull11, 4, 0.25), bx = 238, by = 372;
+  const a = project(S.cam, mApply(S.xf, [AR.XO - 28, -AR.RO - 2, 1])), b = project(S.cam, mApply(S.xf, [AR.XO - 28, AR.RO + 2, 1])); if (!a || !b) return;
+  const y = Math.round((a[1] + b[1]) / 2);
+  sliceMark(Math.max(22, Math.min(a[0], b[0])), Math.min(338, Math.max(a[0], b[0])), y, kl, P.WARN);
+  if (k >= 1 && y + 5 < by - 3) dashLine(bx + XSB / 2, y + 5, bx + XSB / 2, by - 3, P.WARN, 2, 2, 0);
+  xsecInset(bx, by, 'occ', k, P.WARN);
+}
+// scene 11: arrows on the detour — out of the channel above the block, round it through the two side channels and
+// back into the artery below (the parts of the route hidden behind the wall are shown too)
+const COL_ROUTE = () => cached('colroute', () => collatPaths().map(pts => {
+  const sg = pts[0][1] > 0 ? 1 : -1, a = pts[0], b = pts[pts.length - 1];
+  return [[a[0] - 26, sg * 8], [a[0] - 14, sg * 17], ...pts.map(p => [p[0], p[1]]), [b[0] + 14, sg * 17], [b[0] + 26, sg * 8]];
+}));
+function collatArrows(t) {
+  const S = sOcclusion.last; if (!S || t < EV.colFlow || t >= EV.cut12) return;
+  const k = stepK(t, EV.colFlow, EV.cut12, 4, 0.3), clk = flowClock(t, 0.3);
+  COL_ROUTE().forEach((pts, pi) => {
+    const L = pts.length - 1;
+    for (let i = 0; i < 4; i++) {
+      const u = (clk + i / 4 + pi * 0.11) % 1, f = u * L, j = Math.min(L - 1, Math.floor(f)), h = f - j, a = pts[j], b = pts[j + 1];
+      const p = project(S.cam, mApply(S.xf, [lerp(a[0], b[0], h), lerp(a[1], b[1], h), 2])), q = project(S.cam, mApply(S.xf, [b[0], b[1], 2])), o = project(S.cam, mApply(S.xf, [a[0], a[1], 2]));
+      const e = Math.min(1, u / 0.06, (1 - u) / 0.06);                    // arrows grow in at the start of the route and shrink at its end
+      if (p && q && o && e > 0.2) chevron(Math.round(p[0]), Math.round(p[1]), q[0] - o[0], q[1] - o[1], 5.2 * k * e, P.INK);
+    }
+  });
+}
+// ---------------------------------------------------------------- the contrast's route as a strip of icons (scene 15)
+// arm vein → right heart → lungs → left heart → aorta and legs; each station lights up as the contrast front arrives
+// in the 3D picture (the same arrival times, 15_circ.js)
+const RT_ICON = [
+  ['...........', '...........', '...........', '#...#####..', '#...#ooo#..', '#####ooo###', '#...#ooo#..', '#...#####..', '...........', '...........', '...........'],   // syringe: into the arm vein
+  ['...........', '..oo...##..', '.oooo.####.', '.ooooo####.', '.ooooo####.', '.ooooo####.', '..oooo###..', '...ooo##...', '....oo#....', '.....o.....', '...........'],   // heart, the right side (on the viewer's left)
+  ['.....#.....', '.....#.....', '....###....', '..oo.#.oo..', '.ooo.#.ooo.', '.ooo...ooo.', 'oooo...oooo', 'oooo...oooo', 'oooo...oooo', '.ooo...ooo.', '...........'],   // lungs
+  ['...........', '..##...oo..', '.####.oooo.', '.####ooooo.', '.####ooooo.', '.####ooooo.', '..###oooo..', '...##ooo...', '....#oo....', '.....o.....', '...........'],   // heart, the left side
+  ['...ooooo...', '...ooooo...', '...oo.oo...', '...oo.oo...', '...oo.oo...', '...oo.oo...', '...oo.oo...', '...oo.oo...', '...oo.oo...', '..ooo.ooo..', '...........'],   // aorta and legs
+];
+const RT_A = [6.6, 10.6, 12.6, 15.25, 16.55];                           // the front's arrival at each station (CTA-film times → ACLK)
+function routeStrip(t) {
+  if (t < EV.circ15 + 0.15 || t >= EV.fill16) return;                   // it stays to the cut
+  const k = eout(clamp((t - EV.circ15 - 0.15) / 0.25, 0, 1));
+  const n = RT_ICON.length, sc = 3, iw = 11 * sc, gap = 22, tw = n * iw + (n - 1) * gap, bw = tw + 26, x0 = Math.round(CX - bw / 2), y0 = 70, bh = 11 * sc + 13;
+  band(x0, y0, bw, bh, k, P.ACC);
+  if (k < 1) return;
+  for (let i = 0; i < n; i++) {
+    const x = x0 + 14 + i * (iw + gap), on = clamp((t - ACLK(RT_A[i])) / 0.2, 0, 1), pop = on > 0 && on < 1 ? 2 : 0;
+    const lit = on > 0, main = lit ? P.CO3 : P.N5, dim = lit ? P.CO1 : P.N4;
+    bmp(RT_ICON[i], x, y0 + 6 - pop, sc, { '#': i === 0 ? (lit ? P.INK : P.N5) : dim, o: i === 0 ? (lit ? P.CO2 : P.N4) : main });
+    if (i + 1 < n) {                                                    // the link to the next station fills as the front travels
+      const f = clamp((t - ACLK(RT_A[i])) / (ACLK(RT_A[i + 1]) - ACLK(RT_A[i])), 0, 1), xa = x + iw + 4, xb = x + iw + gap - 6, ym = y0 + 6 + Math.floor(11 * sc / 2) - 1;
+      rect(xa, ym, xb, ym + 2, P.N4); if (f > 0) rect(xa, ym, Math.round(lerp(xa, xb, f)), ym + 2, P.CO2);
+      const c = f >= 1 ? P.CO3 : P.N5; rect(xb - 2, ym - 3, xb, ym + 5, c); rect(xb, ym - 2, xb + 2, ym + 4, c); rect(xb + 2, ym - 1, xb + 3, ym + 3, c); rect(xb + 3, ym, xb + 4, ym + 2, c);      // arrow tip
+    }
+  }
+}
 // ---------------------------------------------------------------- all graphic overlays
 function drawUI(t) {
   if (t >= EV.glu[0] && t < EV.push6) hourglass(301, 131, 1 - seg(t, EV.glu[0], EV.push6 - 0.1), stepK(t, EV.cap5, EV.push6, 3, 0.15));
   if (t >= EV.grow8 && t < EV.comp9) hourglass(301, 131, 1 - seg(t, EV.grow8, EV.comp9 - 0.1), stepK(t, EV.cap8, EV.comp9, 3, 0.15));
+  diveReticle(t);
+  locator(t);
+  xsecCompare(t);
+  xsecBlock(t);
+  collatArrows(t);
   demandBars(t);
+  routeStrip(t);
   viewerFrame(t);
   axialInset(t);
+  axialInsetOcc(t);
   divider(t);
   lesionMarks(t);
 }

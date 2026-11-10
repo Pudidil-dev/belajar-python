@@ -43,7 +43,7 @@ function painMarks(cam, pose, k, t) {
 }
 function sWalk(t) {
   const s = walkState(t), cam = walkCam(t), pose = plantedPose(s.root, s.q), pain = ph(t, EV.pain - 0.3, EV.pain + 0.75);
-  skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
+  skyBG(P.K0, P.N2); drawPark(cam, { fog: FOG_W, t }); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: pain * 0.85, fog: FOG_W });
   r3dOutlines();
   painMarks(cam, pose, ph(t, EV.pain, EV.pain + 0.4, lin), t);
@@ -69,13 +69,16 @@ function sLeg(t) {
   // through a muddy purple)
   const warm = ph(t, EV.dive + 0.2, EV.cut4, eio), via = (a, b) => warm < 0.5 ? mixc(a, SKY_DARK, 2 * warm) : mixc(SKY_DARK, b, 2 * warm - 1);
   const bot = via(P.N2, MSKY_BOT), pose = holdPose(t), cam = legCam(t, holdPose()), fog = [600, 6000, bot];
-  skyBG(via(P.K0, MSKY_TOP), bot); drawFloor(cam, fog);
+  skyBG(via(P.K0, MSKY_TOP), bot);
+  drawPark(cam, { fog: [lerp(2400, 600, ph(t, EV.reveal, EV.reveal + 1)), lerp(9000, 6000, ph(t, EV.reveal, EV.reveal + 1)), bot], fade: ph(t, EV.reveal + 0.15, EV.muscle + 0.35), t });   // the park dissolves as we enter the leg
+  drawFloor(cam, fog);
   // the right leg turns to glass and stays; the rest of the body dissolves pixel by pixel; then the muscle clears
   const glass = ph(t, EV.reveal, EV.reveal + 0.75), bodyA = 1 - ph(t, EV.reveal + 0.2, EV.muscle + 0.2), musA = 1 - ph(t, EV.artery - 0.2, EV.artery + 0.5) * 0.85;
   drawLeg(cam, pose, { muscle: musA, bone: 0, art: 1, pain: 0.55 * (1 - ph(t, EV.artery, EV.dive)), fog });
   if (bodyA > 0.02) drawPatient(cam, pose, { alpha: bodyA, skipXf: [pose.right.th, pose.right.sh, pose.right.ft], fog });
-  drawPatient(cam, pose, { glassLeg: glass, glassK: 1 - ph(t, EV.dive + 0.15, EV.dive + 0.4), skipParts: ['pelvis', 'torso', 'head', 'uarm', 'farm'], skipXf: [pose.left.th, pose.left.sh, pose.left.ft], fog });
+  drawPatient(cam, pose, { glassLeg: glass, glassK: 1 - ph(t, EV.dive + 0.15, EV.dive + 0.4), skipParts: ['pelvis', 'torso', 'head', 'uarm', 'farm', 'handR', 'handL'], skipXf: [pose.left.th, pose.left.sh, pose.left.ft], fog });
   r3dOutlines();
+  sLeg.last = { cam, A: treeToWorld(holdPose(), [-76, 690, 4]) };     // for the 2D reticle on the dive site
 }
 // ---------------------------------------------------------------- 04-11: the artery, cut lengthwise; blood flows down the screen
 const MICRO_XF = mRz(-Math.PI / 2);                                   // model +x (downstream) → screen down
@@ -127,6 +130,7 @@ function sCompare(t) {
   const stN = { g: 0, xc: AR.XS, w: AR.WS }, stS = { g: 1, cal: 1, xc: AR.XS, w: AR.WS, sick: 1 };
   const slide = ph(t, EV.comp9, EV.comp9 + 0.5, eout), pS = mS(1, pulseScale(t), pulseScale(t));
   const xfN = mMul(mT(-44 - 80 * (1 - slide), 0, 0), mMul(MICRO_XF, pS)), xfS = mMul(mT(44 * slide, 0, 0), mMul(MICRO_XF, pS));
+  sCompare.last = { cam, xfN, xfS };                                   // for the 2D cross-section insets
   MSKY(); drawVessel(cam, stN, xfN); drawVessel(cam, stS, xfS);
   drawCells(cam, xfN, stN, fieldOf(stN, 90, 5), t, { rate: 0.075 });
   drawCells(cam, xfS, stS, fieldOf({ g: 1, xc: AR.XS, w: AR.WS }, 34, 6), t, { rate: 0.075 });   // less flow overall; faster in the throat
@@ -152,13 +156,14 @@ function sOcclusion(t) {
   drawStagnant(cam, xf, OCC_ST, t, 56);
   drawCollatFlow(cam, xf, t, t > EV.colFlow ? ph(t, EV.colFlow, EV.colFlow + 0.6) : 0);
   r3dOutlines();
+  sOcclusion.last = { cam, xf };                                       // for the 2D inset, the flow arrows and the locator
 }
 // ---------------------------------------------------------------- 12: walking again — the working calf needs more than the blocked arteries deliver
 function demandCam(t) { const x = smoothX(WALK12, t, 32.5, 36.6); return camLook([x + 200, 440, 1750], [x + 110, 340, 92], [0, 1, 0], 32); }
 function sDemand(t) {
   const g = WALK12.sample(t), pose = patientPose(g.p, 0, { g, t, effort: ph(t, EV.cut12, EV.rest13) }), cam = demandCam(t);
   const pain = clamp(0.35 + 0.2 * EV.steps12.filter(e => t >= e).length, 0, 1), pulse = Math.max(0, Math.sin(TAU * ((t - EV.cut12) / 0.75))) ** 2;
-  skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
+  skyBG(P.K0, P.N2); drawPark(cam, { fog: FOG_W, t }); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawLeg(cam, pose, { muscle: 1, bone: 0, art: 1, pain, pulse, fog: FOG_W });
   drawPatient(cam, pose, { glassLeg: 1, fog: FOG_W });
   r3dOutlines();
@@ -169,7 +174,7 @@ function sRest(t) {
   const s = walkState(PT_HOLD_END), q = Object.assign({}, s.q, { t, effort: 1 - ph(t, EV.relax, EV.rest13 + 3, lin),
     holdArm: 1 - ph(t, EV.relax - 0.4, EV.relax + 0.5, eio), holdTorso: 1 - ph(t, EV.relax - 0.25, EV.relax + 1.1, eio), holdLeg: 1 - ph(t, EV.relax - 0.1, EV.relax + 1.25, eio) });
   const pose = plantedPose(s.root, q), c5 = walkCam(5.0), cam = floatCam(camLook(lerp3(c5.eye, add3(c5.tg, mul3(sub3(c5.eye, c5.tg), 0.9)), ph(t, EV.rest13, EV.rest13 + 3, lin)), c5.tg, [0, 1, 0], 32), t, 6);
-  skyBG(P.K0, P.N2); drawFloor(cam, FOG_W); footShadows(cam, pose);
+  skyBG(P.K0, P.N2); drawPark(cam, { fog: FOG_W, t }); drawFloor(cam, FOG_W); footShadows(cam, pose);
   drawPatient(cam, pose, { pain: 0.85 * (1 - ph(t, EV.relax, EV.rest13 + 2.9)), fog: FOG_W });
   r3dOutlines();
 }
@@ -264,6 +269,7 @@ function sCTAOcclusion(t) {                                            // 19: do
   CTA_SKY(); drawBones(c, { ramp: RT.vr, glass: [0.04, 0.4, 1.6] }); drawTreeCTA(c, TREE()); r3dOutlines();
   const g = ph(t, EV.cutoff19, EV.cutoff19 + 0.5);                     // the blocked segment keeps its wall: a faint cyan outline of its course
   if (g > 0 && TREE().occ) drawMesh(c, TREE().occ, { ramp: [P.CY0, P.CY1, P.CY2, P.CY3], id: 0, glass: [0.02 * g, 0.9 * g, 2.4], amb: 0.4, dif: 0.5 });
+  sCTAOcclusion.last = c;                                              // for the axial inset's slice line
 }
 // 20-21: the normal teaching model (left) and this patient's right leg (right): same scale, same angle, turning together
 function sCompareTrees(t) {
@@ -273,8 +279,11 @@ function sCompareTrees(t) {
   const hot = [{ k: stepK(t, EV.hl21[0], DUR + 1, 3, 0.15) }, { k: stepK(t, EV.hl21[1], DUR + 1, 3, 0.15) }];
   skyBG(P.K0, P.N2);
   ghostBody(c, xL, ['R'], { fog: FOG_T }); ghostBody(c, xR, ['R'], { fog: FOG_T });
-  drawTreeExpl(c, TREE_N(), { xf: xL, fog: FOG_T });
-  drawTreeExpl(c, TREE_R(), { xf: xR, hot, fog: FOG_T });
+  // the blood's pulses travel down both trees (80 a minute, with the score): all the way in the normal leg; in this
+  // patient's leg slower past the narrowing, stopped at the block, a weak trickle round it and below
+  const flow = { T: t + 0.07 * Math.sin(TAU * t / BEAT) };
+  drawTreeExpl(c, TREE_N(), { xf: xL, fog: FOG_T, flow });
+  drawTreeExpl(c, TREE_R(), { xf: xR, hot, fog: FOG_T, flow });
   r3dOutlines();
   sCompareTrees.last = { c, xL, xR };
 }

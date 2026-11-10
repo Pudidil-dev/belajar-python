@@ -85,6 +85,8 @@ const RT = {
   wall: [hexc('#2A1020'), hexc('#561C2C'), hexc('#8E3038'), P.AR3, hexc('#F0A48C')],
   blood: [P.BL0, P.BL1, P.BL2, P.BL3, P.AR2],
   con: [P.CO0, P.CO1, P.CO2, P.CO3, P.CO4],
+  conD: [hexc('#2C567C'), P.CO0, hexc('#6FA3C8'), P.CO1, hexc('#B4D8F0')],      // the lumen between two flow pulses
+  conB: [P.CO1, P.CO2, P.CO3, P.CO4, P.CO4],                                    // a flow pulse
   plq: [P.PL0, P.PL1, P.PL2, P.PL3, P.PL4],
   occ: [P.OC0, P.OC1, P.OC2, P.OC3, P.OC4],
   cal: [P.CA1, P.CA2, P.CA3, P.CA4],
@@ -117,7 +119,51 @@ function lesionAt(name, y, normal) {
 const ECC = norm3([-0.6, 0, 0.8]);
 // the arrival distance of the contrast at a sample (the popliteal below the block and the collaterals fill later)
 function arrivalAt(name, q, normal) { let s = q[4] + (isGen(name) ? 140 : 0); if (!normal && name[0] === 'R' && q[1] < LES.L2.y1 + 2 && !/CIA|IIA|EIA|CFA|PFA|SFA/.test(name)) s += 160; return s; }
-// ---------------------------------------------------------------- the tree meshes. o: {legs: ['R','L'], aorta, normal, rk}
+// ---------------------------------------------------------------- flow through the right leg's tree (scenes 20-21)
+// every sample of every vessel gets the time the blood needs to reach it from the groin (seconds, at drawing speeds),
+// so pulses can travel down the lumen at the local speed: brisk in open arteries, slower behind the stenosis, slowest
+// through the collaterals and below the block, which is fed only by them. The class (0 full, 1 reduced, 2 weak) dims
+// the pulses. Stored in the lumen's vertex attribute as class * 1000 + time.
+const FLOW_V = { open: 380, sfa: 250, post: 150, col: 105, low: 95 };
+function flowField(normal) {
+  const F = {}, S_ = n => vesselSamples(ART[n], 3);
+  const nearest = (S, p) => { let b = 0, bd = 1e9; S.forEach((q, i) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]); if (d < bd) { bd = d; b = i; } }); return b; };
+  const rule = (n, y) => {                                              // [speed, class] of a sample
+    if (isGen(n)) return [FLOW_V.col, 2];
+    if (normal) return [FLOW_V.open, 0];
+    if (/CIA|IIA|EIA|CFA|PFA/.test(n)) return [FLOW_V.open, 0];
+    if (/SFA/.test(n)) return y > LES.L1.y0 ? [FLOW_V.sfa, 0] : [FLOW_V.post, 1];
+    if (/POP/.test(n) && y >= LES.L2.y1) return [FLOW_V.post, 1];
+    return [FLOW_V.low, 2];
+  };
+  const run = (n, i0, i1, tau0) => {                                    // march along samples i0 → i1 (either direction)
+    const S = S_(n), f = F[n] || (F[n] = { tau: new Float32Array(S.length), cls: new Uint8Array(S.length) }), st = i1 >= i0 ? 1 : -1;
+    let tau = tau0;
+    for (let i = i0; i !== i1 + st; i += st) { const r = rule(n, S[i][1]); if (i !== i0) tau += Math.abs(S[i][4] - S[i - st][4]) / r[0]; f.tau[i] = tau; f.cls[i] = r[1]; }
+  };
+  const start = n => { const a = ART[n], par = a.parent && F[a.parent] ? a.parent : null; return par ? F[par].tau[nearest(S_(par), a.pts[0])] : 0; };
+  const whole = n => run(n, 0, S_(n).length - 1, start(n));
+  for (const n of ['RCIA', 'RIIA', 'REIA', 'RCFA', 'RPFA', 'RSFA']) whole(n);
+  if (normal) { for (const n of ['RPOP', 'RATA', 'RTPT', 'RPTA', 'RPER', 'RPERc', 'RGEN1', 'RGEN2', 'RGEN3']) whole(n); return F; }
+  // this patient: the popliteal down to the block, the collaterals round it, then the popliteal below the block from
+  // where the collaterals rejoin it (the stub between the block and that point fills backward)
+  const P_ = S_('RPOP'), top = P_.findIndex(q => q[1] < LES.L2.y0);
+  run('RPOP', 0, Math.max(0, top - 1), start('RPOP'));
+  for (const n of ['RGEN1', 'RGEN2', 'RGEN3']) whole(n);
+  const gEnd = n => { const f = F[n]; return f.tau[f.tau.length - 1]; }, tj = Math.min(gEnd('RGEN1'), gEnd('RGEN2'), gEnd('RGEN3')), g1 = ART.RGEN1.pts, j = nearest(P_, g1[g1.length - 1]);
+  run('RPOP', j, P_.length - 1, tj); run('RPOP', j, top, tj);
+  for (const n of ['RATA', 'RTPT', 'RPTA', 'RPER', 'RPERc']) whole(n);
+  return F;
+}
+const FLOW = { n: null, p: null };
+const flowAttr = (normal, name, i) => { const k = normal ? 'n' : 'p', F = FLOW[k] || (FLOW[k] = flowField(normal)), f = F[name]; return f ? f.cls[i] * 1000 + f.tau[i] : 0; };
+// a pulse train along the transit time: bright while u (the phase within one period) is inside the pulse
+const FLOW_PER = 0.27, FLOW_AMP = [1, 0.62, 0.4];
+function flowPulse(a, T) {
+  const cls = Math.min(2, Math.floor(a / 1000)), u = (((a - cls * 1000 - T) / FLOW_PER) % 1 + 1) % 1;
+  return FLOW_AMP[cls] * smooth(clamp(u / 0.07, 0, 1)) * (1 - smooth(clamp((u - 0.3) / 0.08, 0, 1)));
+}
+// ---------------------------------------------------------------- the tree meshes. o: {legs: ['R','L'], aorta, normal, rk, flow}
 function buildTreeMeshes(o) {
   const legs = o.legs || ['R', 'L'], RK = o.rk || 1, normal = !!o.normal;
   const W_ = new MB(), LU = new MB(), PQ = new MB(), OC = new MB(), CA = new MB();
@@ -138,7 +184,7 @@ function buildTreeMeshes(o) {
       if (j > i) {
         const P_ = [], R_ = [];
         for (let q = i; q <= j; q++) { const kk = st[q].k, ri = r(q) * 0.74, e = (!normal && k === 'RSFA') ? (1 - kk) * 0.42 * ri : 0; P_.push(add3(S[q].slice(0, 3), mul3(ECC, e))); R_.push(Math.max(0.35, ri * kk)); }
-        tubeInto(LU, P_, q => R_[q], q => arrivalAt(k, S[i + q], normal), sides, true);
+        const i0 = i; tubeInto(LU, P_, q => R_[q], q => o.flow ? flowAttr(normal, k, i0 + q) : arrivalAt(k, S[i0 + q], normal), sides, true);
       }
       i = j + 1;
     }
@@ -175,17 +221,19 @@ function buildTreeMeshes(o) {
 // whole-tree views draw the calibres 1.7x more again (3.9x real; the two-tree comparison 2x, 4.6x real) so the tibial arteries stay readable on a phone
 const TREE_RK = 1.7, CMP_RK = 2.0;
 const TREE = () => cached('tree', () => buildTreeMeshes({ rk: TREE_RK }));
-const TREE_N = () => cached('treeN', () => buildTreeMeshes({ normal: true, legs: ['R'], aorta: false, rk: CMP_RK }));
-const TREE_R = () => cached('treeR', () => buildTreeMeshes({ legs: ['R'], aorta: false, rk: CMP_RK }));
+const TREE_N = () => cached('treeN', () => buildTreeMeshes({ normal: true, legs: ['R'], aorta: false, rk: CMP_RK, flow: true }));
+const TREE_R = () => cached('treeR', () => buildTreeMeshes({ legs: ['R'], aorta: false, rk: CMP_RK, flow: true }));
 const TREE_NN = () => cached('treeNN', () => buildTreeMeshes({ normal: true, rk: TREE_RK }));
 // ---------------------------------------------------------------- drawing the tree
 // explanatory look: a red see-through wall, the channel as a column (blood red, white-blue behind the contrast front),
-// the plaque a see-through yellow sleeve, the block orange-brown, calcium white; o: {xf, front, hot: [{y0,y1,k}], fog, wallGlass}
+// the plaque a see-through yellow sleeve, the block orange-brown, calcium white; o: {xf, front, hot: [{y0,y1,k}], fog, wallGlass,
+// flow: {T} (the comparison trees: pulses travel down the lumen with the flow clock T)}
 function drawTreeExpl(cam, T, o) {
   o = o || {};
   const front = o.front === undefined ? 1e9 : o.front, xf = o.xf, fog = o.fog;
   const lumId = newId(P.BL0);
-  if (T.lum) drawMesh(cam, T.lum, { ramp: RT.blood, id: lumId, amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.5, mix: { ramp: RT.con, f: a => smooth(clamp((front - a) / 60, 0, 1)) }, fog }, xf);
+  if (T.lum && o.flow) drawMesh(cam, T.lum, { ramp: RT.conD, id: lumId, amb: 0.34, dif: 0.64, rim: 0.3, spec: 0.5, mix: { ramp: RT.conB, f: a => flowPulse(a, o.flow.T) }, fog }, xf);   // pulses travelling with the blood
+  else if (T.lum) drawMesh(cam, T.lum, { ramp: RT.blood, id: lumId, amb: 0.3, dif: 0.66, rim: 0.3, spec: 0.5, mix: { ramp: RT.con, f: a => smooth(clamp((front - a) / 60, 0, 1)) }, fog }, xf);
   if (T.occ) drawMesh(cam, T.occ, { ramp: RT.occ, id: newId(P.OC0), amb: 0.3, dif: 0.7, rim: 0.25, fog, mix: o.hot && o.hot[1] ? { ramp: RT.hot, f: () => o.hot[1].k } : undefined }, xf);
   if (T.cal) drawMesh(cam, T.cal, { ramp: RT.cal, id: newId(P.CA0), amb: 0.45, dif: 0.6, rim: 0.2, spec: 0.4, fog }, xf);
   if (T.plq) {

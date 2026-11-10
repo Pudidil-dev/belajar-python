@@ -2,7 +2,7 @@
 
 63.000 s · 9:16 · 1080×1920 (a 360×640 pixel grid shown exactly 3× nearest-neighbour) · 60 fps · 21 scenes × 3 s.
 The picture sheet is `docs/storyboard.png` (one labeled frame per scene); the shot list with camera moves is `镜头表.md`.
-Version 3 (the look of the earlier CTA film, natural motion, a realistic CT sequence); what changed and why: `docs/REVISION_ANALYSIS.md`.
+Version 4, the final revision (the look of the earlier CTA film, natural motion, a realistic CT sequence, and a 2D explanatory layer over the 3D); what changed and why: `docs/REVISION_ANALYSIS.md`.
 
 **Shared style for every prompt below.** 3D pixel-art medical animation in the look of the CTA film: smooth shaded
 models (no cubes) lit in limited five-step material ramps with ordered-dither steps between the tones, a soft rim light,
@@ -17,11 +17,19 @@ white-blue contrast `#CDEBFF` (a teaching overlay — contrast does not glow), w
 volume rendering, grey for the axial CT slice. One patient, framed from the neck down; his face is never shown.
 The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 
+**The 2D layer over the 3D (no text; kept in the clean version).** Flat pixel-art graphics explain what the 3D shows:
+cyan `#46C6E6` for "where we are / normal" (the dive reticle, the locator's marker, the normal cross-section's box),
+orange `#F0A93B` for the findings (slice marks, the boxes of the diseased cross-sections, the rings on the CT images,
+the brackets), white for flow arrows. The artery's cross-section is always drawn the same way — tan adventitia, red
+media, a white elastic ring, then an open red channel (normal), a small off-centre channel in yellow plaque with a
+cream cap and white calcium (stenosis), or orange-brown fill with no channel (occlusion) — so the viewer learns it
+beside the 3D cut and recognises it again in the final image.
+
 ---
 
 ### S01 · 0:00–0:03 · WALKING
 **Camera:** lateral tracking from the patient's right at hip height (32° lens), following the hips' running average like a camera operator, so the body breathes inside the frame.
-**Prompt:** A middle-aged man in a grey-blue T-shirt, dark knee-length shorts, white socks and grey trainers walks across a floor of large dark-navy checker tiles, framed from the shoulders down; smooth shaded skin with a rim light, natural adult proportions. A natural, unhurried walk: each foot lands on the heel, rolls flat, then pushes off from the toes while the heel rises; the swinging foot clears the floor on a smooth arc; the hips rise over the standing leg and dip when both feet are down, sway toward the standing foot and turn with the leading leg; the shoulders turn against the hips; the arms swing a moment behind the legs with the elbows bending as they come forward; heel strikes on each beat; soft contact shadows. Text: *Pain while walking?* (optional).
+**Prompt:** A middle-aged man in a grey-blue T-shirt, dark knee-length shorts, white socks and grey trainers walks across a floor of large dark-navy checker tiles, framed from the shoulders down; smooth shaded skin with a rim light, natural adult proportions. A natural, unhurried walk: each foot lands on the heel, rolls flat, then pushes off from the toes while the heel rises; the swinging foot clears the floor on a smooth arc; the hips rise over the standing leg and dip when both feet are down, sway toward the standing foot and turn with the leading leg; the shoulders turn against the hips; the arms swing a moment behind the legs with the elbows bending as they come forward; heel strikes on each beat; soft contact shadows. Behind him, an evening park in flat pixel-art layers that slide past at their own speeds (parallax): a crescent moon with a soft halo and slowly twinkling stars (they hold still), a far skyline with a few lit windows, a line of round moonlit trees, a dark lawn beyond the kerb of the path. His hands have fingers; sleeves and shorts have folded hems, the socks ribbed tops, the trainers laces. Text: *Pain while walking?* (optional).
 
 ### S02 · 0:03–0:06 · THE PATIENT STOPS
 **Camera:** slow push in toward the right calf.
@@ -29,11 +37,11 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 
 ### S03 · 0:06–0:09 · ENTER THE LEG
 **Camera:** fast push: behind the knee, then up along the artery, then a dive into its lumen.
-**Prompt:** The right leg turns to dithered glass; inside it the red-brown calf muscles (gastrocnemius, soleus) and the red arteries (popliteal, anterior tibial, tibioperoneal trunk, posterior tibial, peroneal); the muscle fades in turn. The camera rises along the superficial femoral artery in the thigh and dives in close to it at the site of the future stenosis while the glass skin falls away and the background darkens, then warms to the blood-maroon of the artery world; a soft crossfade (red into red) into scene 4.
+**Prompt:** The right leg turns to dithered glass; inside it the red-brown calf muscles (gastrocnemius, soleus) and the red arteries (popliteal, anterior tibial, tibioperoneal trunk, posterior tibial, peroneal); the muscle fades in turn. The camera rises along the superficial femoral artery in the thigh and dives in close to it at the site of the future stenosis while the glass skin falls away and the background darkens, then warms to the blood-maroon of the artery world; a soft crossfade (red into red) into scene 4. The park dissolves pixel by pixel as the leg turns to glass. Before the dive a cyan pixel reticle (a ring with four ticks, pulsing on the beat) appears on the thigh artery at the spot the camera enters.
 
 ### S04 · 0:09–0:12 · NORMAL REFERENCE
 **Camera:** hold (a short settle after the dive).
-**Prompt:** A healthy artery cut lengthwise, standing vertical, blood flowing down the screen. On both cut faces, in crisp pixel art: the endothelium with small dark nuclei, the white wavy internal elastic lamina, the banded red smooth-muscle media and the tan fibrous adventitia. Inside, the back half of the lumen is a smooth, softly lit pink-red lining with a faint plasma haze; glossy dark-red biconcave red cells tumble downward, surging on each beat. Text: *Normal artery*.
+**Prompt:** A healthy artery cut lengthwise, standing vertical, blood flowing down the screen. On both cut faces, in crisp pixel art: the endothelium with small dark nuclei, the white wavy internal elastic lamina, the banded red smooth-muscle media and the tan fibrous adventitia. Inside, the back half of the lumen is a smooth, softly lit pink-red lining with a faint plasma haze; glossy dark-red biconcave red cells tumble downward, surging on each beat. At the lower left a small locator slides in: a pixel picture of his leg in side view (dark shorts, skin, white sock, grey shoe) with the artery as a red line and a cyan ring with a level line at mid-thigh — where this close-up is. It stays through scene 8. Text: *Normal artery*.
 
 ### S05 · 0:12–0:15 · CHRONIC HIGH GLUCOSE
 **Camera:** hold, same view.
@@ -53,15 +61,15 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 
 ### S09 · 0:24–0:27 · STENOSIS
 **Camera:** hold; the normal artery slides in beside the diseased one.
-**Prompt:** Two artery cutaways side by side at the same scale: left normal, right narrowed by the calcified plaque. In the narrowed one, fewer red cells pass, and short white streaks show the faster jet through the open but narrow channel. Text: *STENOSIS* (large, orange underline).
+**Prompt:** Two artery cutaways side by side at the same scale: left normal, right narrowed by the calcified plaque. In the narrowed one, fewer red cells pass, and short white streaks show the faster jet through the open but narrow channel. Then a dashed slice mark crosses each artery at the narrowing's level (cyan on the normal one, orange on the narrowed one), a dashed leader runs down the gap between them, and two small boxes open side by side at the bottom: the 2D cross-sections — an open red channel inside the wall's rings beside a small off-centre channel in yellow plaque with white calcium. Text: *STENOSIS* (large, orange underline).
 
 ### S10 · 0:27–0:30 · OCCLUSION
 **Camera:** pan down the same artery, then a slow push to the top of the block.
-**Prompt:** Farther downstream, a segment is filled end to end with an orange-brown fibrous plug with wavy fibres and white calcium nodules; the channel tapers into it in a V and stops; the wall layers still outline the vessel's course on both sides. Above the block the red cells stack up and stand almost still, only rocking with each beat (no net flow). Text: *OCCLUSION* (large, orange underline).
+**Prompt:** Farther downstream, a segment is filled end to end with an orange-brown fibrous plug with wavy fibres and white calcium nodules; the channel tapers into it in a V and stops; the wall layers still outline the vessel's course on both sides. Above the block the red cells stack up and stand almost still, only rocking with each beat (no net flow). The locator returns and its marker slides down the leg to behind the knee as the camera pans. With the key term, an orange slice mark crosses the block and a box opens beside it: the cross-section with no channel left, orange-brown fill with white calcium inside the intact wall rings. Text: *OCCLUSION* (large, orange underline).
 
 ### S11 · 0:30–0:33 · COLLATERAL BYPASS
 **Camera:** pull back.
-**Prompt:** Two pink side channels around the blocked segment — present all along — widen into curved bypasses from above the block to below it; a thin stream of red cells travels through them and on, slowly, below the block. The block itself stays closed. Text: *Collateral flow*.
+**Prompt:** Two pink side channels around the blocked segment — present all along — widen into curved bypasses from above the block to below it; a thin stream of red cells travels through them and on, slowly, below the block. The block itself stays closed. White pixel arrows ride the detour with the flow: out of the artery above the block, round it through the side channels and back in below. Text: *Collateral flow*.
 
 ### S12 · 0:33–0:36 · WALKING INCREASES DEMAND
 **Camera:** cut to a side view tracking the walking legs smoothly.
@@ -77,11 +85,11 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 
 ### S15 · 0:42–0:45 · CONTRAST CIRCULATION
 **Camera:** slow lateral move and descent.
-**Prompt:** A glass torso: see-through pink lungs, a steel-blue right heart and veins, a red left heart and aorta continuing down to the iliac arteries; a white-blue contrast front travels from the cannula in the raised right elbow down the arm vein → subclavian vein → superior vena cava → right heart → pulmonary arteries → lungs → pulmonary veins → left heart → aorta and down toward the legs. White-blue is a teaching colour.
+**Prompt:** A glass torso: see-through pink lungs, a steel-blue right heart and veins, a red left heart and aorta continuing down to the iliac arteries; a white-blue contrast front travels from the cannula in the raised right elbow down the arm vein → subclavian vein → superior vena cava → right heart → pulmonary arteries → lungs → pulmonary veins → left heart → aorta and down toward the legs. White-blue is a teaching colour. At the top, in a band like a caption, a strip of five pixel icons joined by arrows — syringe, heart (right half), lungs, heart (left half), legs; each lights up white-blue as the front reaches that station in the 3D picture, and the link before it fills.
 
 ### S16 · 0:45–0:48 · SCAN IMAGES
 **Camera:** hold in the control room, behind the console.
-**Prompt:** The CT control room: a dark wall with a lead-glass window; through it the gantry with its X-ray lamp lit and the table carrying the patient's legs on through the bore at a steady speed (the helical scan). In front, a console monitor on a desk with a keyboard: a grey topogram (frontal scout of the belly to the feet) with an orange scan-range box and a cyan line running down it; beside it the newest axial CT image in greys — air black, fat dark, muscle mid grey, bone cortex near white — with the contrast-filled arteries bright: belly (aorta beside the spine), pelvis, both thighs (the narrowed, calcified right SFA), the knees (the right popliteal without a bright lumen, small bright collaterals around it), the calves (the three tibial arteries) and the ankles; the earlier images line up as thumbnails below, one with each chime. A progress bar and a radiation lamp; no numbers.
+**Prompt:** The CT control room: a dark wall with a lead-glass window; through it the gantry with its X-ray lamp lit and the table carrying the patient's legs on through the bore at a steady speed (the helical scan). In front, a console monitor on a desk with a keyboard: a grey topogram (frontal scout of the belly to the feet) with an orange scan-range box and a cyan line running down it; beside it the newest axial CT image in greys — air black, fat dark, muscle mid grey, bone cortex near white — with the contrast-filled arteries bright: belly (aorta beside the spine), pelvis, both thighs (the narrowed, calcified right SFA), the knees (the right popliteal without a bright lumen, small bright collaterals around it), the calves (the three tibial arteries) and the ankles; the earlier images line up as thumbnails below, one with each chime. A progress bar and a radiation lamp; no numbers. As the scan passes the two lesions, an orange ring with four ticks marks the right thigh artery, then the right popliteal artery, on the axial image; the same rings stay on those two thumbnails, and two orange marks stay on the topogram at those levels.
 
 ### S17 · 0:48–0:51 · CTA RECONSTRUCTION
 **Camera:** from a high three-quarter view down to the level CTA view, turning all the way.
@@ -93,12 +101,12 @@ The symptomatic leg is always the RIGHT leg. No numbers anywhere.
 
 ### S19 · 0:54–0:57 · OCCLUSION ON CTA
 **Camera:** move down the artery to behind the knee, then a slow orbit.
-**Prompt:** The ivory contrast column of the popliteal artery stops; a faint cyan glass outline keeps the blocked segment's course; thinner collaterals curve around it and refill the artery below. Text: *OCCLUSION*.
+**Prompt:** The ivory contrast column of the popliteal artery stops; a faint cyan glass outline keeps the blocked segment's course; thinner collaterals curve around it and refill the artery below. With the cut-off, an orange slice line crosses the blocked segment and a dashed leader opens an axial greyscale slice in the same box as in scene 18: the femur's condyle, the popliteal vein, the artery as a grey ring with bright calcium but no bright channel, the collaterals as small bright dots in the dark fat round it. Text: *OCCLUSION*.
 
 ### S20 · 0:57–1:00 · NORMAL VERSUS DIABETIC PAD
 **Camera:** pull back to the final framing.
-**Prompt:** Two right-leg arterial trees side by side at the same scale and angle, each inside a dark-navy glass leg, divided by a dotted line: left a normal teaching tree with smooth white-blue lumens in red walls; right this patient's tree with the mid-thigh stenosis, the popliteal occlusion with enlarged collaterals, and the below-knee narrowings and calcification. Text: *Normal*, *Diabetic PAD*.
+**Prompt:** Two right-leg arterial trees side by side at the same scale and angle, each inside a dark-navy glass leg, divided by a dotted line: left a normal teaching tree with smooth white-blue lumens in red walls; right this patient's tree with the mid-thigh stenosis, the popliteal occlusion with enlarged collaterals, and the below-knee narrowings and calcification. Bright pulses of flow travel down the lumens with the beat: all the way to the foot in the normal leg; in the patient's leg they shorten and slow past the narrowing, stop at the block, and only a faint, slow trickle passes round it through the collaterals and on below. Text: *Normal*, *Diabetic PAD*.
 
 ### S21 · 1:00–1:03 · FINAL DIAGNOSTIC IMAGE
 **Camera:** hold while both trees turn slightly together.
-**Prompt:** In turn on the beat, the stenosis and then the occlusion light up orange with a bracket beside each, then a dotted orange route traces the collateral bypass; the title settles at the top; the music resolves. Ends on this image (`docs/final_still_labeled.png`, `docs/final_still_clean.png`). Text: *Diabetic Peripheral Arterial Disease*.
+**Prompt:** In turn on the beat, the stenosis and then the occlusion light up orange with a bracket beside each, then a dotted orange route traces the collateral bypass; the title settles at the top; the music resolves. Ends on this image (`docs/final_still_labeled.png`, `docs/final_still_clean.png`). Beside each bracket a small round icon pops in: the narrowed cross-section at the stenosis, the filled one at the occlusion; at the same level beside the normal artery, the open ring in a cyan rim. Text: *Diabetic Peripheral Arterial Disease*.

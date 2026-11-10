@@ -127,3 +127,61 @@ Yang tidak berubah: cerita, 21 adegan × 3 detik, waktu semua kejadian, musik da
   - in the control room the console shows the topogram, the moving scan line and each new axial image, all computed from the same anatomy and lesion map: the narrowed calcified thigh artery, the popliteal without contrast, the collaterals;
   - the slices then stack into a volume, the soft tissue falls away, and the 3D reconstruction of the arteries remains.
 - **Unchanged:** the timing, the audio and the labels.
+
+---
+
+# Revisi 3 (final) — 2D dan 3D digabung supaya tiap adegan langsung terbaca
+
+![Sebelum (atas, v3) dan sesudah (bawah, v4) pada detik yang sama](revision3_before_after.png)
+
+Atas: v3. Bawah: v4. Detik yang sama: 1.3 (berjalan), 5.7 (memegang betis), 26.0 (stenosis), 32.5 (kolateral),
+44.0 (rute kontras), 62.8 (gambar akhir).
+
+Permintaan: perbaikan sekali lagi, dan pastikan 2D dan 3D digabung agar hasilnya lebih jelas.
+
+## Prinsipnya
+
+Gambar 3D memperlihatkan bendanya. Lapisan pixel art 2D di atasnya menjawab tiga pertanyaan penonton, tanpa teks
+(jadi tetap ada di versi clean):
+
+1. **Di mana kita sekarang?**
+2. **Seperti apa potongannya kalau dilihat dari ujung?**
+3. **Ke mana darah mengalir?**
+
+## Yang kurang jelas di v3 dan perbaikannya
+
+| Adegan | Yang kurang jelas | Tambahan 2D di v4 |
+|---|---|---|
+| 3 → 4 | Kamera menyelam ke arteri, tetapi tidak jelas di titik mana | Reticle cyan menandai titik selam di arteri paha |
+| 4–8, 10 | Close-up arteri bisa berada di mana saja; pindah dari stenosis ke oklusi tidak terasa sebagai pindah tempat | Peta lokasi kecil: gambar kaki pasien dengan arteri merah dan penanda cyan. Penanda turun ke belakang lutut saat kamera pindah ke sumbatan |
+| 9 | Potongan memanjang saja; seberapa sempit salurannya harus ditebak | Garis potong di kedua arteri dan dua penampang lintang 2D berdampingan: cincin terbuka (normal) dan cincin menyempit (stenosis) |
+| 10 | "Tersumbat total" hanya terlihat dari samping | Penampang lintang sumbatan: tidak ada saluran di dalam dinding yang utuh |
+| 11 | Saluran kolateral tampak sebagai cincin gelap; arah aliran tidak terbaca | Saluran diterangkan, sel darah diperbanyak, dan panah putih mengikuti jalur memutar: keluar di atas sumbatan, masuk lagi di bawahnya |
+| 15 | Rute kontras harus dibaca dari torso kaca yang rumit dalam 3 detik | Strip lima ikon (suntikan → jantung kanan → paru → jantung kiri → kaki) yang menyala satu per satu saat kontras tiba |
+| 16 | Lesi di irisan CT kecil dan cepat lewat | Cincin oranye menandai arteri paha dan arteri popliteal kanan saat pindaian melewatinya; cincin tetap ada di thumbnail, dengan tanda di topogram |
+| 19 | Adegan stenosis punya inset irisan, adegan oklusi tidak | Inset irisan aksial kedua: dinding tanpa saluran terang, kolateral sebagai titik terang |
+| 20–21 | Dua pohon arteri hampir diam; hanya bentuk yang dibandingkan | Denyut aliran berjalan di kedua pohon mengikuti ketukan musik: sampai ke kaki pada tungkai normal; melambat setelah penyempitan, berhenti di sumbatan, dan hanya menetes lewat kolateral pada tungkai pasien. Ikon penampang muncul di samping tiap temuan |
+| 1–3, 12–13 | Latar adegan berjalan kosong; kecepatan jalan hanya terbaca dari ubin | Taman malam dalam lapisan 2D yang berdiri di dunia 3D dan bergeser dengan kecepatan berbeda (parallax): bulan sabit, bintang, siluet kota, deretan pohon, rumput dan tepi jalan. Taman larut piksel demi piksel saat kamera masuk ke kaki |
+| 2, 13 | Tangan di betis berbentuk papan | Tangan berjari; ditambah kelim lengan dan celana, rusuk kaus kaki, tali sepatu |
+
+Penampang lintang selalu digambar dengan cara yang sama (adventisia cokelat, media merah, cincin elastika putih, lalu
+isi salurannya). Penonton mempelajarinya di adegan 9–10 di samping potongan 3D, melihatnya lagi dalam abu-abu di
+irisan CT (16, 18, 19), dan mengenalinya kembali sebagai ikon di gambar akhir.
+
+Kode warna lapisan 2D: cyan untuk "di sini / normal", oranye untuk temuan penyakit, putih untuk arah aliran.
+
+## Yang tidak berubah
+
+Cerita, 21 adegan × 3 detik, waktu semua kejadian, musik dan SFX, label. Timing sheet voice-over tetap berlaku.
+
+## Summary for the client (English) — final revision
+
+A flat pixel-art layer now explains the 3D pictures without text:
+
+- **Where:** a reticle on the dive site and a small locator picture of the leg show where each close-up is.
+- **Which cut:** 2D cross-sections of the artery open beside its 3D lengthwise cut (open, narrowed, blocked) and return as icons in the final image.
+- **Which way:** arrows ride the collaterals; pulses of flow run down both trees at the end, so the comparison shows function as well as shape.
+- **CT:** an icon strip follows the contrast's route; rings mark the lesions on the CT images; the block gets its own axial inset.
+- **The walk:** it happens in an evening park drawn in 2D parallax layers, and the patient has proper hands and clothing details.
+
+Timing, audio and labels are unchanged.

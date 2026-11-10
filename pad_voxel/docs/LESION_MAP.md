@@ -23,6 +23,13 @@ bottom in the direction of flow: the **stenosis site (L1) upstream**, the **occl
 dives into the right SFA at L1 at the end of scene 3, and scene 4 shows that site *before* the disease (the normal
 reference); scenes 5–8 show it changing over time.
 
+The same three 2D cross-sections follow the lesions through the film (`src/24_ui.js`, `xsecPix`): the **open ring**
+(normal: scene 9, and beside the normal tree in scene 21), the **narrowed ring** with plaque and calcium (L1: scene 9,
+scene 21) and the **filled ring** without a channel (L2: scene 10, scene 21). The locator (scenes 4–8, 10) marks L1 in
+the thigh and then L2 behind the knee on a small picture of the leg; orange rings mark both on the console's CT images
+(scene 16); the axial insets show them on CTA (L1 scene 18, L2 scene 19). In the final comparison the pulses of flow
+slow past L1, stop at L2 and reach the lower leg only through the collaterals.
+
 Rules kept in every scene: glucose stays dissolved in the blood and never forms a plug · plaque stays inside the
 wall under the lining · calcium is opaque white and never confused with contrast · the stenosis keeps a continuous
 channel (faster jet) · the occlusion has no passage and keeps its wall outline · collaterals bypass, they do not

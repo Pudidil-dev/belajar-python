@@ -238,10 +238,21 @@ function drawConsole(t, scanY, nThumb, glow) {
   const ya = yOf(1150), yb = yOf(25);
   rect(tx, ya, tx + TOPO.w, ya + 1, P.WARN); rect(tx, yb, tx + TOPO.w, yb + 1, P.WARN); rect(tx, ya, tx + 1, yb + 1, P.WARN); rect(tx + TOPO.w - 1, ya, tx + TOPO.w, yb + 1, P.WARN);
   const ys = yOf(scanY); if (ys > ya && ys < yb) { rect(tx - 3, ys, tx + TOPO.w + 3, ys + 1, P.ACC); rect(tx - 4, ys - 1, tx - 2, ys + 2, P.ACC); }
+  // the levels of the two lesions, marked on the topogram once the scan has passed them (the right leg is on the viewer's left)
+  for (const Y of [LES.L1.yc, 519]) if (scanY < Y) { const ym = yOf(Y), xm = tx + Math.round((ART.RSFA.pts[2][0] - TOPO.x0) / (TOPO.x1 - TOPO.x0) * TOPO.w); rect(xm - 4, ym - 1, xm + 5, ym, P.WARN); rect(xm - 4, ym + 1, xm + 5, ym + 2, P.WARN); rect(xm - 5, ym - 1, xm - 4, ym + 2, P.WARN); rect(xm + 5, ym - 1, xm + 6, ym + 2, P.WARN); }
+  // a lesion on an axial image: an orange ring round the right thigh artery at the stenosis, round the right popliteal at the block
+  const lesionRing = (Y, bx0, by0, w, h, F, r) => {
+    const name = Math.abs(Y - LES.L1.yc) < 62 ? 'RSFA' : (Math.abs(Y - 519) < 62 ? 'RPOP' : null); if (!name) return;   // shown a little before and after, long enough to be seen
+    const v = ctVessels(Y).find(q => q.name === name); if (!v) return;
+    const mm = F.span / w, cx = Math.round(bx0 + w / 2 + (v.x - F.cx) / mm), cy = Math.round(by0 + h / 2 - (v.z - F.cz) / mm);
+    ring(cx, cy, r, r > 5 ? 2 : 1.3, P.WARN);
+    if (r > 5) for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) rect(Math.min(cx + ax * (r + 2), cx + ax * (r + 6)) - (ax ? 0 : 1), Math.min(cy + ay * (r + 2), cy + ay * (r + 6)) - (ay ? 0 : 1), Math.max(cx + ax * (r + 2), cx + ax * (r + 6)) + 1, Math.max(cy + ay * (r + 2), cy + ay * (r + 6)) + 1, P.WARN);
+  };
   // the axial image, the newest slice at the table position
   const vx = tx + TOPO.w + 8, vy = ty, vw = x1 - 6 - vx, vh = 186, F = sliceFrame(scanY);
   rect(vx - 1, vy - 1, vx + vw + 1, vy + vh + 1, hexc('#2A3440'));
   drawSlice(scanY, vx, vy, vw, vh, F.span, F.cx, F.cz);
+  lesionRing(scanY, vx, vy, vw, vh, F, 10 + (Math.floor(t * 8) % 2));
   // the images already taken, as small thumbnails along the bottom (each arrives with the score's chime)
   const tw = 34, th = 30, gap = 4, n = Math.floor(nThumb), ty2 = vy + vh + 8, levels = [1100, 980, 860, 700, 520, 330];
   for (let k = 0; k < Math.min(6, n + 1); k++) {
@@ -250,5 +261,6 @@ function drawConsole(t, scanY, nThumb, glow) {
     rect(bx - 1, by - 1, bx + tw + 1, by + th + 1, hexc('#2A3440'));
     if (a < 1) { rect(bx, by, bx + tw, by + th, hexc('#06090D')); continue; }
     drawSlice(Y, bx, by, tw, th, Fk.span, Fk.cx, Fk.cz);
+    lesionRing(Y, bx, by, tw, th, Fk, 4);
   }
 }

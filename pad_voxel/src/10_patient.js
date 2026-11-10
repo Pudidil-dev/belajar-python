@@ -19,6 +19,11 @@ const RP = {
   sole: ['#8E949A', '#BEC3C8', '#E2E5E8', '#F6F7F8'].map(hexc),
   hair: ['#120E14', '#21191F', '#33262A', '#4A3733'].map(hexc),
   pain: [P.PA0, P.PA1, P.PA2, P.PA3, P.PA4],
+  // small details that make the clothes read: the folded hems of the sleeves and shorts, the ribbed sock tops, the laces
+  shirtHem: ['#131C27', '#213243', '#334E66', '#4B6C88', '#7495AF'].map(hexc),
+  shortsHem: ['#11171D', '#1F2933', '#303D4B', '#465666', '#607386'].map(hexc),
+  sockRib: ['#5C626A', '#8A9098', '#AEB4BA', '#CACFD4'].map(hexc),
+  lace: ['#8E949A', '#BEC3C8', '#E2E5E8', '#F6F7F8'].map(hexc),
 };
 const PVS = 6;                                    // meshing grid (mm)
 // ---------------------------------------------------------------- parts (local frames: joint at origin)
@@ -33,7 +38,19 @@ const SD = {
   torso: (x, y, z) => { const belly = sdE(x, y, z, 8, 120, 0, 118, 150, 160), chest = sdE(x, y, z, 14, 300, 0, 112, 150, 182), sh = sdB(x, y, z, 0, 390, 0, 86, 50, 196, 46); return smin(smin(belly, chest, 40), sh, 50); },
   head: (x, y, z) => Math.min(sdC(x, y, z, -4, 0, 0, 0, 90, 0, 54, 50), sdE(x, y, z, 6, 170, 0, 98, 118, 86)),
   uarm: (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -300, 0, 52, 40),
-  farm: (x, y, z) => Math.min(sdC(x, y, z, 0, 0, 0, 0, -250, 0, 38, 28), sdB(x, y, z, 6, -320, 0, 16, 62, 40, 10), sdC(x, y, z, 18, -270, 22, 34, -330, 26, 11, 9)),
+  farm: (x, y, z) => sdC(x, y, z, 0, 0, 0, 0, -252, 0, 38, 27),
+  // the right hand, relaxed (wrist at the origin, fingers toward −y, the palm facing −z, the thumb on the +x side):
+  // a palm, four fingers of two segments each curling toward the palm, and the thumb. The left hand is its mirror.
+  hand: (x, y, z) => {
+    let f = 1e9;
+    for (const [fx, L] of [[33, 68], [14, 76], [-5, 70], [-24, 54]]) {
+      const l1 = L * 0.55, l2 = L * 0.45, c1 = 0.3, c2 = 0.95, my = -88 - l1 * Math.cos(c1), mz = -l1 * Math.sin(c1);
+      f = Math.min(f, sdC(x, y, z, fx, -84, 0, fx, my, mz, 9, 8.4), sdC(x, y, z, fx, my, mz, fx, my - l2 * Math.cos(c2), mz - l2 * Math.sin(c2), 8.4, 7.4));
+    }
+    const palm = sdB(x, y, z, 5, -48, 0, 38, 44, 12.5, 11);
+    const thumb = Math.min(sdC(x, y, z, 36, -26, -3, 56, -58, -12, 11.5, 10), sdC(x, y, z, 56, -58, -12, 59, -88, -22, 10, 8.6));
+    return smin(smin(palm, f, 5), thumb, 7);
+  },
   thigh: (x, y, z) => sdC(x, y, z, 6, 0, 0, 0, -440, 0, 90, 58),
   shin: (x, y, z) => smin(sdC(x, y, z, 6, 0, 0, 4, -420, 0, 52, 30), sdE(x, y, z, -30, -130, 0, 50, 120, 48), 30),
   foot: (x, y, z) => smin(sdE(x, y, z, -20, -40, 0, 60, 44, 48), sdE(x, y, z, 110, -52, 0, 104, 32, 50), 30),
@@ -46,19 +63,29 @@ function buildParts() {
   PART.pelvis = iso(SD.pelvis, [-150, -120, -190, 125, 175, 190], null, 10);       // big smooth parts on a coarser grid
   PART.torso = iso(SD.torso, [-140, -20, -215, 150, 470, 215], null, 11);
   PART.head = iso(SD.head, [-120, -20, -100, 130, 290, 100], hairAttr, 9);
-  PART.sleeve = iso(keep(SD.uarm, -160, true), [-60, -320, -60, 60, 50, 60], null, 8);
+  const band = (f, y0, y1, grow) => (x, y, z) => Math.max(f(x, y, z) - grow, y0 - y, y - y1);   // a slightly raised band between two heights
+  PART.sleeve = iso(keep(SD.uarm, -146, true), [-60, -320, -60, 60, 50, 60], null, 8);
+  PART.sleeveHem = iso(band(SD.uarm, -161, -146, 2.5), [-64, -170, -64, 64, -138, 64], null, 7);
   PART.uarmSkin = iso(keep(SD.uarm, -160, false), [-60, -320, -60, 60, 50, 60]);
-  PART.farm = iso(SD.farm, [-50, -460, -50, 60, 40, 50]);
-  PART.thighShorts = iso(keep(SD.thigh, -300, true), [-100, -460, -100, 110, 60, 100], null, 9);
+  PART.farm = iso(SD.farm, [-50, -300, -50, 50, 40, 50], null, 7);
+  PART.handR = iso(SD.hand, [-46, -182, -58, 76, 12, 26], null, 5);
+  PART.handL = iso((x, y, z) => SD.hand(x, y, -z), [-46, -182, -26, 76, 12, 58], null, 5);
+  PART.thighShorts = iso(keep(SD.thigh, -284, true), [-100, -460, -100, 110, 60, 100], null, 9);
+  PART.shortsHem = iso(band(SD.thigh, -301, -284, 3), [-100, -312, -100, 112, -276, 100], null, 8);
   PART.thighSkin = iso(keep(SD.thigh, -300, false), [-100, -460, -100, 110, 60, 100], null, 7);
   PART.shinSkin = iso(keep(SD.shin, -330, true), [-110, -440, -80, 80, 40, 80], calfAttr);
-  PART.sock = iso(keep(SD.shin, -330, false), [-110, -440, -80, 80, 40, 80]);
+  PART.sockRib = iso(band(SD.shin, -352, -329, 2.5), [-70, -360, -60, 70, -322, 60], null, 7);
+  PART.sock = iso(keep(SD.shin, -350, false), [-110, -440, -80, 80, 40, 80]);
   PART.shoe = iso(keep(SD.foot, -70, true), [-90, -90, -60, 220, 30, 60], null, 7);
+  PART.lace = iso((x, y, z) => Math.max(SD.foot(x, y, z) - 2.5, sdB(x, y, z, 62, -20, 0, 40, 40, 21, 6)), [10, -70, -34, 116, 16, 34], null, 7);
   PART.sole = iso(keep(SD.foot, -70, false), [-90, -90, -60, 220, 30, 60]);
 }
 // which meshes make each rig part, and their materials
-const PART_MESH = { pelvis: [['pelvis', 'shorts']], torso: [['torso', 'shirt']], head: [['head', 'skin']], uarm: [['sleeve', 'shirt'], ['uarmSkin', 'skin']], farm: [['farm', 'skin']],
-  thigh: [['thighShorts', 'shorts'], ['thighSkin', 'skin']], shin: [['shinSkin', 'skin'], ['sock', 'sock']], foot: [['shoe', 'shoe'], ['sole', 'sole']] };
+// [mesh, material, outline group (when it shares its neighbour's outline)]
+const PART_MESH = { pelvis: [['pelvis', 'shorts']], torso: [['torso', 'shirt']], head: [['head', 'skin']],
+  uarm: [['sleeve', 'shirt'], ['sleeveHem', 'shirtHem', 'shirt'], ['uarmSkin', 'skin']], farm: [['farm', 'skin']], handR: [['handR', 'skin']], handL: [['handL', 'skin']],
+  thigh: [['thighShorts', 'shorts'], ['shortsHem', 'shortsHem', 'shorts'], ['thighSkin', 'skin']], shin: [['shinSkin', 'skin'], ['sockRib', 'sockRib', 'sock'], ['sock', 'sock']],
+  foot: [['shoe', 'shoe'], ['lace', 'lace', 'shoe'], ['sole', 'sole']] };
 const OL = { skin: P.SK0, shirt: hexc('#0E1620'), shorts: hexc('#04070A'), sock: hexc('#4A5058'), shoe: hexc('#0C0F12'), sole: hexc('#5A6066') };
 // ---------------------------------------------------------------- the walk: footfalls → rolling feet → leg IK
 // Planned from where the feet land, like a real walk. Each heel strike has a time and a place; a foot that carries
@@ -268,8 +295,12 @@ function patientPose(P0, facing, q) {
     const back = norm3(sub3(mApply(tor, [-1, 0, 0]), mApply(tor, [0, 0, 0]))), latR = norm3(sub3(mApply(pel, [0, 0, 1]), mApply(pel, [0, 0, 0])));
     const ir = ikArm(armR, calfT, add3(back, [0, 0, 0.6]), add3(mul3(latR, 0.8), mul3(back, 0.4)));
     const il = ikArm(armL, thighFront, add3(back, [0, 0, -0.4]), add3(mul3(latR, -0.6), mul3(back, 0.2)));
-    out.push(['uarm', ir.ua], ['farm', ir.fa], ['uarm', il.ua], ['farm', il.fa]);
-  } else out.push(['uarm', armR.ua], ['farm', armR.fa], ['uarm', armL.ua], ['farm', armL.fa]);
+    armR = ir; armL = il;
+  }
+  out.push(['uarm', armR.ua], ['farm', armR.fa], ['uarm', armL.ua], ['farm', armL.fa]);
+  // the hands: palms toward the thighs when the arms hang; turned to lie on the calf and on the thigh when he holds them
+  const pron = -Math.PI / 2 * smooth(hArm), wrist = mMul(mT(0, -250, 0), mRy(pron));
+  out.push(['handR', mMul(armR.fa, wrist)], ['handL', mMul(armL.fa, wrist)]);
   return { parts: out, right, left };
 }
 // kept for the scenes: with a walk sample the IK already keeps both feet planted
@@ -284,9 +315,10 @@ function drawPatient(cam, pose, o) {
   for (const [name, xf] of pose.parts) {
     if (o.skipParts && o.skipParts.includes(name)) continue;
     if (o.skipXf && o.skipXf.includes(xf)) continue;
-    for (const [mesh, mt0] of PART_MESH[name]) {
-      const mt = o.socks && name === 'foot' ? 'sock' : mt0;              // shoes off on the CT table
-      const m = { ramp: RP[mt], id: ids[mt], amb: 0.32, dif: 0.68, rim: 0.26, fog: o.fog };
+    for (const [mesh, mt0, grp] of PART_MESH[name]) {
+      if (o.socks && mesh === 'lace') continue;                          // shoes off on the CT table
+      const mt = o.socks && name === 'foot' ? 'sock' : mt0;
+      const m = { ramp: RP[mt], id: ids[o.socks && name === 'foot' ? 'sock' : (grp || mt)], amb: 0.32, dif: 0.68, rim: 0.26, fog: o.fog };
       if (mt === 'skin') Object.assign(m, { spec: 0.12, cap: 0.86 });
       if (mesh === 'head') m.mix = { ramp: RP.hair, f: a => a };
       if (mesh === 'shinSkin' && o.pain > 0 && xf === pose.right.sh) m.mix = { ramp: RP.pain, f: a => a * o.pain };

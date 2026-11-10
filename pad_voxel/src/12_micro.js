@@ -28,7 +28,7 @@ const MR = {
   rbc: [P.BL1, P.BL2, P.AR2, P.AR3, P.AR4], wbc: ['#5A5470', '#8C86A4', '#C2BCD6', '#E6E2F2', '#FAF8FF'].map(hexc),
   nuc: ['#2E1E48', '#4E3878', '#6E56A0', '#9078C0'].map(hexc), ldl: ['#6A4A06', '#B08A18', '#F0C030', '#FFE08A'].map(hexc),
   mac: ['#5E4E3A', '#8E7A5E', '#BCA888', '#DCCCB0', '#F2E8D6'].map(hexc), foam: ['#7A5A10', '#C09A30', '#F0D060', '#FFF0A8'].map(hexc),
-  col: ['#5A2030', '#94404E', '#C86A74', '#EC9EA0', '#FFD0D0'].map(hexc), colIn: ['#3A1420', '#5A2030', '#7A3040'].map(hexc),
+  col: ['#5A2030', '#94404E', '#C86A74', '#EC9EA0', '#FFD0D0'].map(hexc), colIn: ['#4E1A28', '#7E3242', '#AC5260'].map(hexc),
 };
 const CX_ = {}; for (const [k, v] of Object.entries({
   ol: '#1E0C10', adv: '#A87460', adv2: '#B98670', advF: '#DDB094', advN: '#4E2E28',
@@ -232,9 +232,9 @@ function drawCollatFlow(cam, xf, t, k) {
   if (k <= 0) return;
   const m = rbcMat(), clk = flowClock(t, 0.33);                       // the same pulse drives the side channels
   collatPaths().forEach((pts, pi) => {
-    const n = 7, L = pts.length - 1;
+    const n = 11, L = pts.length - 1;
     for (let i = 0; i < n; i++) {
-      const g = smooth(clamp(7 * k - i, 0, 1)); if (g < 0.05) continue;
+      const g = smooth(clamp(n * k - i, 0, 1)); if (g < 0.05) continue;
       const u = ((clk + i / n + pi * 0.37) % 1), f = u * L, j = Math.floor(f), h = f - j, a = pts[j], b = pts[Math.min(L, j + 1)];
       drawRBC(cam, xf, lerp(a[0], b[0], h), lerp(a[1], b[1], h), -3, t + i, 0.5, m, 0.7 * g);
     }
