@@ -1,0 +1,149 @@
+[
+ {
+  "scene": "s01_still",
+  "kind": "caption",
+  "text": "During heart surgery",
+  "start": 0.2,
+  "end": 2
+ },
+ {
+  "scene": "s02_moving",
+  "kind": "caption",
+  "text": "What keeps blood moving?",
+  "start": 2.3,
+  "end": 4
+ },
+ {
+  "scene": "s04_machine",
+  "kind": "caption",
+  "text": "Heart–lung machine",
+  "start": 6.3,
+  "end": 8.95
+ },
+ {
+  "scene": "s05_drain",
+  "kind": "caption",
+  "text": "Venous drainage",
+  "start": 9.3,
+  "end": 11.95
+ },
+ {
+  "scene": "s06_reservoir",
+  "kind": "caption",
+  "text": "Reservoir",
+  "start": 13.3,
+  "end": 14.95
+ },
+ {
+  "scene": "s07_pump",
+  "kind": "caption",
+  "text": "Blood is pumped",
+  "start": 16,
+  "end": 18.95
+ },
+ {
+  "scene": "s08_temp",
+  "kind": "caption",
+  "text": "Temperature control",
+  "start": 19.4,
+  "end": 21.95
+ },
+ {
+  "scene": "s09_oxygenator",
+  "kind": "caption",
+  "text": "Oxygenator",
+  "start": 22.5,
+  "end": 24.75
+ },
+ {
+  "scene": "s10_fiber",
+  "kind": "label",
+  "text": "Gas",
+  "start": 26.3,
+  "end": 28.95
+ },
+ {
+  "scene": "s10_fiber",
+  "kind": "label",
+  "text": "Blood",
+  "start": 26.7,
+  "end": 28.95
+ },
+ {
+  "scene": "s11_diffuse",
+  "kind": "caption",
+  "text": "Oxygen diffuses in",
+  "start": 29.3,
+  "end": 32.95
+ },
+ {
+  "scene": "s12_rbc",
+  "kind": "caption",
+  "text": "Into the red blood cell",
+  "start": 33.3,
+  "end": 36.95
+ },
+ {
+  "scene": "s13_hemoglobin",
+  "kind": "caption",
+  "text": "Hemoglobin carries oxygen",
+  "start": 37.4,
+  "end": 41.95
+ },
+ {
+  "scene": "s14_co2",
+  "kind": "caption",
+  "text": "Carbon dioxide leaves",
+  "start": 42.3,
+  "end": 45.0
+ },
+ {
+  "scene": "s15_filter",
+  "kind": "caption",
+  "text": "Filter + monitoring",
+  "start": 46.3,
+  "end": 49
+ },
+ {
+  "scene": "s16_aorta",
+  "kind": "caption",
+  "text": "Back to the body",
+  "start": 49.3,
+  "end": 52
+ },
+ {
+  "scene": "s17_tissue",
+  "kind": "caption",
+  "text": "Oxygen delivered",
+  "start": 52.6,
+  "end": 55.95
+ },
+ {
+  "scene": "s18_perfusionist",
+  "kind": "caption",
+  "text": "Continuously monitored",
+  "start": 56.3,
+  "end": 58.95
+ },
+ {
+  "scene": "s19_system",
+  "kind": "caption",
+  "text": "Pump",
+  "start": 59.75,
+  "end": 62.65
+ },
+ {
+  "scene": "s19_system",
+  "kind": "caption",
+  "text": "→ Oxygenate",
+  "start": 60.5,
+  "end": 62.65
+ },
+ {
+  "scene": "s19_system",
+  "kind": "caption",
+  "text": "→ Return",
+  "start": 61.25,
+  "end": 62.65
+ }
+]
