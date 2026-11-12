@@ -39,13 +39,14 @@ const parenchyma = (c, cam, v) => {
   if ((x1 - x0) / s * (y1 - y0) / s > 6000) return;
   c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.strokeStyle = P.al1; c.lineWidth = 1;
   for (let gy = Math.floor(y0 / s); gy <= y1 / s; gy++) for (let gx = Math.floor(x0 / s); gx <= x1 / s; gx++) {
-    const jx = (hh(gx, gy) - 0.5) * 3, jy = (hh(gy, gx + 7) - 0.5) * 3, [sx, sy] = K.S(cam, gx * s + jx, gy * s + jy);
-    c.beginPath(); c.arc(Math.round(sx), Math.round(sy), Math.max(1, r * z), 0, TAU); c.stroke();
+    const jx = (hh(gx, gy) - 0.5) * 4.4, jy = (hh(gy, gx + 7) - 0.5) * 4.4, [sx, sy] = K.S(cam, gx * s + jx, gy * s + jy), rr2 = Math.max(1, r * z * (0.75 + 0.5 * hh(gx + 3, gy + 5))), a0 = hh(gx, gy + 11) * TAU;
+    c.beginPath(); c.arc(Math.round(sx), Math.round(sy), rr2, a0, a0 + TAU * (0.55 + 0.4 * hh(gx + 9, gy))); c.stroke();
   }
   c.restore();
 };
 // o: { v, flow: +1 (inspiration, cyan) / −1 (expiration, amber) / 0, a }
 AIR.tree = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).tree = cam;
   const v = o.v ?? 1, z = cam.z, flow = o.flow ?? 1, gmax = o.gmax ?? Math.floor(Math.log(300 / (120 * z)) / Math.log(0.705)) + 3;
   parenchyma(c, cam, v);
   const [vx0, vy0] = K.Sinv(cam, -20, -20), [vx1, vy1] = K.Sinv(cam, W + 20, H + 20);
@@ -63,14 +64,24 @@ AIR.tree = (c, cam, T, o = {}) => {
   };
   visit(T0, 0, 1, 9);
   segs.sort((p, q) => p[3] - q[3]);
-  for (const [b, x1, y1] of segs) tube(c, cam, [[b.x, b.y], [x1, y1]], b.w, 'aw', { bias: 0.05 });
-  for (const [b, x1, y1] of segs) { if (b.w * z < 3) continue; tube(c, cam, [[b.x, b.y], [x1, y1]], b.w * 0.58, ['n1', 'n2', 'n3'], { edge: false }); }
-  // gas in the lumen: short trails moving down the tree (inspiration) or up (expiration)
-  if (flow !== 0) for (const [b, x1, y1, g, id] of segs) {
-    if (b.w * z < 4) continue;
-    const pts = BREATH.path([[b.x, b.y], [x1, y1]], 4);
-    BREATH.stream(c, cam, pts, T, { n: Math.max(3, Math.round(b.len / b.w * 3)), speed: b.len * 1.6, dir: flow, seed: id, spread: b.w * 0.18, len: b.len * 0.05, w: U.clamp(Math.round(b.w * z * 0.07), 1, 3), maxTrail: U.clamp(b.w * z * 0.6, 3, 16), a: o.a ?? 1, ramp: flow > 0 ? ['cy3', 'cy4', 'cy5'] : ['am3', 'am4', 'am5'] });
-  }
+  // each branch bends a little (a hashed bow) and narrows along its length: an organic tube, not a straight pipe
+  const curve = (b, x1, y1, id) => { const bow = (hh(id, 9) - 0.5) * 0.16 * b.len, mx = (b.x + x1) / 2 - Math.sin(b.ang) * bow, my = (b.y + y1) / 2 + Math.cos(b.ang) * bow; const pts = []; for (let k = 0; k <= 8; k++) { const q = k / 8, u = 1 - q; pts.push([u * u * b.x + 2 * u * q * mx + q * q * x1, u * u * b.y + 2 * u * q * my + q * q * y1]); } return pts; };
+  const taper = (pts, w, ramp, o2) => { tube(c, cam, pts.slice(0, 5), w, ramp, o2); tube(c, cam, pts.slice(4), w * 0.86, ramp, o2); };
+  const CP = segs.map(([b, x1, y1, , id]) => curve(b, x1, y1, id));
+  segs.forEach(([b], i) => taper(CP[i], b.w, 'aw', { bias: 0.05 }));
+  // cartilage rings on the wide branches: pale bands across the wall on both sides of the lumen
+  segs.forEach(([b, , , , id], i) => {
+    if (b.w * z < 16) return;
+    const pts = BREATH.path(CP[i], 2), L = BREATH.len(pts), step = b.w * 0.42;
+    for (let d = step * 0.6; d < L - step * 0.3; d += step) { const [x, y, an] = BREATH.at(pts, pts.S, d), nx = -Math.sin(an), ny = Math.cos(an), wr = b.w * (1 - 0.14 * d / L) * 0.5; for (const s2 of [-1, 1]) line(c, cam, [[x + nx * s2 * wr * 0.66, y + ny * s2 * wr * 0.66], [x + nx * s2 * wr * 0.94, y + ny * s2 * wr * 0.94]], 'aw5', { alpha: 0.75 }); }
+  });
+  segs.forEach(([b], i) => { if (b.w * z < 3) return; taper(CP[i], b.w * 0.6, ['aw0', 'aw1', 'aw1'], { edge: false }); });
+  // gas in the lumen: round particles moving down the tree (inspiration) or up (expiration)
+  if (flow !== 0) segs.forEach(([b, x1, y1, g, id], i) => {
+    if (b.w * z < 4) return;
+    const pts = BREATH.path(CP[i], 4);
+    BREATH.stream(c, cam, pts, T, { n: Math.max(3, Math.round(b.len / b.w * 3)), speed: b.len * 1.6, dir: flow, seed: id, spread: b.w * 0.2, len: b.len * 0.03, dot: true, w: U.clamp(Math.round(b.w * z * 0.1), 3, 6), maxTrail: U.clamp(b.w * z * 0.1, 2, 4), a: o.a ?? 1, ramp: flow > 0 ? ['cy4', 'cy5', 'cy4'] : ['am4', 'am5', 'am4'], trail: flow > 0 ? 'cy2' : 'am2' });
+  });
 };
 // ================= the acinus: alveolar ducts and sacs =================
 const ALV = []; const DUCTS = [[[0, -110], [0, -46]], [[0, -46], [-38, 6]], [[0, -46], [4, 18]], [[0, -46], [40, 2]]];
@@ -79,43 +90,70 @@ for (const [cx, cy, n, r0] of [[-44, 22, 7, 15], [6, 40, 7, 15], [46, 18, 7, 15]
   if (n > 3) ALV.push([cx, cy, r0 * 0.9]);
 }
 AIR.ALV = ALV;
+const CENTRE = new Set(); { let i = 0; for (const n of [7, 7, 7, 3, 3, 2, 2]) { i += n; if (n > 3) { CENTRE.add(i); i++; } } }   // each big cluster's central sac
 // o: { v, flow, mol (0..1: molecules inside the alveoli), hi: index of an alveolus to mark }
 AIR.acinus = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).acinus = cam;
   const v = o.v ?? 1, z = cam.z, s = 1 + 0.11 * v, sp = 1 + 0.05 * v;
   PIX.rect(c, 0, 0, W, H, 'al1');
   // the alveolar walls (sacs) behind, then the ducts, then the capillary mesh over the walls
   const A = ALV.map(([x, y, r]) => [x * sp, y * sp, r * s]);
-  for (const [x, y, r] of A) LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x - r, y - r, x + r, y + r]), ['al1', 'al2', 'al3', 'al4'], { bias: -0.05 });
-  for (const [x, y, r] of A) LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.arc(x - r * 0.06, y - r * 0.06, r * 0.8, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x - r, y - r, x + r, y + r]), ['al3', 'al4', 'al5', 'al5'], { edge: false, bias: -0.05 });   // the thin wall, light inside (gas-filled)
-  for (const [x, y, r] of A) LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.arc(x - r * 0.34, y - r * 0.36, r * 0.14, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x - r, y - r, x + r, y + r]), ['w', 'w', 'w', 'w'], { edge: false, alpha: 0.5 });   // a soft membrane sheen
-  for (const d of DUCTS) { const pts = d.map(([x, y]) => [x * sp, y * sp]); tube(c, cam, pts, 13, 'aw', { bias: 0.02 }); tube(c, cam, pts, 7, ['n0', 'n1', 'n2'], { edge: false }); }
+  const sac = (x, y, r) => {
+    LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x - r, y - r, x + r, y + r]), ['al1', 'al2', 'al3', 'al4'], { bias: -0.05 });
+    LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.arc(x - r * 0.06, y - r * 0.06, r * 0.8, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x - r, y - r, x + r, y + r]), ['al3', 'al4', 'al5', 'al5'], { edge: false, bias: -0.05 });   // the thin wall, light inside (gas-filled)
+    LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.arc(x - r * 0.34, y - r * 0.36, r * 0.14, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x - r, y - r, x + r, y + r]), ['w', 'w', 'w', 'w'], { edge: false, alpha: 0.5 });   // a soft membrane sheen
+  };
+  // the sacs round each duct first, then the ducts, then each cluster's central sac over the duct's open end
+  A.forEach(([x, y, r], i) => { if (!CENTRE.has(i)) sac(x, y, r); });
+  DUCTS.forEach((d, k) => {
+    const pts = BREATH.path(d.map(([x, y]) => [x * sp, y * sp]), 2), n = pts.length, w0 = k ? 10 : 14, w1 = k ? 7.5 : 11;
+    for (let j = 0; j < 4; j++) { const seg = pts.slice(Math.floor(j * (n - 1) / 4), Math.floor((j + 1) * (n - 1) / 4) + 1), w = lerp(w0, w1, j / 3); tube(c, cam, seg, w, k ? 'al' : 'aw', { bias: k ? -0.12 : 0.02 }); }
+    for (let j = 0; j < 4; j++) { const seg = pts.slice(Math.floor(j * (n - 1) / 4), Math.floor((j + 1) * (n - 1) / 4) + 1), w = lerp(w0, w1, j / 3) * 0.56; tube(c, cam, seg, w, ['aw0', 'aw1', 'aw1'], { edge: false }); }
+  });
+  A.forEach(([x, y, r], i) => { if (CENTRE.has(i)) sac(x, y, r); });
   // capillaries: red vessels along the alveolar walls (dark where blood arrives, brighter where it leaves oxygenated)
   for (let i = 0; i < A.length; i++) { const [x, y, r] = A[i], a0 = hh(i, 2) * TAU; const pts = []; for (let k = 0; k <= 10; k++) { const a = a0 + k / 10 * 2.2; pts.push([x + Math.cos(a) * r * 0.9, y + Math.sin(a) * r * 0.9]); } line(c, cam, pts, i % 3 ? 'vb4' : 'ab4'); if (z > 2.2) line(c, cam, pts.map(([px, py]) => [px + 0.6, py + 0.6]), i % 3 ? 'vb2' : 'ab2'); }
   // gas: trails entering through the ducts (inspiration) and molecules jiggling inside the alveoli
   const flow = o.flow ?? 0;
-  if (flow !== 0) for (let k = 0; k < DUCTS.length; k++) BREATH.stream(c, cam, BREATH.path(DUCTS[k].map(([x, y]) => [x * sp, y * sp]), 3), T, { n: 10, speed: 70, dir: flow, seed: 40 + k, spread: 2, len: 3, ramp: flow > 0 ? ['cy3', 'cy4', 'cy5'] : ['am3', 'am4', 'am5'] });
-  if ((o.mol ?? 0) > 0) for (let i = 0; i < A.length; i++) { const [x, y, r] = A[i]; for (let k = 0; k < 3; k++) { const [jx, jy] = MICRO.jit(i * 5 + k, T, 2.2), px = x + jx * r * 1.1, py = y + jy * r * 1.1, [sx, sy] = K.S(cam, px, py); const s_ = U.clamp(Math.round(z * 0.9), 1, 3); c.save(); c.globalAlpha = o.mol; PIX.rect(c, Math.round(sx), Math.round(sy), s_, s_, (i + k) % 5 < 2 ? 'o22' : 'g3'); c.restore(); } }
+  if (flow !== 0) for (let k = 0; k < DUCTS.length; k++) BREATH.stream(c, cam, BREATH.path(DUCTS[k].map(([x, y]) => [x * sp, y * sp]), 3), T, { n: 10, speed: 70, dir: flow, seed: 40 + k, spread: 2, len: 2, dot: true, w: U.clamp(Math.round(z * 1.2), 2, 4), maxTrail: 4, ramp: flow > 0 ? ['cy4', 'cy5', 'cy4'] : ['am4', 'am5', 'am4'], trail: flow > 0 ? 'cy2' : 'am2' });
+  if ((o.mol ?? 0) > 0) for (let i = 0; i < A.length; i++) { const [x, y, r] = A[i]; for (let k = 0; k < 3; k++) { const [jx, jy] = MICRO.jit(i * 5 + k, T, 2.2), px = x + jx * r * 1.1, py = y + jy * r * 1.1, [sx, sy] = K.S(cam, px, py); const s_ = U.clamp(Math.round(z * 1.1), 2, 4); c.save(); c.globalAlpha = o.mol; c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P[(i + k) % 5 < 2 ? 'o23' : 'g5']; BREATH.dot(c, Math.round(sx), Math.round(sy), s_); c.restore(); } }
 };
 // ================= the alveolar-capillary barrier =================
 // layer boundaries (units, y): gas above 0
 const LAY = AIR.LAY = { lining: [0, 5], epi: [5, 17], inter: [17, 23], endo: [23, 33], lumen: 33 };
+// the boundaries are not ruler lines: each one undulates gently, and the cells bulge round their nuclei
+const NUC = { epi: -60, endo: 70 };
+const BOUND = AIR.BOUND = (lev, x) => {
+  const w = Math.sin(x * 0.047 + lev * 0.9) * 0.62 + Math.sin(x * 0.113 + lev * 2.3) * 0.38, amp = lev === 0 ? 1.4 : 1.1;
+  const bump = (cx, h, s) => h * Math.exp(-(((x - cx) / s) ** 2));
+  let y = lev + amp * w;
+  if (lev === 5) y -= bump(NUC.epi, 3.5, 20); if (lev === 17) y += bump(NUC.epi, 3, 22);
+  if (lev === 23) y -= bump(NUC.endo, 2.5, 22); if (lev === 33) y += bump(NUC.endo, 4.5, 22);
+  return y;
+};
 // o: { o2 (0..1 flux shown), co2 (0..1), rbcX (world x of the cell's centre), bind: callback(i, x, y) }
 AIR.barrier = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).barrier = cam;
   const z = cam.z, [, y0] = K.S(cam, 0, 0);
-  const band = (a, b, ramp, o2 = {}) => { const [, ya] = K.S(cam, 0, a), [, yb] = K.S(cam, 0, b); LIT.shape(c, ctx => { ctx.fillRect(-2, ya, W + 4, yb - ya); }, [-2, ya - 1, W + 2, yb + 1], typeof ramp === 'string' ? R(ramp) : ramp, o2); };
-  PIX.rect(c, 0, 0, W, Math.max(0, Math.round(y0)), 'n1');                                                     // alveolar gas
+  const [wx0] = K.Sinv(cam, -8, 0), [wx1] = K.Sinv(cam, W + 8, 0), st = Math.max(0.5, 3 / z);
+  const band = (a, b, ramp, o2 = {}) => {
+    const pts = []; for (let x = wx0; x <= wx1 + st; x += st) pts.push(K.S(cam, x, BOUND(a, x))); for (let x = wx1 + st; x >= wx0 - st; x -= st) pts.push(K.S(cam, x, BOUND(b, x)));
+    const ys = pts.map(p => p[1]);
+    LIT.shape(c, ctx => { ctx.beginPath(); pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.fill(); }, [-2, Math.min(...ys) - 1, W + 2, Math.max(...ys) + 1], typeof ramp === 'string' ? R(ramp) : ramp, o2);
+  };
+  PIX.rect(c, 0, 0, W, H, 'pl1');                                                                              // plasma below
+  { const pts = []; for (let x = wx0; x <= wx1 + st; x += st) pts.push(K.S(cam, x, BOUND(0, x))); c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = P.n1; c.beginPath(); c.moveTo(-2, -2); pts.forEach(([px, py]) => c.lineTo(px, py)); c.lineTo(W + 2, -2); c.closePath(); c.fill(); c.restore(); }   // alveolar gas
   band(LAY.lining[0], LAY.lining[1], ['wa2', 'wa3', 'wa4', 'tw4'], { edge: false });
   band(LAY.epi[0], LAY.epi[1], 'al', { bias: 0.02 });
   band(LAY.inter[0], LAY.inter[1], ['iv1', 'iv2', 'iv3', 'iv4'], { edge: false });
   band(LAY.endo[0], LAY.endo[1], ['hr2', 'hr3', 'hr4', 'hr5'], { bias: 0.05 });
-  { const [, ya] = K.S(cam, 0, LAY.lumen); PIX.rect(c, 0, Math.round(ya), W, H, 'pl1'); }
-  if (z > 2) {                                                                                                // cell detail: nuclei, the basement membrane line
-    for (const [x, lay, col] of [[-60, 'epi', 'al1'], [70, 'endo', 'hr1']]) { const [a, b] = LAY[lay], [sx, sy] = K.S(cam, x, (a + b) / 2); LIT.shape(c, ctx => { ctx.beginPath(); ctx.ellipse(sx, sy, 14 * z, (b - a) * 0.3 * z, 0, 0, TAU); ctx.fill(); }, [sx - 15 * z, sy - 8 * z, sx + 15 * z, sy + 8 * z], [col, col, col, col], { edge: false }); }
-    const [, yb] = K.S(cam, 0, (LAY.inter[0] + LAY.inter[1]) / 2); for (let x = 0; x < W; x += 3) PIX.rect(c, x, Math.round(yb), 2, 1, 'iv5');
+  if (z > 1.6) {                                                                                              // cell detail: nuclei in their bulges, the basement membrane
+    for (const [x, lay, col] of [[NUC.epi, 'epi', 'al1'], [NUC.endo, 'endo', 'hr1']]) { const [a, b] = LAY[lay], ym = (BOUND(a, x) + BOUND(b, x)) / 2, h = (BOUND(b, x) - BOUND(a, x)) * 0.32, [sx, sy] = K.S(cam, x, ym); LIT.shape(c, ctx => { ctx.beginPath(); ctx.ellipse(sx, sy, 12 * z, h * z, 0, 0, TAU); ctx.fill(); }, [sx - 13 * z, sy - h * z - 2, sx + 13 * z, sy + h * z + 2], [col, col, col, col], { edge: false }); }
+    for (let x = 0; x < W; x += 3) { const [wx] = K.Sinv(cam, x, 0), [, sy] = K.S(cam, wx, (BOUND(LAY.inter[0], wx) + BOUND(LAY.inter[1], wx)) / 2); PIX.rect(c, x, Math.round(sy), 2, 1, 'iv5'); }
   }
-  // the red blood cell gliding along the capillary (side view of the biconcave disc)
+  // the red blood cell gliding along the capillary: its edge-on, biconcave profile (thick rim, thin centre)
   const rx = o.rbcX ?? 0;
-  MICRO.rbc(c, cam, rx, LAY.lumen + 26, 30, 11, 0, {});
+  MICRO.rbcSide(c, cam, rx, LAY.lumen + 26, 30, 11, {});
   // oxygen: diffusing from the gas (many) down through the layers into the plasma and the cell; carbon dioxide the other way
   const nO2 = 46, nCO = 16, per = 2.4;
   if ((o.o2 ?? 0) > 0) for (let k = 0; k < nO2; k++) {
@@ -137,6 +175,7 @@ AIR.barrier = (c, cam, T, o = {}) => {
 // ================= the heated humidifier (cross-section) =================
 // o: { flow (0..1), vapour (0..1), heat (0..1) }
 AIR.humid = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).humid = cam;
   const z = cam.z, fl = o.flow ?? 1, vap = o.vapour ?? 1, ht = o.heat ?? 1;
   PIX.rect(c, 0, 0, W, H, 'k');
   rr(c, cam, -110, 84, 110, 112, 6, R('g'), { bias: 0.08 });                                             // heater base
@@ -149,15 +188,16 @@ AIR.humid = (c, cam, T, o = {}) => {
   if (ht > 0) for (let k = 0; k < 8; k++) { const x = -80 + k * 23, ph = ((T * 0.8 + hh(k, 3)) % 1), y = lerp(80, 30, ph), [sx, sy] = K.S(cam, x, y), s = Math.max(2, 3 * z), a = Math.sin(Math.PI * ph) * ht; if (a < 0.2) continue; c.save(); c.globalAlpha = a; PIX.bline(c, sx - s, sy + s, sx, sy, 'ht4'); PIX.bline(c, sx, sy, sx + s, sy + s, 'ht4'); c.restore(); }
   // the gas path over the water surface, and water vapour leaving the surface and joining it
   const gp = BREATH.path([[-150, -40], [-80, -36], [-30, -6], [30, -6], [80, -36], [150, -40]], 3);
-  if (fl > 0) BREATH.stream(c, cam, gp, T, { n: 90, speed: 140, seed: 7, spread: 10, len: 4, a: fl });
-  if (vap > 0) for (let k = 0; k < 30; k++) {
+  if (fl > 0) BREATH.stream(c, cam, gp, T, { n: 90, speed: 140, seed: 7, spread: 10, len: 3, a: fl, dot: true, w: U.clamp(Math.round(z * 1.3), 2, 4), maxTrail: 4, ramp: ['cy4', 'cy5', 'cy4'], trail: 'cy2' });
+  if (vap > 0) for (let k = 0; k < 40; k++) {
     const ph = ((T * 0.7 + hh(k, 5)) % 1), x0 = (hh(k, 6) - 0.5) * 170, rise = Math.min(1, ph * 2), y = lerp(20, -10, rise), x = x0 + (ph > 0.5 ? (ph - 0.5) * 2 * 200 : 0) + MICRO.jit(k + 70, T, 1.8)[0] * 6;
     const [sx, sy] = K.S(cam, x, y); if (sx > W + 4) continue;
-    MICRO.h2o(c, sx, sy, Math.max(1.2, 1.6 * z), k + T, { a: vap * (ph < 0.95 ? 1 : 0) });
+    MICRO.h2o(c, sx, sy, Math.max(2, 2.1 * z), k + T, { a: vap * (ph < 0.95 ? 1 : 0) });
   }
 };
 // ================= the corrugated tube, transparent, with the flow streaming through =================
 AIR.tube = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).tube = cam;
   const z = cam.z, r = 34, dir = o.dir ?? 1;
   PIX.rect(c, 0, 0, W, H, 'k');
   const [, yt] = K.S(cam, 0, -r), [, yb] = K.S(cam, 0, r);
@@ -168,22 +208,23 @@ AIR.tube = (c, cam, T, o = {}) => {
   for (const [y, col] of [[-r, 'tw4'], [r, 'tw2']]) { const [, sy] = K.S(cam, 0, y); PIX.rect(c, 0, Math.round(sy) - 1, W, Math.max(2, Math.round(2 * z)), col); }
   // the flow: two layers of trails at different speeds (depth)
   const pts = BREATH.path([[x0 - 50, 0], [x1 + 50, 0]], 20);
-  BREATH.stream(c, cam, pts, T, { n: 70, speed: 260 * dir, seed: 3, spread: r * 0.8, len: 10, ramp: o.ramp || ['cy2', 'cy3', 'cy4'], w: Math.max(1, Math.round(z * 0.6)) });
-  BREATH.stream(c, cam, pts, T, { n: 40, speed: 380 * dir, seed: 9, spread: r * 0.55, len: 16, ramp: o.ramp2 || ['cy4', 'cy5', 'w'] });
-  if ((o.vapour ?? 0) > 0) for (let k = 0; k < 20; k++) { const x = x0 + ((hh(k, 3) * (x1 - x0) + T * 300 * dir) % (x1 - x0 + 1) + (x1 - x0)) % (x1 - x0), y = (hh(k, 4) - 0.5) * r * 1.4, [sx, sy] = K.S(cam, x, y); MICRO.h2o(c, sx, sy, Math.max(1.2, 1.5 * z), k, { a: o.vapour }); }
+  BREATH.stream(c, cam, pts, T, { n: 70, speed: 200 * dir, seed: 3, spread: r * 0.8, len: 4, maxTrail: 5, dot: true, ramp: o.ramp || ['cy2', 'cy3', 'cy3'], w: 2 });
+  BREATH.stream(c, cam, pts, T, { n: 40, speed: 280 * dir, seed: 9, spread: r * 0.55, len: 5, maxTrail: 7, dot: true, ramp: o.ramp2 || ['cy4', 'cy5', 'cy4'], trail: (o.ramp2 || ['cy2'])[0], w: U.clamp(Math.round(z * 1.6), 3, 4) });
+  if ((o.vapour ?? 0) > 0) for (let k = 0; k < 20; k++) { const x = x0 + ((hh(k, 3) * (x1 - x0) + T * 300 * dir) % (x1 - x0 + 1) + (x1 - x0)) % (x1 - x0), y = (hh(k, 4) - 0.5) * r * 1.4, [sx, sy] = K.S(cam, x, y); MICRO.h2o(c, sx, sy, Math.max(2, 1.9 * z), k, { a: o.vapour }); }
 };
 // ================= the Y-connector, close =================
 // o: { insp (0..1 flow from the inspiratory limb to the patient), exp (0..1 flow from the patient into the expiratory limb) }
 AIR.YP = { pat: BREATH.path([[40, 0], [0, 0], [-160, 0]], 3), insp: BREATH.path([[170, -110], [90, -46], [40, 0]], 3), exp: BREATH.path([[40, 0], [90, 46], [170, 110]], 3) };
 AIR.ypiece = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).ypiece = cam;
   PIX.rect(c, 0, 0, W, H, 'k');
   const YP = AIR.YP;
   for (const [k, w] of [['insp', 40], ['exp', 40], ['pat', 30]]) { tube(c, cam, YP[k], w, ['tw1', 'tw2', 'tw3', 'tw4'], {}); tube(c, cam, YP[k], w * 0.7, ['n0', 'n1', 'n2'], { edge: false }); }
   LIT.sphere(c, ...K.S(cam, 40, 0), 26 * cam.z, ['tw1', 'tw2', 'tw3', 'tw4'], {}); LIT.sphere(c, ...K.S(cam, 40, 0), 18 * cam.z, ['n0', 'n1', 'n2', 'n2'], { edge: false });
   tube(c, cam, [[-60, 0], [-120, 0]], 34, R('g'), { bias: 0.1 }); tube(c, cam, [[-60, 0], [-160, 0]], 20, ['n0', 'n1', 'n2'], { edge: false });   // 15 mm connector toward the tube
   const fi = o.insp ?? 0, fe = o.exp ?? 0;
-  if (fi > 0) { BREATH.stream(c, cam, YP.insp, T, { n: 40, speed: 220, seed: 2, spread: 12, len: 6, a: fi }); BREATH.stream(c, cam, YP.pat, T, { n: 40, speed: 220, seed: 3, spread: 9, len: 6, a: fi }); }
-  if (fe > 0) { BREATH.stream(c, cam, BREATH.path([[-160, 0], [0, 0], [40, 0]], 3), T, { n: 40, speed: 180, seed: 4, spread: 9, len: 6, a: fe, ramp: ['am3', 'am4', 'am5'] }); BREATH.stream(c, cam, YP.exp, T, { n: 40, speed: 180, seed: 5, spread: 12, len: 6, a: fe, ramp: ['am3', 'am4', 'am5'] }); }
+  if (fi > 0) { BREATH.stream(c, cam, YP.insp, T, { n: 40, speed: 220, seed: 2, spread: 12, len: 4, a: fi, dot: true, w: U.clamp(Math.round(cam.z * 1.8), 2, 4), maxTrail: 6, ramp: ['cy4', 'cy5', 'cy4'], trail: 'cy2' }); BREATH.stream(c, cam, YP.pat, T, { n: 40, speed: 220, seed: 3, spread: 9, len: 4, a: fi, dot: true, w: U.clamp(Math.round(cam.z * 1.8), 2, 4), maxTrail: 6, ramp: ['cy4', 'cy5', 'cy4'], trail: 'cy2' }); }
+  if (fe > 0) { BREATH.stream(c, cam, BREATH.path([[-160, 0], [0, 0], [40, 0]], 3), T, { n: 40, speed: 180, seed: 4, spread: 9, len: 4, a: fe, ramp: ['am4', 'am5', 'am4'], dot: true, w: U.clamp(Math.round(cam.z * 1.8), 2, 4), maxTrail: 6, trail: 'am2' }); BREATH.stream(c, cam, YP.exp, T, { n: 40, speed: 180, seed: 5, spread: 12, len: 4, a: fe, ramp: ['am4', 'am5', 'am4'], dot: true, w: U.clamp(Math.round(cam.z * 1.8), 2, 4), maxTrail: 6, trail: 'am2' }); }
 };
 AIR.init = () => {};
 })();

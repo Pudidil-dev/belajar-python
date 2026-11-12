@@ -128,19 +128,28 @@ INSIDE.board = (c, cam, T, o = {}) => {
   rr(c, cam, B.x0, B.y0, B.x1, B.y1, 4, R('pc'), {});
   if (z > 0.7) for (let k = 0; k < 9; k++) line(c, cam, [[B.x0 + 8, B.y0 + 30 + k * 32], [B.x0 + 40, B.y0 + 30 + k * 32]], 'pc1');
   // traces first (copper), then chips on top
-  for (const k of ['tO2', 'tAirV', 'tO2V', 'tPsol', 'tFlow', 'tPres', 'tExpV', 'tExpF', 'tTimer', 'tVol', 'tDisp']) line(c, cam, RT[k], (o.trace && o.trace[k]) ? 'hm5' : 'hm2');
+  for (const k of ['tO2', 'tAirV', 'tO2V', 'tPsol', 'tFlow', 'tPres', 'tExpV', 'tExpF', 'tTimer', 'tVol', 'tDisp']) {
+    const on = o.trace && o.trace[k];
+    if (z < 0.9) line(c, cam, RT[k], on ? 'hm5' : 'hm3');
+    else { tube(c, cam, RT[k], 2.2, ['pc0', 'pc0', 'pc0'], { edge: false }); tube(c, cam, RT[k], 1.3, on ? ['hm3', 'hm4', 'hm4'] : ['hm1', 'hm2', 'hm2'], { edge: false }); }
+  }
   const [cx, cy] = LY.cpu; chip(c, cam, cx, cy, 44, 44);
   if (z > 1.4) { rr(c, cam, cx - 14, cy - 14, cx + 14, cy + 14, 1, ['n1', 'n2', 'g2', 'g3'], {}); }
   chip(c, cam, LY.adc[0], LY.adc[1], 22, 14); chip(c, cam, LY.drv[0], LY.drv[1], 24, 14); chip(c, cam, LY.mem[0], LY.mem[1], 22, 12);
   // the breath timer: a crystal and a counter, with its progress ring (a circle of small lights that fills, then fires)
   const [tx, ty] = LY.timer; rr(c, cam, tx - 6, ty - 4, tx + 6, ty + 4, 2, R('g'), { bias: 0.3 }); chip(c, cam, tx + 20, ty, 14, 10);
   if (o.timer != null) {
-    const q = clamp(o.timer), n = 20, r = 13;
-    for (let k = 0; k < n; k++) { const a = -Math.PI / 2 + k / n * TAU, [px, py] = K.S(cam, tx + Math.cos(a) * r, ty + Math.sin(a) * r), s = Math.max(1, Math.round(z * 1.4)); PIX.rect(c, Math.round(px - s / 2), Math.round(py - s / 2), s, s, k / n < q ? (q >= 1 ? 'w' : 'ys4') : 'pc2'); }
+    const q = clamp(o.timer), r = 13, [px, py] = K.S(cam, tx, ty), R0 = r * z, lw = Math.max(2, Math.round(2.6 * z));
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.lineCap = 'butt';
+    c.strokeStyle = P.k; c.lineWidth = lw + 2; c.beginPath(); c.arc(px, py, R0, 0, TAU); c.stroke();
+    c.strokeStyle = P.pc2; c.lineWidth = lw; c.beginPath(); c.arc(px, py, R0, 0, TAU); c.stroke();
+    if (q > 0) { c.strokeStyle = P[q >= 1 ? 'ys5' : 'ys4']; c.beginPath(); c.arc(px, py, R0, -Math.PI / 2, -Math.PI / 2 + q * TAU); c.stroke(); }
+    c.fillStyle = P.g7; for (let k = 0; k < 4; k++) { const an = -Math.PI / 2 + k * Math.PI / 2; c.fillRect(Math.round(px + Math.cos(an) * (R0 + lw)), Math.round(py + Math.sin(an) * (R0 + lw)), Math.max(1, Math.round(z * 0.8)), Math.max(1, Math.round(z * 0.8))); }
+    c.restore();
   }
   // the integrated-volume indicator: a bar of lights that fills as the measured flow adds up; a mark at the target volume
   const [vx, vy] = LY.vol, n = 12, q = clamp(o.vol ?? 0);
-  for (let k = 0; k < n; k++) { const on = k / n < q - 1e-6; rr(c, cam, vx - 30 + k * 5, vy - 5, vx - 27 + k * 5, vy + 5, 0.5, on ? (q >= 1 ? ['w', 'w', 'w', 'w'] : ['cy2', 'cy3', 'cy4', 'cy5']) : ['k', 'n1', 'pc1', 'pc2'], { edge: false }); }
+  for (let k = 0; k < n; k++) { const on = k / n < q - 1e-6; rr(c, cam, vx - 30 + k * 5, vy - 5, vx - 27 + k * 5, vy + 5, 0.5, on ? (q >= 1 ? ['ys3', 'ys4', 'ys5', 'ys5'] : ['cy2', 'cy3', 'cy4', 'cy5']) : ['k', 'n1', 'pc1', 'pc2'], { edge: false }); }
   line(c, cam, [[vx + 30.5, vy - 8], [vx + 30.5, vy + 8]], 'ys4');
   for (const [x, y] of [[B.x0 + 6, B.y0 + 6], [B.x1 - 6, B.y0 + 6], [B.x0 + 6, B.y1 - 6], [B.x1 - 6, B.y1 - 6]]) LIT.sphere(c, ...K.S(cam, x, y), Math.max(1, 2 * z), R('g'), { bias: 0.2 });
 };
@@ -148,6 +157,7 @@ INSIDE.board = (c, cam, T, o = {}) => {
 // o: { airV, o2V (0..1 openings), psol (0..1), expV (closing force 0..1), flowAir, flowO2, flowBlend, flowExp (0..1),
 //      signals: [[routeKey, q]], timer, vol, hi: {key: a}, trace: {key: true}, casing (0..1: the opaque casing over it) }
 INSIDE.scene = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).inside = cam;
   PIX.rect(c, 0, 0, W, H, 'k');
   // the casing walls (a thick light-grey section line) and the dark interior
   rr(c, cam, -8, -8, 488, 648, 14, R('vt'), { bias: 0.02 });
@@ -156,14 +166,15 @@ INSIDE.scene = (c, cam, T, o = {}) => {
   tube(c, cam, [[480, 70], [560, 70]], 9, ['g3', 'g4', 'g5', 'g6'], {}); tube(c, cam, [[480, 150], [560, 150]], 9, ['g3', 'g4', 'g5', 'g6'], {});
   INSIDE.board(c, cam, T, o);
   // gas channels: steel walls, dark lumen
-  for (const [k, w] of [['air', 9], ['o2', 9], ['blend', 10], ['exp', 10]]) { tube(c, cam, RT[k], w, R('g'), { bias: 0.05 }); tube(c, cam, RT[k], w * 0.55, ['k', 'n0', 'n1'], { edge: false }); }
+  for (const [k, w] of [['air', 12], ['o2', 12], ['blend', 13], ['exp', 13]]) { tube(c, cam, RT[k], w, R('g'), { bias: 0.05 }); tube(c, cam, RT[k], w * 0.64, ['n0', 'n1', 'n1'], { edge: false }); }
   rr(c, cam, LY.mixer[0] - 12, LY.mixer[1] - 12, LY.mixer[0] + 12, LY.mixer[1] + 12, 6, R('g'), { bias: 0.1 }); rr(c, cam, LY.mixer[0] - 8, LY.mixer[1] - 8, LY.mixer[0] + 8, LY.mixer[1] + 8, 5, ['k', 'n0', 'n1'], { edge: false });
   // particles: air (21 % O2, the rest mostly N2), oxygen (pure), the blend (FiO2 40 %), expired gas (amber trails)
   const fa = o.flowAir ?? 0, fo = o.flowO2 ?? 0, fb = o.flowBlend ?? 0, fe = o.flowExp ?? 0;
-  if (fa > 0) BREATH.stream(c, cam, RT.air, T, { n: 160, speed: 70 * fa, mix: 0.21, seed: 3, spread: 1.6, w: U.clamp(Math.round(cam.z * 1.2), 1, 3), a: Math.min(1, fa * 2) });
-  if (fo > 0) BREATH.stream(c, cam, RT.o2, T, { n: 160, speed: 70 * fo, mix: 1.0, seed: 4, spread: 1.6, w: U.clamp(Math.round(cam.z * 1.2), 1, 3), a: Math.min(1, fo * 2) });
-  if (fb > 0) BREATH.stream(c, cam, RT.blend, T, { n: 320, speed: 110 * fb, mix: 0.4, seed: 5, spread: 1.8, w: U.clamp(Math.round(cam.z * 1.2), 1, 3), a: Math.min(1, fb * 2) });
-  if (fe > 0) BREATH.stream(c, cam, RT.exp, T, { n: 120, speed: 90 * fe, seed: 6, spread: 1.8, len: 3, w: U.clamp(Math.round(cam.z * 1.0), 1, 3), ramp: ['am3', 'am4', 'am5'], a: Math.min(1, fe * 2) });
+  const pw = U.clamp(Math.round(cam.z * 1.05), 2, 4);
+  if (fa > 0) BREATH.stream(c, cam, RT.air, T, { n: 130, speed: 70 * fa, mix: 0.21, seed: 3, spread: 2.2, w: pw, dot: true, a: Math.min(1, fa * 2) });
+  if (fo > 0) BREATH.stream(c, cam, RT.o2, T, { n: 130, speed: 70 * fo, mix: 1.0, seed: 4, spread: 2.2, w: pw, dot: true, a: Math.min(1, fo * 2) });
+  if (fb > 0) BREATH.stream(c, cam, RT.blend, T, { n: 260, speed: 110 * fb, mix: 0.4, seed: 5, spread: 2.4, w: pw, dot: true, a: Math.min(1, fb * 2) });
+  if (fe > 0) BREATH.stream(c, cam, RT.exp, T, { n: 110, speed: 90 * fe, seed: 6, spread: 2.4, len: 3, w: pw, dot: true, maxTrail: 4, ramp: ['am4', 'am5', 'am4'], trail: 'am2', a: Math.min(1, fe * 2) });
   // components
   for (const g of ['air', 'o2']) { const L = LY[g]; filter(c, cam, L.filt, L.y); regulator(c, cam, L.reg, L.y, T, 0.6); INSIDE.valve(c, cam, L.valve, L.y, g === 'air' ? (o.airV ?? 0.5) : (o.o2V ?? 0.3), 1, { hi: o.hi && o.hi[g + 'V'] }); }
   INSIDE.o2Sensor(c, cam, T, { hi: o.hi && o.hi.o2s });

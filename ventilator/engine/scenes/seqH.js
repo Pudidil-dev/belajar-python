@@ -43,11 +43,11 @@ SC['s39_return'] = {
   draw(c, t, S) { const tau = S.t - 60; MACRO.scene(c, C39(t), tau, { v: BREATH.v(tau), flowIn: 0, monitor: { sweep: 0.0 } }); },
   cues: [[0.0, 'buildup', 0.8, 0, 1.5]],
 };
-// S40 — the next breath enters the tube; the lungs begin to expand; the last frame is frame 0 (58.5–60.0 s)
+// S40 — at rest; the gas of the next breath arrives along the circuit; the last frame is frame 0, where it begins
 SC['s40_loop'] = {
   draw(c, t, S) {
     const tau = S.t - 60, fi = MO.smooth(clamp((tau + 0.6) / 0.6));
-    MACRO.scene(c, SHOT.OPEN, tau, { v: BREATH.v(tau), flowIn: fi, pulse: SHOT.pulseD(tau) > 0 ? SHOT.pulseD(tau) : null, monitor: { sweep: Math.max(0, 0.03 + tau * 0.02) } });
+    MACRO.scene(c, SHOT.OPEN, tau, { v: BREATH.v(tau), flowIn: fi, monitor: { sweep: 0 } });
   },
   cues: [[0.0, 'loop_rise', 1.0, 0, 1.5]],
 };

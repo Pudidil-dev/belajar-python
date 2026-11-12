@@ -1,85 +1,58 @@
-// SEQUENCE A — THE IMPOSSIBLE BREATH (0–3 s): the result first. A breath is already entering the lungs at frame 0; the
-// camera dives with it down the trachea, through the branching airways, into the alveoli and across the alveolar-capillary
-// barrier, then pulls all the way back out — barrier, alveolus, bronchial tree, lung, chest, patient, circuit — until the
-// ICU ventilator that delivered it stands in frame, its screen drawing the inspiratory waveform.
+// SEQUENCE A — THE BREATH (0–8 s on screen): the result first, calmly. One continuous shot, no cuts and no flashes: the
+// chest in its transparent cutaway, the endotracheal tube in the trachea, and the lungs breathing — two whole
+// ventilator breaths at the set rate. Each breath: the gas flows in (cyan) while the volume rises steadily and the lungs
+// inflate (the bases move down, the sides out), then the flow stops and the lungs recoil on their own, deflating as the
+// exhaled gas (amber) leaves. During the second breath the camera pulls slowly back to the whole set-up: the tube, the
+// circuit and the ICU ventilator whose screen draws the same breath. The film's last frame is this shot's first frame.
+// The six scene slots (S01–S06) are beats of the one shot; all of it is drawn from r, the seconds on screen.
 (() => {
 const clamp = U.clamp, lerp = U.lerp;
-const M = MACRO.R;
-// gas in the trachea and both main bronchi, and in the first lobar branches (dense: the breath arriving)
+const M = MACRO.R, HK = BREATH.HOOK;
+// gas in the trachea and both main bronchi, and in the first lobar branches
 const AIRWAY = [M.trachea, M.bronR, M.bronL];
 const LOBAR = MACRO.TREE.filter(s => s[4] > 2.4).map(([x0, y0, x1, y1]) => BREATH.path([[x0, y0], [x1, y1]], 2));
 const airwayGas = (c, cam, T, v, a = 1, dir = 1) => {
-  const E = p => MACRO.ex(p[0], p[1], v), ramp = dir > 0 ? ['cy3', 'cy4', 'cy5'] : ['am3', 'am4', 'am5'];
-  AIRWAY.forEach((p, k) => BREATH.stream(c, cam, BREATH.path(p.map(E), 1), T, { n: 70, speed: 120, dir, seed: 11 + k, spread: k ? 2.2 : 3.4, len: 2, a, ramp }));
-  LOBAR.forEach((p, k) => BREATH.stream(c, cam, BREATH.path(p.map(E), 1), T, { n: 14, speed: 90, dir, seed: 31 + k, spread: 1, len: 1.5, a, ramp }));
+  if (a <= 0.01) return;
+  const E = p => MACRO.ex(p[0], p[1], v);
+  const w = U.clamp(Math.round(cam.z * 0.75), 2, 4), rd = dir > 0 ? ['cy4', 'cy5', 'cy4'] : ['am4', 'am5', 'am4'], tr = dir > 0 ? 'cy2' : 'am2';
+  AIRWAY.forEach((p, k) => BREATH.stream(c, cam, BREATH.path(p.map(E), 1), T, { n: 50, speed: 120, dir, seed: 11 + k, spread: k ? 2.2 : 3.4, len: 1.5, a, ramp: rd, dot: true, w, maxTrail: 4, trail: tr }));
+  LOBAR.forEach((p, k) => BREATH.stream(c, cam, BREATH.path(p.map(E), 1), T, { n: 10, speed: 90, dir, seed: 31 + k, spread: 1, len: 1, a, ramp: rd, dot: true, w: Math.max(2, w - 1), maxTrail: 3, trail: tr }));
 };
 window.airwayGas = airwayGas;
-// S01 — the breath arrives: a cyan pulse runs through the tube into the trachea; the lungs begin to expand (0–0.375 s)
-SC['s01_breath'] = {
-  draw(c, t, S) {
-    const tau = t, cam = SHOT.hookCam(tau), v = BREATH.v(tau);
-    MACRO.scene(c, cam, tau, { v, flowIn: 1, pulse: SHOT.pulseD(tau), monitor: { sweep: 0.03 } });
-    airwayGas(c, cam, tau, v, MO.smooth(clamp(tau / 0.3)));
-  },
-  cues: [[0.0, 'thump', 1.0, 0], [0.0, 'fwoosh', 1.0, 0.15, 0.45]],
+// the flows of the hook's breaths: in (cyan) while the ventilator delivers, out (amber) while the lungs recoil
+const hookFlow = r => {
+  const { k, u } = BREATH.hookPhase(r), fin = u < HK.TI ? 1 - MO.smooth(clamp((u - HK.TI + 0.12) / 0.12)) : 0;
+  const fout = u >= HK.TI ? MO.smooth(clamp((u - HK.TI) / 0.15)) * Math.exp(-(u - HK.TI) / 1.1) : 0;
+  return { fin, fout, k, u };
 };
-// S02 — down the trachea: the gas divides at the carina into the two main bronchi (0.375–0.875 s)
-SC['s02_trachea'] = {
-  draw(c, t, S) {
-    const q = MO.sineInOut(clamp(t / 0.5)), cam = SHOT.zoom(SHOT.hookCam(0.375), { x: -12, y: -36, z: 8 }, q), v = BREATH.v(S.t);
-    MACRO.scene(c, cam, S.t, { v, flowIn: 1, pulse: Math.min(SHOT.D_CARINA, SHOT.pulseD(S.t)) });
-    airwayGas(c, cam, S.t, v, 1);
-  },
-  cues: [[0.0, 'whoosh_dir', 0.9, -0.6, 0.5]],
+SHOT.hookFlow = hookFlow;
+// particles move at the rate of the last scene (S40), so the loop point joins without a jump
+const TP = 2 / 3;
+const drawHook = (c, r) => {
+  const cam = SHOT.hookCam(r), v = BREATH.hookV(r), { fin, fout } = hookFlow(r), T = r * TP;
+  const sweep = ((r / HK.P) % 1 + 1) % 1;
+  MACRO.scene(c, cam, T, { v, flowIn: fin, flowOut: fout, monitor: { sweep } });
+  airwayGas(c, cam, T, v, fin * MO.smooth(clamp(r / 0.25)), 1);
+  airwayGas(c, cam, T, v, fout, -1);
 };
-// S03 — the airways branch again and again: three rapid zooms through the generations (0.875–1.375 s)
-const SPURT = t => { const k = Math.min(3, Math.floor(t / 0.125)), q = MO.cubicInOut(clamp((t - k * 0.125) / 0.125)); return k < 3 ? 0.4 + k * 2 + 2 * q : 6.4 + 0.5 * MO.smooth(clamp((t - 0.375) / 0.125)); };
-SC['s03_branches'] = {
-  xin: 0.0625,
-  draw(c, t, S) { AIR.tree(c, AIR.treeCam(SPURT(t)), S.t, { flow: 1, v: BREATH.v(S.t) }); },
-  cues: [[0.0, 'swish', 0.9, -0.5, 0], [0.125, 'swish', 0.9, 0.0, 1], [0.25, 'swish', 0.95, 0.5, 2]],
+SHOT.drawHook = drawHook;
+const hook = { draw(c, t, S) { drawHook(c, S.t / HK.W); } };
+// S01 — frame 0: the lungs at rest; the breath begins, the gas flows in, the lungs start to inflate (0–1 s)
+SC['s01_breath'] = { ...hook,
+  // the hook's sound, on screen time (the score's grid): the valve opens and the gas flows in, the lungs stretch, the
+  // passive exhale; the same for the second breath; the slow pull-back; the bass hit as the ventilator stands in frame
+  gcues: [[0.0, 'valve_click', 0.45, -0.2], [0.0, 'airflow', 0.5, -0.3, 1.0], [0.5, 'elastic', 0.45, 0], [HK.TI, 'exhale', 0.55, 0.2, 2.6],
+    [HK.P, 'valve_click', 0.4, -0.2], [HK.P, 'airflow', 0.45, -0.3, 1.0], [HK.P + 0.5, 'elastic', 0.4, 0], [HK.P + HK.TI, 'exhale', 0.5, 0.2, 2.4],
+    [5.25, 'zoom_out', 0.4, 0, 2.6], [7.25, 'monitor_blip', 0.4, 0.3], [7.75, 'monitor_blip', 0.4, 0.3]],
 };
-// S04 — into the alveoli: they fill and stretch smoothly as the gas arrives (1.375–1.875 s)
-SC['s04_alveoli'] = {
-  xin: 0.0625,
-  draw(c, t, S) {
-    const q = MO.cubicOut(clamp(t / 0.5)), cam = { x: lerp(0, -40, q), y: lerp(-40, 22, q), z: K.zl(0.85, 2.7, q) };
-    AIR.acinus(c, cam, S.t, { v: BREATH.v(S.t), flow: 1, mol: q });
-  },
-  cues: [[0.0, 'elastic', 0.9, -0.2]],
-};
-// S05 — the alveolar-capillary barrier: oxygen crosses into the blood and a red cell takes it up (1.875–2.375 s)
-const rbcX = T => -90 + (T - 1.875) * 150;
-const tagged = t => { const T = 1.875 + t; if (t < 0.125) return [rbcX(T) + 18, lerp(-36, 2, t / 0.125)]; if (t < 0.375) return [rbcX(T) + 18 - (t - 0.125) * 20, lerp(2, AIR.LAY.lumen + 20, MO.smooth((t - 0.125) / 0.25))]; return [rbcX(T) + 13, AIR.LAY.lumen + 24]; };
-SC['s05_barrier'] = {
-  xin: 0.0625,
-  draw(c, t, S) {
-    const cam = { x: rbcX(S.t) - 4, y: 22, z: 3.1 };
-    AIR.barrier(c, cam, S.t, { o2: 1, co2: 0.8, rbcX: rbcX(S.t) });
-    const [x, y] = tagged(t), [px, py] = K.S(cam, x, y);
-    if (t < 0.375) { MICRO.o2(c, px, py, 7, 0.6 + t * 3, { ramp: ['o22', 'o23', 'o24', 'o25', 'w'] }); MICRO.tag(c, px, py, 9, S.t, 'w'); }
-    else { const k = (t - 0.375) / 0.125; FX.ring(c, px, py, 6 + 30 * k, 'w', 1 - k); FX.ring(c, px, py, 3 + 18 * k, 'hm4', 1 - k); }
-  },
-  cues: [[0.0, 'pop', 0.9, -0.3], [0.125, 'tick', 0.9, 0.2], [0.375, 'shimmer', 1.0, 0.3]],
-};
-// S06 — the explosive scale reveal: barrier → alveolus → bronchial tree → lung → chest → patient → circuit → ventilator
-const STAGE = [0.1, 0.2, 0.32];
-SC['s06_reveal'] = {
-  draw(c, t, S) {
-    const T = S.t, v = BREATH.v(T);
-    const barrier = cc => { const q = clamp(t / STAGE[0]); AIR.barrier(cc, { x: rbcX(2.375) - 4, y: 22, z: K.zl(3.1, 0.7, q) }, T, { o2: 1, co2: 0.8, rbcX: rbcX(T) }); };
-    const acinus = cc => { const q = clamp((t - STAGE[0] + 0.03) / (STAGE[1] - STAGE[0])); AIR.acinus(cc, { x: lerp(-40, 0, q), y: lerp(22, -40, q), z: K.zl(3.2, 0.55, q) }, T, { v, flow: 1, mol: 1 }); };
-    const tree = cc => { const q = clamp((t - STAGE[1] + 0.03) / (STAGE[2] - STAGE[1])); AIR.tree(cc, AIR.treeCam(lerp(6.6, 0, MO.sineInOut(q))), T, { flow: 1, v }); };
-    const macro = cc => { const q = MO.cubicOut(clamp((t - STAGE[2] + 0.03) / (0.625 - STAGE[2] + 0.03))); MACRO.scene(cc, SHOT.zoom({ x: -28, y: -12, z: 9 }, MACRO.WIDE, q), T, { v, flowIn: 1, monitor: { sweep: lerp(0.12, 0.22, q) } }); };
-    const dz = 0.03;
-    if (t < STAGE[0] - dz) barrier(c);
-    else if (t < STAGE[0]) window.dissolve(c, barrier, acinus, (t - STAGE[0] + dz) / dz);
-    else if (t < STAGE[1] - dz) acinus(c);
-    else if (t < STAGE[1]) window.dissolve(c, acinus, tree, (t - STAGE[1] + dz) / dz);
-    else if (t < STAGE[2] - dz) tree(c);
-    else if (t < STAGE[2]) window.dissolve(c, tree, macro, (t - STAGE[2] + dz) / dz);
-    else macro(c);
-  },
-  cues: [[0.0, 'zoomout', 1.0, 0, 0.625], [0.625, 'bass_hit', 1.0, 0]],
-};
+// S02 — full inflation: the bases have moved down, the sides out (1–2 s)
+SC['s02_trachea'] = { ...hook };
+// S03 — the flow stops; the lungs recoil and deflate on their own, the exhaled gas leaves (2–3.25 s)
+SC['s03_branches'] = { ...hook };
+// S04 — at rest for a moment; the next breath begins (3.25–4.5 s)
+SC['s04_alveoli'] = { ...hook };
+// S05 — the second breath: inflate, deflate; the camera starts to pull back (4.5–6 s)
+SC['s05_barrier'] = { ...hook };
+// S06 — the whole set-up: tube, circuit, humidifier and the ventilator, its screen drawing the breath (6–8 s)
+SC['s06_reveal'] = { ...hook, cues: [[0.75, 'bass_hit', 0.6, 0]] };
 })();

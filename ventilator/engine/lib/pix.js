@@ -49,7 +49,7 @@ defRamp('wa', 6, { hue: 205, shift: 12, sat: 0.6, light: [0.16, 0.7] });        
 defRamp('ht', 6, { hue: 16, shift: 16, sat: 0.85, light: [0.2, 0.7] });                   // heat (heater plate)
 defRamp('pc', 6, { hue: 150, shift: 14, sat: 0.42, light: [0.07, 0.4] });                 // circuit board
 defRamp('hm', 6, { hue: 44, shift: 18, sat: 0.78, light: [0.2, 0.8] });                   // heme (gold), copper traces
-defRamp('hb', 7, { hue: 6, shift: 16, sat: 0.36, light: [0.18, 0.8] });                   // hemoglobin (dusty coral)
+defRamp('hb', 7, { hue: 4, shift: 14, sat: 0.46, light: [0.24, 0.86] });                  // hemoglobin (coral, brighter: it read as brown)
 defRamp('mt', 5, { hue: 150, shift: 14, sat: 0.55, light: [0.25, 0.85] });                // monitor flow trace (green)
 window.RAMP = RAMP;
 const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];

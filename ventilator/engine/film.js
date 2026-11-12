@@ -10,37 +10,47 @@ window.SC = window.SC || {};
 window.BPM = 120; window.BEAT = 0.5; window.BAR = 2;
 const qs = new URLSearchParams(location.search);
 window.NOTEXT = qs.has('notext');
+// [id, duration on screen (s), the scene's own animation length (s)]. Each scene's animation is stretched to its screen
+// duration (the revision that slowed the film from 60 to 88 s): its camera, particles and state all run in the original
+// 60-s timeline, so the loop and the machine's sequence stay exact, only calmer.
 const SCN = [
-  ['s01_breath', 0.375], ['s02_trachea', 0.5], ['s03_branches', 0.5], ['s04_alveoli', 0.5], ['s05_barrier', 0.5], ['s06_reveal', 0.625],
-  ['s07_circuit', 1.5], ['s08_cutaway', 1.75], ['s09_sources', 1.75], ['s10_air', 1.375], ['s11_oxygen', 1.375], ['s12_valves', 1.5],
-  ['s13_mix', 1.5], ['s14_o2sensor', 2.25], ['s15_timer', 1.5], ['s16_signals', 1.5], ['s17_inspvalve', 1.625], ['s18_flowsensor', 1.625],
-  ['s19_feedback', 1.75], ['s20_outlet', 1.5], ['s21_humidifier', 1.5], ['s22_tube', 1.5], ['s23_ypiece', 1.5], ['s24_ett', 1.5],
-  ['s25_bronchi', 1.5], ['s26_alveoli', 1.625], ['s27_membrane', 1.625], ['s28_hemoglobin', 1.75], ['s29_exchange', 2.0], ['s30_volume', 1.5],
-  ['s31_switch', 1.5], ['s32_recoil', 2.0], ['s33_expflow', 2.0], ['s34_expvalve', 2.0], ['s35_peep', 2.0], ['s36_sensors', 2.0],
-  ['s37_machine', 2.0], ['s38_next', 2.0], ['s39_return', 1.5], ['s40_loop', 1.5]];
+  ['s01_breath', 1.0, 0.375], ['s02_trachea', 1.0, 0.375], ['s03_branches', 1.25, 0.46875], ['s04_alveoli', 1.25, 0.46875], ['s05_barrier', 1.5, 0.5625], ['s06_reveal', 2.0, 0.75],
+  ['s07_circuit', 2.5, 1.5], ['s08_cutaway', 2.5, 1.75], ['s09_sources', 3.0, 1.75],
+  ['s10_air', 2.0, 1.375], ['s11_oxygen', 2.0, 1.375], ['s12_valves', 2.5, 1.5], ['s13_mix', 2.5, 1.5], ['s14_o2sensor', 3.0, 2.25],
+  ['s15_timer', 2.5, 1.5], ['s16_signals', 2.25, 1.5], ['s17_inspvalve', 2.25, 1.625], ['s18_flowsensor', 2.5, 1.625], ['s19_feedback', 2.5, 1.75],
+  ['s20_outlet', 2.0, 1.5], ['s21_humidifier', 2.25, 1.5], ['s22_tube', 1.75, 1.5], ['s23_ypiece', 2.0, 1.5], ['s24_ett', 2.0, 1.5], ['s25_bronchi', 2.0, 1.5],
+  ['s26_alveoli', 2.25, 1.625], ['s27_membrane', 2.5, 1.625], ['s28_hemoglobin', 2.75, 1.75], ['s29_exchange', 2.5, 2.0],
+  ['s30_volume', 2.0, 1.5], ['s31_switch', 2.25, 1.5], ['s32_recoil', 2.5, 2.0], ['s33_expflow', 2.25, 2.0], ['s34_expvalve', 2.5, 2.0], ['s35_peep', 2.5, 2.0],
+  ['s36_sensors', 2.5, 2.0], ['s37_machine', 2.5, 2.0], ['s38_next', 2.5, 2.0], ['s39_return', 2.25, 1.5], ['s40_loop', 2.25, 1.5]];
 let acc = 0;
-const ERAS = window.ERAS = SCN.map(([id, dur], i) => { const e = { id, dur, t0: acc, t1: acc + dur, transition: null, n: i + 1 }; acc += dur; return e; });
-window.__total = acc;                                                   // 60
+let oacc = 0;
+const ERAS = window.ERAS = SCN.map(([id, dur, odur], i) => { const e = { id, dur, odur, t0: acc, t1: acc + dur, ot0: oacc, transition: null, n: i + 1 }; acc += dur; oacc += odur; return e; });
+window.__total = acc;                                                   // 88
 window.T0 = Object.fromEntries(ERAS.map(e => [e.id, e.t0]));            // film time at which each scene starts
 
 const main = document.getElementById('c'); main.width = W; main.height = H;
 const mc = main.getContext('2d', { willReadFrequently: true });
 window.__canvas = main;
 
+// lt is screen time inside the scene; the scene draws in its own (original) time lo, with rt = the screen time for labels
+const warp = (e, lt) => lt * (e.odur ?? e.dur) / e.dur;
 function drawOne(cc, e, lt) {
-  const s = SC[e.id];
+  const s = SC[e.id], lo = warp(e, lt);
   cc.save(); window.__scene = e.id;
   if (!s) { PIX.rect(cc, 0, 0, W, H, 'n0'); PIX.text(cc, 'MISSING ' + e.id, 6, 200, 'w'); cc.restore(); return; }
-  s.draw(cc, lt, { id: e.id, dur: e.dur, t: e.t0 + lt, n: e.n });
+  window.__cams = {};
+  const S = { id: e.id, dur: e.odur ?? e.dur, t: (e.ot0 ?? e.t0) + lo, n: e.n, rt: lt, rdur: e.dur };
+  s.draw(cc, lo, S);
+  if (window.LABELS) { cc.setTransform(1, 0, 0, 1, 0, 0); cc.globalAlpha = 1; LABELS.draw(cc, e.id, S, lo); }
   cc.restore(); cc.setTransform(1, 0, 0, 1, 0, 0); cc.globalAlpha = 1; cc.globalCompositeOperation = 'source-over'; cc.filter = 'none';
 }
 function drawScene(c, e, lt) {
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
   c.fillStyle = PIX.P.k; c.fillRect(0, 0, W, H);
   const s = SC[e.id], i = ERAS.indexOf(e), pe = i > 0 ? ERAS[i - 1] : null;
-  if (s && s.xin && pe && lt < s.xin && SC[pe.id]) {
+  if (s && s.xin && pe && warp(e, lt) < s.xin && SC[pe.id]) {
     // a dithered dissolve from the previous scene's last frame: connected shots never hard-cut
-    window.dissolve(c, cc => drawOne(cc, pe, pe.dur - 1 / 120), cc => drawOne(cc, e, lt), MO.smooth(lt / s.xin));
+    window.dissolve(c, cc => drawOne(cc, pe, pe.dur - 1 / 120), cc => drawOne(cc, e, lt), MO.smooth(warp(e, lt) / s.xin));
   } else drawOne(c, e, lt);
   c.setTransform(1, 0, 0, 1, 0, 0);
 }
@@ -87,7 +97,9 @@ window.dumpCues = () => {
   for (const e of ERAS) {
     const s = SC[e.id];
     const cues = s && (typeof s.cues === 'function' ? s.cues() : s.cues);
-    if (cues) for (const [tt, sfx, g = 1, pan = 0, arg = null] of cues) if (tt + e.t0 >= 0 && tt + e.t0 < window.__total) out.push({ t: +(e.t0 + tt).toFixed(4), sfx, g, pan, arg, scene: e.id });
+    if (s && s.gcues) for (const [t, sfx, g = 1, pan = 0, arg = null] of s.gcues) out.push({ t: +t.toFixed(4), sfx, g, pan, arg, scene: e.id });   // already on screen time
+    const k = e.dur / (e.odur ?? e.dur);                                // cue times are in the scene's own time: stretch them
+    if (cues) for (const [tt, sfx, g = 1, pan = 0, arg0 = null] of cues) { const t = e.t0 + tt * k, arg = typeof arg0 === 'number' && arg0 > 0.05 && /^(whoosh_dir|fwoosh|zoomout|airflow|trace_up|push|reveal_sweep|glide|hiss_air|hiss_o2|whip|o2_stream|servo|swirl|signal_zip|activate|gas_start|whoosh_pneu|warm|rush|tunnel|airflow_soft|dive|molecular|exhale|reverse_air|release_hiss|stabilize|zoom_out|rise|buildup|loop_rise)$/.test(sfx) ? +(arg0 * k).toFixed(3) : arg0; if (t >= 0 && t < window.__total) out.push({ t: +t.toFixed(4), sfx, g, pan, arg, scene: e.id }); }
   }
   return out.sort((a, b) => a.t - b.t);
 };

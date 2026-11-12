@@ -12,8 +12,11 @@ SHOT.D_MOUTH = nearest(HP, 0, -104);
 SHOT.D_CARINA = BREATH.len(HP);
 SHOT.SPEED = 150;                                                       // units/s: the breath enters fast
 SHOT.pulseD = tau => SHOT.D_MOUTH + SHOT.SPEED * tau;
-// the opening camera move (S01): a small impact push toward the trachea, following the gas
-SHOT.hookCam = tau => { const q = MO.cubicIn(clamp(tau / 0.375)); return { x: 0, y: lerp(-18, -58, q), z: K.zl(2.2, 3.4, q) }; };
+// the opening shot (S01–S06, one continuous move): the chest, the lungs breathing, then the whole set-up
+SHOT.hookCam = r => {                                                   // r: seconds on screen from the film's start
+  const push = MO.sineInOut(clamp(r / 4.3)), out = MO.sineInOut(clamp((r - 5.0) / 3.0));
+  return SHOT.zoom({ x: 0, y: lerp(-18, -22, push), z: K.zl(2.2, 2.34, push) }, MACRO.WIDE, out);
+};
 // log-zoom between two cameras
 SHOT.zoom = (a, b, q) => ({ x: lerp(a.x, b.x, q), y: lerp(a.y, b.y, q), z: K.zl(a.z, b.z, q) });
 // a camera that moves along a list of keys [[t, x, y, z]] (eased, log zoom)

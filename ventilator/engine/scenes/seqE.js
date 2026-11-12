@@ -23,7 +23,7 @@ SC['s21_humidifier'] = {
 // S22 — the transparent corrugated inspiratory limb: fast tracking with the conditioned gas (27.0–28.5 s)
 SC['s22_tube'] = {
   xin: 0.0625,
-  draw(c, t, S) { AIR.tube(c, { x: 420 * t, y: 0, z: 2.1 }, S.t, { vapour: 0.6 }); },
+  draw(c, t, S) { AIR.tube(c, { x: 150 * t, y: 0, z: 2.1 }, S.t, { vapour: 0.8 }); },
   cues: [[0.0, 'rush', 0.9, -0.3, 1.5]],
 };
 // S23 — the Y-connector: fresh gas turns toward the patient; the expiratory limb is still (28.5–30.0 s)
@@ -41,10 +41,10 @@ SC['s24_ett'] = {
   cues: [[0.0, 'tunnel', 0.9, -0.2, 1.5]],
 };
 // S25 — the trachea divides into bronchi, the bronchi into bronchioles: three rhythmic sweeps (31.5–33.0 s)
-const G25 = t => { const k = Math.min(2, Math.floor(t / 0.5)), q = MO.cubicInOut(clamp((t - k * 0.5) / 0.3)); return 0.2 + k * 2.1 + 2.1 * q; };
+const G25 = t => 0.2 + 5.6 * MO.sineInOut(clamp(t / 1.5));
 SC['s25_bronchi'] = {
   xin: 0.0625,
   draw(c, t, S) { AIR.tree(c, AIR.treeCam(G25(t)), S.t, { flow: 1, v: BREATH.v(S.t) }); },
-  cues: [[0.0, 'sweep', 0.85, -0.4, 0], [0.5, 'sweep', 0.85, 0.0, 1], [1.0, 'sweep', 0.9, 0.4, 2]],
+  cues: [[0.0, 'sweep', 0.6, -0.4, 0], [0.5, 'sweep', 0.6, 0.0, 1], [1.0, 'sweep', 0.65, 0.4, 2]],
 };
 })();

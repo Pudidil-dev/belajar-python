@@ -9,10 +9,10 @@ const clamp = U.clamp, lerp = U.lerp;
 // S30 — the target volume is reached; the controller switches to expiration (40.0–41.5 s)
 SC['s30_volume'] = {
   draw(c, t, S) {
-    const k = MO.cubicInOut(clamp((t - 0.22) / 0.16)), cam = SHOT.zoom({ x: 104, y: 300, z: 3.6 }, { x: 242, y: 436, z: 2.7 }, k);
+    const k = MO.sineInOut(clamp((t - 0.1) / 0.55)), cam = SHOT.zoom({ x: 104, y: 300, z: 3.6 }, { x: 242, y: 436, z: 2.7 }, k);
     INSIDE.scene(c, cam, S.t, { ...SHOT.vent(S.t), signals: [['tFlow', clamp(t / 0.3)], ['tVol', clamp((t - 0.3) / 0.2)], ['tPsol', clamp((t - 0.95) / 0.5)], ['tExpV', clamp((t - 1.0) / 0.45)]] });
   },
-  cues: [[0.0, 'pulse', 0.6, -0.4], [0.22, 'snap', 0.8, 0.2], [0.5, 'beep_ok', 1.0, 0], [0.95, 'activate', 0.6, 0, 0.5]],
+  cues: [[0.0, 'pulse', 0.6, -0.4], [0.1, 'snap', 0.5, 0.2], [0.5, 'beep_ok', 0.9, 0], [0.95, 'activate', 0.6, 0, 0.5]],
 };
 // S31 — the inspiratory valve closes (click), the expiratory valve opens (the first exhaled gas) (41.5–43.0 s)
 SC['s31_switch'] = {
@@ -40,7 +40,7 @@ SC['s33_expflow'] = {
   xin: 0.0625,
   draw(c, t, S) {
     const y = cc => AIR.ypiece(cc, C33(Math.min(0.9, t)), S.t, { exp: 1 });
-    const tb = cc => AIR.tube(cc, { x: 460 * (t - 0.85), y: 0, z: 2.1 }, S.t, { ramp: ['am2', 'am3', 'am4'], ramp2: ['am4', 'am5', 'w'] });
+    const tb = cc => AIR.tube(cc, { x: 150 * (t - 0.85), y: 0, z: 2.1 }, S.t, { ramp: ['am2', 'am3', 'am4'], ramp2: ['am4', 'am5', 'am4'] });
     if (t < 0.85) y(c); else if (t < 0.92) window.dissolve(c, y, tb, (t - 0.85) / 0.07); else tb(c);
   },
   cues: [[0.0, 'reverse_air', 0.9, -0.5, 0.9], [0.875, 'rush', 0.7, 0.4, 1.1]],
@@ -52,9 +52,18 @@ SC['s34_expvalve'] = {
   cues: [[0.0, 'release_hiss', 0.9, 0.4, 2.0]],
 };
 // S35 — split view: the valve settles to hold PEEP | the alveoli stay partly open at end-expiration (49.0–51.0 s)
+// a pressure gauge 0–40 cmH2O: a pale face, ticks every 5, the PEEP mark, a yellow needle and the reading below
 const gauge = (c, x, y, r, val) => {
-  for (let k = 0; k <= 16; k++) { const a = Math.PI * 0.75 + k / 16 * Math.PI * 1.5; PIX.rect(c, Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r), 1, 1, k % 4 ? 'g4' : 'g7'); }
-  const a = Math.PI * 0.75 + clamp(val / 40) * Math.PI * 1.5; PIX.bline(c, x, y, x + Math.cos(a) * (r - 2), y + Math.sin(a) * (r - 2), 'ys4'); PIX.rect(c, x - 1, y - 1, 2, 2, 'w');
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = PIX.P.g2; c.beginPath(); c.arc(x, y, r + 3, 0, U.TAU); c.fill();
+  c.fillStyle = PIX.P.g8; c.beginPath(); c.arc(x, y, r, 0, U.TAU); c.fill();
+  c.restore();
+  for (let k = 0; k <= 8; k++) { const a = Math.PI * 0.75 + k / 8 * Math.PI * 1.5; PIX.bline(c, Math.round(x + Math.cos(a) * (r - 1)), Math.round(y + Math.sin(a) * (r - 1)), Math.round(x + Math.cos(a) * (r - (k % 2 ? 3 : 5))), Math.round(y + Math.sin(a) * (r - (k % 2 ? 3 : 5))), 'g2'); }
+  { const a = Math.PI * 0.75 + 5 / 40 * Math.PI * 1.5; PIX.bline(c, Math.round(x + Math.cos(a) * (r - 1)), Math.round(y + Math.sin(a) * (r - 1)), Math.round(x + Math.cos(a) * (r - 6)), Math.round(y + Math.sin(a) * (r - 6)), 'mt2'); }
+  const a = Math.PI * 0.75 + clamp(val / 40) * Math.PI * 1.5;
+  for (const [dx, dy] of [[0, 0], [1, 0]]) PIX.bline(c, x + dx, y + dy, Math.round(x + dx + Math.cos(a) * (r - 4)), Math.round(y + dy + Math.sin(a) * (r - 4)), 'g1');
+  PIX.rect(c, x - 1, y - 1, 3, 3, 'g1');
+  if (!window.NOTEXT) { PIX.text(c, String(Math.round(val)), x + 1, y + 8, 'g1', { align: 'center', shadow: null }); }
 };
 SC['s35_peep'] = {
   xin: 0.0625,
@@ -66,7 +75,7 @@ SC['s35_peep'] = {
     PIX.rect(c, 134, 0, 2, H, 'g3');
     // the pressure gauge on the valve side settles at PEEP (5 cmH2O): it never falls to zero
     const p = lerp(14, 5, MO.cubicOut(clamp(t / 1.1)));
-    PIX.rect(c, 40, 360, 56, 56, 'k'); gauge(c, 68, 390, 22, p);
+    gauge(c, 67, 392, 30, p);
   },
   cues: [[0.25, 'stabilize', 0.9, 0, 1.6]],
 };

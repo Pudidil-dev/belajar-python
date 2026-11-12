@@ -49,9 +49,10 @@ MACRO.WIDTH = { insp: 7, exp: 7, inspConn: 6, ett: 5 };
 MACRO.inspRoute = path([...RT.inspConn, ...RT.humid, ...RT.insp, [36, -128], ...RT.ett, ...RT.trachea].map(p => [p[0], p[1]]), 1);
 MACRO.expRoute = path([...RT.trachea.slice().reverse(), ...RT.ett.slice().reverse(), [36, -128], ...RT.exp].map(p => [p[0], p[1]]), 1);
 // ---------- the lungs expand with v: the bases move down (the diaphragm descends), the sides move out a little ----------
-const EX = MACRO.ex = (x, y, v) => { const cx = x < 0 ? -6 : 6, s = 1 + 0.055 * v; return [cx + (x - cx) * s, y + clamp((y + 34) / 76) * 10 * v]; };
+const EX = MACRO.ex = (x, y, v) => { const cx = x < 0 ? -6 : 6, s = 1 + 0.075 * v; return [cx + (x - cx) * s, y + clamp((y + 34) / 76) * 13 * v]; };
 const LUNG_R = [[-20, -84], [-34, -78], [-48, -58], [-56, -28], [-60, 6], [-58, 34], [-44, 42], [-26, 40], [-12, 30], [-8, 4], [-9, -30], [-13, -62]];
 const LUNG_L = [[20, -82], [36, -74], [50, -54], [58, -24], [61, 10], [57, 36], [42, 44], [30, 42], [24, 30], [16, 14], [16, -6], [11, -32], [14, -64]];
+const FISSURES = [[[-15, -50], [-28, -34], [-42, -10], [-52, 14], [-56, 30]], [[-30, -22], [-44, -18], [-58, -14]], [[15, -48], [28, -30], [42, -6], [52, 18], [56, 32]]];
 const HEART = [[4, 0], [18, -6], [32, 2], [40, 18], [36, 34], [20, 42], [4, 38], [-4, 24], [-6, 10]];
 // the bronchial tree inside the lungs (generated once): segments [x0, y0, x1, y1, w]
 const TREE = [];
@@ -63,6 +64,8 @@ const grow = (x, y, ang, len, w, depth, seed) => {
 grow(-21, -26, Math.PI * 0.62, 16, 3.6, 4, 7); grow(-21, -26, Math.PI * 1.08, 13, 3.0, 3, 11); grow(-21, -26, Math.PI * 1.38, 14, 3.0, 3, 13);
 grow(23, -26, Math.PI * 0.4, 16, 3.6, 4, 17); grow(23, -26, Math.PI * 1.7, 15, 3.0, 3, 19); grow(23, -26, Math.PI * 0.05, 12, 2.6, 3, 23);
 MACRO.TREE = TREE;
+const HEADP = [[0, -161], [11, -159], [19, -153], [23, -143], [23, -131], [20, -121], [14, -112.5], [7, -108], [0, -106.5], [-7, -108], [-14, -112.5], [-20, -121], [-23, -131], [-23, -143], [-19, -153], [-11, -159]];
+const HAIRP = [[-24, -133], [-24.5, -145], [-20, -156], [-11, -162.5], [0, -164], [11, -162.5], [20, -156], [24.5, -145], [24, -133], [21, -140], [17, -146.5], [9, -149.5], [0, -150.5], [-9, -149.5], [-17, -146.5], [-21, -140]];
 const TORSO = [[-14, -100], [-32, -94], [-62, -84], [-71, -60], [-66, -20], [-62, 30], [-60, 70], [60, 70], [62, 30], [66, -20], [71, -60], [62, -84], [32, -94], [14, -100]];
 // ---------- drawing helpers ----------
 const tube = (c, cam, pts, w, ramp, o = {}) => LIT.tube(c, cam, pts, w, typeof ramp === 'string' ? R(ramp) : ramp, o);
@@ -82,13 +85,25 @@ MACRO.patient = (c, cam, T, o = {}) => {
     tube(c, cam, [[s * 64, -80], [s * 74, -40], [s * 76, 10], [s * 72, 52]], 15, 'sk', { bias: -0.05 });
     tube(c, cam, [[s * 72, 52], [s * 60, 84], [s * 44, 100]], 12, 'sk', { bias: -0.02 });
   }
-  // neck and head (the face left plain: no features)
-  tube(c, cam, [[0, -112], [0, -94]], 26, 'sk', { bias: -0.04 });
-  const Hd = LY.head;
-  LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.ellipse(Hd.x, Hd.y, Hd.rx, Hd.ry, 0, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [Hd.x - Hd.rx, Hd.y - Hd.ry, Hd.x + Hd.rx, Hd.y + Hd.ry]), R('sk'), {});
-  LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.ellipse(Hd.x, Hd.y - 9, Hd.rx + 1, Hd.ry - 8, 0, Math.PI, TAU); ctx.fill(); }, LIT.wbox(cam, [Hd.x - Hd.rx - 2, Hd.y - Hd.ry - 2, Hd.x + Hd.rx + 2, Hd.y]), ['g1', 'g2', 'g3', 'g4'], {});   // hair
+  // neck and head: a natural head (the cranium wider than the jaw), ears, hair, closed eyes (sedated), the tube taped at
+  // the mouth
+  tube(c, cam, [[0, -112], [0, -94]], 21, 'sk', { bias: -0.06 });
+  for (const s of [-1, 1]) LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.ellipse(s * 22.5, -131, 3.6, 6.5, s * 0.15, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [s * 22.5 - 5, -139, s * 22.5 + 5, -123]), R('sk'), { bias: -0.08 });
+  const face = blob(HEADP);
+  LIT.path(c, cam, face.path, face.box, R('sk'), { bias: 0.02 });
+  const hair = blob(HAIRP);
+  LIT.path(c, cam, hair.path, hair.box, ['g1', 'g2', 'g3', 'g4'], { bias: -0.05 });
+  if (z > 0.7) {
+    for (const s of [-1, 1]) {
+      line(c, cam, [[s * 13, -134], [s * 10, -132.6], [s * 6.5, -132.6], [s * 4, -133.8]], 'sk1');                     // closed eyelid
+      line(c, cam, [[s * 14, -139.5], [s * 10, -141], [s * 5, -140.2]], 'g2');                                          // brow
+    }
+    line(c, cam, [[0, -136], [-0.6, -128], [-2.2, -125.4], [1.4, -125]], 'sk2');                                          // nose
+    line(c, cam, [[-6, -116.8], [-2.5, -117.4], [2.5, -117.4], [6, -116.8]], 'sk2');                                      // lips round the tube
+    rr(c, cam, -12, -118, 13, -114.2, 1, ['iv2', 'iv3', 'iv4', 'iv5'], {});                                               // the tape holding the tube
+  }
   // the torso: skin seen as a translucent cutaway (outline + light fill), the anatomy inside
-  const tor = blob(TORSO);
+  const tor = blob(TORSO.map(([x, y]) => [x * (1 + 0.025 * v * clamp((70 - y) / 60) * clamp((y + 100) / 40)), y]));   // the chest wall widens a little with each breath
   LIT.path(c, cam, tor.path, tor.box, ['sk1', 'sk2', 'sk3', 'sk4'], { alpha: 0.55, bias: -0.1 });
   MACRO.chest(c, cam, T, v, o);
   line(c, cam, tor.pts.concat([tor.pts[0]]), 'sk4', { alpha: 0.9 });
@@ -103,18 +118,19 @@ MACRO.chest = (c, cam, T, v, o = {}) => {
   // heart behind the lungs' medial edges
   const hb = blob(HEART); LIT.path(c, cam, hb.path, hb.box, R('hr'), { bias: -0.05 });
   // the diaphragm: a dome under each lung, descending with v
-  for (const s of [-1, 1]) line(c, cam, [[s * 8, 44], [s * 24, 47], [s * 44, 49], [s * 60, 42]].map(([x, y]) => [x, y + 10 * v]), 'hr2');
+  for (const s of [-1, 1]) line(c, cam, [[s * 8, 44], [s * 24, 47], [s * 44, 49], [s * 60, 42]].map(([x, y]) => [x, y + 13 * v]), 'hr2');
   // lungs: soft pink, translucent membrane edges
   for (const L of [LUNG_R, LUNG_L]) { const b = blob(L.map(E)); LIT.path(c, cam, b.path, b.box, R('al'), { alpha: 0.92, bias: -0.06 + 0.05 * v }); }
+  if (z > 0.9) for (const f of FISSURES) line(c, cam, f.map(E), 'al1', { alpha: 0.7 });
   // the bronchial tree (coral), drawn inside the lungs
-  for (const [x0, y0, x1, y1, w] of TREE) { const a = E([x0, y0]), b = E([x1, y1]); if (w * z < 0.6) continue; tube(c, cam, [a, b], w, 'aw', { bias: 0.04 }); }
+  for (const [x0, y0, x1, y1, w] of TREE) { const a = E([x0, y0]), b = E([x1, y1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; if (w * z < 0.6) continue; tube(c, cam, [a, m], w, 'aw', { bias: 0.04 }); tube(c, cam, [m, b], w * 0.82, 'aw', { bias: 0.04 }); }
   tube(c, cam, [E([0, -45]), E([-8, -38]), E([-16, -31]), E([-21, -26])], 6, 'aw', { bias: 0.04 });
   tube(c, cam, [E([0, -45]), E([8, -39]), E([16, -33]), E([23, -26])], 6, 'aw', { bias: 0.04 });
   // the trachea with its cartilage rings
   const Tr = LY.trachea;
   rr(c, cam, Tr.x0, Tr.top, Tr.x1, Tr.carina + 2, 4, R('aw'), { bias: 0.08 });
   if (z > 1.4) for (let y = Tr.top + 3; y < Tr.carina - 1; y += 4) line(c, cam, [[Tr.x0 + 0.5, y], [Tr.x1 - 0.5, y]], 'aw5', { alpha: 0.8 });
-  rr(c, cam, Tr.x0 + 2, Tr.top + 1, Tr.x1 - 2, Tr.carina, 2, ['n0', 'n1', 'n2', 'n3'], { edge: false });   // the lumen
+  rr(c, cam, Tr.x0 + 2, Tr.top + 1, Tr.x1 - 2, Tr.carina, 2, ['aw0', 'aw1', 'aw1', 'aw2'], { edge: false });   // the lumen (mucosa)
   // ribs: faint bands over the lungs (the transparent cage) and the sternum
   if (z > 0.45) {
     for (let k = 0; k < 7; k++) for (const s of [-1, 1]) {
@@ -183,6 +199,7 @@ MACRO.vent = (c, cam, T, o = {}) => {
 // o: { v, flowIn (0..1: inspiratory trails), flowOut (0..1: expiratory trails), hiInsp, hiExp, pulse: d (along inspRoute),
 //      monitor: {…}, heat }
 MACRO.scene = (c, cam, T, o = {}) => {
+  (window.__cams = window.__cams || {}).macro = cam;
   PIX.rect(c, 0, 0, W, H, 'k');
   // a quiet room: a darker floor band under the bed and the ventilator
   const [, fy] = K.S(cam, 0, 420); if (fy < H) PIX.rect(c, 0, Math.round(fy), W, H, 'n0');
@@ -196,11 +213,12 @@ MACRO.scene = (c, cam, T, o = {}) => {
   MACRO.ypiece(c, cam);
   // airflow: cyan trails toward the patient while the ventilator delivers, amber trails back during expiration
   const fi = o.flowIn ?? 0, fo = o.flowOut ?? 0;
-  if (fi > 0) { for (const k of ['inspConn', 'humid', 'insp']) BREATH.stream(c, cam, RT[k], T, { n: Math.round(BREATH.len(RT[k]) / 7), speed: 90, len: 3, a: fi, seed: k.length, spread: 1.5 }); BREATH.stream(c, cam, RT.ett, T, { n: 14, speed: 70, len: 3, a: fi, seed: 5, spread: 0.6 }); }
-  if (fo > 0) { BREATH.stream(c, cam, RT.exp, T, { n: Math.round(BREATH.len(RT.exp) / 8), speed: 70, len: 3, a: fo, seed: 9, spread: 1.5, ramp: ['am3', 'am4', 'am5'] }); BREATH.stream(c, cam, RT.ett, T, { n: 12, speed: 60, dir: -1, len: 3, a: fo, seed: 6, spread: 0.6, ramp: ['am3', 'am4', 'am5'] }); }
-  if (o.hiInsp > 0) BREATH.pulse(c, cam, MACRO.inspRoute, o.hiInsp, { len: 60, w: 5 });
-  if (o.hiExp > 0) BREATH.pulse(c, cam, MACRO.expRoute, o.hiExp, { len: 60, w: 5, ramp: ['am3', 'am4', 'am5', 'w'] });
-  if (o.pulse != null) BREATH.pulse(c, cam, MACRO.inspRoute, o.pulse, { len: 34, w: 4 });
+  const pw = U.clamp(Math.round(cam.z * 1.1), 2, 4);
+  if (fi > 0) { for (const k of ['inspConn', 'humid', 'insp']) BREATH.stream(c, cam, RT[k], T, { n: Math.round(BREATH.len(RT[k]) / 7), speed: 90, len: 3, a: fi, seed: k.length, spread: 1.5, dot: true, w: pw, maxTrail: 4, ramp: ['cy4', 'cy5', 'cy4'] }); BREATH.stream(c, cam, RT.ett, T, { n: 14, speed: 70, len: 3, a: fi, seed: 5, spread: 0.6, dot: true, w: pw, maxTrail: 4, ramp: ['cy4', 'cy5', 'cy4'] }); }
+  if (fo > 0) { BREATH.stream(c, cam, RT.exp, T, { n: Math.round(BREATH.len(RT.exp) / 8), speed: 70, len: 3, a: fo, seed: 9, spread: 1.5, ramp: ['am4', 'am5', 'am4'], dot: true, w: pw, maxTrail: 4 }); BREATH.stream(c, cam, RT.ett, T, { n: 12, speed: 60, dir: -1, len: 3, a: fo, seed: 6, spread: 0.6, ramp: ['am4', 'am5', 'am4'], dot: true, w: pw, maxTrail: 4 }); }
+  if (o.hiInsp > 0) BREATH.pulse(c, cam, MACRO.inspRoute, o.hiInsp, { len: 60, w: 3.2 });
+  if (o.hiExp > 0) BREATH.pulse(c, cam, MACRO.expRoute, o.hiExp, { len: 60, w: 3.2, ramp: ['am2', 'am3', 'am4', 'am5'] });
+  if (o.pulse != null) BREATH.pulse(c, cam, MACRO.inspRoute, o.pulse, { len: 34, w: 3 });
 };
 MACRO.init = () => {};
 })();

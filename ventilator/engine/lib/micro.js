@@ -44,6 +44,18 @@ MICRO.rbc = (c, cam, x, y, rx, ry, rot = 0, o = {}) => {
   LIT.shape(c, ctx => { ctx.beginPath(); ctx.ellipse(sx + 0.6, sy + 0.6, ix, iy, rot, 0, TAU); ctx.fill(); }, box, ramp, { flat: 1, amb: 0.42, dif: 0, alpha: a, edge: false, bias,
     tone: (px, py) => -0.42 * (((px - sx) * L[0] + (py - sy) * L[1]) / Math.max(1, ix)) });
 };
+// a red blood cell seen edge-on: the biconcave profile (thick rounded rim, thin centre), its rims catching the light
+const rbcH = q => { const r2 = q * q; return Math.sqrt(Math.max(0, 1 - r2)) * (0.38 + 1.4 * r2 - 0.6 * r2 * r2) / 0.66; };
+MICRO.rbcSide = (c, cam, x, y, rx, ry, o = {}) => {
+  const z = cam.z, a = o.a ?? 1, ramp = o.ramp || R('rc');
+  if (rx * z < 2) { const [sx, sy] = S(cam, x, y); PIX.rect(c, Math.round(sx), Math.round(sy), 1, 1, ramp[3]); return; }
+  const pts = [];
+  for (let k = 0; k <= 40; k++) { const q = -1 + 2 * k / 40; pts.push([x + q * rx, y - ry * rbcH(q)]); }
+  for (let k = 40; k >= 0; k--) { const q = -1 + 2 * k / 40; pts.push([x + q * rx, y + ry * rbcH(q)]); }
+  LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.fill(); }, LIT.wbox(cam, [x - rx, y - ry, x + rx, y + ry]), ramp, { alpha: a, bias: o.bias || 0 });
+  if (rx * z < 8) return;
+  for (const s of [-1, 1]) LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.ellipse(x + s * rx * 0.64 - rx * 0.03, y - ry * 0.3, rx * 0.1, ry * 0.32, 0, 0, TAU); ctx.fill(); }, LIT.wbox(cam, [x + s * rx * 0.64 - rx * 0.2, y - ry, x + s * rx * 0.64 + rx * 0.2, y + ry]), [ramp[4], ramp[4], ramp[4], ramp[4]], { edge: false, alpha: a });
+};
 // ---------- hemoglobin: four subunits (two alpha, lighter; two beta, darker), each a cluster of round lobes with a heme in a
 // surface pocket. s = the subunit offset (world units); shift = 0..1 the small shape change after oxygen binds. ----------
 const SUB = [ // [dx, dy, kind, heme offset dx, dy, depth]
@@ -55,12 +67,16 @@ MICRO.hbHeme = (k, cx, cy, s, shift = 0) => {                       // the world
   const ox = dx * s + hx * s * 0.62, oy = dy * s + hy * s * 0.62; return [cx + ox * ca - oy * sa, cy + ox * sa + oy * ca];
 };
 MICRO.hb = (c, cam, cx, cy, s, o = {}) => {
+  (window.__cams = window.__cams || {}).hb = cam;
   const z = cam.z, shift = o.shift || 0, a = o.a ?? 1, order = [1, 2, 0, 3];
   for (const k of order) {
     const [dx, dy, kind] = SUB[k], rot = (k < 2 ? 1 : -1) * 0.07 * shift, ca = Math.cos(rot), sa = Math.sin(rot);
     const ux = cx + (dx * s) * ca - (dy * s) * sa, uy = cy + (dx * s) * sa + (dy * s) * ca, bias = kind === 'a' ? 0.1 : -0.14;
-    const lobes = LOBES.map(([lx, ly, lr], i) => [ux + lx * s * (1 + 0.05 * Math.sin(k * 3 + i)), uy + ly * s, lr * s]).sort((p, q) => (q[0] + q[1]) - (p[0] + p[1]));
-    for (const [lx, ly, lr] of lobes) { const [px, py] = S(cam, lx, ly); LIT.sphere(c, px, py, lr * z, R('hb'), { amb: 0.24, bias: bias + (o.dim ? -0.1 : 0), alpha: a }); }
+    const lobes = LOBES.map(([lx, ly, lr], i) => [ux + lx * s * (1 + 0.05 * Math.sin(k * 3 + i)), uy + ly * s, lr * s]);
+    const ramp = kind === 'a' ? ['hb2', 'hb3', 'hb4', 'hb5', 'hb6'] : ['hb1', 'hb2', 'hb3', 'hb4', 'hb5'];
+    const bx = [ux - s * 0.8, uy - s * 0.8, ux + s * 0.8, uy + s * 0.8];
+    LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); for (const [lx, ly, lr] of lobes) { ctx.moveTo(lx + lr, ly); ctx.arc(lx, ly, lr, 0, TAU); } ctx.fill(); }, LIT.wbox(cam, bx), ramp, { alpha: a, bias: o.dim ? -0.12 : 0.02 });
+    if (s * z > 30 && !o.dim) for (const [lx, ly, lr] of lobes.slice(1)) { const [px, py] = S(cam, lx, ly); c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.strokeStyle = P[ramp[1]]; c.lineWidth = 1; c.globalAlpha = 0.55 * a; c.beginPath(); c.arc(Math.round(px), Math.round(py), Math.max(2, lr * z * 0.9), Math.PI * 0.15, Math.PI * 0.75); c.stroke(); c.restore(); }
     // the heme in its pocket: a small gold disc with the iron in the middle (detailed when large)
     const [hx, hy] = MICRO.hbHeme(k, cx, cy, s, shift), [px, py] = S(cam, hx, hy), hr = s * 0.17 * z;
     MICRO.heme(c, px, py, hr, { a, glint: o.glint ? o.glint[k] : 0, bound: o.bound ? o.bound[k] : 0, t: o.t || 0 });

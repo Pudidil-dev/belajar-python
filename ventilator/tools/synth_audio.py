@@ -6,16 +6,17 @@ film's own, not a placeholder for a missing file.
   uv run --no-project --with numpy --with scipy --with soundfile python tools/synth_audio.py build/cues.json output/
 
 Writes music.wav, sfx.wav, mix.wav (−14 LUFS) and mix_vo.wav (a bed for a later voice-over) into the output folder. All are
-exactly 60.000 s and loop: the beds are periodic in 60 s and tails that ring past the end fold onto the start.
+exactly 88.000 s and loop: the beds are periodic in 88 s and tails that ring past the end fold onto the start.
 
-- **Grid.** 120 BPM in 4/4: a bar is 2 s, the film is 30 bars; every cut of the picture sits on a 16th (0.125 s).
-- **Harmony.** A minor: two bars of Am under the hook, then Am – F – C – G, one chord per bar; the last bar (G) resolves
+- **Grid.** 120 BPM in 4/4: a bar is 2 s, the film is 44 bars (88 s); every cut of the picture sits on a 16th (0.125 s).
+- **Harmony.** A minor: four bars of Am under the hook, then Am – F – C – G, one chord per bar; the last bar (G) resolves
   into the first (Am) across the loop.
-- **The hook (0–3 s).** Sound design leads, synced to every cut: THUMP + FWOOSH on frame 0, a panned whoosh into the
-  trachea, three swishes on three 16ths, an elastic stretch, POP – TICK – SHIMMER at the barrier, a rising zoom-out, one
-  16th of silence, then the bass hit and the drop at 3.0 s, when the ventilator stands in frame.
+- **The hook (0–8 s).** Sound design leads, synced to every cut: THUMP + FWOOSH on frame 0, a panned whoosh into the
+  trachea, three swishes as the airways branch, an elastic stretch, POP – TICK – SHIMMER at the barrier, a rising zoom-out,
+  one 16th of silence, then the bass hit and the drop at 8.0 s, when the ventilator stands in frame. (The revision slowed
+  the film from 60 to 88 s: every scene's timing and every cue stretched with it.)
 - **The arc.** The drop (the machine) → the blender groove with a 16th arpeggio → the controller (half time, digital blips,
-  a stab on the breath trigger) → a snare-roll build → the full drop as the breath is delivered (24 s) → a breakdown for
+  a stab on the breath trigger) → a snare-roll build → the full drop as the breath is delivered (40 s) → a breakdown for
   gas exchange (bells, crystal ticks, the binding) → the switch and a half-time "exhale" for expiration and PEEP → the
   groove again for the monitoring → a rising mechanical rhythm and a riser into the loop point, where the opening thump hits.
 - **Panning.** Moving sounds travel across the stereo field with the picture (whooshes, sweeps, signals, the tube rush).
@@ -179,7 +180,7 @@ def put_sweep(bus, sig, t, g=1.0, p0=-0.6, p1=0.6, verb=0.0, dly=0.0):
 CH = {'Am': dict(root=33, tones=[69, 72, 76], pad=[45, 57, 60, 64, 69]), 'F': dict(root=29, tones=[65, 69, 72], pad=[41, 53, 57, 60, 65]),
       'C': dict(root=36, tones=[64, 67, 72], pad=[48, 55, 60, 64, 67]), 'G': dict(root=31, tones=[62, 67, 71], pad=[43, 55, 59, 62, 67])}
 LOOP = ['Am', 'F', 'C', 'G']
-def chord_of_bar(n): n = n % NBAR; return 'Am' if n < 2 else LOOP[(n - 2) % 4]
+def chord_of_bar(n): n = n % NBAR; return 'Am' if n < 4 else LOOP[(n - 4) % 4]
 def chord_at(t): return chord_of_bar(int((max(0, t) % TOTAL) / BAR + 1e-9))
 def cn(t, k, octave=0): tones = CH[chord_at(t)]['tones']; return tones[k % 3] + 12 * (k // 3) + octave
 # the hook: a syncopated riff on 0, 1.5, 3 and 3.5 beats: the call steps down, the answer climbs
@@ -237,59 +238,63 @@ def beat_kicks(t0, t1, g=0.8, depth=0.45):
     t = t0
     while t < t1 - 1e-6: kick_at(t, g, depth); t += BEAT
 
-# ---------------------------------------------------------------- the arrangement (bar n starts at 2n s; 30 bars = 60 s)
-# 0–3 s, the hook: sound design leads; an A pedal and a rising swell into the reveal; the music drops out for one 16th
-subhold(0, 0.55, bars=2)
-put('pad', pad(CH['Am']['pad'], 3.3, 900, 0.0, 0.8), 0.0, 0.3, 0, 0.5)
-put('fx', riser(2.2, 150, 6500) * 0.75, 0.8, 0.28, 0, 0.3)
-BREATH = (2.875, 3.0)
-# 3–8 s: the machine is revealed — the drop: four-on-the-floor, the machine pulse, the hook riff
-put('fx', crash(2.4), 3.0, 0.26, 0, 0.4); put('fx', boom(62, 30, 1.6), 3.0, 0.18)
-beat_kicks(3.0, 4.0, 0.9, 0.5); machine_bass(1, 0.9, 800, beats=(2, 3)); saws(1, 0.6, 2500)
-for n in (2, 3):
-    drums(n, 'four', 0.82, hat_g=0.8, shaker_g=0.4, depth=0.5); machine_bass(n, 0.9, 850); padbar(n, 0.8, 1500, 0.1); hookbar(n, 'call' if n == 2 else 'answer', 'pluck', 0.95)
-# 8–16 s: the gas blender — the groove with claps and a 16th arpeggio
+# ---------------------------------------------------------------- the arrangement (bar n starts at 2n s; 44 bars = 88 s)
+CUE_T = lambda name, dflt: next((c['t'] for c in cuesheet['cues'] if c['sfx'] == name), dflt)
+TRIG = CUE_T('trigger', 30.0); BIND = CUE_T('bind', 58.3)
+# 0–8 s, the hook: sound design leads; an A pedal, a soft pad, a light pluck figure, a riser into the reveal, then one 16th
+# of silence before the drop
+subhold(0, 0.5, bars=4)
+put('pad', pad(CH['Am']['pad'], 8.2, 900, 0.0, 2.0), 0.0, 0.28, 0, 0.5)
+for n in (2, 3): arpbar(n, 0.28, 1800, 0.5, 12)
+put('fx', riser(3.6, 150, 6500) * 0.7, 4.3, 0.26, 0, 0.3)
+BREATH = (7.875, 8.0)
+# 8–16 s: the machine is revealed — the drop: four-on-the-floor, the machine pulse, the hook riff (call and answer)
+put('fx', crash(2.4), 8.0, 0.17, 0, 0.4); put('fx', boom(62, 30, 1.6), 8.0, 0.12)
 for n in range(4, 8):
-    drums(n, 'four', 0.8, clap_g=0.6, hat_g=0.9, shaker_g=0.5, open_g=0.4 if n % 2 else 0, depth=0.5); machine_bass(n, 0.95, 950); padbar(n, 0.9, 1600, 0.1); arpbar(n, 0.5, 2600)
-    hookbar(n, 'call' if n % 2 == 0 else 'answer', 'pluck', 1.0)
-# 16–22 s: the electronic controller — half-time kick, digital blips; a stab at the trigger (17.25 s)
-for n in range(8, 11):
-    drums(n, 'half', 0.75, hat_g=0.7, depth=0.4); machine_bass(n, 0.7, 700); padbar(n, 0.85, 1200); digital(n, 0.9 + 0.1 * (n - 8))
-put('hook', chime([cn(17.25, i, 12) for i in range(3)] + [cn(17.25, 0, 24)], 0.9, 0.012, glass), 17.25, 0.5, 0, 0.4)
-# 22–24 s: the build — snare roll, riser, the bass climbing
-drums(11, 'four', 0.6, hat_g=0.9, depth=0.3); digital(11, 1.0); snare_roll(22.0, 24.0, 1.0); put('fx', riser(2.0, 200, 7000), 22.0, 0.3, 0, 0.3)
-BREATH2 = (23.875, 24.0)
-# 24–33 s: delivering the breath — the full drop: kick, claps, open hats, supersaw chords, the riff doubled by a lead
-put('fx', crash(2.6), 24.0, 0.32, 0, 0.4)
-for n in range(12, 17):
-    beats = range(4) if n < 16 else range(2)
-    drums(n, 'four', 0.95, clap_g=0.85, hat_g=1.0, shaker_g=0.6, open_g=0.8, depth=0.6, beats=beats); machine_bass(n, 1.05, 1150, beats=beats)
-    if n < 16: saws(n, 0.9, 3800); hookbar(n, 'call' if n % 2 == 0 else 'answer', 'full', 1.0); arpbar(n, 0.55, 3000)
-    else: hookbar(n, 'call', 'full', 0.9)
-# 33–38 s: microscopic gas exchange — the drums fall away; pad, bells, crystalline arpeggio; a soft swell into the binding
-padbar(16, 0.9, 1100, 0.2, t0=33.0); padbar(17, 0.95, 1300, 0.25); padbar(18, 0.95, 1500, 0.3)
-for n in (17, 18): hookbar(n, 'answer' if n == 17 else 'call', 'bell', 0.75); arpbar(n, 0.4, 1800, 0.5, 24)
-subhold(17, 0.5); subhold(18, 0.55)
-put('fx', riser(1.25, 300, 5000) * 0.6, 36.0, 0.2, 0, 0.3)
-# 38–40 s: the whole interface — the pulse returns, light
-drums(19, 'half', 0.6, hat_g=0.6, shaker_g=0.5, depth=0.3); machine_bass(19, 0.6, 700); padbar(19, 0.9, 1400); hookbar(19, 'answer', 'pluck', 0.8)
-# 40–43 s: target volume, the switch — a lighter groove, a stab on the valve click
-for n in (20,):
-    drums(n, 'four', 0.7, clap_g=0.4, hat_g=0.7, depth=0.4); machine_bass(n, 0.8, 800); padbar(n, 0.9, 1400); hookbar(n, 'call', 'pluck', 0.85)
-drums(21, 'half', 0.7, hat_g=0.6, depth=0.4, beats=range(2)); machine_bass(21, 0.7, 700, beats=range(2)); padbar(21, 0.8, 1200)
-# 43–51 s: expiration and PEEP — half-time, the pad's filter closing like an exhale, then a steady settle
-for k, n in enumerate(range(21, 26)):
-    beats = range(2, 4) if n == 21 else range(4) if n < 25 else range(2)
-    drums(n, 'half', 0.6, hat_g=0.45, shaker_g=0.3, depth=0.3, beats=beats)
-    if n > 21: padbar(n, 0.85, max(500, 1300 - 180 * k), 0.0); subhold(n, 0.5)
-for n in (22, 24): hookbar(n, 'answer', 'bell', 0.6)
-# 51–55 s: feedback — the groove returns, lighter
-drums(25, 'four', 0.7, hat_g=0.7, depth=0.4, beats=range(2, 4)); machine_bass(25, 0.75, 800, beats=range(2, 4))
-for n in (26, 27): drums(n, 'four', 0.75, clap_g=0.5, hat_g=0.8, shaker_g=0.4, depth=0.45); machine_bass(n, 0.85, 900); padbar(n, 0.85, 1500); hookbar(n, 'call' if n == 26 else 'answer', 'pluck', 0.9)
-# 55–60 s: the next trigger approaches — rising mechanical rhythm, a snare roll and a riser into the loop point (the opening thump)
-drums(28, 'four', 0.7, hat_g=1.0, shaker_g=0.8, depth=0.4); machine_bass(28, 0.9, 1000); padbar(28, 0.8, 1700); digital(28, 0.8)
-drums(29, 'four', 0.65, hat_g=1.0, depth=0.35, beats=range(3)); machine_bass(29, 0.9, 1200, beats=range(3)); digital(29, 1.0)
-snare_roll(57.0, 59.75, 1.0); put('fx', riser(3.0, 180, 7500), 57.0, 0.3, 0, 0.3)
+    drums(n, 'four', 0.8, hat_g=0.75, shaker_g=0.4, depth=0.5); machine_bass(n, 0.9, 850); padbar(n, 0.8, 1500, 0.1)
+    hookbar(n, 'call' if n % 2 == 0 else 'answer', 'pluck', 0.9)
+# 16–28 s: the gas blender — the groove with claps and a 16th arpeggio
+for n in range(8, 14):
+    drums(n, 'four', 0.78, clap_g=0.55, hat_g=0.85, shaker_g=0.5, open_g=0.35 if n % 2 else 0, depth=0.5); machine_bass(n, 0.9, 950)
+    padbar(n, 0.9, 1600, 0.1); arpbar(n, 0.45, 2600); hookbar(n, 'call' if n % 2 == 0 else 'answer', 'pluck', 0.95)
+# 28–38 s: the electronic controller — half-time kick, digital blips; a stab when the breath timer fires
+for n in range(14, 19):
+    drums(n, 'half', 0.72, hat_g=0.65, depth=0.4); machine_bass(n, 0.7, 700); padbar(n, 0.85, 1200); digital(n, 0.8 + 0.05 * (n - 14))
+put('hook', chime([cn(TRIG, i, 12) for i in range(3)] + [cn(TRIG, 0, 24)], 0.9, 0.012, glass), TRIG, 0.45, 0, 0.4)
+# 38–40 s: the build — snare roll, riser, the bass climbing
+drums(19, 'four', 0.6, hat_g=0.9, depth=0.3); digital(19, 1.0); snare_roll(38.0, 40.0, 0.9); put('fx', riser(2.0, 200, 7000), 38.0, 0.28, 0, 0.3)
+BREATH2 = (39.875, 40.0)
+# 40–52 s: delivering the breath — the full drop: kick, claps, open hats, supersaw chords, the riff doubled by a lead
+put('fx', crash(2.6), 40.0, 0.3, 0, 0.4)
+for n in range(20, 26):
+    beats = range(4) if n < 25 else range(2)
+    drums(n, 'four', 0.92, clap_g=0.8, hat_g=0.95, shaker_g=0.6, open_g=0.7, depth=0.6, beats=beats); machine_bass(n, 1.0, 1100, beats=beats)
+    if n < 25: saws(n, 0.85, 3600); hookbar(n, 'call' if n % 2 == 0 else 'answer', 'full', 1.0); arpbar(n, 0.5, 3000)
+    else: hookbar(n, 'call', 'full', 0.85)
+# 51–60 s: microscopic gas exchange — the drums fall away; pad, bells, a crystalline arpeggio; a soft swell into the binding
+padbar(25, 0.8, 1000, 0.2, t0=51.0)
+for n in range(26, 30): padbar(n, 0.95, 1100 + 120 * (n - 26), 0.25); subhold(n, 0.5)
+for n in (27, 28, 29): hookbar(n, 'answer' if n % 2 else 'call', 'bell', 0.7); arpbar(n, 0.38, 1800, 0.5, 24)
+put('fx', riser(1.6, 300, 5000) * 0.6, BIND - 1.6, 0.2, 0, 0.3)
+# 60–62 s: the whole interface — the pulse returns, light
+drums(30, 'half', 0.6, hat_g=0.6, shaker_g=0.5, depth=0.3); machine_bass(30, 0.6, 700); padbar(30, 0.9, 1400); hookbar(30, 'answer', 'pluck', 0.8)
+# 62–66 s: the target volume, the switch — a lighter groove
+drums(31, 'four', 0.68, clap_g=0.4, hat_g=0.7, depth=0.4); machine_bass(31, 0.8, 800); padbar(31, 0.9, 1400); hookbar(31, 'call', 'pluck', 0.85)
+drums(32, 'half', 0.65, hat_g=0.6, depth=0.4, beats=range(2)); machine_bass(32, 0.7, 700, beats=range(2)); padbar(32, 0.8, 1200)
+# 66–76 s: expiration and PEEP — half time, the pad's filter closing like an exhale, then a steady settle
+for k, n in enumerate(range(33, 38)):
+    drums(n, 'half', 0.58, hat_g=0.45, shaker_g=0.3, depth=0.3)
+    padbar(n, 0.85, max(500, 1300 - 160 * k), 0.0); subhold(n, 0.5)
+for n in (34, 36): hookbar(n, 'answer', 'bell', 0.6)
+# 76–80 s: feedback — the groove returns, lighter
+for n in (38, 39): drums(n, 'four', 0.72, clap_g=0.45, hat_g=0.8, shaker_g=0.4, depth=0.45); machine_bass(n, 0.85, 900); padbar(n, 0.85, 1500); hookbar(n, 'call' if n == 38 else 'answer', 'pluck', 0.9)
+# 80–88 s: the next trigger approaches — a rising mechanical rhythm, a snare roll and a riser into the loop point
+for k, n in enumerate(range(40, 44)):
+    beats = range(4) if n < 43 else range(3)
+    drums(n, 'four', 0.7 - 0.02 * k, hat_g=0.9 + 0.03 * k, shaker_g=0.7 if n < 42 else 0, depth=0.4); machine_bass(n, 0.85 + 0.02 * k, 1000 + 80 * k, beats=beats)
+    if n < 42: padbar(n, 0.8, 1600 + 100 * k)
+    digital(n, 0.7 + 0.1 * k)
+snare_roll(84.0, 87.75, 0.9); put('fx', riser(4.0, 180, 7500), 84.0, 0.28, 0, 0.3)
 
 # ---------------------------------------------------------------- the continuous sound environment (periodic beds)
 TT = np.arange(NT) / SR
@@ -409,7 +414,7 @@ def rms_db(x, t0=None, t1=None):
     seg = x[:, int((t0 or 0) * SR):int((t1 or TOTAL) * SR)]; return 10 * np.log10(np.mean(seg ** 2) + 1e-12)
 for k in ('drum', 'bass', 'pad', 'hook', 'lead', 'arp', 'fx'):             # one 16th of silence before each drop
     for (a_, b_) in (BREATH, BREATH2): BUS[k][:, int(a_ * SR):int(b_ * SR)] = 0.0
-MID = (24, 32); LEAD = (24, 32)
+MID = (40, 48); LEAD = (40, 48)
 REF = {'drum': (-17.0, *MID), 'bass': (-19.5, *MID), 'pad': (-24.0, *MID), 'hook': (-18.5, *MID), 'arp': (-28.0, *MID), 'lead': (-23.0, *LEAD), 'fx': (-28.0, 0, TOTAL)}
 for k, (target, a, b) in REF.items():
     BUS[k] *= 10 ** ((target - rms_db(BUS[k], a, b)) / 20)
@@ -469,9 +474,9 @@ def limiter_gain(x, thr, look=0.004, rel=0.09):
     return np.minimum(g, sm)
 def master(mix, parts, target):
     """Normalise mix to the loudness target with a look-ahead limiter at −1 dBFS; the same gains go on every part."""
-    for _ in range(3):
+    for _ in range(4):
         g0 = 10 ** ((target - lufs(mix)) / 20); mix = mix * g0; parts = [p * g0 for p in parts]
-        gl_ = limiter_gain(mix, 10 ** (-2.2 / 20)); mix = mix * gl_; parts = [p * gl_ for p in parts]
+        gl_ = limiter_gain(mix, 10 ** (-3.0 / 20)); mix = mix * gl_; parts = [p * gl_ for p in parts]
     return mix, parts
 mix, (music_o, sfx_o) = master(music + sfx, [music, sfx], -14.0)
 vo_music = np.stack([music_bed[i] - 0.4 * bp(music_bed[i], 300, 3000) for i in range(2)])

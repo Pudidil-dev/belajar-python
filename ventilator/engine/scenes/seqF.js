@@ -20,6 +20,7 @@ SC['s27_membrane'] = {
 // S28 — a red blood cell passes; oxygen enters it and binds to hemoglobin (36.25–38.0 s)
 const rbc28 = T => -70 + (T - 36.25) * 90;
 const TB = 1.0;
+SHOT.rbc28 = rbc28;
 SC['s28_hemoglobin'] = {
   xin: 0.0625,
   draw(c, t, S) {
@@ -33,7 +34,7 @@ SC['s28_hemoglobin'] = {
       MICRO.hb(cc, cam, 0, 0, 40, { shift, bound: [bound, 0, 0, 0], glint: [Math.max(0, 1 - Math.abs(t - TB - 0.1) / 0.2), 0, 0, 0], t: T });
       const H0 = MICRO.hbHeme(0, 0, 0, 40, 0);
       if (t < TB) { const q = MO.cubicIn(clamp((t - 0.7) / (TB - 0.7))), [px, py] = K.S(cam, lerp(H0[0] - 40, H0[0] + 2, q), lerp(H0[1] - 36, H0[1] - 5, q)); MICRO.o2(cc, px, py, 4.5, -1.1, { ramp: ['o22', 'o23', 'o24', 'o25', 'w'] }); }
-      if (t >= TB && t < TB + 0.4) { const [hx, hy] = K.S(cam, H0[0], H0[1]), k2 = (t - TB) / 0.4; FX.ring(cc, hx, hy, 6 + 34 * MO.cubicOut(k2), 'w', 1 - k2); FX.ring(cc, hx, hy, 3 + 22 * MO.cubicOut(k2), 'hm4', 1 - k2); }
+      if (t >= TB && t < TB + 0.4) { const [hx, hy] = K.S(cam, H0[0], H0[1]), k2 = (t - TB) / 0.4; FX.ring(cc, hx, hy, 10 + 8 * MO.cubicOut(k2), 'hm4', 0.6 * (1 - k2)); }
     };
     if (t < 0.7) track(c); else if (t < 0.78) window.dissolve(c, track, hb, (t - 0.7) / 0.08); else hb(c);
   },
@@ -42,7 +43,7 @@ SC['s28_hemoglobin'] = {
 // S29 — the whole interface: oxygen in, carbon dioxide out, at the same time (38.0–40.0 s)
 SC['s29_exchange'] = {
   xin: 0.0625,
-  draw(c, t, S) { const q = MO.sineInOut(clamp(t / 2)); AIR.barrier(c, { x: lerp(-20, 40, q), y: lerp(16, 6, q), z: K.zl(2.4, 1.15, q) }, S.t, { o2: 1, co2: 1, rbcX: -100 + (S.t - 38) * 80 }); },
+  draw(c, t, S) { const q = MO.sineInOut(clamp(t / 2)); AIR.barrier(c, { x: lerp(-20, 30, q), y: lerp(16, 10, q), z: K.zl(2.6, 1.6, q) }, S.t, { o2: 1, co2: 1, rbcX: -100 + (S.t - 38) * 80 }); },
   cues: [[0.0, 'molecular', 0.7, 0, 2.0], [1.0, 'co2_out', 0.6, -0.3]],
 };
 })();

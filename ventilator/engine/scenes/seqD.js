@@ -31,12 +31,12 @@ SC['s18_flowsensor'] = {
   cues: [[0.5, 'measure', 0.7, -0.3, 0], [0.625, 'measure', 0.7, -0.2, 1], [0.75, 'measure', 0.7, -0.1, 2], [0.875, 'measure', 0.75, 0, 3], [0.6, 'signal_zip', 0.6, 0.2, 0.8], [1.5, 'vol_tick', 0.7, 0.1]],
 };
 // S19 — feedback: flow and pressure in, valve adjustment out, volume adding up (22.25–24.0 s)
-const C19 = K.camTrack([[0, 238, 356, 3.0], [0.4, 116, 232, 3.0], [0.8, 236, 360, 3.0], [1.2, 124, 330, 2.4], [1.75, 176, 330, 1.25]]);
+const C19 = K.camTrack([[0, 168, 336, 2.6], [1.75, 176, 330, 1.45]]);
 SC['s19_feedback'] = {
   draw(c, t, S) {
     const st = SHOT.vent(S.t), adj = 0.05 * Math.sin(t * 9) * (t > 0.4 && t < 1.4 ? 1 : 0);
     INSIDE.scene(c, C19(t), S.t, { ...st, psol: st.psol + adj, signals: [['tFlow', clamp(t / 0.35)], ['tPres', clamp((t - 0.05) / 0.35)], ['tPsol', clamp((t - 0.4) / 0.35)], ['tFlow', clamp((t - 0.8) / 0.35)], ['tPres', clamp((t - 0.85) / 0.35)], ['tPsol', clamp((t - 1.2) / 0.35)]] });
   },
-  cues: [[0.0, 'pulse', 0.7, -0.2], [0.4, 'servo', 0.7, -0.4, 0.3], [0.8, 'pulse', 0.7, 0.2], [1.2, 'servo', 0.6, -0.4, 0.3], [1.5, 'pulse', 0.6, 0]],
+  cues: [[0.0, 'pulse', 0.6, -0.2], [0.4, 'servo', 0.6, -0.4, 0.3], [0.8, 'pulse', 0.6, 0.2], [1.2, 'servo', 0.5, -0.4, 0.3], [1.5, 'pulse', 0.5, 0]],
 };
 })();

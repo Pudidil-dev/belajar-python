@@ -12,11 +12,11 @@ SC['s10_air'] = {
 // S11 — the oxygen inlet: a dense stream of O2 through its own regulated channel (9.375–10.75 s)
 SC['s11_oxygen'] = {
   draw(c, t, S) {
-    const q1 = MO.cubicInOut(clamp(t / 0.3)), q2 = MO.sineInOut(clamp((t - 0.3) / 1.075));
-    const cam = t < 0.3 ? { x: lerp(372, 456, q1), y: lerp(72, 150, q1), z: 3.6 } : { x: lerp(456, 372, q2), y: 150, z: 3.6 };
+    const q1 = MO.sineInOut(clamp(t / 0.5)), q2 = MO.sineInOut(clamp((t - 0.5) / 0.875));
+    const cam = t < 0.5 ? { x: lerp(372, 456, q1), y: lerp(72, 150, q1), z: 3.6 } : { x: lerp(456, 372, q2), y: 150, z: 3.6 };
     INSIDE.scene(c, cam, S.t, SHOT.vent(S.t));
   },
-  cues: [[0.0, 'pneu_click', 1.0, 0.3], [0.0, 'whip', 0.5, 0.2, 0.3], [0.3, 'o2_stream', 0.6, 0.4, 1.0]],
+  cues: [[0.0, 'pneu_click', 0.8, 0.3], [0.0, 'whip', 0.35, 0.2, 0.5], [0.5, 'o2_stream', 0.6, 0.4, 0.875]],
 };
 // S12 — both proportional valves adjust their openings for the selected FiO2 (10.75–12.25 s)
 SC['s12_valves'] = {
@@ -29,7 +29,7 @@ SC['s13_mix'] = {
   cues: [[0.0, 'swirl', 0.8, 0.3, 1.5]],
 };
 // S14 — the oxygen sensor measures the blend; its signal runs into the circuit board (13.75–16.0 s)
-const sig14 = t => clamp((t - 0.5) / 1.3);
+const sig14 = SHOT.sig14 = t => clamp((t - 0.5) / 1.3);
 SC['s14_o2sensor'] = {
   draw(c, t, S) {
     const q = sig14(t), R = INSIDE.R.tO2, [hx, hy] = BREATH.at(R, R.S, q * BREATH.len(R));
