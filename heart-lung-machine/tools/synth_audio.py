@@ -9,16 +9,17 @@ Writes four stems into the output folder (or *_notext.wav without the label tick
                picture-synced effects
   mix.wav      music + sound, mastered to −14 LUFS: the film's sound when there is no narration
   mix_vo.wav   the same with the melody pulled back and the voice band thinned, at −19 LUFS: a bed for a later voice-over
-All are exactly 68.000 s and loop: the beds are periodic in 68 s, and tails that ring past the end fold onto the start.
+All are exactly 92.000 s and loop: the beds are periodic in 92 s, and tails that ring past the end fold onto the start.
 
-- **Grid.** 120 BPM in 4/4: a bar is 2 s, the film is 34 bars.
-- **Harmony.** The opening and the closing (bars 0–2 and 31–33) hold a suspended G, the question; the reveal of the machine
-  at 6 s resolves it to C. Then C – Am – F – G, one chord per bar, seven times; a cycle starts exactly at 38.0 s, where
-  oxygen binds to hemoglobin (the payoff), and at 54 s (oxygen delivered).
+- **Grid.** 120 BPM in 4/4: a bar is 2 s, the film is 46 bars.
+- **Harmony.** The opening and the closing (bars 0–2 and 43–45) hold a suspended G, the question; the turn to the machine
+  at 6 s resolves it to C. Then C – Am – F – G, one chord per bar, ten times; a cycle starts exactly at 54.0 s, where
+  oxygen binds to hemoglobin (the payoff), and at 70 s (oxygen delivered).
+- **The workflow.** In S05 each of the seven steps rings one note higher than the last (a pentatonic ladder).
 - **The hook.** A marimba figure in a 3-3-2 eighth-note rhythm: three notes down (a call), next cycle three up (the answer).
-- **The arc.** The still heart (no drums) → the machine (a light pulse) → its parts (forward motion) → the microscopic
-  world (the drums fall away, a quieter space, a held breath) → the binding (the full groove) → the way back (it starts
-  to resolve) → the perfusionist and the recap (thinning) → the suspended opening chord again.
+- **The arc.** The still heart (no drums) → the machine from the side and its workflow (a light pulse) → its parts
+  (forward motion) → the microscopic world (the drums fall away, a quieter space, a held breath) → the binding (the full
+  groove) → the way back (it starts to resolve) → the other lines and the perfusionist (thinning) → the opening chord.
 - **The rules of this film.** No heartbeat sound at any point; no kick drum while the arrested heart is on screen; no
   alarm, no flatline, no rhythmic monitor beep; the flow is continuous and never pulses; no splashing, bubbling, punctures,
   clamps or impacts. Molecular sounds are soft, tuned, editorial cues.
@@ -169,7 +170,7 @@ CH = {'Gs': dict(root=31, tones=[67, 72, 74], pad=[43, 55, 60, 62, 67]), 'C': di
       'Am': dict(root=33, tones=[64, 69, 72], pad=[45, 52, 60, 64, 69]), 'F': dict(root=29, tones=[65, 69, 72], pad=[41, 53, 60, 65, 69]),
       'G': dict(root=31, tones=[62, 67, 71], pad=[43, 50, 59, 62, 67])}
 LOOP = ['C', 'Am', 'F', 'G']
-def chord_of_bar(n): n = n % NBAR; return 'Gs' if n <= 2 or n >= 31 else LOOP[(n - 3) % 4]
+def chord_of_bar(n): n = n % NBAR; return 'Gs' if n <= 2 or n >= NBAR - 3 else LOOP[(n - 3) % 4]
 def chord_at(t): return chord_of_bar(int(max(0, t) / BAR + 1e-9))
 def cn(t, k, octave=0): tones = CH[chord_at(t)]['tones']; return tones[k % 3] + 12 * (k // 3) + octave
 CALL = {'C': [76, 74, 72], 'Am': [76, 72, 69], 'F': [77, 72, 69], 'G': [74, 71, 67]}       # down
@@ -218,48 +219,68 @@ def question(t0, g=1.0):                                   # the opening questio
     put('hook', bell(79 + 12, 2.0, 1.3), t0 + BEAT, 0.3 * g, 0.3, 0.6, 0.4); put('hook', marimba(79, 0.8), t0 + BEAT, 0.4 * g, 0.3, 0.4, 0.3)
 
 # ---------------------------------------------------------------- the arrangement (bar n starts at 2n s)
-# bars 0–2 (0–6 s): the still heart. The suspended chord, no drums; the question at 2.25 s; a slow swell into the reveal
+# Sections follow the scene starts (T0) so that the score stays attached to the picture: the binding (S16 + 1.0 s) and the
+# oxygen payoff (S20 + 2.0 s) land on the downbeat of a C bar, the first bar of a C – Am – F – G cycle.
+T0 = {k: v[0] for k, v in SCENES.items()}
+def bar_at(t): return int(round(t / BAR))
+B_BIND = bar_at(T0['s16_hemoglobin'] + 1.0); B_PAY = bar_at(T0['s20_tissue'] + 2.0); B_END = NBAR - 3
+assert (B_BIND - 3) % 4 == 0 and (B_PAY - 3) % 4 == 0, 'binding and payoff must start a chord cycle'
+def light(n, g=1.0, kick_='half'):                         # the machine's light pulse
+    padbar(n, 0.9 * g, 1200 + 40 * (n % 4)); hookbar(n, 'call' if (n - 3) % 8 < 4 else 'answer', 'mar', 0.9 * g)
+    drums(n, kick_, 0.6, hat_g=0.6, shaker_g=0.45, depth=0.3); bassline(n, 0.7, 700)
+def groove(n, open_=False, clap=True):                     # forward motion through the parts
+    padbar(n, 1.0, 1500, 0.1); hookbar(n, 'call' if (n - 7) % 8 < 4 else 'answer', 'mar', 1.0)
+    drums(n, 'four', 0.72, clap_g=0.55 if clap else 0, hat_g=0.9, shaker_g=0.6, open_g=(0.4 if n % 2 else 0) + (0.3 if open_ else 0), depth=0.45); bassline(n, 0.95); arpbar(n, 0.6, 2200 + (400 if open_ else 0))
+def nokick(n, g=1.0, inst='bell'):                          # the heart on screen: no kick, a lighter pulse
+    padbar(n, 0.95 * g, 1400, 0.1); hookbar(n, 'answer' if n % 2 else 'call', inst, 0.85 * g); drums(n, 'none', hat_g=0.7, shaker_g=0.6); bassline(n, 0.75, 750); arpbar(n, 0.5, 2000)
+# bars 0–2 (0–6 s): the still heart. The suspended chord, no drums; the question at 2.25 s; a slow swell into the turn
 padbar(0, 1.0, 1000, bars=3, att=1.2); subhold(0, 0.6, bars=3)
 question(2.25, 0.9)
 put('fx', riser(1.8, 200, 2600) * 0.6, 4.2, 0.22, 0, 0.3)
 for k in range(8): put('drum', shaker(), 4.0 + k * BEAT / 2, 0.06 + 0.012 * k, -0.4)
-# bar 3 (6 s): the machine — the question resolves to C; the pulse begins
+# bars 3–4 (6–10 s): the machine from the side — the question resolves to C; the heart is still in the frame: no kick yet
 put('fx', chime([72, 76, 79, 84], 1.8, 0.05, bell), 6.0, 0.3, 0, 0.6)
-for n in range(3, 7):
-    padbar(n, 0.9, 1200 + 60 * (n - 3)); hookbar(n, 'call' if (n - 3) % 8 < 4 else 'answer', 'mar', 0.9)
-    drums(n, 'half', 0.6, hat_g=0.5 + 0.1 * (n - 3), shaker_g=0.4 if n >= 5 else 0, depth=0.3); bassline(n, 0.7, 700)
-# bars 7–14 (14–30 s): the pump, temperature, the oxygenator, the fibre — smooth forward motion
-put('fx', revcym(1.2), 14.0 - 1.2, 0.16, 0, 0.3)
-for n in range(7, 15):
-    padbar(n, 1.0, 1500, 0.1); hookbar(n, 'call' if (n - 7) % 8 < 4 else 'answer', 'mar', 1.0)
-    drums(n, 'four', 0.72, clap_g=0.55, hat_g=0.9, shaker_g=0.6, open_g=0.4 if n % 2 else 0, depth=0.45); bassline(n, 0.95); arpbar(n, 0.6, 2200)
-# bars 15–16 (30–34 s): the membrane — the kick falls away, a lighter texture
-for n in (15, 16):
-    padbar(n, 0.9, 1100); hookbar(n, 'answer' if n == 15 else 'call', 'bell', 0.75); drums(n, 'none', hat_g=0.6, shaker_g=0.5); bassline(n, 0.55, 600); arpbar(n, 0.45, 1600)
-# bars 17–18 (34–38 s): inside the red cell — a quieter space, then a held breath before the binding
-for n in (17, 18): padbar(n, 0.85, 800); subhold(n, 0.7); arpbar(n, 0.35, 1100, 1.0)
-put('fx', riser(2.4, 180, 5200), 36.0 - 0.6 + 0.2, 0.26, 0, 0.25)
-BREATH = (37.75, 38.0)
-# bars 19–22 (38–46 s): the binding at 38.0 s — the full groove, the hook doubled; CO2 leaves
-put('fx', boom(58, 34, 1.4), 38.0, 0.18)
-for n in range(19, 23):
+for n in (3, 4): light(n, 0.9, 'none')
+# bars 5–8 (10–18 s): the workflow, one drop round the loop — the light pulse with a half-time kick; the steps ring on top
+for n in range(5, 9): light(n, 1.0, 'half'); arpbar(n, 0.4, 1800)
+# bars 9–10 (18–22 s): drainage from the chest (the heart on screen): hats, shaker and bass carry it, no kick
+put('fx', revcym(1.2), 2 * 11 - 1.2, 0.16, 0, 0.3)
+for n in (9, 10): nokick(n, 0.95, 'mar')
+# bars 11–16 (22–34 s): reservoir, pump, heater–cooler, heat exchanger — smooth forward motion
+for n in range(11, 17): groove(n)
+# bars 17–20 (34–42 s): gas, the oxygenator, the push into one fibre — the groove opens up
+for n in range(17, 21): groove(n, open_=True)
+# bars 21–22 (42–46 s): one fibre, end-on — the groove without the clap
+for n in (21, 22): groove(n, clap=False)
+# bars 23–24: the membrane — the kick falls away, a lighter texture
+for n in range(B_BIND - 4, B_BIND - 2):
+    padbar(n, 0.9, 1100); hookbar(n, 'answer' if n % 2 else 'call', 'bell', 0.75); drums(n, 'none', hat_g=0.6, shaker_g=0.5); bassline(n, 0.55, 600); arpbar(n, 0.45, 1600)
+# bars 25–26: inside the red cell — a quieter space, then a held breath before the binding
+for n in range(B_BIND - 2, B_BIND): padbar(n, 0.85, 800); subhold(n, 0.7); arpbar(n, 0.35, 1100, 1.0)
+put('fx', riser(2.4, 180, 5200), B_BIND * BAR - 2.0 + 0.2, 0.26, 0, 0.25)
+BREATH = (B_BIND * BAR - 0.25, B_BIND * BAR)
+# bars 27–30: the binding — the full groove, the hook doubled; CO2 leaves
+put('fx', boom(58, 34, 1.4), B_BIND * BAR, 0.18)
+for n in range(B_BIND, B_BIND + 4):
     padbar(n, 0.95, 1900, 0.25); hookbar(n, 'call' if n % 2 else 'answer', 'full', 1.0)
     drums(n, 'four', 0.92, clap_g=0.85, hat_g=1.0, shaker_g=0.7, open_g=0.7, depth=0.55); bassline(n, 1.05, 1050); arpbar(n, 0.7, 2700, 0.25)
-# bars 23–24 (46–50 s): the filter and the detector — the groove continues, lighter
-for n in (23, 24):
-    padbar(n, 0.95, 1500, 0.1); hookbar(n, 'call' if n == 23 else 'answer', 'mar', 0.9); drums(n, 'four', 0.72, clap_g=0.55, hat_g=0.85, shaker_g=0.5, depth=0.45); bassline(n, 0.9); arpbar(n, 0.55, 2200)
-# bars 25–26 (50–54 s): back to the aorta (the heart is on screen: no kick) — the journey starts to resolve
-for n in (25, 26):
-    padbar(n, 0.95, 1400, 0.1); hookbar(n, 'answer', 'bell', 0.85); drums(n, 'none', hat_g=0.7, shaker_g=0.6); bassline(n, 0.75, 750); arpbar(n, 0.5, 2000)
-# bar 27 (54 s): oxygen delivered — a small payoff in the capillary
-put('fx', chime([72, 76, 79, 84, 88], 1.6, 0.05, glass), 54.0, 0.45, 0, 0.6)
-padbar(27, 1.0, 1700, 0.2); hookbar(27, 'call', 'full', 0.85); drums(27, 'four', 0.7, clap_g=0.5, hat_g=0.85, shaker_g=0.5, depth=0.45); bassline(27, 0.9); arpbar(27, 0.55, 2300)
-# bars 28–30 (56–62 s): the perfusionist and the recap — thinning, no kick
-for n in (28, 29, 30):
-    padbar(n, 0.9, 1200 - 80 * (n - 28)); hookbar(n, 'answer' if n == 29 else 'call', 'mar', 0.75 - 0.08 * (n - 28)); drums(n, 'none', hat_g=0.45, shaker_g=0.4 - 0.1 * (n - 28)); subhold(n, 0.6)
-# bars 31–33 (62–68 s): back to the opening — the suspended chord, the same balance as bar 0
-padbar(31, 1.0, 1000, bars=3, att=1.2); subhold(31, 0.6, bars=3)
-put('hook', bell(74 + 12, 2.2, 1.2), 64.0, 0.18, -0.3, 0.6, 0.3); put('hook', bell(79 + 12, 2.6, 1.2), 65.0, 0.16, 0.3, 0.6, 0.3)
+# bars 31–32: filter and bubble detector — the groove continues, lighter
+for n in range(B_BIND + 4, B_BIND + 6):
+    padbar(n, 0.95, 1500, 0.1); hookbar(n, 'call' if n % 2 else 'answer', 'mar', 0.9); drums(n, 'four', 0.72, clap_g=0.55, hat_g=0.85, shaker_g=0.5, depth=0.45); bassline(n, 0.9); arpbar(n, 0.55, 2200)
+# bars 33–34: back into the aorta (the heart on screen: no kick), then the capillary — the journey starts to resolve
+for n in range(B_BIND + 6, B_PAY): nokick(n)
+# bar 35: oxygen delivered — a small payoff in the capillary
+put('fx', chime([72, 76, 79, 84, 88], 1.6, 0.05, glass), B_PAY * BAR, 0.45, 0, 0.6)
+padbar(B_PAY, 1.0, 1700, 0.2); hookbar(B_PAY, 'call', 'full', 0.85); drums(B_PAY, 'four', 0.7, clap_g=0.5, hat_g=0.85, shaker_g=0.5, depth=0.45); bassline(B_PAY, 0.9); arpbar(B_PAY, 0.55, 2300)
+# bars 36–39: the machine's other lines — cardioplegia (the heart on screen: no kick, a cool bell) and suction
+for n in range(B_PAY + 1, B_PAY + 3): nokick(n, 0.9, 'bell')
+for n in range(B_PAY + 3, B_PAY + 5): nokick(n, 1.0, 'mar'); drums(n, 'none', shaker_g=0.3)
+# bars 40–42: the perfusionist and the whole loop — thinning, no kick
+for i, n in enumerate(range(B_PAY + 5, B_END)):
+    padbar(n, 0.9, 1200 - 80 * i); hookbar(n, 'answer' if i == 1 else 'call', 'mar', 0.75 - 0.08 * i); drums(n, 'none', hat_g=0.45, shaker_g=max(0.0, 0.4 - 0.1 * i)); subhold(n, 0.6)
+# bars 43–45: back to the opening — the suspended chord, the same balance as bar 0
+padbar(B_END, 1.0, 1000, bars=3, att=1.2); subhold(B_END, 0.6, bars=3)
+put('hook', bell(74 + 12, 2.2, 1.2), B_END * BAR + 2.0, 0.18, -0.3, 0.6, 0.3); put('hook', bell(79 + 12, 2.6, 1.2), B_END * BAR + 3.0, 0.16, 0.3, 0.6, 0.3)
 
 # ---------------------------------------------------------------- the continuous sound environment (periodic beds)
 TT = np.arange(NT) / SR
@@ -272,12 +293,14 @@ def per_lfo(period, ph=0.0): k = max(1, round(TOTAL / period)); return 0.5 + 0.5
 # levels per scene (crossfaded over 0.6 s across each cut, so tails cross the cuts): hum, machine, flow, pump, gas, water
 LV = {
  's01_still': (1.0, 0.2, 0.7, 0.1, 0, 0), 's02_moving': (1.0, 0.2, 1.0, 0.1, 0, 0), 's03_follow': (0.9, 0.6, 0.75, 0.2, 0, 0),
- 's04_machine': (0.7, 0.85, 0.6, 0.35, 0, 0.1), 's05_drain': (0.75, 0.6, 0.85, 0.3, 0, 0), 's06_reservoir': (0.55, 0.8, 0.8, 0.4, 0, 0),
- 's07_pump': (0.5, 0.85, 0.6, 1.0, 0, 0), 's08_temp': (0.45, 0.7, 0.5, 0.35, 0, 0.6), 's09_oxygenator': (0.45, 0.75, 0.5, 0.3, 0.35, 0.2),
- 's10_fiber': (0.25, 0.2, 0.45, 0.05, 0.7, 0), 's11_diffuse': (0.2, 0.15, 0.35, 0.05, 0.55, 0), 's12_rbc': (0.15, 0.1, 0.3, 0.0, 0.15, 0),
- 's13_hemoglobin': (0.15, 0.1, 0.25, 0.0, 0.0, 0), 's14_co2': (0.25, 0.3, 0.35, 0.1, 0.7, 0), 's15_filter': (0.55, 0.8, 0.6, 0.35, 0.1, 0.1),
- 's16_aorta': (0.8, 0.4, 1.0, 0.15, 0, 0), 's17_tissue': (0.25, 0.1, 0.45, 0.0, 0, 0), 's18_perfusionist': (1.0, 0.9, 0.55, 0.35, 0, 0.1),
- 's19_system': (0.95, 0.6, 0.6, 0.25, 0, 0), 's20_return': (1.0, 0.25, 0.7, 0.1, 0, 0)}
+ 's04_machine': (0.75, 0.85, 0.6, 0.35, 0.05, 0.1), 's05_workflow': (0.6, 0.85, 0.75, 0.45, 0.1, 0.1), 's06_drain': (0.7, 0.6, 0.9, 0.3, 0, 0),
+ 's07_reservoir': (0.55, 0.8, 0.8, 0.4, 0, 0), 's08_pump': (0.5, 0.85, 0.6, 1.0, 0, 0), 's09_heater': (0.5, 0.8, 0.45, 0.35, 0, 0.8),
+ 's10_exchanger': (0.45, 0.7, 0.5, 0.3, 0, 0.6), 's11_gas': (0.45, 0.75, 0.4, 0.3, 0.8, 0.1), 's12_oxygenator': (0.45, 0.75, 0.5, 0.3, 0.4, 0.2),
+ 's13_fiber': (0.25, 0.2, 0.45, 0.05, 0.7, 0), 's14_diffuse': (0.2, 0.15, 0.35, 0.05, 0.55, 0), 's15_rbc': (0.15, 0.1, 0.3, 0.0, 0.15, 0),
+ 's16_hemoglobin': (0.15, 0.1, 0.25, 0.0, 0.0, 0), 's17_co2': (0.25, 0.3, 0.35, 0.1, 0.7, 0), 's18_filter': (0.55, 0.8, 0.6, 0.35, 0.1, 0.1),
+ 's19_return': (0.8, 0.45, 1.0, 0.15, 0, 0), 's20_tissue': (0.25, 0.1, 0.45, 0.0, 0, 0), 's21_cardioplegia': (0.7, 0.6, 0.6, 0.45, 0, 0.1),
+ 's22_suction': (0.7, 0.75, 0.7, 0.5, 0, 0), 's23_perfusionist': (1.0, 0.9, 0.55, 0.35, 0, 0.1), 's24_system': (0.95, 0.6, 0.6, 0.25, 0, 0),
+ 's25_loop': (1.0, 0.25, 0.7, 0.1, 0, 0)}
 def automation(i):
     v = np.zeros(NT); xs = []
     for sid, (a, b) in SCENES.items(): xs.append((a, b, LV[sid][i]))
@@ -287,7 +310,7 @@ def automation(i):
     ext = np.concatenate([v[-k:], v, v[:k]]); sm = np.convolve(ext, ker, mode='same')[k:-k]     # circular: the seam too
     return sm
 A_hum, A_mac, A_flow, A_pump, A_gas, A_wat = (automation(i) for i in range(6))
-A_flow = A_flow * (1 + 0.2 * (np.abs(TT - 50.5) < 1.5))                 # S16: the flow broadens as it reaches the aorta
+A_flow = A_flow * (1 + 0.2 * (np.abs(TT - (T0['s19_return'] + 2.2)) < 1.0))   # S19: the flow broadens as it reaches the aorta
 bed = np.zeros((2, NT))
 def add(sig, g, pan=0.0):
     a = (np.clip(pan, -1, 1) + 1) * np.pi / 4
@@ -309,7 +332,7 @@ pump = 0.5 * per_sine(196) + 0.25 * per_sine(196.5, 1.0) + 0.15 * per_sine(392, 
 add(pump * A_pump, 0.028, 0.1)
 # the gas compartment: airy (panned to the gas side in S10)
 gas = per_noise(2500, 9000, 41, -0.3)
-gpan = np.where((TT >= SCENES['s10_fiber'][0]) & (TT < SCENES['s10_fiber'][1]), -0.5, -0.15)
+gpan = np.where((TT >= SCENES['s13_fiber'][0]) & (TT < SCENES['s13_fiber'][1]), -0.5, -0.15)
 add(gas * A_gas, 0.022, gpan)
 # temperature-control water: a smooth mid-low stream in its own channel (no bubbling)
 wat = per_noise(250, 1100, 51, -0.5) * (0.9 + 0.1 * per_lfo(4.25))
@@ -317,7 +340,7 @@ add(wat * A_wat, 0.03, 0.35)
 
 # ---------------------------------------------------------------- effects from the picture's cues (tuned, quiet)
 def nz(d, lo, hi, a=0.02, r=None): return bp(noise(d), lo, hi) * env(d, a, r=r if r is not None else d * 0.6)
-TEXT_SFX = {'label'}
+TEXT_SFX = {'label', 'chip'}
 SILENT = {'question', 'machine_in', 'pump_whirr', 'water_flow', 'gas_in', 'gas_bed', 'blood_bed', 'quiet_space', 'room'}
 def make(name, a, t):
     d = float(a) if isinstance(a, (int, float)) and a else None; k = int(a) if isinstance(a, (int, float)) else 0
@@ -359,8 +382,13 @@ def make(name, a, t):
     if name == 'inset': return S(pop(cn(t, 2, 24), 0.06) * 0.4, tick(3800, 0.005) * 0.2), 0.3, 0.1
     if name == 'func': m = [72, 76, 79][k % 3]; return S(bell(m, 1.6, 1.1) * 0.55, marimba(m, 0.7) * 0.4, glass(m + 12, 0.8) * 0.15), 0.6, 0.3
     if name == 'settle_or': dd = 1.4; return whoosh(dd, False, 200, 2400) * 0.3, 0.4, 0
+    if name == 'drop': return S(pop(cn(t, 0, 24), 0.08) * 0.5, glass(cn(t, 2, 24), 0.5) * 0.2), 0.4, 0.2
+    if name == 'step': m = pent(4 + k); return S(marimba(m, 0.5) * 0.5, bell(m + 12, 0.9, 1.2) * 0.22, tick(4200, 0.006) * 0.12), 0.45, 0.3   # a ladder: each step one note higher
+    if name == 'chip': m = [72, 76, 79][k % 3]; return S(marimba(m, 0.45) * 0.5, glass(m + 12, 0.5) * 0.18), 0.4, 0.25
+    if name == 'puff': return nz(0.35, 2500, 9000, 0.03, 0.25) * 0.5, 0.3, 0
+    if name == 'roller': dd = d or 1.2; return S(nz(dd, 200, 1400, dd * 0.3, dd * 0.4) * 0.5, gl(cn(t, 0, 12), cn(t, 0, 12), dd, dd * 0.3, dd * 0.4) * 0.12), 0.3, 0
     raise KeyError(name)
-GAIN = {'bind': 1.2, 'func': 0.62, 'reveal': 0.55, 'resolve': 0.55, 'granular': 0.55, 'disperse': 0.6, 'fabric': 0.7, 'instrument': 0.75, 'label': 0.45,
+GAIN = {'step': 0.6, 'chip': 0.55, 'drop': 0.5, 'puff': 0.45, 'roller': 0.5, 'bind': 1.2, 'func': 0.62, 'reveal': 0.55, 'resolve': 0.55, 'granular': 0.55, 'disperse': 0.6, 'fabric': 0.7, 'instrument': 0.75, 'label': 0.45,
         'path_out': 0.35, 'path_back': 0.35, 'heat_glide': 0.4, 'climb': 0.6, 'arrive': 0.7, 'scale_in': 0.6}
 missing = set(); used = {}
 for cu in cuesheet['cues']:
@@ -378,7 +406,8 @@ def rms_db(x, t0=None, t1=None):
     seg = x[:, int((t0 or 0) * SR):int((t1 or TOTAL) * SR)]; return 10 * np.log10(np.mean(seg ** 2) + 1e-12)
 for k in ('drum', 'bass', 'pad', 'hook', 'lead', 'arp', 'fx'):             # the held breath before the binding
     BUS[k][:, int(BREATH[0] * SR):int(BREATH[1] * SR)] = 0.0
-REF = {'drum': (-17.0, 14, 30), 'bass': (-19.5, 14, 30), 'pad': (-24.0, 14, 30), 'hook': (-18.5, 14, 30), 'arp': (-28.0, 14, 30), 'lead': (-23.0, 38, 46), 'fx': (-28.0, 0, 68)}
+MID = (2 * 11, 2 * 17); LEAD = (B_BIND * BAR, B_BIND * BAR + 8)
+REF = {'drum': (-17.0, *MID), 'bass': (-19.5, *MID), 'pad': (-24.0, *MID), 'hook': (-18.5, *MID), 'arp': (-28.0, *MID), 'lead': (-23.0, *LEAD), 'fx': (-28.0, 0, TOTAL)}
 for k, (target, a, b) in REF.items():
     BUS[k] *= 10 ** ((target - rms_db(BUS[k], a, b)) / 20)
 duck = {k: np.ones(N) for k in ('bass', 'pad', 'arp')}
@@ -407,16 +436,16 @@ hook_ech = rel(pingpong(DLY['h']), hook_dry, -10.0)
 mus_wet = rel(conv(VERB['m']), mus_dry + hook_dry, -14.0)
 sfx_dry = BUS['sfx']
 sfx_pk = np.percentile(np.abs(sfx_dry[sfx_dry != 0]), 99.9) if np.any(sfx_dry) else 1.0
-hook_pk = np.percentile(np.abs(hook_dry[:, 14 * SR:30 * SR]), 99.9)
+hook_pk = np.percentile(np.abs(hook_dry[:, MID[0] * SR:MID[1] * SR]), 99.9)
 sfx_dry = sfx_dry * (0.72 * hook_pk / (sfx_pk + 1e-12))
 sfx_ech = rel(pingpong(DLY['s'], 0.38, 4), sfx_dry, -16.0); sfx_wet = rel(conv(VERB['s']), sfx_dry, -10.0)
 # the beds sit under everything: about 12 dB below the music in the busy middle of the film
 bed_full = np.zeros((2, N)); bed_full[:, :NT] = bed
-bed_full *= 10 ** ((rms_db(mus_dry + hook_dry, 14, 30) - 12.0 - rms_db(bed_full, 14, 30)) / 20)
+bed_full *= 10 ** ((rms_db(mus_dry + hook_dry, *MID) - 12.0 - rms_db(bed_full, *MID)) / 20)
 music = mus_dry + hook_dry + hook_ech + mus_wet
 music_bed = mus_dry + 0.42 * (hook_dry + hook_ech) + mus_wet
 sfx = sfx_dry + sfx_ech + sfx_wet + bed_full
-def fold(x):                                                # the tail past 68 s folds onto the start: the file loops without a click
+def fold(x):                                                # the tail past the end folds onto the start: the file loops without a click
     tail_ = x[:, NT:]; y = x[:, :NT].copy(); y[:, :tail_.shape[1]] += tail_; return y
 music, music_bed, sfx = [fold(np.stack([hp(x[i], 28) for i in range(2)])) for x in (music, music_bed, sfx)]
 
@@ -456,7 +485,7 @@ bars = [round(float(-0.691 + 10 * np.log10(sum(np.mean(kweight(ch[int(a * SR):in
 rep = {'duration_s': n0 / SR, 'sample_rate': SR, 'bpm': BPM, 'bars': NBAR, 'beats': NBAR * BARB,
        'mix_lufs': round(float(lufs(mix)), 2), 'mix_true_peak_db': round(float(tp(mix)), 2), 'mix_vo_lufs': round(float(lufs(mix_vo)), 2), 'mix_vo_true_peak_db': round(float(tp(mix_vo)), 2),
        'music_lufs': round(float(lufs(music_o)), 2), 'sfx_lufs': round(float(lufs(sfx_o)), 2), 'loop_seam_step': round(seam, 5), 'loop_seam_local_p99': round(local, 5), 'loudness_per_scene_lkfs': bars,
-       'bus_levels_db': {k: round(float(rms_db(BUS[k], REF.get(k, (0, 15, 30))[1], REF.get(k, (0, 15, 30))[2])), 1) for k in BUS}, 'sfx_events': used}
+       'bus_levels_db': {k: round(float(rms_db(BUS[k], REF.get(k, (0, *MID))[1], REF.get(k, (0, *MID))[2])), 1) for k in BUS}, 'sfx_events': used}
 (OUT.parent / 'build').mkdir(exist_ok=True)
 Path(args[2] if len(args) > 2 else OUT.parent / 'build' / f'audio_report{suf}.json').write_text(json.dumps(rep, indent=1))
 print(f"mix {rep['mix_lufs']} LUFS, true peak {rep['mix_true_peak_db']} dB, {rep['duration_s']:.3f} s; vo bed {rep['mix_vo_lufs']} LUFS; seam step {seam:.5f} (local p99 {local:.5f})")

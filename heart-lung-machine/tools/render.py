@@ -63,7 +63,7 @@ with sync_playwright() as p:
         Path(a.cues).parent.mkdir(parents=True, exist_ok=True)
         Path(a.cues).write_text(json.dumps({'total': total, 'fps': a.fps, 'scenes': pg.evaluate('ERAS.map(e => ({id: e.id, t0: e.t0, t1: e.t1}))'), 'cues': cues}, indent=1))
         print(f'cues: {len(cues)} -> {a.cues}')
-        Path(a.cues).with_name('textlog.json').write_text(json.dumps(pg.evaluate('(() => { for (const e of ERAS) for (let k = 0; k < 16; k++) window.renderSolo(e.id, k * 0.25); return window.__textLog; })()'), indent=1, ensure_ascii=False))
+        Path(a.cues).with_name('textlog.json').write_text(json.dumps(pg.evaluate('(() => { for (const e of ERAS) for (let k = 0; k * 0.25 < e.dur; k++) window.renderSolo(e.id, k * 0.25); return window.__textLog; })()'), indent=1, ensure_ascii=False))
     elif a.sheets:
         from PIL import Image
         out = Path(a.out); out.mkdir(parents=True, exist_ok=True)

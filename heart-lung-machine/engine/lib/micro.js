@@ -82,15 +82,16 @@ MICRO.heme = (c, sx, sy, r, o = {}) => {
 // ---------- backgrounds ----------
 // plasma: a dark warm field with large soft out-of-focus cells drifting far behind (depth), never grainy
 MICRO.plasma = (c, cam, T, o = {}) => {
-  PIX.rect(c, 0, 0, W, H, 'pl1');
-  for (let k = 0; k < 9; k++) {
-    const x = ((hh(k, 1) * 420 + T * (6 + 6 * hh(k, 2)) * (o.dir || 1)) % 420 + 420) % 420 - 75, y = hh(k, 3) * 480, r = 26 + 30 * hh(k, 4);
-    PIX.glow(c, x, y, r, k % 3 ? 'pl2' : 'pl3', 0.55);
+  PIX.rect(c, 0, 0, W, H, 'pl0');
+  // a few flat, dim, far-away cells drifting behind (depth without soft glows)
+  for (let k = 0; k < 7; k++) {
+    const x = ((hh(k, 1) * 420 + T * (6 + 6 * hh(k, 2)) * (o.dir || 1)) % 420 + 420) % 420 - 75, y = hh(k, 3) * 480, r = 12 + 14 * hh(k, 4);
+    c.save(); c.fillStyle = P.pl1; c.beginPath(); c.ellipse(Math.round(x), Math.round(y), r, r * 0.66, hh(k, 5) * 3, 0, TAU); c.fill(); c.restore();
   }
 };
 // gas: a cool dark field with faint pale-cyan streaks drifting (the sweep gas)
 MICRO.gas = (c, x0, x1, T, o = {}) => {
-  PIX.rect(c, x0, 0, x1 - x0, H, 'n1');
+  PIX.rect(c, x0, 0, x1 - x0, H, 'k');
   for (let k = 0; k < 16; k++) {
     const y = ((hh(k, 9) * 520 - T * (30 + 20 * hh(k, 8))) % 520 + 520) % 520 - 20, x = x0 + hh(k, 7) * (x1 - x0), L = 10 + 18 * hh(k, 6);
     PIX.rect(c, Math.round(x), Math.round(y), 1, Math.round(L), k % 2 ? 'ox0' : 'n2');

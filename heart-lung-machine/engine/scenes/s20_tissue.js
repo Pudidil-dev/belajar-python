@@ -1,13 +1,13 @@
-// S17 OXYGEN REACHES TISSUE (52–56 s): a simplified systemic capillary. Red cells pass in single file, held inside the
+// S20 OXYGEN REACHES TISSUE (68–72 s): a simplified systemic capillary. Red cells pass in single file, held inside the
 // vessel. Some oxygen leaves their hemoglobin, leaves the cells, crosses the thin capillary wall and diffuses into the
 // tissue cells around it, which warm slightly in colour. Not all the oxygen leaves: the cells stay red. The camera holds a
-// moment, then begins to pull back.
+// moment, then begins to pull back. Labels: capillary, red blood cells, O2, tissue cells.
 (() => {
 const { W, H } = PIX;
 const clamp = U.clamp, lerp = U.lerp, hh = U.hash, R = n => window.RAMP[n];
 const CY = 250, LUM = 26, WALL = 6;
 const CELLS = []; for (let k = 0; k < 40; k++) { const side = k % 2 ? 1 : -1, x = -40 + (k >> 1) * 22 + hh(k, 1) * 8, y = CY + side * (LUM + WALL + 30 + hh(k, 2) * 70); CELLS.push([x, y, 22 + 8 * hh(k, 3), side, k]); }
-SC['s17_tissue'] = {
+SC['s20_tissue'] = {
   xin: 0.5,
   draw(c, t, S) {
     const T = S.t, q = MO.smooth(clamp(t / 2.4)), cam = { x: 135, y: CY, z: t < 2.6 ? lerp(1.0, 1.12, q) : lerp(1.12, 0.92, MO.smooth(clamp((t - 2.6) / 1.4))) };
@@ -31,8 +31,12 @@ SC['s17_tissue'] = {
       if (t < 0.4 + hh(k, 44) * 0.8) continue;
       const [px, py] = K.S(cam, x, y); MICRO.o2(c, px, py, 3.2 * cam.z, k, { a });
     }
-    CAP.ctx(c, t, { text: 'Oxygen delivered', t0: 0.6, t1: 3.7, acc: 'ox4' });
+    const [wx, wy] = K.S(cam, 60, CY - LUM - WALL / 2), [ux, uy] = K.S(cam, 170, CY + LUM + WALL + 60);
+    CAP.part(c, t, { text: 'CAPILLARY WALL', ax: wx, ay: wy, x: 18, y: Math.max(92, wy - 44), t0: 0.7, t1: 3.85, col: 'hr5', lineCol: 'hr3' });
+    CAP.part(c, t, { text: 'TISSUE CELLS', ax: ux, ay: uy, x: Math.min(190, ux + 14), y: Math.min(440, uy + 40), t0: 1.2, t1: 3.85, col: 'ts5', lineCol: 'ts3' });
+    CAP.part(c, t, { text: 'O₂ LEAVES THE BLOOD', ax: null, x: 135, y: 412, t0: 1.7, t1: 3.85, col: 'ox5', align: 'center' });
+    CAP.scene(c, t, { title: 'OXYGEN DELIVERED', ctx: 'From blood into tissue.', t0: 0.5, t1: 3.92, acc: 'ox4' });
   },
-  cues: [[0.0, 'capillary', 0.5, 0, 0.5], [0.6, 'disperse', 0.8, 0, 2.6], [2.0, 'payoff', 1.0, 0]],
+  cues: [[0.0, 'capillary', 0.5, 0, 0.5], [0.6, 'disperse', 0.8, 0, 2.6], [0.7, 'label', 0.3, -0.4], [1.2, 'label', 0.3, 0.4], [2.0, 'payoff', 1.0, 0]],
 };
 })();

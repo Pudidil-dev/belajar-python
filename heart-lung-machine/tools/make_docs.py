@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the production package from the film's own sources, so the documents cannot drift from the film:
 镜头表.md (shot list), the scene files' header comments, build/cues.json and build/textlog.json (render.py --cues) and
-build/audio_report.json (synth_audio.py). Writes docs/: storyboard.md, timeline.md, prompts.md (keyframe, motion and SFX
+build/audio_report.json (synth_audio.py), and build/loop_check.json (the loop measurement, optional). Writes docs/: storyboard.md, timeline.md, prompts.md (keyframe, motion and SFX
 prompts per scene), labels.md / .srt / .json, cue_sheet.md, rationale.md, mechanism.md, assets.md, loop.md.
 
   python3 tools/make_docs.py
@@ -39,82 +39,100 @@ def xin(sid):
 by = defaultdict(list)
 for c in cues['cues']: by[c['scene']].append(c)
 FRAMES = {
- 's01_still': ('The opening composition, no caption: the arrested heart centred in the open chest; the venous line (burgundy) leaving the right atrium to the left, the arterial line (red) arching in from the right to the ascending aorta above the cross-clamp; gloved hands with forceps at both edges; teal drapes.', 'The same composition 6 % closer; "During heart surgery" fading; both hands at rest.'),
- 's02_moving': ('As the end of S01.', 'Closer on the venous line where it leaves the right atrium: a short see-through stretch with red cells and a flow arrow; the still heart behind it; "What keeps blood moving?" fading.'),
- 's03_follow': ('As the end of S02.', 'The venous line over the drapes reaching the top of the machine, a bright marker riding it.'),
- 's04_machine': ('The venous line entering the reservoir, close.', 'A three-quarter view of the console with the perfusionist at the left edge: reservoir, pump, oxygenator assembly, the lines; the return line lit; "Heart–lung machine" fading.'),
- 's05_drain': ('The console.', 'The venous side as a diagram: the body outline over the drapes, the great veins into the right atrium, the venous line, the reservoir below the dashed heart level.'),
- 's06_reservoir': ('The diagram.', 'The reservoir close and see-through: inlet tube, filter sock, steady level, submerged outlet, level sensor; "Reservoir" fading.'),
- 's07_pump': ('The reservoir outlet.', 'The pump head in cutaway on its drive: blood in at the centre, red cells spiralling out to the side outlet, magnets in the drive; "Blood is pumped" fading.'),
- 's08_temp': ('The pump (dissolving).', 'The heat-exchanger schematic: water channel above, solid finned wall, blood channel below, heat arrows crossing the wall; the location inset; "Temperature control" fading.'),
- 's09_oxygenator': ('The schematic (dissolving to the assembly).', 'One hollow fibre across the whole frame, picked out from its neighbours, blood between the fibres.'),
- 's10_fiber': ('The fibre in side view (dissolving).', 'The fibre end-on: the membrane ring, gas with oxygen inside, red cells streaming round it outside; labels Gas and Blood fading.'),
- 's11_diffuse': ('The cross-section (dissolving).', 'The fibre wall magnified: many oxygen molecules on the gas side, fewer on the blood side; the followed molecule out in the plasma; "Oxygen diffuses in" fading.'),
- 's12_rbc': ('The followed molecule in the plasma.', 'Inside the red cell: the membrane a see-through rim, hemoglobin molecules all round, the followed oxygen near one of them; "Into the red blood cell" fading.'),
- 's13_hemoglobin': ('A small hemoglobin molecule in the middle of the frame.', 'The whole molecule: four subunits, four hemes, two carrying oxygen; "Hemoglobin carries oxygen" fading.'),
- 's14_co2': ('The fibre wall again (match cut), CO₂ on the blood side.', 'The oxygenator assembly from close, its outlet at the top; the fibre bundle fading out.'),
- 's15_filter': ('The assembly outlet.', 'The bubble detector on the arterial line, its light on; "Filter + monitoring" fading.'),
- 's16_aorta': ('The detector.', 'The ascending aorta close: the arterial cannula above the cross-clamp, red chevrons round the arch and up its branches; "Back to the body" fading.'),
- 's17_tissue': ('The aorta (dissolving).', 'A capillary with red cells in single file; oxygen molecules in the tissue; the tissue cells slightly warmer in colour; "Oxygen delivered" fading.'),
- 's18_perfusionist': ('The capillary (dissolving).', 'The perfusionist at the console, the monitor inset with four steady traces; "Continuously monitored" fading.'),
- 's19_system': ('The perfusionist, pulling back.', 'The whole circuit, starting to move up toward the return line; the recap fading.'),
- 's20_return': ('The whole circuit.', 'The opening composition, identical to frame 0.'),
+ 's01_still': ('The opening composition, the title typing in: the arrested heart centred in the open chest; the venous line (burgundy) leaving the right atrium to the left, the arterial line (red) arching in from the right to the ascending aorta above the cross-clamp; gloved hands with forceps at both edges; teal drapes.', 'The same composition 6 % closer; "DURING HEART SURGERY" and its first context line on screen; both hands at rest.'),
+ 's02_moving': ('As the end of S01.', 'Closer on the venous line where it leaves the right atrium: a see-through stretch with red cells in steady files; labels RED BLOOD CELLS and VENOUS LINE; the heart still behind.'),
+ 's03_follow': ('As the end of S02.', 'The venous line running off the end of the table into darkness, a bright marker on it, the label TO THE MACHINE riding with it.'),
+ 's04_machine': ('The view from above folding flat to a line across the middle of the frame.', 'The whole set-up from the side: the patient on the table with the heart in a round cutaway window, the machine on the floor below; the outgoing and the returning line lit in turn and labelled; the title HEART–LUNG MACHINE.'),
+ 's05_workflow': ('The whole circuit from the side; a bright drop leaving the right atrium.', 'The drop back in the aorta; seven numbered badges on the diagram (1 DRAIN … 7 RETURN); the camera pushing into the chest window.'),
+ 's06_drain': ('The chest window close: the right atrium and the venous cannula, labelled.', 'The top of the reservoir; two dashed levels (heart, reservoir) with an arrow between them and the label GRAVITY.'),
+ 's07_reservoir': ('The reservoir cap and its two inlets.', 'The reservoir close up: particles running down through the filter into the pool and out of the submerged outlet; six parts labelled; the level sensor lit once.'),
+ 's08_pump': ('The line from the reservoir outlet descending to the pump.', 'The pump head and drive cut open: motor, magnets, rotor and red cells spiralling out of the side outlet; five parts labelled; the strip IN → SPIN → OUT lit.'),
+ 's09_heater': ('The pump; the camera starting to move right.', 'The heater–cooler cut open (water tank, heater coil, cooling coil, water pump) and its two water lines lit up to the heat exchanger.'),
+ 's10_exchanger': ('A dissolve into the heat-exchanger cutaway.', 'Water and blood channels with the solid wall between, heat arrows crossing it; the location inset; four labels.'),
+ 's11_gas': ('A dissolve to the gas blender close up, the oxygen and air hoses lit.', 'The gas line into the oxygenator lit, used gas puffing from the exhaust; six labels.'),
+ 's12_oxygenator': ('The oxygenator from the side, its ports labelled.', 'One hollow fibre across the whole frame, picked out in white among the others.'),
+ 's13_fiber': ('The picked fibre turning end-on (dissolving).', 'The fibre in cross-section: gas core with oxygen molecules, the membrane ring, red cells streaming round it; five labels.'),
+ 's14_diffuse': ('The cross-section (dissolving).', 'The fibre wall magnified: many oxygen molecules on the gas side, fewer on the blood side; one tagged molecule in the plasma; four labels.'),
+ 's15_rbc': ('The tagged molecule in the plasma.', 'Inside the red cell: the membrane a see-through rim, hemoglobin molecules, the molecule heading for one; labels RED BLOOD CELL and HEMOGLOBIN.'),
+ 's16_hemoglobin': ('A small hemoglobin molecule in the middle of the frame.', 'The whole molecule: four subunits, two hemes holding oxygen; labels HEMOGLOBIN and 4 HEMES, 4 SEATS FOR O₂.'),
+ 's17_co2': ('The fibre wall again (match cut), CO₂ on the blood side.', 'Pulled back to the oxygenator from the side, at its outlet.'),
+ 's18_filter': ('The top of the oxygenator, the filter lighting.', 'The bubble detector on the arterial line lit and labelled.'),
+ 's19_return': ('The arterial line, a bright marker climbing it.', 'The chest window close: chevrons running round the aortic arch and up its branches; AORTA, TO THE BODY and CROSS-CLAMP labelled.'),
+ 's20_tissue': ('The aorta (dissolving).', 'A capillary with red cells in single file; oxygen spreading into the tissue cells, which warm slightly; three labels.'),
+ 's21_cardioplegia': ('The capillary dissolving to the cardioplegia roller pump and its bag on the mast.', 'The chest window: white chevrons running down the coronary arteries from the aortic root; CROSS-CLAMP, AORTIC ROOT and CORONARY ARTERIES labelled.'),
+ 's22_suction': ('The chest window: the sucker in a small pool of spilled blood.', 'The left side of the machine: the suction line lit to the roller pump, the magnified rollers squeezing the tube, the return line into the reservoir.'),
+ 's23_perfusionist': ('The console monitor (dissolving), the perfusionist from behind in the foreground.', 'The monitor inset with four steady traces: FLOW, PRESSURE, TEMP, OXYGEN.'),
+ 's24_system': ('The monitor, the camera easing back.', 'The whole set-up from the side, subdued; the return line lit; PUMP, OXYGENATE, RETURN listed under the title.'),
+ 's25_loop': ('The whole set-up from the side, a marker on the arterial line.', 'The opening composition from above, identical to frame 0.'),
 }
-MATCH = {'s01_still': 'the loop: frame 0 equals the last frame', 's02_moving': 'continuous (one camera)', 's03_follow': 'continuous', 's04_machine': 'continuous', 's05_drain': 'continuous',
-         's06_reservoir': 'continuous', 's07_pump': 'continuous', 
-         's15_filter': 'continuous', 's16_aorta': 'continuous', 's19_system': 'continuous', 's20_return': 'continuous'}
+MATCH = {'s01_still': 'the loop: frame 0 equals the last frame', 's04_machine': 'the view turns (a fold from above to the side)', 's25_loop': 'continuous, then the view turns back (a fold to above)'}
 MUSIC = [(0, 6, 'question', 'bars 0–2: a suspended G chord, no drums; at 2.25 s a rising fourth that does not resolve'),
-         (6, 19, 'the machine', 'bar 3: the question resolves to C at 6.0 s; a light pulse, the marimba hook, off-beat bass'),
-         (19, 30, 'its parts', 'the groove: four-on-the-floor, claps, hats, arpeggio; the hook answers itself every four bars'),
-         (30, 38, 'the microscopic world', 'the kick falls away (30 s), then a quieter space inside the red cell (34 s), a riser and a held breath (37.75–38.0 s)'),
-         (38, 46, 'the binding', 'bar 19 at 38.0 s, the downbeat of a cycle: the full groove, the hook doubled by a lead'),
-         (46, 56, 'the way back', 'lighter; no kick while the heart is on screen (50–52 s); a small payoff at 54.0 s'),
-         (56, 62, 'the team and the recap', 'thinning, no kick; three related tones on the recap'),
-         (62, 68, 'the opening again', 'bars 31–33: the suspended G chord, the same balance as bar 0, continuing across the seam')]
+         (6, 10, 'the machine', 'bars 3–4: the question resolves to C at 6.0 s as the view turns to the machine; the marimba hook, no kick while the heart is in frame'),
+         (10, 18, 'the workflow', 'bars 5–8: a light half-time pulse; each of the seven steps rings one note higher than the last (a pentatonic ladder)'),
+         (18, 22, 'drainage', 'bars 9–10: hats, shaker and bass, no kick (the heart is on screen)'),
+         (22, 34, 'the parts', 'bars 11–16: the groove — four-on-the-floor, claps, hats, arpeggio; the hook answers itself every four bars'),
+         (34, 42, 'gas and the oxygenator', 'bars 17–20: the groove opens up (open hats, a brighter arpeggio)'),
+         (42, 46, 'one fibre', 'bars 21–22: the groove without the clap'),
+         (46, 54, 'the microscopic world', 'the kick falls away (46 s), then a quieter space inside the red cell (50 s), a riser and a held breath (53.75–54.0 s)'),
+         (54, 62, 'the binding', 'bar 27 at 54.0 s, the downbeat of a cycle: the full groove, the hook doubled by a lead'),
+         (62, 70, 'the way back', 'lighter; no kick while the heart is on screen (66–70 s)'),
+         (70, 72, 'oxygen delivered', 'bar 35 at 70.0 s: a small payoff, one bar of four-on-the-floor'),
+         (72, 80, 'the other lines', 'cardioplegia (bells, no kick: the heart is on screen), then suction (marimba, shaker)'),
+         (80, 86, 'the team and the whole loop', 'thinning, no kick; three related tones on the recap'),
+         (86, 92, 'the opening again', 'bars 43–45: the suspended G chord, the same balance as bar 0, continuing across the seam')]
 music_at = lambda t: next(m for m in MUSIC if m[0] <= t < m[1])
-BASE = ("Premium original pixel-art medical illustration with voxel-inspired 3D depth, vertical 9:16, deep navy background. A 2D pixel "
-        "model lit like a 3D object: one light from the top left, hue-shifted colour ramps, flat colour bands with dither only where two "
-        "bands meet, a lighter rim on lit edges and a darker edge on shaded ones, no black outlines. An adult on cardiopulmonary bypass "
-        "during heart surgery: the arrested heart in an anterior-oblique educational cutaway, a venous cannula in the right atrium, an "
-        "arterial cannula in the distal ascending aorta above an aortic cross-clamp, a thin subdued cardioplegia line; surgeons only as "
-        "teal-gowned arms and light neutral gloves at the frame edges; one heart–lung machine (hard-shell reservoir, centrifugal pump, "
-        "integrated heat exchanger / hollow-fibre oxygenator / arterial filter, clamp-on bubble detector, separate gas and water lines). "
-        "Venous blood dark burgundy, oxygenated blood brighter red, never blue. O₂ cyan paired spheres, CO₂ amber three-atom symbols, "
-        "hemoglobin lavender, heme gold with an iron centre. No embedded text, no logos, no faces, no gore, no heavy bloom, no toy-like organs.")
-MOTION = ("Animate only the stated action. The heart never moves. Blood moves continuously and never pulses. Every tube keeps its route "
-          "and attachment points. The centrifugal pump stays a smooth-rotor centrifugal pump. Gas, water and blood stay in separate "
-          "channels. Red cells never cross the oxygenator membrane. Moving markers show direction only. One eased camera move per scene; "
-          "scale changes are visible zooms. No shake, no flicker, no morphing, no new parts.")
+BASE = ("Original pixel-art medical explainer in simple flat 2D, vertical 9:16, near-black background. Each part is one flat colour "
+        "with a 1-px light edge on its top left and a darker band on its bottom right; no gradients, no soft glows, no black outlines. "
+        "An adult on cardiopulmonary bypass during heart surgery, in two views. From above: the arrested heart in the open chest, a "
+        "venous cannula in the right atrium, an arterial cannula in the ascending aorta above a cross-clamp, surgeons only as "
+        "teal-gowned arms and light neutral gloves at the edges. From the side: the patient on the table (the head hidden behind the "
+        "anaesthesia screen, a round cutaway window showing the heart) and the heart–lung machine on the floor below, in flow order — "
+        "hard-shell reservoir, centrifugal pump on its drive, one oxygenator assembly (heat exchanger, hollow fibres, arterial "
+        "filter), clamp-on bubble detector — with a gas blender (oxygen and air), a heater–cooler on the floor, cardioplegia and "
+        "suction roller pumps and a monitor; every line shows its direction of flow. Venous blood dark burgundy, oxygenated blood "
+        "brighter red, never blue. O₂ cyan paired spheres, CO₂ amber three-atom symbols, hemoglobin lavender, heme gold with an iron "
+        "centre. No embedded text, no logos, no faces, no gore, no toy-like organs.")
+MOTION = ("Animate only the stated action. The heart never moves. Blood moves continuously and never pulses. Every line keeps its route "
+          "and attachment points and shows its direction with moving marks. The centrifugal pump stays a smooth-rotor pump turned by "
+          "magnets; roller pumps push by squeezing the tube. Gas, water, cardioplegia and blood stay in separate channels. Red cells "
+          "never cross the oxygenator membrane. One eased camera move per scene; scale changes are visible zooms; the change of view "
+          "is a fold. No shake, no flicker, no morphing, no new parts.")
 SFX = {
  's01_still': 'A low, steady operating-room equipment hum (tuned to G) begins at frame 0 together with a soft room tone and a quiet, continuous, filtered blood-flow texture. At 0.3 s the left surgeon\'s gown makes a faint fabric movement. At 1.0 s a small, restrained metal contact as the right hand lifts its forceps. Under it, the score holds a soft suspended G chord. No heartbeat, no monitor beep, no alarm.',
- 's02_moving': 'The blood-flow layer comes forward: a soft, filtered, continuous fluid texture, never pulsing, never splashing. A faint glassy shimmer as the tube wall becomes see-through (2.35 s). At 2.25 s the score asks its question: a soft bell rising a fourth (D → G) that does not resolve.',
- 's03_follow': 'The same flow texture travels with the camera. A short, soft camera sweep. The machine\'s low motor hum fades in gradually as the line approaches the console; a quiet shaker builds toward the reveal.',
- 's04_machine': 'At 6.0 s the score resolves the question onto C with a restrained bell chord — the reveal. The console hum and the pump\'s smooth tone sit low in the mix (the machine was already running: no power-on). A soft rising tone accompanies the outgoing path lighting up (6.7 s), a second one the returning path (7.85 s). A light pulse begins.',
- 's05_drain': 'A quiet, steady fluid movement panned gently toward the reservoir (left). One soft tick as the height marker draws. No suction roar.',
- 's06_reservoir': 'A soft enclosed-fluid texture as the camera arrives (low-passed, still). The console ambience continues. One quiet editorial tick as the level sensor\'s light glows (13.75 s). No low-level alarm, no splashing.',
- 's07_pump': 'The pump\'s rotational tone comes forward: smooth, stable, slightly chorused, at one constant pitch — it does not speed up as the camera moves closer. A faint glassy shimmer as the housing turns see-through. The flow layer follows the visible spiral.',
- 's08_temp': 'A subtle, smooth water-circuit texture in its own channel (no bubbling). Two small tonal glides accompany the heat arrows crossing the wall (19.6 s, 20.6 s). No boiling, steam or freezing sounds.',
- 's09_oxygenator': 'A subtle reveal shimmer (a few soft glass notes) as the housing turns see-through. A very quiet, airy gas texture begins: the separate gas circuit, never bubbles in the blood. A soft blip as one fibre is picked out, then a gentle push.',
- 's10_fiber': 'Two restrained textures: an airy layer for the gas compartment (left of centre) and a softer, low fluid layer for the blood (right), still clear in mono. Two tiny ticks as the labels appear.',
- 's11_diffuse': 'A delicate tonal cue marks the change of scale (29.0 s). Soft granular motion — tiny tuned pops — for the molecules. Two soft marimba contacts as the followed molecule enters and leaves the membrane. No valve click, no door.',
- 's12_rbc': 'The molecular texture continues, then the sound space becomes quieter and closer as the camera enters the cell: the music falls to a pad. A soft glassy tone as the molecule passes the membrane (34.9 s). No puncture, tearing or impact.',
- 's13_hemoglobin': 'A soft whoosh into the molecule. At 38.0 s, on the downbeat, a delicate, satisfying contact tone (bell, marimba and glass on the chord) as oxygen binds, followed by a soft resolving harmonic layer while the full groove returns. Four tiny tuned ticks as the four sites glint; a smaller contact as a second site binds. No metallic hammer, no lock-clamp sound.',
- 's14_co2': 'A soft swish for the match cut. Quiet granular motion. A restrained outward airy sweep as CO₂ leaves with the gas (44.3 s). The blood-flow layer continues underneath. A soft pull-back whoosh. No exhaust blast.',
- 's15_filter': 'Soft flow continues. Two quiet editorial ticks, one for the filter highlight (46.25 s) and one for the detector (47.75 s). No emergency alarm, no arcade success chime.',
- 's16_aorta': 'The flow texture broadens and climbs with the camera. A soft bell as the view arrives at the aorta. The music starts to resolve the journey; no kick while the heart is on screen.',
- 's17_tissue': 'A soft whoosh into the capillary. Gentle, dispersing tuned tones as oxygen leaves the cells and spreads into the tissue. A small musical payoff on the downbeat at 54.0 s. No electric shock, no power-up.',
- 's18_perfusionist': 'The operating-room ambience returns (hum, room tone, the console). A tiny interface blip only as the monitor inset appears. No rhythmic ECG beep.',
- 's19_system': 'Three related soft tones (C, E, G on bell and marimba) exactly as the pump, the oxygenator and the return line light (59.75, 60.5, 61.25 s). The flow continues under them without a break.',
- 's20_return': 'A soft glide as the camera follows the line back up. The balance returns to the opening: equipment hum, soft flow, room tone. The score settles on the opening suspended chord and continues across the loop seam without a gap.',
+ 's02_moving': 'The blood-flow layer comes forward: a soft, filtered, continuous fluid texture, never pulsing, never splashing. A faint glassy shimmer as the tube wall becomes see-through (2.35 s). At 2.25 s the score asks its question: a soft bell rising a fourth that does not resolve. Two small ticks as the labels appear.',
+ 's03_follow': 'The same flow texture travels with the camera. A short, soft camera sweep; a small tick for the label. The machine\'s low motor hum fades in gradually; a quiet shaker builds toward the turn.',
+ 's04_machine': 'A soft whoosh as the view folds from above to the side (6.0 s). At 6.5 s the score resolves the question onto C with a restrained bell chord: the reveal. The console hum and the pump\'s smooth tone sit low (the machine was already running: no power-on). A soft rising tone follows the outgoing line and a higher one the returning line; small ticks as the labels appear.',
+ 's05_workflow': 'A soft pop as the drop sets off (10.5 s). Each of the seven steps rings as the drop reaches it: a marimba note with a little bell, one pentatonic step higher each time, a ladder from drain to return. The flow and pump beds come forward under a light half-time pulse. A short push at the end.',
+ 's06_drain': 'A quiet, steady fluid movement down the line, panned left. One soft tick as the height marks draw. No suction roar.',
+ 's07_reservoir': 'A soft enclosed-fluid texture as the camera arrives (low-passed, still). One quiet editorial tick as the level sensor\'s light glows (22.75 s). Small ticks for the labels. No low-level alarm, no splashing.',
+ 's08_pump': 'The pump\'s rotational tone comes forward: smooth, stable, at one constant pitch; it does not speed up as the camera moves closer. A faint glassy shimmer as the housing opens. Three bright marimba notes as IN, SPIN and OUT light (25.0, 25.8, 26.6 s). The flow follows the visible spiral.',
+ 's09_heater': 'A subtle, smooth water texture in its own channel (no bubbling) as the heater–cooler opens; a soft tonal glide as the water lines light. No boiling and no compressor noise.',
+ 's10_exchanger': 'The water texture continues. Two small tonal glides as the heat arrows cross the wall (32.6, 33.6 s). No boiling, steam or freezing sounds.',
+ 's11_gas': 'A quiet airy gas texture: the separate gas circuit. A soft glassy shimmer as the blender opens, small ticks for the labels, a short soft puff from the exhaust (37.15 s). Never bubbles in the blood.',
+ 's12_oxygenator': 'A subtle reveal shimmer (a few soft glass notes) as the fibres appear. A soft blip as one fibre is picked out, then a gentle push.',
+ 's13_fiber': 'Two restrained textures: an airy layer for the gas compartment (left of centre) and a softer, low fluid layer for the blood (right), still clear in mono. Small ticks as the labels appear.',
+ 's14_diffuse': 'A delicate tonal cue marks the change of scale (45.0 s). Soft granular motion, tiny tuned pops, for the molecules. Two soft marimba contacts as the followed molecule enters and leaves the membrane. No valve click, no door.',
+ 's15_rbc': 'The molecular texture continues, then the sound space becomes quieter and closer as the camera enters the cell: the music falls to a pad. A soft glassy tone as the molecule passes the membrane (50.9 s). No puncture, tearing or impact.',
+ 's16_hemoglobin': 'A soft whoosh into the molecule. At 54.0 s, on the downbeat, a delicate, satisfying contact tone (bell, marimba and glass on the chord) as oxygen binds, followed by a soft resolving harmonic layer while the full groove returns. Four tiny tuned tones as the four sites glint.',
+ 's17_co2': 'A soft swish for the match cut. Quiet granular motion. A restrained outward airy sweep as CO₂ leaves with the gas (60.3 s). The blood-flow layer continues underneath. A soft pull-back whoosh. No exhaust blast.',
+ 's18_filter': 'Soft flow continues. Two quiet editorial ticks, one for the filter highlight (62.25 s) and one for the detector (63.75 s). No emergency alarm, no arcade success chime.',
+ 's19_return': 'The flow texture broadens and climbs with the camera. A soft bell as the view arrives at the aorta. The music starts to resolve the journey; no kick while the heart is on screen.',
+ 's20_tissue': 'A soft whoosh into the capillary. Gentle, dispersing tuned tones as oxygen leaves the cells and spreads into the tissue. A small musical payoff on the downbeat at 70.0 s. No electric shock, no power-up.',
+ 's21_cardioplegia': 'A soft glide to the pump on the mast. The rollers turn with a quiet, even motor sound (no rhythmic thump). A soft rising tone follows the solution up the line; a cool glassy shimmer as it reaches the coronary arteries (74.4 s). No heartbeat.',
+ 's22_suction': 'A soft fluid draw as the sucker picks up spilled blood (no slurping roar). A small interface blip as the inset opens (78.0 s), a quiet, even roller whirr under it, and a rising tone as the blood climbs back to the reservoir.',
+ 's23_perfusionist': 'The operating-room ambience returns (hum, room tone, the console). A tiny interface blip only as the monitor inset appears. No rhythmic ECG beep.',
+ 's24_system': 'Three related soft tones (C, E, G on bell and marimba) exactly as the pump, the oxygenator and the return line light (84.0, 84.75, 85.5 s). The flow continues under them without a break.',
+ 's25_loop': 'A soft glide as the camera follows the line up; a whoosh as the view folds back to above (88.7 s). The balance returns to the opening: equipment hum, soft flow, room tone. The score settles on the opening suspended chord and continues across the loop seam without a gap.',
 }
 sb = [f'# Storyboard — {len(ids)} scenes, {TOTAL:.0f} s at {FPS} fps', '', 'Generated by `tools/make_docs.py` from `镜头表.md`, the scene files and the cue sheet. "Motion" is the header comment of the scene\'s own file, i.e. what the code animates. The start and end frames of every scene are in `storyboard_frames.png` (left to right, top to bottom: S01 start, S01 end, S02 start, …).', '']
 tl = [f'# Editing timeline (exactly {TOTAL:.3f} s, {int(TOTAL * FPS)} frames at {FPS} fps)', '',
       'The engine assembles the film in one pass (`engine/film.js`). Every transition is inside its scene\'s time, as the brief requires:', '',
-      '- **continuous**: one camera move carries straight on (scenes 1–7, 15–16, 19–20);',
-      '- **dissolve**: an ordered-dither dissolve from the previous scene\'s last frame (0.12–0.5 s), used at every change of scale (8–14, 17, 18);',
+      '- **continuous**: one camera move carries straight on (scenes 1–3, 5–9, 12, 18–19, 22, 24);',
+      '- **fold**: the view turns between above and the side, the first picture folding flat to a line and the second unfolding from it (S04, and inside S25);',
+      '- **dissolve**: an ordered-dither dissolve from the previous scene\'s last frame (0.12–0.5 s), used at every change of scale (10, 11, 13–17, 20, 21, 23);',
       '- no hard cuts and no added transition time.', '',
-      '- **Captions.** One at a time, top centre (art rows 60–124 of 480; nothing below row 452, nothing in the right-hand button strip). `--notext` renders the clean version; `labels.srt` has every caption with its times.',
-      '- **Audio.** `mix.wav` under the labeled picture, `mix_notext.wav` under the clean one; `mix_vo.wav` (or `music.wav` + `sfx.wav`) under a voice-over. All are exactly 68.000 s.', '',
+      '- **Captions.** The X-ray film\'s style: a small upper-case title top left with an accent bar and one context line under it (art rows 42–66 of 480), typed on at 40 characters/s and erased at 70 before the scene ends; part and particle labels on leader lines; numbered step badges in S05. Nothing below row 452 except the S08 strip, nothing in the right-hand button strip. `--notext` renders the clean version; `labels.srt` has every caption and label with its times.',
+      '- **Audio.** `mix.wav` under the labeled picture, `mix_notext.wav` under the clean one; `mix_vo.wav` (or `music.wav` + `sfx.wav`) under a voice-over. All are exactly 92.000 s.', '',
       '| # | In (s) | Out (s) | Frames | Scene | Transition in | Camera | Caption | Music |', '|---|---|---|---|---|---|---|---|---|']
 pr = ['# Keyframe, motion and SFX prompts (one set per scene)', '', 'The film is drawn by code, so these are not what made it. They restate each scene for an image or video model or a sound designer (alternative keyframes, a print storyboard, a re-score), using the brief\'s constraints as the fixed base.', '', '**Image base:** ' + BASE, '', '**Motion base:** ' + MOTION, '']
 for i, (sc, row) in enumerate(zip(SCN, SHOTS)):
@@ -123,7 +141,7 @@ for i, (sc, row) in enumerate(zip(SCN, SHOTS)):
     x = xin(sid); trans = f'dissolve {x:.2f} s' if x else MATCH.get(sid, 'continuous')
     snd = ', '.join(f"{c['sfx']} @{c['t'] - t0:.3f}".rstrip('0').rstrip('.') for c in by.get(sid, []))
     a, b, mname, mdesc = music_at(t0)
-    small = ', '.join(e['text'] for e in textlog.get(sid, []) if e['kind'] != 'ctx')
+    small = ', '.join(e['text'] for e in textlog.get(sid, []) if e['kind'] not in ('ctx', 'title'))
     f0, f1 = FRAMES[sid]
     sb += [f'## {key} · {span} · `{sid}` · {t1 - t0:.0f} s', '', f'- **Picture:** {obj}.', f'- **Action:** {act}.', f'- **Start frame ({t0:.2f} s, frame {int(t0 * FPS)}):** {f0}', f'- **End frame ({t1:.2f} s, frame {int(t1 * FPS) - 1}):** {f1}',
            f'- **Camera:** {camw} ({CAM.get(camw, camw)}).', f'- **Transition in:** {trans}.', f'- **Caption:** {label}' + (f' · small labels: {small}' if small else '') + '.',
@@ -132,14 +150,15 @@ for i, (sc, row) in enumerate(zip(SCN, SHOTS)):
     pr += [f'## {key} · {span}', '', f'**Keyframe (start):** {BASE} Frame: {f0}', '', f'**Keyframe (end):** {BASE} Frame: {f1}', '',
            f'**Motion ({t1 - t0:.0f} s):** {MOTION} This scene: {act}. Camera: {CAM.get(camw, camw)}.', '', f'**SFX:** {SFX[sid]}', '']
 (D / 'storyboard.md').write_text('\n'.join(sb) + '\n')
-(D / 'timeline.md').write_text('\n'.join(tl) + '\n\nMusic grid: 120 BPM in 4/4, a bar every 2 s, 34 bars. The loop: see `loop.md`.\n')
+(D / 'timeline.md').write_text('\n'.join(tl) + '\n\nMusic grid: 120 BPM in 4/4, a bar every 2 s, 46 bars. The loop: see `loop.md`.\n')
 (D / 'prompts.md').write_text('\n'.join(pr) + '\n')
 # labels
 labs = []
 for sc in SCN:
     for e in textlog.get(sc['id'], []):
         dur = sc['t1'] - sc['t0']
-        labs.append({'scene': sc['id'], 'kind': 'caption' if e['kind'] == 'ctx' else 'label', 'text': e['text'], 'start': round(sc['t0'] + e['t0'], 3), 'end': round(sc['t0'] + min(dur, (e['t1'] if e['t1'] is not None else dur) + 0.25), 3)})
+        cap = e['kind'] in ('ctx', 'title'); t1 = e['t1'] if e['t1'] is not None else dur
+        labs.append({'scene': sc['id'], 'kind': 'caption' if cap else 'label', 'text': e['text'], 'start': round(sc['t0'] + e['t0'], 3), 'end': round(sc['t0'] + (t1 if cap else min(dur, t1 + 0.25)), 3)})
 labs.sort(key=lambda l: (l['start'], l['text']))
 (D / 'labels.json').write_text(json.dumps(labs, indent=1, ensure_ascii=False) + '\n')
 def ts(x): h_ = int(x // 3600); m = int(x % 3600 // 60); s = x % 60; return f'{h_:02d}:{m:02d}:{int(s):02d},{int(round((s - int(s)) * 1000)):03d}'
@@ -148,15 +167,15 @@ def ts(x): h_ = int(x // 3600); m = int(x % 3600 // 60); s = x % 60; return f'{h
                              + '\n'.join(f"| {l['scene']} | {l['kind']} | {l['text']} | {l['start']:.2f} | {l['end']:.2f} |" for l in labs) + '\n')
 # cue sheet
 cs = ['# Audio cue sheet', '', 'Every effect comes from a cue the picture emits (`window.dumpCues()` → `build/cues.json`), so it lands on its visual cause; tonal effects are tuned to the chord of the moment. Under them runs a continuous sound environment (operating-room hum, machine hum, blood flow, pump, gas, water), mixed per scene and crossfaded over 0.6 s across every cut.', '',
-      '## Music', '', '120 BPM, 4/4, 34 bars. Bars 0–2 and 31–33: a suspended G (the question). Bars 3–30: C – Am – F – G, one chord per bar, seven times; cycles start at 6, 14, 22, 30, 38, 46 and 54 s.', '',
+      '## Music', '', '120 BPM, 4/4, 46 bars. Bars 0–2 and 43–45: a suspended G (the question). Bars 3–42: C – Am – F – G, one chord per bar, ten times; cycles start at 6, 14, 22, 30, 38, 46, 54, 62, 70 and 78 s.', '',
       '| From | To | Section | What plays |', '|---|---|---|---|'] + [f'| {a} s | {b} s | {m} | {d} |' for a, b, m, d in MUSIC]
 cs += ['', '## Beds (continuous)', '', '| Bed | Sound | Where it is forward |', '|---|---|---|',
        '| Operating-room hum | 49 Hz with harmonics (G), room tone | the operating field, the perfusionist, the ending |',
        '| Machine hum | a soft motor tone at 147 Hz (D), slowly beating | at the console |',
-       '| Blood flow | filtered noise, continuous, only very slow drift | S02 (forward), S05–S06, S16 (broader) |',
-       '| Pump | a smooth stable tone at 196 Hz (G) with a band of air | S07 |',
-       '| Gas | airy high noise | S09–S11, S14 (panned to the gas side in S10) |',
-       '| Water | a smooth mid-low stream | S08 |']
+       '| Blood flow | filtered noise, continuous, only very slow drift | S02 (forward), S05–S07, S19 (broader) |',
+       '| Pump | a smooth stable tone at 196 Hz (G) with a band of air | S08 (forward), S05, S21–S22 |',
+       '| Gas | airy high noise | S11–S14, S17 (panned to the gas side in S13) |',
+       '| Water | a smooth mid-low stream | S09–S10 |']
 if rep:
     cs += ['', '## Measured levels', '', 'Measurements of the files `tools/synth_audio.py` wrote, not a listening test.', '',
            f"- **Length.** {rep['duration_s']:.3f} s, {rep['sample_rate']} Hz, 24-bit stereo.",
@@ -173,22 +192,29 @@ cs += ['', '## Cues', '', '| Time (s) | Scene | Effect | Gain | Pan | Arg |', '|
 ## The intended experience
 
 The first frame shows a contradiction that needs no words: a motionless heart, surgeons' hands at work, and blood visibly
-moving through two connected tubes. The question appears at 2 s and the answer, a machine, at 6 s. From there the film follows
-one continuous route: down the venous line, through each part of the machine, then down in scale (fibre, membrane, red cell,
-hemoglobin). It comes back out along the arterial line to the aorta and the tissue, and ends on the opening frame, which the
-viewer now understands.
+moving through two connected tubes. The question is on screen by 2 s and the answer, a machine, at 6 s. Then the view turns
+to the side, and the film becomes an explanation of the machine, the way a dialysis set-up is usually explained: the patient
+above, the machine below, the lines between them with their direction of flow. One drop of blood goes round the whole loop
+in seven numbered steps (S05); then each step gets its own close-up, from the drainage by gravity to the return into the
+aorta, with the oxygenator taken down in scale to one fibre, the membrane, a red cell and hemoglobin. Two more jobs of the
+machine follow (cardioplegia, suction), then the perfusionist, the whole loop, and the opening frame again.
 
 ## Creative decisions
 
-- **The patient and the heart come first**, so the machine has a purpose before it appears.
-- **The surgeons stay at the edges** (gowned arms and gloved hands), setting the scene without competing with the heart and the tubing.
-- **The answer comes early (6 s)**, then curiosity moves to how it works inside.
-- **One locked circuit.** Venous blood (burgundy) runs down the viewer's left, through the machine left to right along the bottom,
-  and returns (red) up the right. The same routes are drawn in every scene, so the viewer never has to re-learn the space.
-- **Most time goes to gas exchange (25–46 s).** The oxygen binding at 38.0 s is the visual and musical peak.
-- **The ending returns to the opening frame**, pixel for pixel, so the video loops.
-- **Look.** 2D pixel models lit like 3D objects (one light, hue-shifted ramps, dither only at band edges), drawn at 270×480 and
-  scaled exactly 4× with nearest neighbour, so the pixels read clearly at 1080×1920.
+- **The machine is the subject.** Fourteen of the twenty-five scenes are about the console and its lines (S04–S12, S18–S19,
+  S21–S24); the molecular sequence keeps its place as the payoff of step 5.
+- **Seen from the side.** The side view shows what the view from above cannot: the height difference that drives venous
+  drainage, the order of the parts, and every line's direction. The surgeon's view from above stays for the opening and the
+  closing, so the loop frame is the operating field.
+- **A workflow in seven steps first, then the details.** The numbered overview (drain, collect, pump, warm/cool, add O₂,
+  filter, return) gives the viewer a map; every later step title carries its number.
+- **Every highlighted part is named.** Parts and particles get small upper-case labels on leader lines as they light.
+- **Pumps shown working.** The centrifugal pump in a side cutaway (motor → magnets → rotor; in → spin → out) and the roller
+  pump magnified (rollers squeezing a tube, the principle of a dialysis blood pump).
+- **One locked circuit.** Every line is defined once (`engine/lib/side.js`) and drawn the same way in every scene.
+- **The ending returns to the opening frame**, so the video loops.
+- **Look.** Simple flat 2D pixels like the X-ray film: one flat colour per part with a light top-left edge and a shadow band,
+  near-black background, no soft glows; drawn at 270×480 and scaled exactly 4× with nearest neighbour.
 - **No reference images were supplied.** Following the codixel skill, the organic subjects (the heart, the people) are drawn in
   code and kept simple; the people never show a face.
 
@@ -196,26 +222,29 @@ viewer now understands.
 
 - An adult, conventional cardiopulmonary bypass, already established from frame one; the patient anesthetized and anticoagulated, the circuit primed.
 - An arrested-heart operation: the heart stopped with cardioplegia and the ascending aorta cross-clamped. This is the chosen scenario, not a requirement of all cardiac surgery.
-- Gravity venous drainage through one cannula in the right atrium into a hard-shell reservoir below the patient.
+- Gravity venous drainage through one cannula in the right atrium into a hard-shell reservoir well below the patient.
 - A centrifugal pump; an integrated assembly of heat exchanger, hollow-fibre oxygenator (gas inside the fibres, blood outside) and arterial filter; a clamp-on bubble detector on the arterial line.
-- Arterial return into the distal ascending aorta, on the systemic side of the clamp; cardioplegia delivered to the aortic root, below the clamp.
+- Arterial return into the distal ascending aorta, on the systemic side of the clamp; cardioplegia delivered by a roller pump to the aortic root, below the clamp; cardiotomy suction by a roller pump into the reservoir.
 
 ## Simplifications
 
-- **One reference layout.** Real component arrangements vary.
+- **A schematic side view.** The machine is drawn large and well below the table so that it fits a vertical frame; real consoles stand beside the table, and their parts are arranged in many different ways.
+- **Two views of one set-up.** The view from above and the side view are joined by a fold; the heart in the side view's window is the same model as the view from above.
 - **Schematic scale.** The fibre, the membrane, the red cell and the hemoglobin molecule are shown at magnifications that differ by orders of magnitude; every change of scale is a visible zoom.
 - **Teaching colours.** O₂ cyan, CO₂ amber, hemoglobin lavender, heme gold, water blue are conventions, not real colours.
-- **Cutaways.** The see-through tube, reservoir, pump and housing are educational.
-- **The heat exchanger** is shown as two straight channels and a wall; real ones are bundles of fine tubes.
+- **Cutaways.** The see-through tube, reservoir, pump, heater–cooler and blender are educational.
+- **The heat exchanger** is shown as two straight channels and a wall; real ones are bundles of fine tubes. One water loop is shown; heater–cooler units often also serve the cardioplegia circuit.
+- **Cardioplegia** is shown as a bag pumped by a roller pump; blood cardioplegia (mixed with oxygenated blood from the circuit) and its own heat exchanger are left out. It is given in doses; none are shown.
+- **Suction** goes straight to the reservoir; vents and other accessory lines are left out.
 - **CO₂** is shown only as dissolved CO₂ crossing the membrane; how blood carries CO₂ is not shown.
 - **The monitor** shows labelled, steady traces with no numbers, so no targets or settings are implied.
-- **Accessory lines** (vents, suction, pressure lines) are left out. Cardioplegia is a thin, subdued line.
 - **Nothing procedural.** There are no doses, settings, targets, or steps of cannulation or machine operation.
 
 ## Hypotheses (to test, not claims)
 
 - The contradiction at frame 0 and the early answer at 6 s should hold viewers past the first seconds.
-- The molecular payoff at 38 s should be the most remembered moment.
+- The numbered seven-step loop should make the machine easy to retell.
+- The molecular payoff at 54 s should be the most remembered moment.
 - The pixel-identical loop should earn replays.
 
 These are retention bets to measure on the platform; none of them guarantees reach.
@@ -230,41 +259,44 @@ anaesthetist before publication. Creative choices and hypotheses are in `rationa
 | Scene | What the film shows | Fact it rests on | Simplification |
 |---|---|---|---|
 | S01–S02 | A still heart; blood moving in the tubes | During arrested-heart surgery with CPB, the heart is stopped with cardioplegia while the pump maintains systemic flow | Bypass is already running from frame one |
-| S04 | The console and a perfusionist | CPB is run by a perfusionist with the surgical and anaesthesia team | One console, one operator shown |
-| S05 | Blood drains from the right atrium to a reservoir below the patient | Gravity (siphon) venous drainage needs the reservoir below the heart | The body outline and great veins are schematic |
-| S06 | A hard-shell reservoir with a steady level and a submerged outlet | The reservoir holds a working volume; the outlet stays under the surface; level sensing guards against air | Inner geometry simplified |
-| S07 | A centrifugal pump: central inlet, smooth rotor, peripheral outlet, magnetic drive | Centrifugal pumps add energy by rotation (a forced vortex) and are driven magnetically through the housing | Cells shown intact and large; rotor vanes simplified |
-| S08 | Water and blood in separate channels with heat crossing a solid wall | The heat exchanger transfers heat through a wall; water and blood never mix | Two straight channels instead of a tube bundle |
-| S09–S10 | Hollow fibres; gas inside, blood outside | In the common hollow-fibre design the sweep gas flows inside the fibres and blood flows around them | One fibre in cross-section, enlarged |
-| S11 | O₂ crosses the intact membrane by diffusion, with a net flux toward the blood | Diffusion follows the partial-pressure gradient; no cells cross; no gas bubbles form in the blood | Molecules drawn huge and few; random motion stylized |
-| S12 | O₂ enters a red cell through its membrane | O₂ diffuses through plasma and the red-cell membrane | No hole or channel is shown |
-| S13 | O₂ binds reversibly to the iron of a heme; four subunits, four sites; the protein shifts slightly | Hemoglobin is a tetramer (2 α, 2 β); each heme iron binds one O₂ reversibly; binding changes the protein's conformation | Shape change stylized; two of four sites filled |
-| S14 | CO₂ crosses from the blood into the gas and is swept away | CO₂ is removed across the same membrane into the sweep gas | Only dissolved CO₂ shown; carriage on hemoglobin and as bicarbonate not shown |
-| S15 | An arterial filter in the assembly; a separate clamp-on bubble detector | Integrated arterial filters trap particles and bubbles; ultrasonic detectors monitor the line, they do not remove anything | No air event is staged |
-| S16 | Oxygenated blood returns through a cannula in the ascending aorta above the cross-clamp | The arterial cannula must be on the systemic side of the clamp to perfuse the body | Arch branches drawn short |
-| S17 | O₂ leaves hemoglobin, crosses the capillary wall and reaches tissue; cells stay in the vessel | Systemic O₂ unloading by diffusion down the gradient; not all O₂ is released | The tissue response is a restrained colour change |
-| S18 | Flow, pressure, temperature and oxygenation are watched continuously | These are monitored throughout CPB | No values or targets shown; monitoring does not mean complications are impossible |
+| S04–S05 | The machine below the patient; one loop in seven steps | CPB drains venous blood, pumps it through an oxygenator with temperature control and a filter, and returns it to the arterial system | One schematic layout, not to scale |
+| S06 | Blood drains from the right atrium down to a reservoir well below the heart | Gravity (siphon) venous drainage needs the reservoir below the heart; the height difference drives it | Heights exaggerated for the frame |
+| S07 | A hard-shell reservoir: inlets, filter, steady level, submerged outlet, level sensor | The reservoir holds a working volume; the outlet stays under the surface; level sensing guards against air entering the pump | Inner geometry simplified |
+| S08 | A centrifugal pump: motor, magnets, smooth rotor; in at the centre, out at the side | Centrifugal pumps add energy by rotation (a forced vortex) and are driven magnetically through the closed housing | Rotation slowed to be readable; cells shown large |
+| S09–S10 | A heater–cooler pumps water to the heat exchanger; heat crosses a solid wall | Temperature is managed by water from a heater–cooler through the heat exchanger; water and blood never mix | One water loop; two straight channels instead of a tube bundle |
+| S11 | Oxygen and air mixed in a blender, metered by flowmeters, into the oxygenator; exhaust out | The sweep gas (an oxygen/air mix set by a blender and flowmeter) flows through the oxygenator and leaves through its exhaust | No settings shown |
+| S12–S13 | Hollow fibres; gas inside, blood outside | In the common hollow-fibre design the sweep gas flows inside the fibres and blood flows around them | One fibre in cross-section, enlarged |
+| S14 | O₂ crosses the intact membrane by diffusion, with a net flux toward the blood | Diffusion follows the partial-pressure gradient; no cells cross; no gas bubbles form in the blood | Molecules drawn huge and few; random motion stylized |
+| S15 | O₂ enters a red cell through its membrane | O₂ diffuses through plasma and the red-cell membrane | No hole or channel is shown |
+| S16 | O₂ binds reversibly to the iron of a heme; four subunits, four sites; the protein shifts slightly | Hemoglobin is a tetramer (2 α, 2 β); each heme iron binds one O₂ reversibly; binding changes the protein's conformation | Shape change stylized; two of four sites filled |
+| S17 | CO₂ crosses from the blood into the gas and is swept away | CO₂ is removed across the same membrane into the sweep gas | Only dissolved CO₂ shown; carriage on hemoglobin and as bicarbonate not shown |
+| S18 | An arterial filter in the assembly; a separate clamp-on bubble detector | Integrated arterial filters trap particles and bubbles; ultrasonic detectors monitor the line, they do not remove anything | No air event is staged |
+| S19 | Oxygenated blood returns through a cannula in the ascending aorta above the cross-clamp | The arterial cannula must be on the systemic side of the clamp to perfuse the body | Arch branches drawn short |
+| S20 | O₂ leaves hemoglobin, crosses the capillary wall and reaches tissue; cells stay in the vessel | Systemic O₂ unloading by diffusion down the gradient; not all O₂ is released | The tissue response is a restrained colour change |
+| S21 | A roller pump sends cold cardioplegia into the aortic root, below the clamp, and into the coronary arteries | Antegrade cardioplegia is delivered into the aortic root proximal to the cross-clamp; the clamp keeps it out of the systemic circulation, so it perfuses the coronaries and keeps the heart arrested | Bag and roller pump only; blood mixing, doses and timing not shown |
+| S22 | A sucker returns spilled blood through a roller pump to the reservoir | Cardiotomy suction returns shed blood to the circuit through the reservoir's filter; roller pumps push by occluding a tube against a raceway | Vents and suction control not shown |
+| S23 | Flow, pressure, temperature and oxygenation are watched continuously | These are monitored throughout CPB by the perfusionist | No values or targets shown; monitoring does not mean complications are impossible |
 
 ## The brief's accuracy checks
 
 | Check | How the film meets it |
 |---|---|
 | Bypass established in the opening | Blood moves in both connected lines from frame 0 (S01) |
-| Arrested heart is the chosen scenario | Stated in `rationale.md`; no claim that all cardiac surgery needs it |
-| Venous and arterial connections consistent | One route per tube, defined once in `engine/lib/world.js` and drawn in every scene |
-| Arterial return perfuses the body despite the clamp | The cannula enters the ascending aorta above the clamp (S16, `docs/sheets/heart.png`) |
-| Circuit fluid-filled and prepared | Every tube and component is filled with blood from frame 0 |
+| Arrested heart is the chosen scenario | Stated in `rationale.md`; S21 shows how cardioplegia keeps it still; no claim that all cardiac surgery needs it |
+| Venous and arterial connections consistent | One route per line, defined once in `engine/lib/side.js` (and `world.js` for the view from above) and drawn in every scene |
+| Arterial return perfuses the body despite the clamp | The cannula enters the ascending aorta above the clamp (S19, `docs/sheets/heart.png`) |
+| Circuit fluid-filled and prepared | Every line and component is filled from frame 0 |
 | Reservoir outlet submerged | The outlet is below the constant working level (`MACHINE.LEVEL`) in every frame |
-| Centrifugal pump throughout | The same smooth-rotor head in every scene |
+| Centrifugal pump throughout | The same smooth-rotor head in every scene; the roller pumps are only for cardioplegia and suction |
 | Pump does not shred red cells | Cells ride the flow intact; no blades |
-| Water, blood and gas separate | Separate lines and channels in every view (S08, S10) |
-| Gas inside, blood outside the fibres | S09–S11 |
-| O₂ crosses by diffusion | Random walks with a net flux down the gradient (S11) |
-| Red cells do not cross the membrane | Cells stay on the blood side (S10, S11) |
-| O₂ binds reversibly | Binding at the iron with a two-way arrow (S13) |
-| CO₂ leaves through the gas pathway | S14 |
+| Water, blood and gas separate | Separate lines and channels in every view (S09–S11, S13) |
+| Gas inside, blood outside the fibres | S12–S14 |
+| O₂ crosses by diffusion | Random walks with a net flux down the gradient (S14) |
+| Red cells do not cross the membrane | Cells stay on the blood side (S13, S14) |
+| O₂ binds reversibly | Binding at the iron with a two-way arrow (S16) |
+| CO₂ leaves through the gas pathway | S17; the exhaust in S11 |
 | Blood stays red / burgundy | Venous burgundy and oxygenated red ramps only; never blue |
-| Bubble detector is not a filter | It only lights; nothing is removed (S15) |
+| Bubble detector is not a filter | It only lights; nothing is removed (S18) |
 | Monitoring is not a guarantee | No claim on screen; noted here |
 | No emergency or defibrillation scene | None |
 | No heartbeat over the arrested heart | No heartbeat sound at any point; no kick drum while the heart is on screen |
@@ -275,23 +307,24 @@ Every asset is one piece of code, so it cannot drift between scenes. The referen
 
 | Asset | Code | Locked |
 |---|---|---|
-| The circuit layout | `engine/lib/world.js` (`WORLD.LY`, `WORLD.R`) | Positions of every component and the route of every tube; the order of points is the direction of flow |
-| The operative field and the heart | `engine/lib/heart.js` | Anterior view; the heart never moves; cannula above the clamp, cardioplegia below it; three arch branches |
+| The side view (the machine's world) | `engine/lib/side.js` (`SIDE.LY`, `SIDE.R`, `SIDE.track`) | Positions of every part and the route of every line; the order of points is the direction of flow |
+| The machine's parts | `engine/lib/machine.js` | Reservoir (constant level, submerged outlet), centrifugal pump and drive, oxygenator (HX, fibres, filter), detector, blender, heater–cooler, roller pumps, monitor |
+| The view from above and the heart | `engine/lib/world.js`, `engine/lib/heart.js` | The opening and closing composition; the heart never moves; cannula above the clamp, cardioplegia below it |
 | The team | `engine/lib/people.js` | Surgeons: arms and gloved hands at the frame edges; the perfusionist from behind; no faces |
-| The machine | `engine/lib/machine.js` | Reservoir (constant level, submerged outlet), centrifugal pump, integrated HX / oxygenator / filter, detector, monitor |
 | The microscopic models | `engine/lib/micro.js` | O₂ pair, CO₂ triad, red cell (biconcave), hemoglobin (2 α + 2 β, four hemes), heme with iron |
-| The look | `engine/lib/lit.js`, `engine/lib/pix.js` | One light from the top left; hue-shifted ramps; dither only at band edges; 270×480 drawn, 4× nearest-neighbour |
+| The look | `engine/lib/lit.js`, `engine/lib/pix.js` | Flat colour per part, light edge top left, shadow band bottom right; 270×480 drawn, 4× nearest-neighbour |
+| The text | `engine/lib/cap.js` | Title top left with accent bar and context line; part labels on leader lines; step badges |
 
-## Tubing rules
+## Line rules (side view)
 
-- **Venous line.** From the right atrium down the viewer's left to the reservoir inlet. Burgundy, 11 units wide.
-- **Machine path.** Reservoir outlet → pump inlet (top) → pump outlet (side) → assembly inlet (bottom). Burgundy.
-- **Arterial line.** Assembly outlet (top) → bubble detector → up the viewer's right → the aortic cannula. Red, 9 units wide.
-- **Cardioplegia.** Thin (3 units) and subdued, beside the arterial line, ending at the aortic root.
-- **Gas and water.**
-  - Gas (pale cyan) runs from the blender to the assembly's gas inlet, and leaves at its gas outlet.
-  - Water (blue) runs between the heater–cooler and the assembly's water ports.
-- **Flow.** Markers move at one constant speed; the pattern repeats every 0.5 s (blood) or 1 s (gas, water), so it is identical at 0 and 68 s.
+- **Venous line.** From the right atrium out of the chest window and down to the reservoir's venous inlet. Burgundy, 7 units.
+- **Machine path.** Reservoir outlet → pump inlet (top, centre) → pump outlet (side) → oxygenator inlet (bottom). Burgundy, 7 units.
+- **Arterial line.** Oxygenator outlet (top) → bubble detector → up and over the drapes → the aortic cannula. Red, 5 units.
+- **Cardioplegia.** Bag → roller pump on the mast → a thin rose line (2 units) to the aortic root, below the clamp.
+- **Suction.** Sucker in the chest → down the far left → roller pump on the cart → up into the reservoir's suction inlet. 3 units.
+- **Gas.** Oxygen and air hoses → blender → the oxygenator's gas inlet (pale cyan); the exhaust at its bottom.
+- **Water.** Heater–cooler ↔ the heat exchanger's two ports (blue).
+- **Flow.** Marks move at one constant speed (blood 30 units/s, 15 apart: a 0.5-s pattern; other lines at half speed).
 
 ## What must not appear
 
@@ -303,34 +336,34 @@ Every asset is one piece of code, so it cannot drift between scenes. The referen
 - **Blood and the circuit.**
   - No bubbles in the blood.
   - No blades in the pump.
-  - No mixing of water, gas and blood.
+  - No mixing of water, gas, cardioplegia and blood.
   - No cells crossing the membrane.
   - No hole punched into a cell.
-  - No tube changing its attachment.
+  - No line changing its attachment.
 - **Molecules.** No O₂ split into atoms, and no rusting iron.
-- **Clinical numbers.** No numbers on the monitor; no doses, settings or targets.
+- **Clinical numbers.** No numbers on the monitor or the blender; no doses, settings or targets.
 """)
+lp = R / 'build/loop_check.json'
+LOOP_NOTE = (lambda d: f"The state at {d['t1']} s differs from frame 0 by {d['diff_px']} art pixels; an ordinary step from one frame to the next near the end changes about {d['step_px']} art pixels, so the seam is an ordinary frame step.")(json.loads(lp.read_text())) if lp.exists() else ''
 (D / 'loop.md').write_text(f"""# Loop specification
 
 ## Picture
 
-- **Same state at both ends.** S20 ends on `WORLD.CAM0`, the opening camera, with both hands at rest. The flow markers are in
-  the same phase, since the pattern repeats every 0.5 s and 68 s is a whole number of repeats.
-- **Measured.** The state at 68.0 s differs from frame 0 by 2 art pixels, from rounding. A normal step from one frame to the
-  next changes about 490 art pixels, so the seam is an ordinary frame step.
-  `tools/render.py --stills 0,67.9999` writes both frames; `docs/frame_open.png`, `docs/frame_close.png` and
-  `docs/loop_compare.png` show them.
-- **No text at the seam.** The recap fades by 62.65 s and S20 has none. "During heart surgery" types in 0.2 s after the restart.
+- **Same state at both ends.** S25 ends on `WORLD.CAM0`, the opening camera, with both hands at rest. The flow marks are in
+  the same phase, since the pattern repeats every 0.5 s and 92 s is a whole number of repeats.
+- **Measured.** `tools/render.py --stills 0,91.9999` writes both frames; `docs/frame_open.png`, `docs/frame_close.png` and
+  `docs/loop_compare.png` show them. {LOOP_NOTE}
+- **No text at the seam.** The recap erases by 86.9 s and S25 has none. "DURING HEART SURGERY" types in 0.15 s after the restart.
 - **Camera.** It eases into the opening view and S01 starts from rest, so speed is continuous across the seam.
 
 ## Sound
 
-- **Bars.** 34 bars at 120 BPM in 4/4 = exactly 68.000 s.
-- **Harmony.** Bars 31–33 hold the opening suspended G chord, and bar 0 continues it.
-- **Beds.** The hum, flow, pump, gas and water beds are exactly periodic in 68 s: tones with whole cycles in the loop, and noise
+- **Bars.** 46 bars at 120 BPM in 4/4 = exactly 92.000 s.
+- **Harmony.** Bars 43–45 hold the opening suspended G chord, and bar 0 continues it.
+- **Beds.** The hum, flow, pump, gas and water beds are exactly periodic in 92 s: tones with whole cycles in the loop, and noise
   filtered in the frequency domain of the whole loop. Their level automation is smoothed circularly, so the seam is treated like
   any other moment.
-- **Tails.** Reverb and echo that ring past 68 s are folded onto the start.
+- **Tails.** Reverb and echo that ring past 92 s are folded onto the start.
 - **Measured.** {('The step from the last sample to the first is ' + str(rep['loop_seam_step']) + ' of full scale, against ' + str(rep['loop_seam_local_p99']) + ' for ordinary steps near the end.') if rep else 'see cue_sheet.md.'}
 
 ## Export

@@ -1,7 +1,7 @@
 // S02 BLOOD IS STILL MOVING (2–4 s): the same heart, patient and tubing. The camera shifts toward the venous tube where it
 // leaves the right atrium, the heart still in frame behind it. A short stretch of the tube opens as an educational cutaway:
 // its wall becomes a clear outline and red cells slide steadily along inside it, with a moving flow arrow. Steady, never
-// pulsing. The heart does not move.
+// pulsing. The heart does not move. Labels name the red blood cells and the venous line.
 (() => {
 const clamp = U.clamp, lerp = U.lerp;
 const G0 = 24, G1 = 92;                                             // the see-through stretch of the venous line (units along it)
@@ -32,8 +32,12 @@ SC['s02_moving'] = {
     const cam = WORLD.track(S.t), k = MO.smooth(clamp((t - 0.35) / 0.4));
     WORLD.scene(c, cam, S.t, { tubes: { venous: { glass: [G0, G1, k] } } });
     window.glassTube(c, cam, 'venous', S.t, G0, G1, k);
-    CAP.ctx(c, t, { text: 'What keeps\nblood moving?', t0: 0.3, t1: 1.75, acc: 'ab3' });
+    if (!window.NOTEXT) { const L = window.__textLog; window.__scene = '_s02'; CAP.scene(c, S.t, window.OPEN_CAP); window.__scene = S.id; delete L._s02; }
+    // the open stretch names what is inside it
+    const [x1, y1] = WORLD.at(WORLD.R.venous, WORLD.R.venous.S, 70), [ax, ay] = K.S(cam, x1, y1), [x2, y2] = WORLD.at(WORLD.R.venous, WORLD.R.venous.S, 40), [bx, by] = K.S(cam, x2, y2);
+    CAP.part(c, t, { text: 'RED BLOOD CELLS', ax, ay, x: ax + 26, y: ay + 22, t0: 0.75, t1: 1.9, col: 'rc5', lineCol: 'rc3' });
+    CAP.part(c, t, { text: 'VENOUS LINE', ax: bx, ay: by, x: bx + 34, y: by - 34, t0: 1.05, t1: 1.9, col: 'vb5', lineCol: 'g6' });
   },
-  cues: [[0.35, 'glass_open', 0.5, -0.4], [0.3, 'question', 1.0, 0]],
+  cues: [[0.35, 'glass_open', 0.5, -0.4], [0.3, 'question', 1.0, 0], [0.75, 'label', 0.4, -0.3], [1.05, 'label', 0.4, 0.2]],
 };
 })();

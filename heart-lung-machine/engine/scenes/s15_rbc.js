@@ -1,6 +1,7 @@
-// S12 INTO A RED BLOOD CELL (33–37 s): the followed oxygen molecule drifts through the plasma to a red blood cell (a
+// S15 INTO A RED BLOOD CELL (49–53 s): the followed oxygen molecule drifts through the plasma to a red blood cell (a
 // biconcave disc). The camera zooms in as the molecule passes through the cell's membrane (it diffuses through; nothing is
 // punched open); the membrane turns see-through and the interior appears, packed with hemoglobin. The molecule heads for one.
+// Labels: O2, red blood cell, hemoglobin.
 (() => {
 const clamp = U.clamp, lerp = U.lerp, hh = U.hash, R = n => window.RAMP[n];
 const C = { x: 150, y: 10, rx: 82, ry: 56, rot: -0.18 }, TGT = [116, 14];
@@ -9,7 +10,7 @@ const HBS = []; for (let k = 0; HBS.length < 34 && k < 400; k++) { const x = C.x
 HBS.push([TGT[0], TGT[1], 0.5]);
 window.S12 = { C, TGT };
 const molAt = t => { const [jx, jy] = MICRO.jit(77, t, 2); if (t < 1.8) return [lerp(-20, 64, MO.sineInOut(clamp(t / 1.8))) + jx * 6, lerp(18, 8, t / 1.8) + jy * 8]; if (t < 2.4) return [lerp(64, 74, (t - 1.8) / 0.6) + jx * 2, 8 + jy * 2]; return [lerp(74, TGT[0] - 6, MO.sineInOut(clamp((t - 2.4) / 1.5))) + jx * 2, lerp(8, TGT[1] - 6, clamp((t - 2.4) / 1.5)) + jy * 2]; };
-SC['s12_rbc'] = {
+SC['s15_rbc'] = {
   xin: 0.3,
   draw(c, t, S) {
     const q = MO.sineInOut(clamp((t - 0.8) / 3.0)), cam = { x: lerp(40, TGT[0] - 4, q), y: lerp(10, TGT[1] - 2, q), z: K.zl(1.1, 3.0, q) };
@@ -25,8 +26,12 @@ SC['s12_rbc'] = {
     const [mx, my] = molAt(t), [px, py] = K.S(cam, mx, my);
     MICRO.o2(c, px, py, 3.6 * Math.min(cam.z, 1.6), -0.5, { ramp: ['ox1', 'ox2', 'ox3', 'ox4', 'ox5'] });
     MICRO.tag(c, px, py, 8 * Math.min(cam.z, 1.6), S.t, 'ox5');
-    CAP.ctx(c, t, { text: 'Into the red\nblood cell', t0: 0.3, t1: 3.7, acc: 'rc5' });
+    const [ex, ey] = K.S(cam, C.x - C.rx * 0.7, C.y - C.ry * 0.7), [hx, hy] = K.S(cam, TGT[0], TGT[1] + 8);
+    CAP.part(c, t, { text: 'O₂', ax: px, ay: py - 8, x: px - 20, y: py - 40, t0: 0.4, t1: 1.7, col: 'ox5', lineCol: 'ox3' });
+    CAP.part(c, t, { text: 'RED BLOOD CELL', ax: ex, ay: ey, x: Math.max(6, ex - 30), y: Math.max(92, ey - 46), t0: 0.7, t1: 2.2, col: 'rc5', lineCol: 'rc4' });
+    CAP.part(c, t, { text: 'HEMOGLOBIN', ax: hx, ay: hy + 10, x: hx + 26, y: Math.min(440, hy + 60), t0: 2.6, t1: 3.85, col: 'hb5', lineCol: 'hb4' });
+    CAP.scene(c, t, { title: 'INTO A RED BLOOD CELL', ctx: 'Through its membrane.', t0: 0.3, t1: 3.92, acc: 'rc5' });
   },
-  cues: [[0.2, 'drift', 0.5, 0.2, 1.6], [1.9, 'membrane_pass', 0.8, 0.1], [2.0, 'quiet_space', 0.7, 0, 2.0]],
+  cues: [[0.2, 'drift', 0.5, 0.2, 1.6], [0.4, 'label', 0.3, -0.2], [0.7, 'label', 0.3, -0.3], [1.9, 'membrane_pass', 0.8, 0.1], [2.0, 'quiet_space', 0.7, 0, 2.0], [2.6, 'label', 0.3, 0.2]],
 };
 })();

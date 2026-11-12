@@ -8,7 +8,7 @@
 // it untouched.
 (() => {
 const { W, H, P } = PIX;
-const LIT = window.LIT = { NAME: 'LIT' };
+const LIT = window.LIT = { NAME: 'LIT', FLAT: true };
 const norm = v => { const n = Math.hypot(...v); return v.map(q => q / n); };
 const L = LIT.L = norm([-0.55, -0.72, 0.62]);                 // the one light: from the top left, toward the viewer
 const LP = norm([L[0], L[1]]);                                  // its direction in the picture plane
@@ -66,6 +66,23 @@ LIT.shape = (c, draw, box, ramp, o = {}) => {
   // o.cylX: shade each row as a slice of a vertical cylinder (containers, liquid columns), instead of a dome
   const rowL = o.cylX ? new Int16Array(y1 - y0).fill(-1) : null, rowR = o.cylX ? new Int16Array(y1 - y0).fill(-1) : null;
   if (o.cylX) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (M[y * W + x]) { if (rowL[y - y0] < 0) rowL[y - y0] = x; rowR[y - y0] = x; }
+  // FLAT (the default since the xray-style revision): a flat base colour, a 1-px light edge on the top-left, a darker band
+  // on the bottom-right (the classic flat pixel-art facet, as in xray-machine) — no dome gradients, no dither
+  if (LIT.FLAT && !o.smooth) {
+    const kb = Math.max(1, Math.min(n - 2, Math.round((n - 1) * (0.5 + (o.bias || 0) * 1.6)))), sw = Math.max(1, Math.min(3, Math.round(dmax * 0.2)));
+    const out = (X, Y) => X < x0 || Y < y0 || X >= x1 || Y >= y1 || !M[Y * W + X];
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      if (!M[y * W + x]) continue;
+      if (a < 1 && BT(x, y) >= a) continue;
+      if (o.clip && !o.clip(x, y)) continue;
+      let k = kb + (o.tone ? Math.round(o.tone(x, y, D[y * W + x]) * (n - 1) * 0.9) : 0);
+      if (o.edge !== false) { if (out(x + sw, y + sw)) k -= 2; else if (out(x - 1, y - 1)) k += 2; else if (o.cylX && rowL && x - rowL[y - y0] === 2) k += 1; }
+      k = Math.max(0, Math.min(n - 1, k));
+      const col = cols[k], i = ((y - y0) * bw + (x - x0)) * 4; dd[i] = col[0]; dd[i + 1] = col[1]; dd[i + 2] = col[2]; dd[i + 3] = 255;
+    }
+    c.putImageData(img, x0, y0);
+    return { x0, y0, x1, y1, dmax, R };
+  }
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
     if (!M[y * W + x]) continue;
     if (a < 1 && BT(x, y) >= a) continue;
@@ -113,7 +130,16 @@ LIT.sphere = (c, sx, sy, r, ramp, o = {}) => {
     if (q > 1) continue;
     if (a < 1 && BT(x, y) >= a) continue;
     const nz = Math.sqrt(1 - q);
-    let k = band(amb + dif * Math.max(0, dx * L[0] + dy * L[1] + nz * L[2]) + (o.bias || 0), n, x, y, o.strip ?? 1 / 3);
+    let k;
+    if (LIT.FLAT && !o.smooth) {
+      const kb = Math.max(1, Math.min(n - 2, Math.round((n - 1) * (0.5 + (o.bias || 0) * 1.6)))), sh = Math.max(0.9, r * 0.3) / r;
+      k = (dx + sh) ** 2 + (dy + sh) ** 2 > 1 ? kb - (r > 2.5 ? 2 : 1) : kb;
+      if (r >= 2.2 && (dx + 0.42) ** 2 + (dy + 0.42) ** 2 < Math.max(0.05, (0.9 / r) ** 2, 0.22 ** 2)) k = kb + 2;
+      k = Math.max(0, Math.min(n - 1, k));
+      const col = cols[k], i = ((y - y0) * bw + (x - x0)) * 4; dd[i] = col[0]; dd[i + 1] = col[1]; dd[i + 2] = col[2]; dd[i + 3] = 255;
+      continue;
+    }
+    k = band(amb + dif * Math.max(0, dx * L[0] + dy * L[1] + nz * L[2]) + (o.bias || 0), n, x, y, o.strip ?? 1 / 3);
     if (o.edge !== false && q > (1 - 1.6 / r) ** 2 && r > 2.5) { const f = -(-dx * LP[0] - dy * LP[1]); if (f < -0.1) k = Math.max(0, k - 2); }
     const col = cols[k], i = ((y - y0) * bw + (x - x0)) * 4; dd[i] = col[0]; dd[i + 1] = col[1]; dd[i + 2] = col[2]; dd[i + 3] = 255;
   }
@@ -150,10 +176,13 @@ LIT.cyl = (c, cam, cx, y, r, h, ramp, o = {}) => {
     if (a < 1 && BT(x2, y2) >= a) continue;
     if (o.clip && !o.clip(x2, y2)) continue;
     const onTop = o.top !== false && ((py - sy) / ry) ** 2 + dx * dx <= 1;
-    let v;
-    if (onTop) v = amb + dif * (0.25 * -L[1] + 0.97 * L[2]) + 0.12; else { const nz = Math.sqrt(1 - dx * dx); v = amb + dif * Math.max(0, dx * L[0] + nz * L[2]); }
-    let k = band(v + (o.bias || 0), n, x2, y2, 1 / 3);
-    if (!onTop && Math.abs(dx) > 1 - 1.4 / R) k = Math.max(0, k - (dx > 0 ? 2 : 0));
+    let v, k;
+    if (LIT.FLAT) { const kb = Math.max(1, Math.min(n - 2, Math.round((n - 1) * (0.5 + (o.bias || 0) * 1.6)))); k = onTop ? kb + 1 : dx > 0.55 ? kb - 2 : (dx > -0.8 && dx < -0.6) ? kb + 2 : kb; k = Math.max(0, Math.min(n - 1, k)); }
+    else {
+      if (onTop) v = amb + dif * (0.25 * -L[1] + 0.97 * L[2]) + 0.12; else { const nz = Math.sqrt(1 - dx * dx); v = amb + dif * Math.max(0, dx * L[0] + nz * L[2]); }
+      k = band(v + (o.bias || 0), n, x2, y2, 1 / 3);
+      if (!onTop && Math.abs(dx) > 1 - 1.4 / R) k = Math.max(0, k - (dx > 0 ? 2 : 0));
+    }
     const col = cols[k], i = ((y2 - y0) * bw + (x2 - x0)) * 4; dd[i] = col[0]; dd[i + 1] = col[1]; dd[i + 2] = col[2]; dd[i + 3] = 255;
   }
   c.putImageData(img, x0, y0);

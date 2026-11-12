@@ -1,7 +1,8 @@
-// S11 OXYGEN CROSSES THE MEMBRANE (29–33 s): a small piece of the fibre wall, magnified. Gas side on the left (many oxygen
+// S14 OXYGEN CROSSES THE MEMBRANE (45–49 s): a small piece of the fibre wall, magnified. Gas side on the left (many oxygen
 // molecules), blood side on the right (plasma, the edge of a red cell). The molecules move at random; on balance more cross
 // toward the blood, where there are fewer of them (the partial-pressure gradient), than come back. The membrane stays
-// whole; no cell crosses it; no bubbles form. One oxygen molecule is followed across the boundary.
+// whole; no cell crosses it; no bubbles form. One oxygen molecule is followed across the boundary. Labels: gas side,
+// membrane, blood side, O2.
 (() => {
 const { W, H } = PIX;
 const clamp = U.clamp, lerp = U.lerp, hh = U.hash, R = n => window.RAMP[n];
@@ -37,7 +38,7 @@ window.membraneView = (c, cam, T, lt, o = {}) => {
     MICRO.o2(c, px, py, 3.3 * z, (hh(k, 23) - 0.5) * 4 + jy * 2, { a });
   }
 };
-SC['s11_diffuse'] = {
+SC['s14_diffuse'] = {
   xin: 0.5,
   draw(c, t, S) {
     const [tx, ty] = window.trackO2(t), cam = { x: lerp(-30, 60, MO.sineInOut(clamp((t - 0.6) / 3.2))), y: 10, z: lerp(0.7, 1.1, MO.cubicOut(clamp(t / 0.9))) };
@@ -45,8 +46,13 @@ SC['s11_diffuse'] = {
     const [px, py] = K.S(cam, tx, ty);
     MICRO.o2(c, px, py, 3.6 * cam.z, -0.5, { ramp: ['ox1', 'ox2', 'ox3', 'ox4', 'ox5'] });
     MICRO.tag(c, px, py, 8 * cam.z, S.t, 'ox5');
-    CAP.ctx(c, t, { text: 'Oxygen diffuses in', t0: 0.3, t1: 3.7, acc: 'ox4' });
+    const [mx0] = K.S(cam, -14, 0), [mx1] = K.S(cam, 14, 0);
+    CAP.part(c, t, { text: 'GAS SIDE', ax: null, x: Math.max(6, mx0 - 70), y: 96, t0: 0.6, t1: 3.85, col: 'ox4' });
+    CAP.part(c, t, { text: 'BLOOD SIDE', ax: null, x: Math.min(W - 64, mx1 + 14), y: 96, t0: 0.85, t1: 3.85, col: 'rc5' });
+    CAP.part(c, t, { text: 'MEMBRANE', ax: (mx0 + mx1) / 2, ay: 410, x: (mx0 + mx1) / 2 + 18, y: 430, t0: 1.1, t1: 3.85, col: 'iv5', lineCol: 'iv3' });
+    CAP.part(c, t, { text: 'O₂', ax: px, ay: py - 9 * cam.z, x: px, y: py - 34 * cam.z, t0: 1.4, t1: 3.85, col: 'ox5', lineCol: 'ox3', align: 'center', dot: false });
+    CAP.scene(c, t, { title: 'OXYGEN DIFFUSES IN', ctx: 'More crosses in than out.', t0: 0.3, t1: 3.92, acc: 'ox4' });
   },
-  cues: [[0.0, 'scale_in', 0.8, 0], [0.4, 'granular', 0.6, -0.4, 3.4], [1.4, 'cross', 0.7, 0], [2.5, 'cross_out', 0.6, 0.3]],
+  cues: [[0.0, 'scale_in', 0.8, 0], [0.4, 'granular', 0.6, -0.4, 3.4], [0.6, 'label', 0.3, -0.5], [0.85, 'label', 0.3, 0.5], [1.1, 'label', 0.3, 0], [1.4, 'cross', 0.7, 0], [2.5, 'cross_out', 0.6, 0.3]],
 };
 })();

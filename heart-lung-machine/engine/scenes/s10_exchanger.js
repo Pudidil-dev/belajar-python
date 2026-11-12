@@ -1,13 +1,13 @@
-// S08 TEMPERATURE CONTROL (19–22 s): a simplified cutaway of the heat exchanger at the bottom of the assembly. Blood (the
-// lower channel) and temperature-control water (the upper channel, blue outline) flow past each other in separate channels
+// S10 THE HEAT EXCHANGER (32–35 s): a simplified cutaway of the heat exchanger at the bottom of the oxygenator. Blood (the
+// lower channel) and the heater–cooler's water (the upper channel, blue outline) flow past each other in separate channels
 // divided by a solid wall. A few small heat arrows cross the wall; the liquids never mix. The camera moves sideways along
-// the two channels. A small inset shows where this is: the bottom band of the assembly.
+// the two channels. A small inset shows where this is: the bottom band of the oxygenator. Labels: water, wall, blood, heat.
 (() => {
 const { W, H } = PIX;
 const clamp = U.clamp, lerp = U.lerp, R = n => window.RAMP[n];
 const Y = { w0: 196, w1: 256, wall0: 256, wall1: 272, b0: 272, b1: 352 };      // screen rows of the water, the wall, the blood
 window.hxView = (c, T, pan, k = 1) => {
-  PIX.rect(c, 0, 0, W, H, 'n0'); PIX.glow(c, 135, 280, 260, 'n2', 0.8);
+  PIX.rect(c, 0, 0, W, H, 'k');
   const off = -pan;
   // water channel: a dark blue body, a clear wall drawn as a blue outline, water flowing to the left
   LIT.shape(c, ctx => { ctx.fillRect(0, Y.w0, W, Y.w1 - Y.w0); }, [0, Y.w0 - 2, W, Y.w1 + 2], ['n1', 'n2', 'wa0', 'wa1'], { cylX: false, amb: 0.3, dif: 0.4, edge: false, flat: 0.6 });
@@ -42,13 +42,17 @@ window.hxInset = (c, a = 1) => {
   PIX.rect(c, cx - r + 2, top + hh - 18, 2 * r - 4, 14, 'wa3'); PIX.rect(c, cx - r + 2, top + hh - 18, 2 * r - 4, 1, 'wa4');
   c.restore();
 };
-SC['s08_temp'] = {
+SC['s10_exchanger'] = {
   xin: 0.4,
   draw(c, t, S) {
     window.hxView(c, S.t, 70 * MO.sineInOut(clamp(t / 3)), MO.smooth(clamp((t - 0.5) / 0.5)));
     window.hxInset(c, MO.smooth(clamp((t - 0.6) / 0.4)));
-    CAP.ctx(c, t, { text: 'Temperature control', t0: 0.4, t1: 2.7, acc: 'wa4' });
+    CAP.part(c, t, { text: 'WATER', ax: 150, ay: 222, x: 176, y: 172, t0: 0.7, t1: 2.85, col: 'wa4', lineCol: 'wa3' });
+    CAP.part(c, t, { text: 'SOLID WALL', ax: 96, ay: 264, x: 24, y: 166, t0: 1.0, t1: 2.85, col: 'g8' });
+    CAP.part(c, t, { text: 'BLOOD', ax: 120, ay: 330, x: 64, y: 372, t0: 1.3, t1: 2.85, col: 'vb5', lineCol: 'vb4' });
+    CAP.part(c, t, { text: 'HEAT', ax: null, x: 214, y: 284, t0: 1.6, t1: 2.85, col: 'ft4' });
+    CAP.scene(c, t, { title: 'HEAT EXCHANGER', ctx: 'Heat crosses. Nothing mixes.', t0: 0.4, t1: 2.92, acc: 'wa4' });
   },
-  cues: [[0.0, 'water_flow', 0.6, 0.4, 3.0], [0.6, 'heat_glide', 0.7, 0, 1.2], [1.6, 'heat_glide', 0.5, 0, 1.0]],
+  cues: [[0.0, 'water_flow', 0.6, 0.4, 3.0], [0.6, 'heat_glide', 0.7, 0, 1.2], [0.7, 'label', 0.3, 0.4], [1.0, 'label', 0.3, -0.4], [1.3, 'label', 0.3, -0.2], [1.6, 'heat_glide', 0.5, 0, 1.0]],
 };
 })();

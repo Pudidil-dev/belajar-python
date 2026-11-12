@@ -1,6 +1,7 @@
-// WORLD — the one locked layout of the film (the operating table at the top, the heart–lung machine below it), its tube
-// routes, the blood flow along them, and the macro camera track. World units: at z = 1 one unit is one art pixel of the
-// opening frame (270×480); y runs down. The heart is at the origin.
+// WORLD — the operating field seen from above (the surgeon's view of the opening and the closing): the draped table, the
+// arrested heart, the tubes leaving it toward the machine, and the camera track of S01–S03. The machine itself is shown
+// from the side (SIDE, MACHINE). World units: at z = 1 one unit is one art pixel of the opening frame (270×480); y runs
+// down. The heart is at the origin. The routes still run on to where the machine would be, off the table.
 //   venous side   RA cannula → venous line down the viewer's left → the reservoir (below the patient: gravity drainage)
 //   machine       reservoir → centrifugal pump → integrated heat exchanger / oxygenator / arterial filter (left to right)
 //   arterial side oxygenator outlet → bubble detector → arterial line up the viewer's right → cannula in the distal
@@ -75,20 +76,11 @@ WORLD.track = T => {
   if (!TR) TR = K.camTrack([
     [0.0, 0, 2, 1], [2.0, 0, 2, 1.06],                         // S01: a very small forward move
     [3.6, -60, 40, 1.5], [4.0, -64, 44, 1.5],                  // S02: shift toward the venous tube, the heart still in frame
-    [5.0, -92, 360, 0.9], [6.0, -88, 680, 1.15],               // S03: track down the venous line to the machine
-    [7.6, -40, 780, 0.8], [9.0, -36, 780, 0.78],               // S04: pull back into the three-quarter overview
-    [10.0, -50, 420, 0.42], [12.0, -56, 520, 0.42],            // S05: the body-to-circuit diagram (venous side)
-    [13.3, -79, 764, 3.0], [15.0, -79, 780, 3.0],              // S06: into the reservoir
-    [15.9, -36, 858, 3.6], [19.0, -36, 858, 3.6],              // S07: the pump (hold)
-    [22.0, 40, 800, 2.6], [23.6, 42, 790, 3.4], [25.0, 42, 784, 14],   // S09: the oxygenator, then a push to one fibre
-    [45.0, 42, 784, 14], [46.0, 46, 762, 3.2],                // S14 end: pull back from the fibre to the assembly outlet
-    [46.9, 46, 760, 3.2], [47.9, 62, 700, 3.0], [49.0, 62, 700, 3.0],   // S15: filter, then the bubble detector
-    [50.2, 96, 330, 0.9], [51.4, -6, -54, 2.4], [52.0, -8, -58, 2.5],   // S16: up the arterial line to the aorta
-    [56.0, -112, 704, 1.25], [59.0, -110, 700, 1.3],          // S18: the perfusionist and the monitor
-    [59.9, 0, 400, 0.4], [62.2, 0, 400, 0.4], [63.0, 40, 240, 0.5],    // S19: the whole circuit, then toward the return line
-    [64.6, 90, 40, 0.75], [67.4, 0, 2, 1.0], [68.0, 0, 2, 1.0]]);       // S20: back up to the opening frame
+    [5.1, -84, 230, 1.12], [6.0, -92, 380, 1.15]]);            // S03: track down the venous line, off the table toward the machine
   return TR(T);
 };
+// the closing move (S25): from the heart, as the view turns back from the side, out to the opening composition
+WORLD.closing = q => K.camLerp({ x: -10, y: -30, z: 1.9 }, WORLD.CAM0, q);
 
 // ---------- drawing the tubes ----------
 // One tube: blood inside clear PVC. The blood is shaded as a cylinder in its ramp (LIT), a pale streak runs along the lit
@@ -131,7 +123,7 @@ WORLD.tube = (c, cam, key, t, o = {}) => {
     LIT.line(c, cam, streak, 'tw4', { alpha: (o.a ?? 1) * 0.9 });
   }
   // flow markers: short dashes of a lighter step, moving at one steady speed
-  const ph = WORLD.phase(t), gap = WORLD.FLOW.gap, dl = gap * 0.32, mc = ramp[Math.min(n - 1, 3)];
+  const ph = WORLD.phase(t), gap = WORLD.FLOW.gap, dl = gap * 0.32, mc = ramp[Math.min(n - 1, 5)];       // two steps above the flat base, so the flow reads
   for (let d = Math.ceil((d0 - ph) / gap) * gap + ph; d < d1; d += gap) {
     if (d < d0) continue;
     if (o.glass && d > o.glass[0] && d < o.glass[1] && (o.glass[2] ?? 0) > 0.5) continue;
@@ -152,13 +144,10 @@ WORLD.ORDER = ['venous', 'resPump', 'pumpOxy', 'arterial'];
 // o: { hand: {l: [dx, dy], r: [dx, dy]}, tubes: {key: {…WORLD.tube options}}, machine: {…}, people: true, heartO: {…} }
 WORLD.scene = (c, cam, T, o = {}) => {
   HEART.field(c, cam, T);
-  if (window.MACHINE) MACHINE.draw(c, cam, T, o.machine || {});
   HEART.draw(c, cam, T, o.heartO || {});
   const to = o.tubes || {};
-  for (const k of ['waterIn', 'waterOut', 'gas', 'exhaust', 'resPump', 'pumpOxy', 'cardio', 'venous', 'arterial']) if (!(to[k] && to[k].hide)) WORLD.tube(c, cam, k, T, to[k] || {});
-  if (window.MACHINE && MACHINE.front) MACHINE.front(c, cam, T, o.machine || {});
+  for (const k of ['cardio', 'venous', 'arterial']) if (!(to[k] && to[k].hide)) WORLD.tube(c, cam, k, T, to[k] || {});
   if (o.people !== false) {
-    PEOPLE.perfusionist(c, cam, o.perf || {});
     PEOPLE.surgeon(c, cam, -1, { hand: (o.hand && o.hand.l) || [0, 0] });
     PEOPLE.surgeon(c, cam, 1, { hand: (o.hand && o.hand.r) || [0, 0] });
   }

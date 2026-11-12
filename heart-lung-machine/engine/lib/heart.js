@@ -41,8 +41,7 @@ HEART.CLAMP_Y = -46; HEART.CARDIO = [-6, -30];
 HEART.field = (c, cam, t = 0) => {
   const S = (x, y) => K.S(cam, x, y), Wn = WORLD.LY.window, T = WORLD.LY.table;
   // the floor and the pool of operating light
-  PIX.rect(c, 0, 0, W, H, 'n0');
-  const [lx, ly] = S(0, 60); PIX.glow(c, lx, ly, 420 * cam.z, 'n2', 0.9);
+  PIX.rect(c, 0, 0, W, H, 'k');
   // the table under the drapes: an oblique slab (its far end under the anaesthesia screen), the drapes hanging over its foot
   LIT.block(c, cam, T.x0 - 6, T.y1 - 6, T.x1 - T.x0 + 12, 30, 18, R('dr'), { front: 1, top: 3, side: 0 });
   LIT.shape(c, ctx => { K.cam(ctx, cam); ctx.beginPath(); ctx.roundRect(T.x0, T.y0, T.x1 - T.x0, T.y1 - T.y0, 18 / 1); ctx.fill(); }, LIT.wbox(cam, [T.x0, T.y0, T.x1, T.y1]), R('dr'), { R: 26 * cam.z, amb: 0.3, dif: 0.6, hmul: 0.5 });
