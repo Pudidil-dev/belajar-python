@@ -201,7 +201,7 @@ machine follow (cardioplegia, suction), then the perfusionist, the whole loop, a
 
 ## Creative decisions
 
-- **The machine is the subject.** Fourteen of the twenty-five scenes are about the console and its lines (S04–S12, S18–S19,
+- **The machine is the subject.** Fifteen of the twenty-five scenes are about the console and its lines (S04–S12, S18–S19,
   S21–S24); the molecular sequence keeps its place as the payoff of step 5.
 - **Seen from the side.** The side view shows what the view from above cannot: the height difference that drives venous
   drainage, the order of the parts, and every line's direction. The surgeon's view from above stays for the opening and the

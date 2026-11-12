@@ -2,148 +2,1002 @@
  {
   "scene": "s01_still",
   "kind": "caption",
-  "text": "During heart surgery",
-  "start": 0.2,
-  "end": 2
+  "text": "DURING HEART SURGERY",
+  "start": 0.15,
+  "end": 3.9
+ },
+ {
+  "scene": "s01_still",
+  "kind": "caption",
+  "text": "The heart is stopped,",
+  "start": 0.8,
+  "end": 3.9
+ },
+ {
+  "scene": "s01_still",
+  "kind": "caption",
+  "text": "yet blood keeps moving.",
+  "start": 1.375,
+  "end": 3.9
  },
  {
   "scene": "s02_moving",
-  "kind": "caption",
-  "text": "What keeps blood moving?",
-  "start": 2.3,
+  "kind": "label",
+  "text": "RED BLOOD CELLS",
+  "start": 2.75,
   "end": 4
+ },
+ {
+  "scene": "s02_moving",
+  "kind": "label",
+  "text": "VENOUS LINE",
+  "start": 3.05,
+  "end": 4
+ },
+ {
+  "scene": "s03_follow",
+  "kind": "label",
+  "text": "TO THE MACHINE",
+  "start": 4.35,
+  "end": 6
  },
  {
   "scene": "s04_machine",
   "kind": "caption",
-  "text": "Heart–lung machine",
-  "start": 6.3,
-  "end": 8.95
+  "text": "HEART–LUNG MACHINE",
+  "start": 6.6,
+  "end": 9.9
  },
  {
-  "scene": "s05_drain",
-  "kind": "caption",
-  "text": "Venous drainage",
-  "start": 9.3,
-  "end": 11.95
- },
- {
-  "scene": "s06_reservoir",
-  "kind": "caption",
-  "text": "Reservoir",
-  "start": 13.3,
-  "end": 14.95
- },
- {
-  "scene": "s07_pump",
-  "kind": "caption",
-  "text": "Blood is pumped",
-  "start": 16,
-  "end": 18.95
- },
- {
-  "scene": "s08_temp",
-  "kind": "caption",
-  "text": "Temperature control",
-  "start": 19.4,
-  "end": 21.95
- },
- {
-  "scene": "s09_oxygenator",
-  "kind": "caption",
-  "text": "Oxygenator",
-  "start": 22.5,
-  "end": 24.75
- },
- {
-  "scene": "s10_fiber",
+  "scene": "s04_machine",
   "kind": "label",
-  "text": "Gas",
-  "start": 26.3,
-  "end": 28.95
+  "text": "HEART",
+  "start": 6.75,
+  "end": 10
  },
  {
-  "scene": "s10_fiber",
+  "scene": "s04_machine",
+  "kind": "caption",
+  "text": "Seen from the side.",
+  "start": 7.2,
+  "end": 9.9
+ },
+ {
+  "scene": "s04_machine",
   "kind": "label",
-  "text": "Blood",
-  "start": 26.7,
-  "end": 28.95
+  "text": "VENOUS LINE: OUT",
+  "start": 7.3,
+  "end": 10
  },
  {
-  "scene": "s11_diffuse",
-  "kind": "caption",
-  "text": "Oxygen diffuses in",
-  "start": 29.3,
-  "end": 32.95
+  "scene": "s04_machine",
+  "kind": "label",
+  "text": "MACHINE",
+  "start": 7.9,
+  "end": 10
  },
  {
-  "scene": "s12_rbc",
+  "scene": "s04_machine",
+  "kind": "label",
+  "text": "ARTERIAL LINE: BACK",
+  "start": 8.55,
+  "end": 10
+ },
+ {
+  "scene": "s05_workflow",
   "kind": "caption",
-  "text": "Into the red blood cell",
+  "text": "ONE LOOP, SEVEN STEPS",
+  "start": 10.15,
+  "end": 17.1
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "caption",
+  "text": "Follow one drop of blood.",
+  "start": 10.825,
+  "end": 17.1
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "1 DRAIN",
+  "start": 11.02,
+  "end": 17.4
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "2 COLLECT",
+  "start": 11.97,
+  "end": 17.4
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "3 PUMP",
+  "start": 13.24,
+  "end": 17.4
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "4 WARM/COOL",
+  "start": 14.23,
+  "end": 17.4
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "5 ADD O₂",
+  "start": 14.64,
+  "end": 17.4
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "6 FILTER",
+  "start": 15,
+  "end": 17.4
+ },
+ {
+  "scene": "s05_workflow",
+  "kind": "label",
+  "text": "7 RETURN",
+  "start": 16.05,
+  "end": 17.4
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "caption",
+  "text": "1 · VENOUS DRAINAGE",
+  "start": 18.1,
+  "end": 20.92
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "label",
+  "text": "RIGHT ATRIUM",
+  "start": 18.2,
+  "end": 19.55
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "label",
+  "text": "VENOUS CANNULA",
+  "start": 18.45,
+  "end": 19.65
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "caption",
+  "text": "Gravity pulls it down.",
+  "start": 18.725,
+  "end": 20.92
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "label",
+  "text": "HEART LEVEL",
+  "start": 19,
+  "end": 21
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "label",
+  "text": "RESERVOIR LEVEL",
+  "start": 19.25,
+  "end": 21
+ },
+ {
+  "scene": "s06_drain",
+  "kind": "label",
+  "text": "GRAVITY",
+  "start": 19.5,
+  "end": 21
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "caption",
+  "text": "2 · RESERVOIR",
+  "start": 21.1,
+  "end": 23.92
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "label",
+  "text": "VENOUS INLET",
+  "start": 21.45,
+  "end": 24
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "caption",
+  "text": "A steady buffer of blood.",
+  "start": 21.575,
+  "end": 23.92
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "label",
+  "text": "FROM SUCTION",
+  "start": 21.7,
+  "end": 24
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "label",
+  "text": "FILTER",
+  "start": 21.95,
+  "end": 24
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "label",
+  "text": "BLOOD LEVEL",
+  "start": 22.25,
+  "end": 24
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "label",
+  "text": "LEVEL SENSOR",
+  "start": 22.65,
+  "end": 24
+ },
+ {
+  "scene": "s07_reservoir",
+  "kind": "label",
+  "text": "OUTLET",
+  "start": 23,
+  "end": 24
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "caption",
+  "text": "3 · CENTRIFUGAL PUMP",
+  "start": 24.15,
+  "end": 28.9
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "caption",
+  "text": "A spinning rotor drives flow.",
+  "start": 24.8,
+  "end": 28.9
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "IN",
+  "start": 25,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "INLET",
+  "start": 25,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "ROTOR",
+  "start": 25.5,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "SPIN",
+  "start": 25.8,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "MAGNETS",
+  "start": 26.05,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "MOTOR",
+  "start": 26.4,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "OUT",
+  "start": 26.6,
+  "end": 29
+ },
+ {
+  "scene": "s08_pump",
+  "kind": "label",
+  "text": "OUTLET",
+  "start": 26.75,
+  "end": 29
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "caption",
+  "text": "4 · HEATER–COOLER",
+  "start": 29.1,
+  "end": 31.92
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "caption",
+  "text": "Warm or cool water loop.",
+  "start": 29.675,
+  "end": 31.92
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "label",
+  "text": "HEATER–COOLER",
+  "start": 29.85,
+  "end": 32
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "label",
+  "text": "HEATER",
+  "start": 29.95,
+  "end": 32
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "label",
+  "text": "COOLER",
+  "start": 30.2,
+  "end": 32
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "label",
+  "text": "WATER OUT",
+  "start": 30.6,
+  "end": 32
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "label",
+  "text": "WATER BACK",
+  "start": 30.8,
+  "end": 32
+ },
+ {
+  "scene": "s09_heater",
+  "kind": "label",
+  "text": "HEAT EXCHANGER",
+  "start": 31.05,
+  "end": 32
+ },
+ {
+  "scene": "s10_exchanger",
+  "kind": "caption",
+  "text": "HEAT EXCHANGER",
+  "start": 32.4,
+  "end": 34.92
+ },
+ {
+  "scene": "s10_exchanger",
+  "kind": "label",
+  "text": "WATER",
+  "start": 32.7,
+  "end": 35
+ },
+ {
+  "scene": "s10_exchanger",
+  "kind": "caption",
+  "text": "Heat crosses. Nothing mixes.",
+  "start": 32.9,
+  "end": 34.92
+ },
+ {
+  "scene": "s10_exchanger",
+  "kind": "label",
+  "text": "SOLID WALL",
+  "start": 33,
+  "end": 35
+ },
+ {
+  "scene": "s10_exchanger",
+  "kind": "label",
+  "text": "BLOOD",
   "start": 33.3,
-  "end": 36.95
+  "end": 35
  },
  {
-  "scene": "s13_hemoglobin",
-  "kind": "caption",
-  "text": "Hemoglobin carries oxygen",
-  "start": 37.4,
-  "end": 41.95
+  "scene": "s10_exchanger",
+  "kind": "label",
+  "text": "HEAT",
+  "start": 33.6,
+  "end": 35
  },
  {
-  "scene": "s14_co2",
+  "scene": "s11_gas",
+  "kind": "label",
+  "text": "O₂",
+  "start": 35.35,
+  "end": 38
+ },
+ {
+  "scene": "s11_gas",
   "kind": "caption",
-  "text": "Carbon dioxide leaves",
+  "text": "5 · GAS SUPPLY",
+  "start": 35.4,
+  "end": 37.92
+ },
+ {
+  "scene": "s11_gas",
+  "kind": "label",
+  "text": "AIR",
+  "start": 35.55,
+  "end": 38
+ },
+ {
+  "scene": "s11_gas",
+  "kind": "label",
+  "text": "GAS BLENDER",
+  "start": 35.85,
+  "end": 38
+ },
+ {
+  "scene": "s11_gas",
+  "kind": "caption",
+  "text": "Oxygen and air, mixed.",
+  "start": 35.9,
+  "end": 37.92
+ },
+ {
+  "scene": "s11_gas",
+  "kind": "label",
+  "text": "FLOWMETERS",
+  "start": 36.2,
+  "end": 38
+ },
+ {
+  "scene": "s11_gas",
+  "kind": "label",
+  "text": "SWEEP GAS IN",
+  "start": 36.75,
+  "end": 38
+ },
+ {
+  "scene": "s11_gas",
+  "kind": "label",
+  "text": "EXHAUST",
+  "start": 37.15,
+  "end": 38
+ },
+ {
+  "scene": "s12_oxygenator",
+  "kind": "caption",
+  "text": "OXYGENATOR",
+  "start": 38.1,
+  "end": 40.92
+ },
+ {
+  "scene": "s12_oxygenator",
+  "kind": "label",
+  "text": "BLOOD IN",
+  "start": 38.2,
+  "end": 39.9
+ },
+ {
+  "scene": "s12_oxygenator",
+  "kind": "label",
+  "text": "BLOOD OUT",
+  "start": 38.4,
+  "end": 39.9
+ },
+ {
+  "scene": "s12_oxygenator",
+  "kind": "caption",
+  "text": "Gas inside hollow fibres.",
+  "start": 38.5,
+  "end": 40.92
+ },
+ {
+  "scene": "s12_oxygenator",
+  "kind": "label",
+  "text": "GAS IN",
+  "start": 38.6,
+  "end": 39.9
+ },
+ {
+  "scene": "s12_oxygenator",
+  "kind": "label",
+  "text": "HOLLOW FIBRES",
+  "start": 38.9,
+  "end": 39.9
+ },
+ {
+  "scene": "s13_fiber",
+  "kind": "caption",
+  "text": "ONE HOLLOW FIBRE",
+  "start": 41.4,
+  "end": 44.92
+ },
+ {
+  "scene": "s13_fiber",
+  "kind": "caption",
+  "text": "Gas inside, blood outside.",
+  "start": 41.95,
+  "end": 44.92
+ },
+ {
+  "scene": "s13_fiber",
+  "kind": "label",
+  "text": "GAS",
   "start": 42.3,
-  "end": 45.0
+  "end": 45
  },
  {
-  "scene": "s15_filter",
+  "scene": "s13_fiber",
+  "kind": "label",
+  "text": "BLOOD",
+  "start": 42.6,
+  "end": 45
+ },
+ {
+  "scene": "s13_fiber",
+  "kind": "label",
+  "text": "MEMBRANE",
+  "start": 42.9,
+  "end": 45
+ },
+ {
+  "scene": "s13_fiber",
+  "kind": "label",
+  "text": "O₂",
+  "start": 43.2,
+  "end": 45
+ },
+ {
+  "scene": "s13_fiber",
+  "kind": "label",
+  "text": "RED BLOOD CELL",
+  "start": 43.5,
+  "end": 45
+ },
+ {
+  "scene": "s14_diffuse",
   "kind": "caption",
-  "text": "Filter + monitoring",
-  "start": 46.3,
+  "text": "OXYGEN DIFFUSES IN",
+  "start": 45.3,
+  "end": 48.92
+ },
+ {
+  "scene": "s14_diffuse",
+  "kind": "label",
+  "text": "GAS SIDE",
+  "start": 45.6,
   "end": 49
  },
  {
-  "scene": "s16_aorta",
+  "scene": "s14_diffuse",
+  "kind": "label",
+  "text": "BLOOD SIDE",
+  "start": 45.85,
+  "end": 49
+ },
+ {
+  "scene": "s14_diffuse",
   "kind": "caption",
-  "text": "Back to the body",
+  "text": "More crosses in than out.",
+  "start": 45.9,
+  "end": 48.92
+ },
+ {
+  "scene": "s14_diffuse",
+  "kind": "label",
+  "text": "MEMBRANE",
+  "start": 46.1,
+  "end": 49
+ },
+ {
+  "scene": "s14_diffuse",
+  "kind": "label",
+  "text": "O₂",
+  "start": 46.4,
+  "end": 49
+ },
+ {
+  "scene": "s15_rbc",
+  "kind": "caption",
+  "text": "INTO A RED BLOOD CELL",
   "start": 49.3,
-  "end": 52
+  "end": 52.92
  },
  {
-  "scene": "s17_tissue",
-  "kind": "caption",
-  "text": "Oxygen delivered",
-  "start": 52.6,
-  "end": 55.95
+  "scene": "s15_rbc",
+  "kind": "label",
+  "text": "O₂",
+  "start": 49.4,
+  "end": 50.95
  },
  {
-  "scene": "s18_perfusionist",
-  "kind": "caption",
-  "text": "Continuously monitored",
-  "start": 56.3,
-  "end": 58.95
+  "scene": "s15_rbc",
+  "kind": "label",
+  "text": "RED BLOOD CELL",
+  "start": 49.7,
+  "end": 51.45
  },
  {
-  "scene": "s19_system",
+  "scene": "s15_rbc",
   "kind": "caption",
-  "text": "Pump",
-  "start": 59.75,
-  "end": 62.65
+  "text": "Through its membrane.",
+  "start": 49.975,
+  "end": 52.92
  },
  {
-  "scene": "s19_system",
-  "kind": "caption",
-  "text": "→ Oxygenate",
-  "start": 60.5,
-  "end": 62.65
+  "scene": "s15_rbc",
+  "kind": "label",
+  "text": "HEMOGLOBIN",
+  "start": 51.6,
+  "end": 53
  },
  {
-  "scene": "s19_system",
+  "scene": "s16_hemoglobin",
   "kind": "caption",
-  "text": "→ Return",
-  "start": 61.25,
-  "end": 62.65
+  "text": "HEMOGLOBIN CARRIES OXYGEN",
+  "start": 53.3,
+  "end": 57.92
+ },
+ {
+  "scene": "s16_hemoglobin",
+  "kind": "label",
+  "text": "HEME",
+  "start": 53.75,
+  "end": 55.4
+ },
+ {
+  "scene": "s16_hemoglobin",
+  "kind": "caption",
+  "text": "O₂ binds to iron in heme.",
+  "start": 54.075,
+  "end": 57.92
+ },
+ {
+  "scene": "s16_hemoglobin",
+  "kind": "label",
+  "text": "IRON (Fe)",
+  "start": 54.15,
+  "end": 55.4
+ },
+ {
+  "scene": "s16_hemoglobin",
+  "kind": "label",
+  "text": "O₂ BOUND",
+  "start": 54.3,
+  "end": 55.4
+ },
+ {
+  "scene": "s16_hemoglobin",
+  "kind": "label",
+  "text": "HEMOGLOBIN",
+  "start": 56,
+  "end": 58
+ },
+ {
+  "scene": "s16_hemoglobin",
+  "kind": "label",
+  "text": "4 HEMES, 4 SEATS FOR O₂",
+  "start": 56.4,
+  "end": 58
+ },
+ {
+  "scene": "s17_co2",
+  "kind": "caption",
+  "text": "CARBON DIOXIDE LEAVES",
+  "start": 58.3,
+  "end": 60.75
+ },
+ {
+  "scene": "s17_co2",
+  "kind": "label",
+  "text": "CO₂",
+  "start": 58.4,
+  "end": 60.5
+ },
+ {
+  "scene": "s17_co2",
+  "kind": "caption",
+  "text": "Swept away with the gas.",
+  "start": 58.975,
+  "end": 60.75
+ },
+ {
+  "scene": "s17_co2",
+  "kind": "label",
+  "text": "SWEEP GAS",
+  "start": 59,
+  "end": 60.85
+ },
+ {
+  "scene": "s18_filter",
+  "kind": "caption",
+  "text": "6 · FILTER + BUBBLE DETECTOR",
+  "start": 62.1,
+  "end": 64.92
+ },
+ {
+  "scene": "s18_filter",
+  "kind": "label",
+  "text": "ARTERIAL FILTER",
+  "start": 62.35,
+  "end": 65
+ },
+ {
+  "scene": "s18_filter",
+  "kind": "label",
+  "text": "CATCHES DEBRIS",
+  "start": 62.75,
+  "end": 64.15
+ },
+ {
+  "scene": "s18_filter",
+  "kind": "caption",
+  "text": "Debris caught; air watched.",
+  "start": 62.95,
+  "end": 64.92
+ },
+ {
+  "scene": "s18_filter",
+  "kind": "label",
+  "text": "BUBBLE DETECTOR",
+  "start": 63.8,
+  "end": 65
+ },
+ {
+  "scene": "s18_filter",
+  "kind": "label",
+  "text": "WATCHES FOR AIR",
+  "start": 64.1,
+  "end": 65
+ },
+ {
+  "scene": "s19_return",
+  "kind": "caption",
+  "text": "7 · BACK TO THE BODY",
+  "start": 65.1,
+  "end": 67.92
+ },
+ {
+  "scene": "s19_return",
+  "kind": "label",
+  "text": "ARTERIAL LINE",
+  "start": 65.3,
+  "end": 66.75
+ },
+ {
+  "scene": "s19_return",
+  "kind": "caption",
+  "text": "Into the aorta.",
+  "start": 65.75,
+  "end": 67.92
+ },
+ {
+  "scene": "s19_return",
+  "kind": "label",
+  "text": "AORTA",
+  "start": 67,
+  "end": 68
+ },
+ {
+  "scene": "s19_return",
+  "kind": "label",
+  "text": "TO THE BODY",
+  "start": 67.25,
+  "end": 68
+ },
+ {
+  "scene": "s19_return",
+  "kind": "label",
+  "text": "CROSS-CLAMP",
+  "start": 67.35,
+  "end": 68
+ },
+ {
+  "scene": "s20_tissue",
+  "kind": "caption",
+  "text": "OXYGEN DELIVERED",
+  "start": 68.5,
+  "end": 71.92
+ },
+ {
+  "scene": "s20_tissue",
+  "kind": "label",
+  "text": "CAPILLARY WALL",
+  "start": 68.7,
+  "end": 72
+ },
+ {
+  "scene": "s20_tissue",
+  "kind": "caption",
+  "text": "From blood into tissue.",
+  "start": 69.05,
+  "end": 71.92
+ },
+ {
+  "scene": "s20_tissue",
+  "kind": "label",
+  "text": "TISSUE CELLS",
+  "start": 69.2,
+  "end": 72
+ },
+ {
+  "scene": "s20_tissue",
+  "kind": "label",
+  "text": "O₂ LEAVES THE BLOOD",
+  "start": 69.7,
+  "end": 72
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "label",
+  "text": "ROLLER PUMP",
+  "start": 72.25,
+  "end": 73.65
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "caption",
+  "text": "CARDIOPLEGIA",
+  "start": 72.5,
+  "end": 75.92
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "label",
+  "text": "COLD SOLUTION",
+  "start": 72.5,
+  "end": 73.65
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "caption",
+  "text": "Cold solution keeps it still.",
+  "start": 72.95,
+  "end": 75.92
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "label",
+  "text": "CROSS-CLAMP",
+  "start": 74.55,
+  "end": 76
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "label",
+  "text": "AORTIC ROOT",
+  "start": 74.75,
+  "end": 76
+ },
+ {
+  "scene": "s21_cardioplegia",
+  "kind": "label",
+  "text": "CORONARY ARTERIES",
+  "start": 75,
+  "end": 76
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "label",
+  "text": "SPILLED BLOOD",
+  "start": 76.2,
+  "end": 77.35
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "caption",
+  "text": "SUCTION",
+  "start": 76.2,
+  "end": 79.92
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "label",
+  "text": "SUCKER",
+  "start": 76.4,
+  "end": 77.35
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "caption",
+  "text": "Spilled blood is saved.",
+  "start": 76.525,
+  "end": 79.92
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "label",
+  "text": "ROLLER PUMP",
+  "start": 77.95,
+  "end": 80
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "label",
+  "text": "ROLLERS SQUEEZE",
+  "start": 78.3,
+  "end": 80
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "label",
+  "text": "THE TUBE",
+  "start": 78.45,
+  "end": 80
+ },
+ {
+  "scene": "s22_suction",
+  "kind": "label",
+  "text": "BACK TO RESERVOIR",
+  "start": 78.9,
+  "end": 80
+ },
+ {
+  "scene": "s23_perfusionist",
+  "kind": "caption",
+  "text": "PERFUSIONIST",
+  "start": 80.2,
+  "end": 82.92
+ },
+ {
+  "scene": "s23_perfusionist",
+  "kind": "label",
+  "text": "MONITOR",
+  "start": 80.3,
+  "end": 83
+ },
+ {
+  "scene": "s23_perfusionist",
+  "kind": "caption",
+  "text": "Watches every reading.",
+  "start": 80.65,
+  "end": 82.92
+ },
+ {
+  "scene": "s24_system",
+  "kind": "caption",
+  "text": "THE WHOLE LOOP",
+  "start": 83.15,
+  "end": 86.9
+ },
+ {
+  "scene": "s24_system",
+  "kind": "label",
+  "text": "PUMP",
+  "start": 84,
+  "end": 86.8
+ },
+ {
+  "scene": "s24_system",
+  "kind": "label",
+  "text": "OXYGENATE",
+  "start": 84.75,
+  "end": 87
+ },
+ {
+  "scene": "s24_system",
+  "kind": "label",
+  "text": "OXYGENATOR",
+  "start": 84.75,
+  "end": 86.8
+ },
+ {
+  "scene": "s24_system",
+  "kind": "label",
+  "text": "RETURN",
+  "start": 85.5,
+  "end": 86.8
  }
 ]
