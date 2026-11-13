@@ -2,7 +2,7 @@
 
 The hook stage sits 440 px above the machine, so the camera tilts down to the centrifuge and back up for the reveal (the
 wall's crosses scroll with it). After the spin-up a line of light cuts the casing and the film moves to the cutaway
-(engine/cutaway.py), where the camera tracks our tube in its bucket, rolls with it and dives in. An iris joins the
+(engine/cutaway.py), where the camera tracks our tube in its angled hole, rolls with it and dives in. An iris joins the
 cutaway and the inside-the-tube view both ways. Zooms and rolls are done on the big pixels at output resolution.
 """
 import math

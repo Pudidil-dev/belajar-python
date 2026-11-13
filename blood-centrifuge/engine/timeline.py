@@ -18,8 +18,8 @@ TWIN_POP = 0.5             # the separated twin pops in ("TWO LAYERS.")
 TWIN_POOF = 1.0            # ... and vanishes; the red tube slides to the centre
 SLIDE = (1.0, 1.5)
 # ---- scene 2: into the machine
-FLY = (1.5, 2.1)           # machine rises into frame, tube shrinks toward the front bucket
-INSERT = (2.1, 2.5)        # tube drops into the bucket
+FLY = (1.5, 2.1)           # machine rises into frame, tube shrinks toward the front hole
+INSERT = (2.1, 2.5)        # tube drops into the hole
 CLINK = 2.5
 LID_CLOSE = (2.75, 3.0)
 THUNK = 3.0
@@ -43,7 +43,7 @@ SEP = (11.0, 16.75)
 IRIS_OUT = (17.75, 18.0)
 # ---- scene 7: back out in the cutaway while it brakes; the casing closes
 PULL = (18.0, 18.75)
-SLOW = (18.0, 20.0)        # the rotor stops at 20.0, buckets hang down again
+SLOW = (18.0, 20.0)        # the rotor stops at 20.0
 CLOSE = (20.0, 20.5)       # casing halves come back together
 STOP = 20.5                # clunk; outside view, LCD "End"
 DONE_BEEPS = (20.625, 20.75, 20.875)
@@ -144,7 +144,7 @@ _REV = np.concatenate([[0], np.cumsum((_W[1:] + _W[:-1]) * 0.5 * np.diff(_TS))])
 
 
 def rotor_angle(t):
-    """Outside-view rotor angle (rad): turns from SPIN0 until the casing is cut; at rest (front bucket forward) after."""
+    """Outside-view rotor angle (rad): turns from SPIN0 until the casing is cut; at rest (front hole forward) after."""
     if t >= STOP:
         return 0.0
     return 2 * math.pi * (float(np.interp(t, _TS, _REV)) % 1.0)
@@ -174,7 +174,7 @@ _RC = np.concatenate([[0], np.cumsum((_WC[1:] + _WC[:-1]) * 0.5 * np.diff(_TC))]
 _REV_DIVE = float(np.interp(IRIS_IN[0], _TC, _RC))
 _REV_PULL = float(np.interp(PULL[0], _TC, _RC))
 _REV_STOP = float(np.interp(SLOW[1], _TC, _RC))
-# bucket 0 (our tube) sits at phi = theta + pi/2. At the dive and at the pull-out it must be on the left (phi = pi);
+# hole 0 (our tube) sits at phi = theta + pi/2. At the dive and at the pull-out it must be on the left (phi = pi);
 # when the rotor stops it must be at the front (phi = pi/2). The brake's turn count is nudged to make both true.
 _BRAKE_REV = _REV_STOP - _REV_PULL
 _BRAKE_TARGET = max(0.75, round(_BRAKE_REV - 0.75) + 0.75)         # nearest count that ends at the front
@@ -182,7 +182,7 @@ _BRAKE_SCALE = _BRAKE_TARGET / _BRAKE_REV
 
 
 def cut_angle(t):
-    """Cutaway rotor angle theta (rad); bucket k sits at phi = theta + k*pi/2 + pi/2."""
+    """Cutaway rotor angle theta (rad); hole 0 (our tube) sits at phi = theta + pi/2."""
     if t < PULL[0]:
         rev = float(np.interp(t, _TC, _RC)) - _REV_DIVE + 0.25       # phi_0 = pi at the dive
     else:
