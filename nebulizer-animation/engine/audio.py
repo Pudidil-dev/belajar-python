@@ -286,8 +286,27 @@ def mesh_buzz():
     return (buzz * gate + whine) * vis
 
 
-def sfx():
+def ui_sounds(bus, lang):
+    """The explanation layer: soft dialog blips while a caption types, a two-note chime when a box opens, a tick
+    when a part tag pops in. Kept quiet and high so they sit above the music without masking it."""
+    from . import explain
+    k = 0
+    for t, kind in explain.typing_events(lang):
+        if kind == 'type':
+            f = (1046.5, 1174.7, 1318.5, 1174.7)[k % 4]
+            bus.put(S.blip(f, f * 0.94, 0.016, 0.5), t, 0.045, 0.15)
+            k += 1
+        elif kind == 'open':
+            bus.put(S.blip(1568.0, 1568.0, 0.03, 0.25), t, 0.05, -0.2)
+            bus.put(S.blip(2093.0, 2093.0, 0.05, 0.25), t + 0.045, 0.05, 0.2)
+        else:
+            bus.put(S.blip(2637.0, 1760.0, 0.022, 0.5), t, 0.06, 0.3)
+
+
+def sfx(info=True, lang='en'):
     bus = Loop()
+    if info:
+        ui_sounds(bus, lang)
     # ---- the patient breathing in (19.2 -> 20.8, across the loop) and the mist hiss in the mask
     bus.put(breath(1.6, 700, 1900, 1, 1.3), 19.2, 0.34, 0.15)
     bus.put(breath(1.6, 4200, 7200, 2, 1.6), 19.2, 0.12, 0.2)          # the light "fsssh" of the inhale
@@ -350,14 +369,14 @@ def master(mus, fx, target=-14.0):
     return mix
 
 
-def render(out_dir, log=print):
+def render(out_dir, log=print, info=True, lang='en'):
     from pathlib import Path
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     log('audio: score ...')
     mus = music()
     log('audio: effects ...')
-    fx = sfx()
+    fx = sfx(info, lang)
     mix = master(mus, fx)
     g = 10 ** ((-16.0 - S.lufs(mus)) / 20)
     S.write_wav(out / 'music.wav', np.clip(mus * g, -1, 1))

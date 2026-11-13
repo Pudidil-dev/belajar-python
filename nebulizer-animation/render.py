@@ -7,6 +7,8 @@
     python render.py --sheet 0:20:1       # one contact sheet (canvas size) -> output/sheet.png
     python render.py --from 8 --to 15     # just a slice
     python render.py --audio-only         # only the soundtrack (music.wav, sfx.wav, mix.wav)
+    python render.py --lang id            # on-screen explanations in Bahasa Indonesia
+    python render.py --clean              # the minimal cut: no captions, tags or HUD
 
 Needs Python 3.9+, numpy, Pillow and ffmpeg (on PATH, or `pip install imageio-ffmpeg` and it is found automatically).
 Every frame is drawn on a 270x480 pixel canvas and scaled exactly 4x (nearest neighbour) to 1080x1920.
@@ -37,12 +39,12 @@ def find_ffmpeg():
         sys.exit('ffmpeg not found. Install it (https://ffmpeg.org) or run: pip install imageio-ffmpeg')
 
 
-_FPS, _SCALE, _LABEL = 30, 4, True
+_FPS, _SCALE, _LABEL, _INFO, _LANG = 30, 4, True, True, 'en'
 
 
-def _init(fps, scale, label):
-    global _FPS, _SCALE, _LABEL
-    _FPS, _SCALE, _LABEL = fps, scale, label
+def _init(fps, scale, label, info=True, lang='en'):
+    global _FPS, _SCALE, _LABEL, _INFO, _LANG
+    _FPS, _SCALE, _LABEL, _INFO, _LANG = fps, scale, label, info, lang
     from engine import person, mist
     person.grids()
     mist.mask_grid()
@@ -51,7 +53,7 @@ def _init(fps, scale, label):
 
 def _frame(i):
     from engine import scenes
-    return scenes.render(i / _FPS, _FPS, _SCALE, _LABEL).tobytes()
+    return scenes.render(i / _FPS, _FPS, _SCALE, _LABEL, _INFO, _LANG).tobytes()
 
 
 def render_film(a):
@@ -64,7 +66,7 @@ def render_film(a):
     audio = None
     if not a.no_audio:
         from engine import audio as AU
-        audio, info = AU.render(out.parent, log=lambda s: print(s, flush=True))
+        audio, info = AU.render(out.parent, log=lambda s: print(s, flush=True), info=not a.clean, lang=a.lang)
     ff = find_ffmpeg()
     W, H = 270 * a.scale, 480 * a.scale
     n0 = int(round(a.t0 * a.fps))
@@ -85,12 +87,12 @@ def render_film(a):
     st = time.time()
     frames = range(n0, n1)
     if jobs == 1:
-        _init(a.fps, a.scale, not a.no_label)
+        _init(a.fps, a.scale, not a.no_label, not a.clean, a.lang)
         it = map(_frame, frames)
         pool = None
     else:
         ctx = mp.get_context('spawn')
-        pool = ctx.Pool(jobs, initializer=_init, initargs=(a.fps, a.scale, not a.no_label))
+        pool = ctx.Pool(jobs, initializer=_init, initargs=(a.fps, a.scale, not a.no_label, not a.clean, a.lang))
         it = pool.imap(_frame, frames, chunksize=4)
     try:
         for k, buf in enumerate(it):
@@ -111,19 +113,20 @@ def render_film(a):
 def render_stills(a):
     from PIL import Image
     from engine import scenes
-    _init(a.fps, a.scale, not a.no_label)
+    _init(a.fps, a.scale, not a.no_label, not a.clean, a.lang)
     out = Path(a.out) if a.out else ROOT / 'output' / 'stills'
     out.mkdir(parents=True, exist_ok=True)
     for s in a.stills.split(','):
         t = float(s)
-        Image.fromarray(scenes.render(t, a.fps, a.scale, not a.no_label)).save(out / f'frame_{t:06.2f}s.png')
+        im = scenes.render(t, a.fps, a.scale, not a.no_label, not a.clean, a.lang)
+        Image.fromarray(im).save(out / f'frame_{t:06.2f}s.png')
     print('stills ->', out)
 
 
 def render_sheet(a):
     from PIL import Image, ImageDraw
     from engine import scenes
-    _init(a.fps, 1, not a.no_label)
+    _init(a.fps, 1, not a.no_label, not a.clean, a.lang)
     if ':' in a.sheet:
         s0, s1, step = map(float, a.sheet.split(':'))
         ts, v = [], s0
@@ -132,7 +135,7 @@ def render_sheet(a):
             v += step
     else:
         ts = [float(x) for x in a.sheet.split(',')]
-    ims = [scenes.render_canvas(t, a.fps, not a.no_label) for t in ts]
+    ims = [scenes.render_canvas(t, a.fps, not a.no_label, not a.clean, a.lang) for t in ts]
     cols = min(a.cols, len(ims))
     rows = (len(ims) + cols - 1) // cols
     w, h, pad = 270, 480, 14
@@ -160,7 +163,11 @@ def main():
     ap.add_argument('--preset', default='medium')
     ap.add_argument('--preview', action='store_true', help='quick half-size MP4 -> output/preview.mp4')
     ap.add_argument('--no-audio', action='store_true')
-    ap.add_argument('--no-label', action='store_true', help='leave out the tiny VIBRATING MESH tag')
+    ap.add_argument('--lang', choices=('en', 'id'), default='en',
+                    help='language of the on-screen explanations: en (English) or id (Bahasa Indonesia)')
+    ap.add_argument('--clean', action='store_true',
+                    help='no explanations: no captions, part tags or zoom/scale HUD (the minimal cut)')
+    ap.add_argument('--no-label', action='store_true', help='with --clean: also leave out the VIBRATING MESH tag')
     ap.add_argument('--audio-only', action='store_true')
     ap.add_argument('--stills')
     ap.add_argument('--sheet')
@@ -168,7 +175,7 @@ def main():
     a = ap.parse_args()
     if a.audio_only:
         from engine import audio as AU
-        AU.render(Path(a.out) if a.out else ROOT / 'output', log=print)
+        AU.render(Path(a.out) if a.out else ROOT / 'output', log=print, info=not a.clean, lang=a.lang)
     elif a.stills:
         render_stills(a)
     elif a.sheet:

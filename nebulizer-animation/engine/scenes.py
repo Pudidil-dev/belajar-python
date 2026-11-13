@@ -10,7 +10,7 @@ import numpy as np
 from . import gfx, palette as P
 from . import timeline as T
 from .view import View, put, tones, mix, sd_circle
-from . import person, device, mist, micro, fx
+from . import person, device, mist, micro, fx, explain
 
 W, H = gfx.W, gfx.H
 _JJ, _II = np.mgrid[0:H, 0:W]
@@ -94,7 +94,9 @@ def rim_ring(buf, cx, cy, rx, ry):
     put(buf, (0, 0, W, H), (k >= 1.0 + thick - 1.2 / min(rx, ry)) & ring, P.GR[1])
 
 
-def render_canvas(t, fps=30, label=True):
+def render_canvas(t, fps=30, label=True, info=True, lang='en'):
+    """One frame on the 270x480 canvas. info=True adds the explanation layer (captions, part tags, HUD); with
+    info=False the film is the clean version (only the tiny VIBRATING MESH tag, unless label=False)."""
     t = t % T.TOTAL
     cx, cy, z = T.camera(t)
     view = View(cx, cy, z)
@@ -114,10 +116,12 @@ def render_canvas(t, fps=30, label=True):
         rim_ring(out, pcx, pcy, rx, ry)
     if hero:
         fx.hero_droplet(out, view, t)
-    if label:
+    if info:
+        explain.draw(out, view, t, lang)
+    elif label:
         fx.mesh_label(out, view, t)
     return out
 
 
-def render(t, fps=30, scale=gfx.SCALE, label=True):
-    return gfx.upscale(render_canvas(t, fps, label), scale)
+def render(t, fps=30, scale=gfx.SCALE, label=True, info=True, lang='en'):
+    return gfx.upscale(render_canvas(t, fps, label, info, lang), scale)
