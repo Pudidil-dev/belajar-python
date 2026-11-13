@@ -18,8 +18,8 @@ LID_R, LID_T = 72, 7        # lid radius and thickness
 WIN_R = 52                  # lid window radius
 BOWL_R, BOWL_DEPTH = 64, 24
 ROT_R, ROT_DROP, ROT_T = 54, 12, 6
-SLOT_RAD = 38
-N_SLOTS = 4                 # swing-out rotor: four buckets
+SLOT_RAD = 37
+N_SLOTS = 8                 # fixed-angle rotor: eight angled holes
 OPEN_DEG = 100.0            # lid fully open
 EDGE_DEG = math.degrees(math.atan(K))   # lid seen edge-on (~31 deg)
 
@@ -33,7 +33,7 @@ class State:
         self.lid = OPEN_DEG       # lid angle in degrees (0 closed)
         self.theta = 0.0          # rotor angle (rad); slot 0 is at the front when theta = 0 (mod 2 pi)
         self.blur = 0.0           # rotor angle swept during the frame (rad)
-        self.caps = (0, 2)        # occupied buckets: our tube (0) and the balance tube (2)
+        self.caps = (0, 4)        # occupied holes: our tube (0) and the balance tube (4)
         self.hide_front = False   # slot 0's cap is drawn by the tube shader instead
         self.lcd_on = False
         self.lcd = '   0'
@@ -52,7 +52,7 @@ def slot_center(ox, oy, k=0, theta=0.0):
     return ox + SLOT_RAD * math.cos(phi), oy + ROT_DROP + SLOT_RAD * K * math.sin(phi)
 
 
-SLOT_RX, SLOT_RY = 8.0, 4.8          # inner opening of a bucket (seen from above)
+SLOT_RX, SLOT_RY = 7.5, 4.5          # opening of a hole (seen from above)
 
 
 def slot_clip(ox, oy):
@@ -251,42 +251,38 @@ def draw_bowl(buf, ox, oy):
     return opening
 
 
-def draw_rotor(buf, cx, cy, theta, caps=(0, 2), hide_front=False):
-    """Swing-out rotor seen from above: a hub with four arms, each ending in a yoke that holds a bucket."""
-    phis = [theta + k * 2 * math.pi / N_SLOTS + math.pi / 2 for k in range(N_SLOTS)]
-    ends = []
-    for phi in phis:
+def draw_rotor(buf, cx, cy, theta, caps=(0, 4), hide_front=False):
+    """Fixed-angle rotor seen from above: a solid aluminium disc with eight holes bored at an angle (each hole slants
+    down and outward, so its lit wall shows on the hub side and the tube caps lean in)."""
+    side = gfx.ellipse(cx, cy + ROT_T, ROT_R, ROT_R * K)
+    gfx.fill(buf, side, AL[2])
+    gfx.fill(buf, side.bottom_edge(), AL[1])
+    top = gfx.ellipse(cx, cy, ROT_R, ROT_R * K)
+    xs, ys = top.grid()
+    v = 0.66 - 0.22 * (xs - cx) / ROT_R - 0.30 * (ys - cy) / (ROT_R * K)
+    gfx.shade(buf, top, AL[3:9], np.clip(v, 0, 1))
+    gfx.fill(buf, gfx.ring(cx, cy, ROT_R * 0.88, ROT_R * 0.88 * K, 1.0), AL[4])
+    for k in range(N_SLOTS):            # spokes between the holes
+        phi = theta + (k + 0.5) * 2 * math.pi / N_SLOTS + math.pi / 2
         c, s_ = math.cos(phi), math.sin(phi)
-        ends.append((cx + (SLOT_RAD - 9) * c, cy + (SLOT_RAD - 9) * K * s_))
-    for (x1, y1) in ends:                      # arm thickness (underside)
-        gfx.fill(buf, gfx.line(cx, cy + 3, x1, y1 + 3, 7), AL[2])
-    for (x1, y1) in ends:                      # arm tops
-        arm = gfx.line(cx, cy, x1, y1, 7)
-        gfx.fill(buf, arm, AL[5])
-        gfx.fill(buf, arm.top_edge(), AL[7])
-    order = sorted(range(N_SLOTS), key=lambda k: math.sin(phis[k]))
+        gfx.fill(buf, gfx.line(cx + 15 * c, cy + 15 * K * s_, cx + 44 * c, cy + 44 * K * s_), AL[4])
+    order = sorted(range(N_SLOTS), key=lambda k: math.sin(theta + k * 2 * math.pi / N_SLOTS + math.pi / 2))
     for k in order:
-        phi = phis[k]
-        bx, by = cx + SLOT_RAD * math.cos(phi), cy + SLOT_RAD * K * math.sin(phi)
-        tx, ty = -math.sin(phi), K * math.cos(phi)
-        n = math.hypot(tx, ty) or 1.0
-        tx, ty = tx / n * 12.5, ty / n * 12.5
-        gfx.fill(buf, gfx.line(bx - tx, by - ty + 2, bx + tx, by + ty + 2, 3), AL[3])       # yoke
-        gfx.fill(buf, gfx.ellipse(bx, by + 4, SLOT_RX + 1.5, SLOT_RY + 1), AL[2])           # bucket body below rim
-        rim = gfx.ellipse(bx, by, SLOT_RX + 1.5, SLOT_RY + 1)
-        gfx.fill(buf, rim, AL[6])
-        gfx.fill(buf, rim.top_edge(), AL[8])
-        hole = gfx.ellipse(bx, by + 0.5, SLOT_RX, SLOT_RY)
-        gfx.fill(buf, hole, BG[0])
-        gfx.fill(buf, gfx.ellipse(bx, by + 1.5, SLOT_RX - 2, SLOT_RY - 1.6) & hole, BG[1])
-        for sgn in (-1, 1):                                                                 # pivot pins
-            gfx.fill(buf, gfx.rect(bx + sgn * tx - 1, by + sgn * ty + 1, bx + sgn * tx + 1, by + sgn * ty + 3), AL[7])
+        phi = theta + k * 2 * math.pi / N_SLOTS + math.pi / 2
+        ux, uy = math.cos(phi), K * math.sin(phi)            # outward on screen
+        sx, sy = slot_center(cx, cy - ROT_DROP, k, theta)
+        hole = gfx.ellipse(sx, sy, SLOT_RX, SLOT_RY)
+        gfx.fill(buf, hole, AL[4])                                                      # lit bore wall (hub side)
+        gfx.fill(buf, gfx.ellipse(sx + 1.8 * ux, sy + 1.8 * uy + 0.5, SLOT_RX - 0.6, SLOT_RY - 0.4) & hole, BG[0])
+        gfx.fill(buf, gfx.ellipse(sx + 2.6 * ux, sy + 2.6 * uy + 1, SLOT_RX - 2.5, SLOT_RY - 1.8) & hole, BG[1])
+        gfx.fill(buf, hole.bottom_edge(), AL[6])
         if k in caps and not (hide_front and k == 0):
-            gfx.fill(buf, gfx.ellipse(bx, by - 1, 6.2, 3.8), TL[2])
-            capt = gfx.ellipse(bx, by - 3, 6.2, 3.8)
+            qx, qy = sx - 1.6 * ux, sy - 1.6 * uy                                       # cap leans toward the hub
+            gfx.fill(buf, gfx.ellipse(qx, qy - 1, 6.2, 3.8), TL[2])
+            capt = gfx.ellipse(qx, qy - 3, 6.2, 3.8)
             gfx.fill(buf, capt, TL[5])
             gfx.fill(buf, capt.bottom_edge(), TL[4])
-            gfx.fill(buf, gfx.rect(bx - 3, by - 5, bx - 1, by - 4), TL[7])
+            gfx.fill(buf, gfx.rect(qx - 3, qy - 5, qx - 1, qy - 4), TL[7])
     hub_s = gfx.ellipse(cx, cy - 1, 12, 7.2)
     gfx.fill(buf, hub_s, AL[2])
     hub = gfx.ellipse(cx, cy - 4, 12, 7.2)
@@ -294,9 +290,9 @@ def draw_rotor(buf, cx, cy, theta, caps=(0, 2), hide_front=False):
     gfx.shade(buf, hub, AL[4:9], np.clip(0.7 - 0.3 * (xs - cx) / 12 - 0.35 * (ys - cy + 4) / 7.2, 0, 1))
     gfx.fill(buf, gfx.ellipse(cx, cy - 4, 5, 3), AL[2])
     gfx.fill(buf, gfx.ellipse(cx, cy - 5, 2, 1.2), AL[1])
-    # an orientation mark on one arm so slow turns read
-    phi = phis[1]
-    mx, my = cx + 21 * math.cos(phi), cy + 21 * K * math.sin(phi) - 1
+    # a small orientation mark on the rim so slow turns read
+    phi = theta + math.pi / 2 + math.pi
+    mx, my = cx + 49 * math.cos(phi + 0.39), cy + 49 * K * math.sin(phi + 0.39)
     gfx.fill(buf, gfx.ellipse(mx, my, 2.2, 1.4), BL[5])
 
 
@@ -304,12 +300,12 @@ _full_blur = {}
 _scratch = {}
 
 
-def rotor_layer(cx, cy, theta, blur, caps=(0, 2), hide_front=False, tint=None, pal=None, bg=None, key=None):
+def rotor_layer(cx, cy, theta, blur, caps=(0, 4), hide_front=False, tint=None, pal=None, bg=None, key=None):
     """Render the rotor with motion blur over a background canvas `bg`; returns the cropped (rgb, mask, x0, y0).
 
     The mask covers the whole box: the caller clips it to the bowl opening or the lid window."""
-    x0, y0 = int(cx - SLOT_RAD - 14), int(cy - SLOT_RAD * K - 12)
-    x1, y1 = int(cx + SLOT_RAD + 15), int(cy + SLOT_RAD * K + 16)
+    x0, y0 = int(cx - ROT_R - 2), int(cy - ROT_R * K - 10)
+    x1, y1 = int(cx + ROT_R + 3), int(cy + ROT_R * K + ROT_T + 4)
     x0c, y0c, x1c, y1c = max(x0, 0), max(y0, 0), min(x1, gfx.W), min(y1, gfx.H)
     if x1c <= x0c or y1c <= y0c:
         return None

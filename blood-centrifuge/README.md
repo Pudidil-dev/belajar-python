@@ -1,15 +1,22 @@
 # How Blood Centrifuges Separate Blood
 
-A 28-second vertical medical-science short in 16-bit pixel-art game style. A red blood tube goes into a benchtop
-centrifuge and the machine starts to spin. A line of light slices the casing open, and you watch the inside as it runs:
-the motor and its glowing copper windings, the drive shaft, and the swing-out rotor whose buckets fly out level as it
-climbs to 3500 RPM. In bullet time the camera follows our tube and dives into it. The red cells sink and pack at the
-bottom while clear gold plasma opens up above them. Back out, the rotor brakes, the buckets drop, and the casing closes.
-The lid pops, and the tube comes out in two layers: plasma on top, red blood cells below.
+A 30-second looping, vertical medical-science short in 16-bit pixel-art game style.
+1. A red blood tube goes into a benchtop centrifuge with a fixed-angle rotor (eight angled holes), and the machine starts
+   to spin.
+2. A line of light slices the casing open, and you watch the inside as it runs: the motor and its glowing copper
+   windings, the drive shaft, and the rotor with the tubes leaning in its angled holes, climbing to 3500 RPM.
+3. In bullet time the camera follows our tube and dives into it. The red cells sink and pack at the bottom while clear
+   gold plasma opens up above them.
+4. Back out, the rotor brakes and the casing closes. The lid pops, and the tube comes out in two layers: plasma on top,
+   red blood cells below.
+5. Then the tape rewinds: the whole film runs backward until the tube is red again and lands on the first frame, so the
+   video loops seamlessly.
 
 ![storyboard](docs/storyboard.png)
 
-- **Format.** 1080×1920 (9:16, for Shorts / Reels / TikTok), 30 fps (or 60), exactly 28.0 s. H.264 + AAC.
+- **Format.** 1080×1920 (9:16, for Shorts / Reels / TikTok), 30 fps (or 60), exactly 30.0 s. H.264 + AAC.
+- **Loop.** The last frame is the first frame (mean difference ≈ 1/255), and the rewind sound ends on the reversed
+  opening crash, so a looping player shows no seam.
 - **No narration, no subtitles.** The only text is the hook "ONE SPIN. TWO LAYERS." and four small labels (Rotor and
   Motor in the cutaway, Plasma and Red Blood Cells at the end). The machine also has its own display (RPM, End,
   START/STOP/OPEN).
@@ -26,11 +33,11 @@ The lid pops, and the tube comes out in two layers: plasma on top, red blood cel
   - **Machine.** The music tape-stops as the rotor brakes. The beeps and the lid play in silence, then a ♭VI–♭VII–I
     fanfare lands on the reveal.
   - **Effects.** Clink, lid thunk, power beeps, and a rising motor whine with a pulse per turn.
-  - **Cutaway.** A laser cut, then the casing ka-chunks open. Then the motor's coil hum, a clatter as the buckets go
-    level, a bullet-time whoom and the dive.
+  - **Cutaway.** A laser cut, then the casing ka-chunks open. Then the motor's coil hum, a bullet-time whoom and the
+    dive.
   - **Inside the tube.** A splash and bubbles, and soft pentatonic plinks as cells lock into the packed layer.
-  - **Ending.** The buckets clink back down and the casing clunks shut. Then done-beeps, lid pssh, glass shing, reveal
-    chime, label pops and a glint.
+  - **Ending.** The casing clunks shut. Then done-beeps, lid pssh, glass shing, reveal chime, label pops and a glint.
+  - **Rewind.** A tape "chk", then the whole mix played backward at tape speed, with a motor whir and a warble.
   - **Loudness.** The mix is −14 LUFS with true peak below −1 dBTP.
 
 ## Render it yourself
@@ -73,7 +80,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | `python render.py --scale 8` | 2160×3840 (4K vertical); `--scale 2` gives 540×960 for a quick look |
 | `python render.py --from 4 --to 8` | only a slice of the film |
 | `python render.py --stills 0.8,11,22` | full-size PNG frames in `output/stills/` |
-| `python render.py --sheet 0:28:1` | one contact sheet of the whole film in `output/sheet.png` |
+| `python render.py --sheet 0:30:1` | one contact sheet of the whole film in `output/sheet.png` |
 | `python render.py --audio-only` | only the soundtrack (music, effects, mix) |
 | `python render.py --no-audio` | silent video |
 | `python render.py --jobs 2` | fewer CPU cores (the default uses all) |
@@ -85,15 +92,16 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | Time | Picture | Sound |
 |---|---|---|
 | 0–2 | **Hook.** The red tube, "ONE SPIN."; its twin pops in already split gold over red, "TWO LAYERS.", with a little spin arrow between them. The twin poofs; the red tube slides to the centre. | Hook motif, text blips, sparkle chime, poof |
-| 2–4 | The camera tilts down to the centrifuge. The tube flips and drops into the front bucket of the rotor. The round lid slams shut and the panel lights up. | Whoosh, glass clink, lid thunk and latch click, power beeps, START click |
+| 2–4 | The camera tilts down to the centrifuge. The tube flips and drops into the front hole of the rotor. The round lid slams shut and the panel lights up. | Whoosh, glass clink, lid thunk and latch click, power beeps, START click |
 | 4–6 | The rotor starts turning behind the lid window and the LCD climbs. A line of light runs around the casing and cuts it, then the camera pushes in. | Motor whine rising, snare roll and riser, laser cut and sparks |
-| 6–8 | **Cutaway.** The front and the top of the casing fly apart. Inside, the motor's copper windings glow, the armature and the shaft turn, and the swing-out rotor climbs to 3500 RPM; its four buckets swing out level. Labels: Rotor, Motor. | Ka-chunk and split whooshes, the drop, coil hum, bucket clatter, label blips |
+| 6–8 | **Cutaway.** The front and the top of the casing fly apart. Inside, the motor's copper windings glow, the armature and the shaft turn, and the fixed-angle rotor climbs to 3500 RPM. The tubes lean in its angled holes and show through the metal x-ray style. Labels: Rotor, Motor. | Ka-chunk and split whooshes, the drop, coil hum, label blips |
 | 8–10 | Bullet time: the rotor slows to a crawl and gold arrows push toward the tube bottoms. The camera follows our tube, rolls with it and dives in. | Music sinks under a lowpass, deep whoom, then the dive whoosh |
 | 10–14 | Inside the tube: an iris opens on red cells tumbling in the red liquid while speed streaks fly past. Arrows beside the tube show the force toward its bottom, and the cells start to sink. | Splash, sub drop, muffled motor, bubbles, the theme |
 | 14–18 | The cells rain down and lock into a dark packed layer; clear gold plasma opens above them. A thin pale line of white cells settles on top, and a shine sweeps across. | Soft pitched plinks as cells land, "settled" chime |
-| 18–20.5 | Back out to the cutaway: our tube is now gold over red in its bucket. The rotor brakes, the buckets drop back down, and the casing comes back together. | The motor winds down, the music tape-stops with it, buckets clink, casing clunk |
-| 20.5–23.5 | Outside again: the LCD blinks End and the lid springs open. The tube rises out of its bucket, gold over red, and flies up as the machine sinks away. | Three done-beeps, latch clicks, air pssh, glass shing, whoosh |
-| 23.5–28 | Reveal: a sparkle burst, then the labels Plasma and Red Blood Cells. The tube hops and a glint sweeps the glass while the camera eases back, then a 16-step fade. | Reveal chime and the fanfare, label pops, final C major chord |
+| 18–20.5 | Back out to the cutaway: our tube is now gold over red in its hole. The rotor brakes to a stop, and the casing comes back together. | The motor winds down, the music tape-stops with it, casing clunk |
+| 20.5–23.5 | Outside again: the LCD blinks End and the lid springs open. The tube rises out of its hole, gold over red, and flies up as the machine sinks away. | Three done-beeps, latch clicks, air pssh, glass shing, whoosh |
+| 23.5–27 | Reveal: a sparkle burst, then the labels Plasma and Red Blood Cells. The tube hops and a glint sweeps the glass while the camera eases back. | Reveal chime and the fanfare, label pops, final C major chord |
+| 27–30 | **Rewind.** Tape-rewind look (jittering rows, rolling tracking noise, scanlines, a blinking ◀◀). The whole film runs backward: the tube flies back into the machine and its layers mix back into red blood. It returns to the hook and stops on frame 0, so the video loops. | Tape "chk", the mix played backward at tape speed with a motor whir, ending on the reversed opening crash |
 
 **The science.** The tube holds anticoagulated whole blood (a lithium-heparin tube, teal cap). Spinning makes the
 outward pull hundreds of times stronger than gravity, so the denser red blood cells sediment to the bottom of the tube
@@ -104,16 +112,18 @@ the lighter liquid, the yellow plasma (about 55 %), stays above.
 
 - `render.py`: the command line (film, stills, contact sheets, audio only).
 - `engine/`:
-  - `timeline.py`: one timeline for picture and sound (event times, easing, rotor speed, bucket swing and angles).
+  - `timeline.py`: one timeline for picture and sound (event times, easing, rotor speed and angles, rewind curve).
   - `palette.py`, `gfx.py`, `pixfont.py`: the palette, the pixel drawing kit (masks, dithering, camera) and the bitmap fonts.
   - `tube.py`: the blood tube as a per-pixel shader, for any size, angle or separation state.
-  - `machine.py`: the centrifuge, with projected lid, bowl, motion-blurred swing-out rotor, LCD and buttons.
-  - `cutaway.py`: the machine cut open, with hatched section faces, half bowl, swing-out rotor with buckets and tubes,
-    shaft, cut motor with windings and armature, control board, casing pieces, RPM readout, labels and force arrows.
+  - `machine.py`: the centrifuge, with projected lid, bowl, motion-blurred fixed-angle rotor (eight angled holes), LCD
+    and buttons.
+  - `cutaway.py`: the machine cut open, with hatched section faces, half bowl, the fixed-angle rotor with x-ray tubes in
+    their bores, shaft, cut motor with windings and armature, control board, casing pieces, RPM readout, labels and
+    force arrows.
   - `micro.py`: inside the tube, with 3D-lit biconcave red-cell sprites and the sedimentation model.
   - `fx.py`: sparkles, bursts, rays, speed arcs, labels and the iris.
-  - `scenes.py`: what's on screen at each moment, and the camera (push, track, roll, iris).
-  - `audio.py`: the synthesizer, score, sound effects and master (−14 LUFS).
-- `镜头表.md`: the shot list (style lock, palette, 10 shots).
+  - `scenes.py`: what's on screen at each moment, the camera (push, track, roll, iris) and the VHS rewind.
+  - `audio.py`: the synthesizer, score, sound effects, rewind and master (−14 LUFS).
+- `镜头表.md`: the shot list (style lock, palette, 11 shots).
 - `output/交付说明.md`: delivery notes and the quality gate results.
 - `docs/storyboard.png`: one frame from each shot.

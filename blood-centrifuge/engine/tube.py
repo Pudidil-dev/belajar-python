@@ -49,7 +49,8 @@ def layer_mid(which):
     return (PLASMA_END + BUFFY + TLEN - WALL) / 2
 
 
-def draw(buf, cx, cy, s, ang=0.0, sep=0.0, glint=None, clip=None, squash=1.0, label=True, outline=True):
+def draw(buf, cx, cy, s, ang=0.0, sep=0.0, glint=None, clip=None, squash=1.0, label=True, outline=True,
+         ly_min=None, ly_max=None, checker=False):
     """Draw the tube with its axis point ANCHOR at canvas (cx, cy), scale s, rotation ang (radians, clockwise)."""
     if s <= 0.02:
         return gfx.EMPTY
@@ -87,8 +88,19 @@ def draw(buf, cx, cy, s, ang=0.0, sep=0.0, glint=None, clip=None, squash=1.0, la
     inside = glass & (alx < rin)
     wall = glass & ~inside
     sil = cap | glass
+    keep = None
     if clip is not None:
         keep = clip(X + 0 * Y, Y + 0 * X)
+    if ly_min is not None or ly_max is not None or checker:
+        k2 = np.ones_like(sil)
+        if ly_min is not None:
+            k2 &= ly >= ly_min
+        if ly_max is not None:
+            k2 &= ly <= ly_max
+        if checker:                      # x-ray: every other pixel, so what is in front shows through
+            k2 &= ((np.floor(X) + np.floor(Y)) % 2 == 0)
+        keep = k2 if keep is None else (keep & k2)
+    if keep is not None:
         sil &= keep
         cap &= keep
         glass &= keep

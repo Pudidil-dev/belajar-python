@@ -1,8 +1,9 @@
 """One timeline for picture and sound: 120 BPM, a bar is 2 s, every event sits on the 8th-note grid (0.25 s).
 
 Both the renderer and the synthesizer read these times, so a change here moves the picture and its sound together.
-28 s = 14 bars: hook, loading, spin-up, the machine splits open (cutaway: motor, shaft, swing-out rotor), dive into the
-tube, separation, back out to the cutaway while it brakes, the casing closes, stop, lid, reveal.
+30 s = 15 bars: hook, loading, spin-up, the machine splits open (cutaway: motor, shaft, fixed-angle rotor), dive into
+the tube, separation, back out to the cutaway while it brakes, the casing closes, stop, lid, reveal, and a VHS rewind
+that runs the whole film backward and lands on frame 0, so the video loops.
 """
 import math
 import numpy as np
@@ -10,7 +11,7 @@ import numpy as np
 BPM = 120
 BEAT = 60.0 / BPM          # 0.5 s
 BAR = 4 * BEAT             # 2.0 s
-TOTAL = 28.0
+TOTAL = 30.0
 
 # ---- scene 1: hook
 TWIN_POP = 0.5             # the separated twin pops in ("TWO LAYERS.")
@@ -30,7 +31,7 @@ SLICE = (5.5, 5.75)        # a line of light runs around the casing
 SPLIT_PUSH = (5.75, 6.0)   # quick push, flash
 # ---- scene 4: the cutaway (machine split open)
 OPEN = (6.0, 6.5)          # front and top of the casing fly apart
-SWING = (6.5, 8.0)         # motor spins up to 3500 RPM, the buckets swing out
+SWING = (6.5, 8.0)         # in the cutaway the motor spins the rotor up to 3500 RPM
 SPIN_FULL = 8.0
 LABEL_ROTOR = 6.75
 LABEL_MOTOR = 7.25
@@ -58,7 +59,8 @@ LABEL_RBC = 25.0
 # ---- scene 9: final close-up
 GLINT = 26.0
 HOP = 26.0
-OUTRO = (27.5, 28.0)
+# ---- scene 10: rewind to the first frame (loop)
+REWIND = (27.0, 30.0)
 
 OMEGA_MAX = 30.0           # visual rotor speed (rev/s) at full spin in the outside view; the LCD shows 3500 RPM
 
@@ -105,6 +107,12 @@ def lerp(a, b, u):
     return a + (b - a) * u
 
 
+def rewind_source(t):
+    """Film time shown during the rewind: from the start of the rewind back to 0, slow-fast-slow, landing on frame 0."""
+    u = clamp01((t - REWIND[0]) / (REWIND[1] - REWIND[0]))
+    return REWIND[0] * (1 - ease_in_out(u, 2.5))
+
+
 # ---------------------------------------------------------------- the real speed (what the LCD and the motor say)
 def rpm_frac(t):
     """Rotor speed as a fraction of 3500 RPM: a slow start outside, the big climb in the cutaway, the brake."""
@@ -128,12 +136,6 @@ def omega(t):
 
 def rpm(t):
     return int(round(rpm_frac(t) * 3500 / 10.0)) * 10
-
-
-def swing(t):
-    """Bucket swing angle (rad): 0 hanging, pi/2 horizontal. Swing-out buckets fly out early in the climb."""
-    x = clamp01((rpm_frac(t) - 0.2) / 0.55)
-    return math.pi / 2 * smooth(x)
 
 
 _TS = np.linspace(0, TOTAL + 1, 60001)

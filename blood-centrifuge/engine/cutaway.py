@@ -5,8 +5,9 @@ drawn closer. The front half and the top of the casing are cut away, and the cut
 section. What remains:
   - the back wall with vents, a control board and its cable;
   - the steel bowl, cut in half;
-  - the swing-out rotor on its drive shaft: four arms and four buckets that hang down at rest and swing out level as
-    the speed climbs, our tube in one of them, the balance tube opposite;
+  - the fixed-angle rotor on its drive shaft: a solid aluminium rotor with eight holes bored at an angle, the tubes
+    leaning in toward the hub (our tube and the balance tube opposite), drawn x-ray through the metal so the blood
+    shows;
   - the electric motor below, cut in half: copper windings, a spinning armature, bearings, rubber mounts.
 The casing comes apart in two pieces at the start of the scene and closes again at the end.
 """
@@ -20,11 +21,13 @@ KC = 0.5
 CX, CY = 135, 178                  # screen point of the casing's top centre (x = y = z = 0)
 HWc, HDc, FHc = 128, 96, 214       # half width, half depth, height of the casing
 BOWL_R, BOWL_TOP, BOWL_FLOOR = 88, -6, -100
-HUB_Z, HUB_R = -34, 13
-RP, BLEN, BR = 36, 40, 9           # pivot radius, bucket length, bucket radius
+ROTOR_R, ROTOR_TOP, ROTOR_BOT = 72, -28, -54   # fixed-angle rotor: radius, top face, bottom face
+HUB_R, HUB_TOP = 11, -20
+HOLE_R, HOLE_TILT = 52, math.radians(35)       # hole entry radius on the top face, tilt of the bores from vertical
+TUBE_OUT = 20.0                                # px of tube above the top face (cap end)
 MOTOR_R, MOTOR_TOP, MOTOR_BOT = 46, -140, -194
 FLOOR_Z = -205
-TUBE_S = 0.16
+TUBE_S = 0.2
 
 CUT_PAL = np.array(sorted(set(AL + MW + TL + BL + PK + PL + GL + BG)), np.float32)
 
@@ -195,7 +198,7 @@ def draw_motor_live(buf, t, theta, running):
     gfx.shade(buf, arm, AL[1:8], np.clip(v, 0, 1))
     gfx.fill(buf, arm.outline(), BG[0])
     # shaft from the armature up through the bowl floor to the hub
-    sh = gfx.rect(CX - 4, CY - HUB_Z + 6, CX + 4, mt + 8)
+    sh = gfx.rect(CX - 4, CY - ROTOR_BOT - 1, CX + 4, mt + 8)
     xs, ys = sh.grid()
     us = (xs - CX) / 4.0
     vs = 0.3 + 0.6 * np.sqrt(np.clip(1 - us * us, 0, 1)) - 0.2 * us
@@ -206,100 +209,84 @@ def draw_motor_live(buf, t, theta, running):
     gfx.shade(buf, sh, AL[2:9], np.clip(vs, 0, 1))
 
 
-def _bucket(buf, phi, beta, sep, has_tube, pv_only=False):
-    """One arm + yoke + bucket (+ tube) at rotor angle phi and swing beta. Returns screen points (pivot, bottom)."""
-    c, s = math.cos(phi), math.sin(phi)
-    r_hat = np.array([c, s, 0.0])
-    t_hat = np.array([-s, c, 0.0])
-    pv = np.array([RP * c, RP * s, HUB_Z])
-    d = np.array([math.sin(beta) * c, math.sin(beta) * s, -math.cos(beta)])
-    e2 = np.cross(d, t_hat)
-    e2 /= np.linalg.norm(e2)
-    bc = pv + BLEN * d
-    pvs, bcs = P(*pv), P(*bc)
-    if pv_only:
-        return pvs, bcs
-    # arm (underside, then top) from the hub to the yoke
-    h0 = P(*(r_hat * 10 + np.array([0, 0, HUB_Z])))
-    a1 = P(*(r_hat * (RP - 6) + np.array([0, 0, HUB_Z])))
-    gfx.fill(buf, gfx.line(h0[0], h0[1] + 3, a1[0], a1[1] + 3, 6), AL[2])
-    arm = gfx.line(h0[0], h0[1], a1[0], a1[1], 6)
-    gfx.fill(buf, arm, AL[5])
-    gfx.fill(buf, arm.top_edge(), AL[7])
-    # yoke across the tangent, with the pivot pins
-    y1, y2 = P(*(pv - (BR + 3) * t_hat)), P(*(pv + (BR + 3) * t_hat))
-    gfx.fill(buf, gfx.line(y1[0], y1[1], y2[0], y2[1], 3), AL[3])
-    # bucket bottom (closed cup)
-    ps = np.linspace(0, 2 * math.pi, 20, endpoint=False)
-    ring_b = [P(*(bc + (BR - 1) * (math.cos(q) * t_hat + math.sin(q) * e2))) for q in ps]
-    bot = gfx.polygon(ring_b)
-    gfx.fill(buf, bot.dilate(1), BG[0])
-    gfx.fill(buf, bot, AL[3])
-    gfx.fill(buf, bot.top_edge(), AL[5])
-    # the tube inside (cap at the opening, bottom against the cup)
-    if has_tube:
-        cen = pv + (125 * TUBE_S - 2) * d
-        tip = pv + (250 * TUBE_S - 2) * d
-        top = pv - 2 * d
-        a, b = P(*top), P(*tip)
-        vx, vy = b[0] - a[0], b[1] - a[1]
-        f = max(0.25, math.hypot(vx, vy) / (250 * TUBE_S))
-        ang = math.atan2(-vx, vy)
-        cs = P(*cen)
-        tube.draw(buf, cs[0], cs[1], TUBE_S * f ** (1 / 3.0), ang=ang, sep=sep, squash=f ** (2 / 3.0), label=True)
-    # cage rails and the opening ring
-    for q in (0.0, math.pi / 2, math.pi, 1.5 * math.pi):
-        off = BR * (math.cos(q) * t_hat + math.sin(q) * e2)
-        p1, p2 = P(*(pv + off)), P(*(bc + 0.9 * off))
-        front = (math.cos(q) * t_hat + math.sin(q) * e2)[1] > -0.2
-        gfx.fill(buf, gfx.line(p1[0], p1[1], p2[0], p2[1], 2), AL[6] if front else AL[3])
-    ring_o = [P(*(pv + BR * (math.cos(q) * t_hat + math.sin(q) * e2))) for q in ps] + \
-             [P(*(pv + BR * (math.cos(ps[0]) * t_hat + math.sin(ps[0]) * e2)))]
-    gfx.fill(buf, gfx.polyline(ring_o, 2), AL[7])
-    for sgn in (-1, 1):
-        pp = P(*(pv + sgn * (BR + 2) * t_hat))
-        gfx.fill(buf, gfx.rect(pp[0] - 1, pp[1] - 1, pp[0] + 2, pp[1] + 2), AL[8])
-    return pvs, bcs
+def _tube_geom(phi):
+    """3D cap-top, entry and tip points of the tube in the hole at angle phi (the bore slants down and outward)."""
+    c, s_ = math.cos(phi), math.sin(phi)
+    d = np.array([math.sin(HOLE_TILT) * c, math.sin(HOLE_TILT) * s_, -math.cos(HOLE_TILT)])
+    pe = np.array([HOLE_R * c, HOLE_R * s_, ROTOR_TOP])
+    length = 250 * TUBE_S
+    return pe - TUBE_OUT * d, pe, pe + (length - TUBE_OUT) * d, d
 
 
-def draw_rotor(buf, theta, beta, sep):
-    """The whole swing-out rotor at angle theta: back buckets, hub, front buckets."""
-    items = []
-    for k in range(4):
-        phi = theta + k * math.pi / 2 + math.pi / 2
-        items.append((math.sin(phi), k, phi))
-    items.sort()
-    back = [it for it in items if it[0] < 0.05]
-    front = [it for it in items if it[0] >= 0.05]
-    for _, k, phi in back:
-        _bucket(buf, phi, beta, sep, k in (0, 2))
-    # hub (on the shaft)
-    hs = gfx.ellipse(*P(0, 0, HUB_Z - 6), HUB_R, HUB_R * KC)
-    gfx.fill(buf, hs.dilate(1), BG[0])
+def _draw_tube(buf, phi, sep):
+    top, pe, tip, d = _tube_geom(phi)
+    a, b = P(*top), P(*tip)
+    vx, vy = b[0] - a[0], b[1] - a[1]
+    f = max(0.25, math.hypot(vx, vy) / (250 * TUBE_S))
+    ang = math.atan2(-vx, vy)
+    cs = P(*((top + tip) / 2))
+    s_eff, sq = TUBE_S * f ** (1 / 3.0), f ** (2 / 3.0)
+    ly_e = TUBE_OUT / TUBE_S
+    bore = tube.draw(np.zeros_like(buf), cs[0], cs[1], s_eff, ang=ang, sep=sep, squash=sq, ly_min=ly_e, outline=False)
+    gfx.fill(buf, bore.dilate(1), AL[2])
+    gfx.fill(buf, bore, AL[1])
+    tube.draw(buf, cs[0], cs[1], s_eff, ang=ang, sep=sep, squash=sq, ly_min=ly_e, checker=True, outline=False)
+    tube.draw(buf, cs[0], cs[1], s_eff, ang=ang, sep=sep, squash=sq, ly_max=ly_e)
+
+
+def draw_rotor(buf, theta, sep):
+    """The fixed-angle rotor at angle theta: body, angled holes, hub, and the two tubes (x-ray inside the metal)."""
+    xt, yt = P(0, 0, ROTOR_TOP)
+    yb = P(0, 0, ROTOR_BOT)[1]
+    side = gfx.ellipse(CX, yb, ROTOR_R, ROTOR_R * KC) | gfx.rect(CX - ROTOR_R, yt, CX + ROTOR_R, yb)
+    gfx.fill(buf, side.dilate(1), BG[0])
+    xs, ys = side.grid()
+    u = (xs - CX) / ROTOR_R
+    v = 0.25 + 0.55 * np.sqrt(np.clip(1 - u * u, 0, 1)) - 0.18 * u
+    v = np.where(((np.floor(ys) - int(yt)) % 9) == 4, v - 0.18, v)
+    gfx.shade(buf, side, AL[1:7], np.clip(v, 0, 1))
+    top = gfx.ellipse(xt, yt, ROTOR_R, ROTOR_R * KC)
+    xs, ys = top.grid()
+    gfx.shade(buf, top, AL[3:9], np.clip(0.62 - 0.2 * (xs - xt) / ROTOR_R - 0.25 * (ys - yt) / (ROTOR_R * KC), 0, 1))
+    gfx.fill(buf, gfx.ring(xt, yt, ROTOR_R, ROTOR_R * KC, 2.0) & gfx.rect(0, 0, gfx.W, yt), AL[8])
+    gfx.fill(buf, gfx.ring(xt, yt, ROTOR_R * 0.6, ROTOR_R * 0.6 * KC, 1.0), AL[4])
+    holes = []
+    for k in range(8):
+        phi = theta + k * math.pi / 4 + math.pi / 2
+        holes.append((math.sin(phi), k, phi))
+    holes.sort()
+    for _, k, phi in holes:
+        hx, hy = P(HOLE_R * math.cos(phi), HOLE_R * math.sin(phi), ROTOR_TOP)
+        ux, uy = math.cos(phi), KC * math.sin(phi)
+        hole = gfx.ellipse(hx, hy, 7.5, 3.9)
+        gfx.fill(buf, hole, AL[4])
+        gfx.fill(buf, gfx.ellipse(hx + 1.8 * ux, hy + 1.8 * uy + 0.4, 6.8, 3.4) & hole, BG[0])
+        gfx.fill(buf, hole.bottom_edge(), AL[6])
+    # hub nut
+    hs = gfx.ellipse(*P(0, 0, ROTOR_TOP), HUB_R, HUB_R * KC)
+    ht = gfx.ellipse(*P(0, 0, HUB_TOP), HUB_R, HUB_R * KC)
+    gfx.fill(buf, (hs | ht | gfx.rect(CX - HUB_R, P(0, 0, HUB_TOP)[1], CX + HUB_R, P(0, 0, ROTOR_TOP)[1])).dilate(1),
+             BG[0])
     gfx.fill(buf, hs, AL[2])
-    gfx.fill(buf, gfx.rect(CX - HUB_R, P(0, 0, HUB_Z + 5)[1], CX + HUB_R, P(0, 0, HUB_Z - 6)[1]), AL[3])
-    ht = gfx.ellipse(*P(0, 0, HUB_Z + 5), HUB_R, HUB_R * KC)
+    gfx.fill(buf, gfx.rect(CX - HUB_R, P(0, 0, HUB_TOP)[1], CX + HUB_R, P(0, 0, ROTOR_TOP)[1]), AL[3])
     xs, ys = ht.grid()
     gfx.shade(buf, ht, AL[4:9], np.clip(0.75 - 0.3 * (xs - CX) / HUB_R, 0, 1))
-    nx, ny = P(0, 0, HUB_Z + 5)
-    gfx.fill(buf, gfx.ellipse(nx, ny, 5, 2.5), AL[2])
+    nx, ny = P(0, 0, HUB_TOP)
+    gfx.fill(buf, gfx.ellipse(nx, ny, 4.5, 2.2), AL[2])
     mk = theta + math.pi
-    gfx.fill(buf, gfx.ellipse(nx + 9 * math.cos(mk), ny + 4.5 * math.sin(mk), 1.6, 1.2), BL[5])
-    for _, k, phi in front:
-        _bucket(buf, phi, beta, sep, k in (0, 2))
+    gfx.fill(buf, gfx.ellipse(xt + 64 * math.cos(mk + 0.39), yt + 32 * math.sin(mk + 0.39), 2.0, 1.2), BL[5])
+    # the two tubes, back one first
+    tubes = [(math.sin(theta + k * math.pi / 4 + math.pi / 2), theta + k * math.pi / 4 + math.pi / 2) for k in (0, 4)]
+    for _, phi in sorted(tubes):
+        _draw_tube(buf, phi, sep)
 
 
 def tube_screen(t):
-    """Screen centre of our tube (bucket 0) in the cutaway at time t, and its screen axis direction."""
-    theta = T.cut_angle(t)
-    beta = T.swing(t)
-    phi = theta + math.pi / 2
-    c, s = math.cos(phi), math.sin(phi)
-    pv = np.array([RP * c, RP * s, HUB_Z])
-    d = np.array([math.sin(beta) * c, math.sin(beta) * s, -math.cos(beta)])
-    cen = P(*(pv + (125 * TUBE_S - 2) * d))
-    a, b = P(*(pv - 2 * d)), P(*(pv + (250 * TUBE_S - 2) * d))
-    return cen, (b[0] - a[0], b[1] - a[1])
+    """Screen centre of our tube (hole 0) in the cutaway at time t, and its screen axis (cap -> bottom)."""
+    phi = T.cut_angle(t) + math.pi / 2
+    top, pe, tip, d = _tube_geom(phi)
+    a, b = P(*top), P(*tip)
+    return P(*((top + tip) / 2)), (b[0] - a[0], b[1] - a[1])
 
 
 _scr = {}
@@ -308,14 +295,13 @@ _scr = {}
 def rotor_layer(buf, t, fps, sep):
     """Draw the rotor over buf with motion blur (sub-frames averaged over the background, then dithered)."""
     theta = T.cut_angle(t)
-    beta = T.swing(t)
     sweep = abs(T.cut_omega(t)) / fps
     n = 1 if sweep < 0.06 else int(min(10, math.ceil(sweep / 0.1)))
-    x0, y0 = int(CX - RP - BLEN - BR - 8), int(CY - HUB_Z - (RP + BLEN) * KC - 22)
-    x1, y1 = int(CX + RP + BLEN + BR + 9), int(CY - HUB_Z + BLEN + BR + 12)
+    x0, y0 = int(CX - ROTOR_R - 4), int(CY - ROTOR_TOP - ROTOR_R * KC - 30)
+    x1, y1 = int(CX + ROTOR_R + 5), int(CY - ROTOR_BOT + ROTOR_R * KC + 4)
     x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, gfx.W), min(y1, gfx.H)
     if n == 1:
-        draw_rotor(buf, theta, beta, sep)
+        draw_rotor(buf, theta, sep)
         return
     if 's' not in _scr:
         _scr['s'] = np.zeros((gfx.H, gfx.W, 3), np.uint8)
@@ -325,7 +311,7 @@ def rotor_layer(buf, t, fps, sep):
     for i in range(n):
         a = theta - sweep * (i + 0.5) / n
         scratch[y0:y1, x0:x1] = base
-        draw_rotor(scratch, a, beta, sep)
+        draw_rotor(scratch, a, sep)
         acc += scratch[y0:y1, x0:x1]
     acc /= n
     buf[y0:y1, x0:x1] = gfx.quantize(acc, CUT_PAL, x0, y0, spread=18)
@@ -444,21 +430,21 @@ def vlabel(buf, t, t0, t1, x, y_from, y_to, text, col):
 
 
 def force_arrows(buf, t, a):
-    """Gold chevrons beside our tube and the balance tube, pointing to the tube bottoms (outward)."""
+    """Gold chevrons past our tube's and the balance tube's bottoms, along the bore: the push toward the bottom."""
     if a <= 0:
         return
     theta = T.cut_angle(t)
-    beta = T.swing(t)
-    for k in (0, 2):
-        phi = theta + k * math.pi / 2 + math.pi / 2
-        pvs, bcs = _bucket(None, phi, beta, 0, False, pv_only=True)
-        dx, dy = bcs[0] - pvs[0], bcs[1] - pvs[1]
+    for k in (0, 4):
+        phi = theta + k * math.pi / 4 + math.pi / 2
+        top, pe, tip, d = _tube_geom(phi)
+        ts, bs = P(*top), P(*tip)
+        dx, dy = bs[0] - ts[0], bs[1] - ts[1]
         n = math.hypot(dx, dy) or 1.0
         ux, uy = dx / n, dy / n
         px, py = -uy, ux
         for j in range(2):
-            o = 10 + 7 * j + 5 * ((t * 2.2) % 1.0)
-            cx, cy = bcs[0] + ux * o, bcs[1] + uy * o
+            o = 6 + 7 * j + 5 * ((t * 2.2) % 1.0)
+            cx, cy = bs[0] + ux * o, bs[1] + uy * o
             pts = [(cx - ux * 4 + px * 4.5, cy - uy * 4 + py * 4.5), (cx, cy), (cx - ux * 4 - px * 4.5, cy - uy * 4 - py * 4.5)]
             mk = gfx.polyline(pts, 2)
             gfx.fill_dither(buf, mk.dilate(1, diag=True), None, OUTLINE, a)
@@ -474,13 +460,13 @@ def render(t, fps=30):
     sep = 1.0 if t >= T.IRIS_OUT[0] else 0.0
     rotor_layer(buf, t, fps, sep)
     spd = T.clamp01((abs(T.cut_omega(t)) / (2 * math.pi) - 1.0) / 1.6)
-    fx.speed_arcs(buf, CX, CY - HUB_Z, t, spd, rx0=96, k=KC, n=6, spin=5.0)
+    fx.speed_arcs(buf, CX, CY - ROTOR_TOP, t, spd, rx0=84, k=KC, n=6, spin=5.0)
     # HUD and labels
     hud_a = T.clamp01((t - T.OPEN[1] + 0.1) / 0.2) * T.clamp01((T.DIVE[0] + 0.05 - t) / 0.15)
     if t >= T.PULL[0]:
         hud_a = T.clamp01((t - T.PULL[1] + 0.2) / 0.2) * T.clamp01((T.CLOSE[0] + 0.1 - t) / 0.15)
     hud(buf, t, hud_a)
-    vlabel(buf, t, T.LABEL_ROTOR, T.SLOWMO[0], CX, CY - HUB_Z - 8, 112, 'ROTOR', TL[6])
+    vlabel(buf, t, T.LABEL_ROTOR, T.SLOWMO[0], CX, CY - HUB_TOP - 3, 112, 'ROTOR', TL[6])
     if T.LABEL_MOTOR <= t < T.SLOWMO[0]:
         fx.label(buf, t, T.LABEL_MOTOR, CX + MOTOR_R + 6, (CY - MOTOR_TOP + CY - MOTOR_BOT) / 2, +1, ['MOTOR'],
                  PL[6], reach=20)

@@ -672,11 +672,6 @@ def sfx():
     # ---- labels in the cutaway
     bus.put(blip(880.0, 1760.0, 0.08, 0.5), T.LABEL_ROTOR, 0.12, 0.0)
     bus.put(blip(987.77, 1975.5, 0.08, 0.5), T.LABEL_MOTOR, 0.12, 0.4)
-    # ---- the buckets reach level: a little clatter of metal
-    t_level = next(tt for tt in np.arange(T.SWING[0], T.SPIN_FULL, 0.005) if T.swing(tt) > 1.55)
-    for i in range(4):
-        bus.put(click(50 + i, 2800 - 300 * i, 0.03), t_level + i * 0.025, 0.16, -0.5 + 0.33 * i)
-    bus.put(glass_ping(1320.0, 0.35, 54), t_level + 0.02, 0.08)
     # ---- bullet time: a deep whoom and a frozen shimmer; the force arrows blink in
     n = int(0.9 * SR)
     x = np.arange(n) / SR
@@ -699,10 +694,7 @@ def sfx():
     # ---- out again
     bus.put(whoosh(0.32, 3000, 500, 15, 0.8, 0.85), T.IRIS_OUT[0] - 0.05, 0.3)
     bus.put(thump(70, 40, 0.45, 0.2, 16), T.PULL[0], 0.42)
-    # ---- braking in the cutaway: the buckets drop back, the rotor stops, the casing closes
-    t_hang = next(tt for tt in np.arange(T.SLOW[0], T.SLOW[1], 0.005) if T.swing(tt) < 0.05)
-    bus.put(click(60, 1400, 0.04), t_hang, 0.14)
-    bus.put(glass_ping(990.0, 0.3, 61), t_hang + 0.01, 0.06)
+    # ---- braking in the cutaway: the rotor stops, the casing closes
     bus.put(click(62, 900, 0.05), T.SLOW[1], 0.18)
     bus.put(whoosh(0.5, 2600, 400, 63, 0.8, 0.85), T.CLOSE[0], 0.24, -0.2)
     bus.put(whoosh(0.5, 300, 2400, 64, 0.8, 0.85), T.CLOSE[0] + 0.02, 0.2, 0.2)
@@ -804,10 +796,44 @@ def duck_env():
     return 1 - 0.2 * win(T.SWING[0], T.SPIN_FULL + 0.3) - 0.22 * win(T.SEP[0], T.SEP[1] + 0.3, 0.5)
 
 
+def rewind(mix):
+    """The ending: the whole mix played backward at tape speed, following the picture's rewind curve exactly
+    (slow-fast-slow, landing on time 0), with a tape-motor whir, a warble and a 'chk' as the tape engages. It ends on
+    the reversed opening crash, which swells straight into the real one when the video loops."""
+    r0 = int(round(T.REWIND[0] * SR))
+    n = NT - r0
+    tt = T.REWIND[0] + np.arange(n) / SR
+    coarse = np.array([T.rewind_source(x) for x in tt[::48]])
+    pos = np.interp(np.arange(n), np.arange(0, n, 48)[:len(coarse)], coarse) * SR
+    src = np.arange(r0)
+    rev = np.stack([np.interp(pos, src, mix[ch, :r0]) for ch in range(2)])
+    rev = np.stack([lowpass(rev[0], 6500, 127), lowpass(rev[1], 6500, 127)])
+    speed = np.abs(np.gradient(pos))
+    sp = speed / max(speed.max(), 1e-9)
+    rev *= (0.62 + 0.08 * np.sin(2 * math.pi * 8.5 * (tt - T.REWIND[0])))[None, :]
+    whir = bandnoise(n / SR, lambda x: 500 + 3200 * np.interp(x, np.arange(n)[::480] / SR, sp[::480]), 0.8, 91)
+    whir *= np.clip(sp * 1.4, 0, 1) ** 0.7
+    hum = pulse(70 + 260 * sp, n, 0.5) * np.clip(sp * 1.4, 0, 1) * 0.25
+    out = rev + 0.16 * np.stack([whir, whir]) + 0.05 * np.stack([hum, hum])
+    k = click(92, 1800, 0.05)
+    out[:, :len(k)] += 0.45 * k
+    th = thump(140, 60, 0.18, 0.6, 93)
+    out[:, :len(th)] += 0.3 * th
+    e = int(0.004 * SR)
+    out[:, :e] *= np.linspace(0, 1, e)
+    out[:, -e:] *= np.linspace(1, 0, e)
+    res = mix.copy()
+    f = int(0.012 * SR)
+    res[:, r0 - f:r0] *= np.linspace(1, 0, f)[None, :]
+    res[:, r0:] = out
+    return res
+
+
 def master(mus, fx, target=-14.0):
     mix = 0.62 * mus[:, :NT] * duck_env()[None, :] + 1.45 * fx[:, :NT]
+    mix = rewind(mix)
     mix = np.stack([lowpass(mix[0], 15500, 127), lowpass(mix[1], 15500, 127)])
-    fade = int(0.02 * SR)
+    fade = int(0.004 * SR)
     mix[:, -fade:] *= np.linspace(1, 0, fade)
     ceiling = -1.6
     for _ in range(6):

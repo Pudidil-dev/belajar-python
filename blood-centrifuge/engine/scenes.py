@@ -117,7 +117,7 @@ def machine_state(t, fps):
     st = M.State(lid=max(0.0, lid_angle(t)))
     st.theta = T.rotor_angle(t)
     st.blur = 2 * math.pi * T.omega(t) / fps
-    st.caps = (0, 2) if T.INSERT[1] <= t < T.LIFT[1] else (2,)
+    st.caps = (0, 4) if T.INSERT[1] <= t < T.LIFT[1] else (4,)
     st.lcd_on = t >= T.POWER
     if t < T.SPIN0:
         st.lcd = '   0'
@@ -181,7 +181,7 @@ def tube_free(t):
         return lerp(hx, CENTER_XY[0], u), lerp(hy, CENTER_XY[1], u) - 46 * math.sin(math.pi * u), s, \
             0.3 * math.sin(2 * math.pi * u) * (1 - u), 1.0, 1.0
     # reveal and final close-up
-    s = S_REVEAL + (S_FINAL - S_REVEAL) * smooth(u_of(t, (T.LABEL_RBC, T.TOTAL)))
+    s = S_REVEAL + (S_FINAL - S_REVEAL) * smooth(u_of(t, (T.LABEL_RBC, T.REWIND[0])))
     y = CENTER_XY[1] + 1.5 * math.sin(2 * math.pi * 0.7 * (t - T.REVEAL))
     squash = 1.0
     if T.REVEAL <= t < T.REVEAL + 0.2:            # lands with a little squash
@@ -380,8 +380,8 @@ def _flash(out, t):
     return out
 
 
-def render(t, fps=30, scale=gfx.SCALE):
-    """The finished frame at film time t: (H*scale, W*scale, 3) uint8."""
+def render_film(t, fps=30, scale=gfx.SCALE):
+    """The film proper at time t (without the rewind)."""
     in_cut = T.OPEN[0] <= t < T.IRIS_IN[1] or T.IRIS_OUT[0] <= t < T.STOP
     in_micro = T.IRIS_IN[0] <= t < T.IRIS_OUT[1]
     if in_cut:
@@ -404,7 +404,77 @@ def render(t, fps=30, scale=gfx.SCALE):
             out[m_hi] = hi_u[m_hi]
             rh = gfx.upscale(ring_m[..., None], scale)[..., 0]
             out[rh] = gfx.upscale(ring, scale)[rh]
-    out = _flash(out, t)
-    if t >= T.OUTRO[0]:
-        out = gfx.brightness(out, 1 - ease_in(u_of(t, T.OUTRO), 2.0))
+    return _flash(out, t)
+
+
+# ---------------------------------------------------------------- the rewind (VHS look) that closes the loop
+def _rew_icon():
+    m = np.zeros((9, 19), bool)
+    for i in range(9):
+        for c in range(9):
+            if c >= 2 * abs(i - 4):
+                m[i, c] = True
+                m[i, c + 10] = True
+    return np.kron(m, np.ones((2, 2), bool))
+
+
+REW_ICON = _rew_icon()
+
+
+def rewind_strength(t):
+    return clamp01((t - T.REWIND[0]) / 0.12) * clamp01((T.REWIND[1] - 0.05 - t) / 0.35)
+
+
+def vhs(out, t, fps, scale):
+    """Tape-rewind look on a finished frame: jittered rows, a rolling tracking band with static, scanlines, and the
+    blinking rewind icon. All in whole canvas pixels, so it stays pixel art."""
+    a = rewind_strength(t)
+    if a <= 0:
+        return out
+    S = scale
+    out = out.copy()
+    rng = np.random.default_rng(int(round(t * fps)) * 131 + 7)
+    for _ in range(int(14 * a)):                                   # a few rows jump sideways
+        r = int(rng.integers(0, H))
+        out[r * S:(r + 1) * S] = np.roll(out[r * S:(r + 1) * S], int(rng.integers(-3, 4)) * S, axis=1)
+    y0 = int((t * 260) % (H + 60)) - 30                            # the tracking band rolls down the screen
+    for r in range(max(0, y0), min(H, y0 + 16)):
+        out[r * S:(r + 1) * S] = np.roll(out[r * S:(r + 1) * S], int(rng.integers(-5, 6)) * S, axis=1)
+    band_h = max(0, min(H, y0 + 16) - max(0, y0))
+    if band_h > 0:
+        noise = rng.uniform(0, 1, (band_h, W)) < 0.32 * a
+        tone = rng.uniform(0, 1, (band_h, W))
+        cols = np.where(tone[..., None] > 0.5, np.array(MW[8], np.uint8), np.array(MW[4], np.uint8))
+        nm = np.repeat(np.repeat(noise, S, 0), S, 1)
+        nc = np.repeat(np.repeat(cols, S, 0), S, 1)
+        seg = out[max(0, y0) * S:max(0, y0) * S + band_h * S]
+        seg[nm] = nc[nm]
+    thin = int((t * 410 + 200) % H)                                # a second, thin noise line
+    out[thin * S:(thin + 1) * S] = np.where(rng.uniform(0, 1, (S, W * S, 1)) < 0.5 * a,
+                                             np.array(MW[6], np.uint8), out[thin * S:(thin + 1) * S])
+    if S >= 2:                                                     # scanlines
+        out[S - 1::S] = (out[S - 1::S].astype(np.uint16) * 3 // 4).astype(np.uint8)
+    if a > 0.5 and int(t * 4) % 3 != 2:                            # blinking rewind icon, top left
+        ic = REW_ICON
+        x0, y0i = W - 12 - ic.shape[1], 12
+        ol = np.zeros((ic.shape[0] + 2, ic.shape[1] + 2), bool)
+        for dy in (0, 1, 2):
+            for dx in (0, 1, 2):
+                ol[dy:dy + ic.shape[0], dx:dx + ic.shape[1]] |= ic
+        for m, col, off in ((ol, OUTLINE, -1), (ic, MW[8], 0)):
+            big = np.repeat(np.repeat(m, S, 0), S, 1)
+            ys, xs = (y0i + off) * S, (x0 + off) * S
+            seg = out[ys:ys + big.shape[0], xs:xs + big.shape[1]]
+            seg[big[:seg.shape[0], :seg.shape[1]]] = col
+    return out
+
+
+def render(t, fps=30, scale=gfx.SCALE):
+    """The finished frame at film time t: (H*scale, W*scale, 3) uint8. After REWIND[0] the film runs backward to frame 0
+    under a tape-rewind look, so the last frame leads straight back into the first."""
+    if t < T.REWIND[0]:
+        return render_film(t, fps, scale)
+    out = vhs(render_film(T.rewind_source(t), fps, scale), t, fps, scale)
+    if t < T.REWIND[0] + 0.1:
+        out = gfx.whiten(out, 0.5 * (1 - (t - T.REWIND[0]) / 0.1))
     return out
