@@ -151,6 +151,6 @@ def draw_lcd(buf, s, x, y, on, ghost):
             if col is None:
                 continue
             for (px, py) in _seg_pixels(seg):
-                xx, yy = x + i * 7 + px, y + py
+                xx, yy = int(round(x)) + i * 7 + px, int(round(y)) + py
                 if 0 <= xx < gfx.W and 0 <= yy < gfx.H:
                     buf[yy, xx] = col

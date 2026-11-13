@@ -449,7 +449,7 @@ def render(t):
             h, w = spr[1].shape
             gfx.paste_sprite(buf, spr, x[i] - w / 2.0, y[i] - h / 2.0)
     # white cells settle last, on top of the red layer -> a thin pale line
-    k = _smoother((t - 8.0) / (T_SEP1 + 0.35 - 8.0))
+    k = _smoother((t - (T_SEP0 + 1.0)) / (T_SEP1 + 0.35 - (T_SEP0 + 1.0)))
     wspr = wbc_sprite(9)
     for i in range(N_WBC):
         x = WBC_START[i, 0] + (WBC_TARGET[i, 0] - WBC_START[i, 0]) * k
@@ -472,7 +472,7 @@ def render(t):
         f = buf[band2].astype(np.float32)
         buf[band2] = (f + (255 - f) * 0.25).astype(np.uint8)
     # sparkle in the clear plasma
-    clear_a = float(np.clip((t - 9.0) / 2.0, 0, 1))
+    clear_a = float(np.clip((t - (T_SEP0 + 2.0)) / 2.0, 0, 1))
     if clear_a > 0:
         region = plasma & (_YC < y_front - 18)
         _twinkles(buf, t, region, 26, 5, clear_a)

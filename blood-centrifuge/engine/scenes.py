@@ -1,12 +1,13 @@
 """What is on screen at film time t, and where the camera is.
 
-One continuous shot: the hook stage sits 300 px above the machine, so the camera tilts down to the centrifuge and back
-up for the reveal (the wall's crosses scroll with it). The push into the lid window and the pull back out are done on
-the big pixels at output resolution (gfx.camera), and an iris joins the machine to the inside-the-tube view.
+The hook stage sits 440 px above the machine, so the camera tilts down to the centrifuge and back up for the reveal (the
+wall's crosses scroll with it). After the spin-up a line of light cuts the casing and the film moves to the cutaway
+(engine/cutaway.py), where the camera tracks our tube in its bucket, rolls with it and dives in. An iris joins the
+cutaway and the inside-the-tube view both ways. Zooms and rolls are done on the big pixels at output resolution.
 """
 import math
 import numpy as np
-from . import gfx, tube, machine as M, micro, fx, pixfont
+from . import gfx, tube, machine as M, micro, fx, pixfont, cutaway
 from . import timeline as T
 from .timeline import u_of, smooth, ease_in, ease_out, ease_in_out, back_out, lerp, clamp01
 from .palette import BG, MW, TL, PL, BL, OUTLINE, GOLD_DIM
@@ -14,10 +15,10 @@ from .palette import BG, MW, TL, PL, BL, OUTLINE, GOLD_DIM
 W, H = gfx.W, gfx.H
 OX, OY = 135, 262             # machine at rest (centre of its top face)
 STAGE = 440                   # the hook / reveal stage is this far above the machine (open lid hidden)
-S_HOOK, S_SLOT, S_REVEAL, S_FINAL = 0.78, 0.24, 1.12, 1.24
+S_HOOK, S_SLOT, S_REVEAL, S_FINAL = 0.78, 0.24, 1.18, 1.10
 RED_XY, TWIN_XY, CENTER_XY = (72, 250), (198, 250), (135, 236)
 WIN_XY = (135, 256)           # lid window centre (target of the slow push)
-RING_XY = (98, 258)           # left side of the spinning ring of tube caps (target of the dive)
+SPLIT_XY = (135, 300)         # where the quick push aims while the casing is cut
 
 
 # ---------------------------------------------------------------- camera and machine placement
@@ -26,10 +27,10 @@ def cam_scroll(t):
         return 0.0
     if t < T.FLY[1]:
         return STAGE * ease_out(u_of(t, T.FLY), 3)
-    if t < 18.1:
+    if t < T.CAM_UP[0]:
         return float(STAGE)
-    if t < 19.2:
-        return STAGE * (1 - ease_in_out(u_of(t, (18.1, 19.2)), 2.4))
+    if t < T.CAM_UP[1]:
+        return STAGE * (1 - ease_in_out(u_of(t, T.CAM_UP), 2.4))
     return 0.0
 
 
@@ -48,25 +49,44 @@ def inserted_xy(oy):
 
 
 def cam_machine(t):
-    """(zoom, cx, cy) for the stage / machine picture, or None while only the inside view is on screen."""
-    if t < T.PUSH[0]:
-        return 1.0, W / 2, H / 2
-    if t < T.ZOOM_IN[0]:
-        u = smooth(u_of(t, T.PUSH))
-        return 1 + 0.32 * u, W / 2, lerp(H / 2, WIN_XY[1], u)
+    """(zoom, cx, cy) for the outside picture (hook, machine, reveal)."""
+    if t < T.SPLIT_PUSH[0] or t >= T.STOP:
+        return 1.0, W / 2, H / 2                      # hold: the spinning rotor and the climbing LCD carry the shot
+    u = ease_in(u_of(t, T.SPLIT_PUSH), 2.0)
+    return 2.2 ** u, W / 2, lerp(H / 2, SPLIT_XY[1], u)
+
+
+def _roll_to_vertical(axis):
+    """Camera roll that turns the tube's screen axis (cap -> bottom) to point straight down."""
+    a = math.atan2(axis[1], axis[0])
+    r = math.pi / 2 - a
+    return (r + math.pi) % (2 * math.pi) - math.pi
+
+
+def cam_cut(t):
+    """(zoom, cx, cy, roll) for the cutaway: hold, slow push on our tube, dive with a roll; the reverse on the way out."""
+    track0 = T.SLOWMO[0] - 0.4
+    if track0 <= t < T.IRIS_IN[1] or T.IRIS_OUT[0] <= t < T.PULL[1]:
+        (tx, ty), axis = cutaway.tube_screen(t)
+        roll = _roll_to_vertical(axis)
+    if t < track0:
+        return 1.0, W / 2, H / 2, 0.0
+    if t < T.DIVE[0]:
+        u = smooth(u_of(t, (track0, T.DIVE[0])))
+        return 1 + 0.55 * u, lerp(W / 2, tx, u), lerp(H / 2, ty, u), 0.0
     if t < T.IRIS_IN[0]:
-        u = u_of(t, T.ZOOM_IN)
-        return 1.32 * (7.0 / 1.32) ** (u ** 2.0), WIN_XY[0], lerp(WIN_XY[1], RING_XY[1], smooth(u))
+        u = u_of(t, T.DIVE)
+        return 1.55 * (9.0 / 1.55) ** (u ** 1.8), tx, ty, roll * ease_in_out(u, 2.0)
     if t < T.IRIS_IN[1]:
-        return 7.0 * (16.0 / 7.0) ** ease_out(u_of(t, T.IRIS_IN), 3.2), RING_XY[0], RING_XY[1]
+        return 9.0 * (15.0 / 9.0) ** ease_out(u_of(t, T.IRIS_IN), 3.0), tx, ty, roll
     if t < T.IRIS_OUT[0]:
-        return None
-    if t < T.ZOOM_OUT[0]:
-        return 10.0 * 0.8 ** u_of(t, T.IRIS_OUT), RING_XY[0], RING_XY[1]
-    if t < T.ZOOM_OUT[1]:
-        u = ease_out(u_of(t, T.ZOOM_OUT), 3)
-        return 8.0 ** (1 - u), RING_XY[0], lerp(RING_XY[1], H / 2, u)
-    return 1.0, W / 2, H / 2
+        return 1.0, W / 2, H / 2, 0.0
+    if t < T.PULL[0]:
+        return 13.0 * (11.0 / 13.0) ** u_of(t, T.IRIS_OUT), tx, ty, roll
+    if t < T.PULL[1]:
+        u = ease_out(u_of(t, T.PULL), 3.0)
+        return 11.0 ** (1 - u), lerp(tx, W / 2, u), lerp(ty, H / 2, u), roll * (1 - u)
+    return 1.0, W / 2, H / 2, 0.0
 
 
 def shake(t, fps, amp):
@@ -97,7 +117,7 @@ def machine_state(t, fps):
     st = M.State(lid=max(0.0, lid_angle(t)))
     st.theta = T.rotor_angle(t)
     st.blur = 2 * math.pi * T.omega(t) / fps
-    st.caps = (0, 4) if T.INSERT[1] <= t < T.LIFT[1] else (4,)
+    st.caps = (0, 2) if T.INSERT[1] <= t < T.LIFT[1] else (2,)
     st.lcd_on = t >= T.POWER
     if t < T.SPIN0:
         st.lcd = '   0'
@@ -161,7 +181,7 @@ def tube_free(t):
         return lerp(hx, CENTER_XY[0], u), lerp(hy, CENTER_XY[1], u) - 46 * math.sin(math.pi * u), s, \
             0.3 * math.sin(2 * math.pi * u) * (1 - u), 1.0, 1.0
     # reveal and final close-up
-    s = S_REVEAL + (S_FINAL - S_REVEAL) * smooth(u_of(t, (21.0, T.TOTAL)))
+    s = S_REVEAL + (S_FINAL - S_REVEAL) * smooth(u_of(t, (T.LABEL_RBC, T.TOTAL)))
     y = CENTER_XY[1] + 1.5 * math.sin(2 * math.pi * 0.7 * (t - T.REVEAL))
     squash = 1.0
     if T.REVEAL <= t < T.REVEAL + 0.2:            # lands with a little squash
@@ -202,8 +222,8 @@ def stage(t, fps):
     # warm glow + rays behind the reveal, cool glow behind the hook
     if t < 2.2:
         fx.glow(buf, 135, 250 + sy, 150, 190, (BG[3], BG[4]), 1.0)
-    if t >= 18.0:
-        a = clamp01((t - 18.4) / 0.9)
+    if t >= T.FLY_OUT[0]:
+        a = clamp01((t - T.FLY_OUT[0] - 0.4) / 0.9)
         fx.glow(buf, 135, 236 + sy, 170, 230, (BG[3], BG[4], GOLD_DIM), 0.6 + 0.5 * a)
         fx.rays(buf, 135, 236 + sy, t, n=10, col=GOLD_DIM, a=0.42 * a, spin=0.18, rmax=260)
     fx.dust(buf, t, 26, 8, BG[5], 5.0)
@@ -211,7 +231,7 @@ def stage(t, fps):
     # ---- the machine
     if oy < H + 140:
         st = machine_state(t, fps)
-        amp = clamp01((T.omega(t) - 9.0) / 18.0) * 1.2
+        amp = clamp01((T.omega(t) - 2.5) / 4.0) * 1.2 if t < T.OPEN[0] else 0.0
         if T.THUNK <= t < T.THUNK + 0.15:
             amp = max(amp, 2.0 * (1 - (t - T.THUNK) / 0.15))
         dx, dy = shake(t, fps, amp)
@@ -223,9 +243,11 @@ def stage(t, fps):
             st.tube_fn = lambda b, sx=sx, syy=syy, sep=sep: tube.draw(b, sx, syy, S_SLOT, sep=sep,
                                                                          clip=M.slot_clip(ox, oym))
         M.draw(buf, ox, oym, st, t)
-        spd = clamp01((T.omega(t) - 6.0) / 16.0)
+        spd = clamp01((T.omega(t) - 1.5) / 5.0) if t < T.OPEN[0] else 0.0
         wx, wy = M.window_center(ox, oym)
         fx.speed_arcs(buf, wx, wy + 2, t, spd, rx0=88, spin=6.0 + 6.0 * spd)
+        if T.SLICE[0] <= t < T.OPEN[0]:
+            slice_fx(buf, t, ox, oym)
         if spd > 0.3:
             fx.shake_marks(buf, ox - M.HW - 3, oym + 80, t, spd, -1)
             fx.shake_marks(buf, ox + M.HW + 2, oym + 80, t, spd, 1)
@@ -301,6 +323,39 @@ def reveal_fx(buf, t, x, y, s):
     fx.label(buf, t, T.LABEL_RBC, x + edge, ry, +1, ['RED BLOOD', 'CELLS'], BL[6])
 
 
+def slice_fx(buf, t, ox, oy):
+    """A line of light runs around the casing (up the left edge, across the top, down the right): the cut."""
+    p = u_of(t, T.SLICE)
+    top_y = oy
+    bot_y = oy + M.TRY + M.FH
+    xl, xr = ox - M.HW, ox + M.HW
+    path = [(xl, bot_y), (xl, top_y), (xr, top_y), (xr, bot_y)]
+    seg = [bot_y - top_y, xr - xl, bot_y - top_y]
+    total = sum(seg)
+    run = p * total
+    pts, acc = [path[0]], 0.0
+    tip = path[0]
+    for i, L in enumerate(seg):
+        a0, a1 = path[i], path[i + 1]
+        if run >= acc + L:
+            pts.append(a1)
+            tip = a1
+        else:
+            f = (run - acc) / L
+            tip = (a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f)
+            pts.append(tip)
+            break
+        acc += L
+    if len(pts) >= 2:
+        ln = gfx.polyline(pts, 2)
+        gfx.fill(buf, ln.dilate(1), TL[6])
+        gfx.fill(buf, ln, MW[8])
+    if p < 1:
+        fx.star(buf, tip[0], tip[1], 4, MW[8], PL[7])
+        fx.burst(buf, t, t - 0.05, tip[0], tip[1], int(t * 97) % 997, n=6, speed=(60, 120), life=0.15,
+                 cols=(MW[8], PL[7], TL[6]))
+
+
 # ---------------------------------------------------------------- final frame at output resolution
 def micro_zoom(t):
     return 1.0 + 0.3 * (1 - ease_out(u_of(t, (T.IRIS_IN[0], T.IRIS_IN[0] + 0.7)), 3))
@@ -314,17 +369,31 @@ def iris_radius(t):
     return None
 
 
+def _flash(out, t):
+    """Accents: the cut, the casing opening, entering and leaving the tube, the casing closing, the reveal."""
+    for t0, k0, dur, up in ((T.OPEN[0], 0.75, 0.16, 0.12), (T.IRIS_IN[0], 0.6, 0.14, 0.0), (T.PULL[0], 0.35, 0.1, 0.0),
+                            (T.STOP, 0.55, 0.14, 0.0), (T.REVEAL, 0.45, 0.14, 0.0)):
+        if t0 - up <= t < t0:
+            out = gfx.whiten(out, k0 * (1 - (t0 - t) / up))
+        elif t0 <= t < t0 + dur:
+            out = gfx.whiten(out, k0 * (1 - (t - t0) / dur))
+    return out
+
+
 def render(t, fps=30, scale=gfx.SCALE):
     """The finished frame at film time t: (H*scale, W*scale, 3) uint8."""
-    cam = cam_machine(t)
-    r = iris_radius(t)
-    inside = T.IRIS_IN[0] <= t < T.IRIS_OUT[1]
-    if cam is not None:
-        out = gfx.camera(stage(t, fps), cam[0], cam[1], cam[2], scale)
-    if inside:
-        zm = micro_zoom(t)
-        hi_u = gfx.camera(micro.render(t), zm, W / 2, H / 2, scale)
-        if r is None or cam is None:
+    in_cut = T.OPEN[0] <= t < T.IRIS_IN[1] or T.IRIS_OUT[0] <= t < T.STOP
+    in_micro = T.IRIS_IN[0] <= t < T.IRIS_OUT[1]
+    if in_cut:
+        z, cx, cy, roll = cam_cut(t)
+        out = gfx.camera(cutaway.render(t, fps), z, cx, cy, scale, rot=roll)
+    elif not in_micro:
+        z, cx, cy = cam_machine(t)
+        out = gfx.camera(stage(t, fps), z, cx, cy, scale)
+    if in_micro:
+        hi_u = gfx.camera(micro.render(t), micro_zoom(t), W / 2, H / 2, scale)
+        r = iris_radius(t)
+        if r is None or not in_cut:
             out = hi_u
         else:
             m = fx.iris_mask(W / 2, H / 2, r)
@@ -335,10 +404,7 @@ def render(t, fps=30, scale=gfx.SCALE):
             out[m_hi] = hi_u[m_hi]
             rh = gfx.upscale(ring_m[..., None], scale)[..., 0]
             out[rh] = gfx.upscale(ring, scale)[rh]
-    # flashes on the accents (SNES colour math, 16 steps)
-    for t0, k0, dur in ((T.IRIS_IN[0], 0.6, 0.14), (T.ZOOM_OUT[0], 0.35, 0.1), (T.REVEAL, 0.45, 0.14)):
-        if t0 <= t < t0 + dur:
-            out = gfx.whiten(out, k0 * (1 - (t - t0) / dur))
+    out = _flash(out, t)
     if t >= T.OUTRO[0]:
         out = gfx.brightness(out, 1 - ease_in(u_of(t, T.OUTRO), 2.0))
     return out

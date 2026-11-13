@@ -326,10 +326,12 @@ PICKUP = [(12, 1, 72), (13, 1, 76), (14, 1, 79), (15, 1, 82)]       # C7 arpeggi
 
 CHORD = {'C': (36, (0, 4, 7)), 'F': (41, (0, 4, 7)), 'G': (43, (0, 4, 7)), 'Em': (40, (0, 3, 7)),
          'Am': (45, (0, 3, 7)), 'Ab': (44, (0, 4, 7)), 'Bb': (46, (0, 4, 7))}
-BARS = [('F', 'G'), ('Em', 'Am'), ('F', 'G'), ('F', 'G'), ('Em', 'Am'), ('F', 'G'), ('C', 'C'), ('Am', 'F'),
-        ('G', 'G'), ('F', 'G'), ('Ab', 'Bb'), ('C', 'C')]
-LEAD = {0: A1, 1: A2, 3: A1, 4: A2, 5: A1, 6: B2, 7: DESC, 8: PICKUP, 9: A1, 10: FAN, 11: FINAL}
-HARM = {5: A1H, 6: B2H, 9: A1H, 10: FANH, 11: FINALH}
+BARS = [('F', 'G'), ('Em', 'Am'), ('F', 'G'), ('F', 'G'), ('Em', 'Am'), ('F', 'G'), ('Em', 'Am'), ('F', 'G'),
+        ('C', 'C'), ('Am', 'F'), ('G', 'G'), ('F', 'G'), ('Ab', 'Bb'), ('C', 'C')]
+LEAD = {0: A1, 1: A2, 3: A1, 4: A2, 5: A1, 6: A2, 7: A1, 8: B2, 9: DESC, 10: PICKUP, 11: A1, 12: FAN, 13: FINAL}
+HARM = {3: A1H, 5: A1H, 7: A1H, 8: B2H, 11: A1H, 12: FANH, 13: FINALH}
+BUILD, DIVE_BAR, FILL_BAR, BREAK, SILENT, FINAL_BAR = 2, 4, 8, 9, 10, 13
+CRASH_BARS = (0, 3, 5, 7, 11)
 
 
 def bar_t(b, step=0):
@@ -352,34 +354,34 @@ def music_part(lo, hi):
         for half, name in ((0, c1), (1, c2)):
             root = CHORD[name][0]
             base = b * T.BAR + half * T.BAR / 2
-            if b == 2:                                     # build: driving 16ths, crescendo
+            if b == BUILD:                                 # build: driving 16ths, crescendo, gap before the drop
                 for k in range(8):
-                    v = 0.55 + 0.45 * (half * 8 + k) / 15
                     if half == 1 and k >= 6:
-                        continue                           # one 8th of silence before the drop
-                    bass_bus.put(bass(root, STEP * 0.7), base + k * STEP, 0.32 * v)
-            elif b == 7:
+                        continue
+                    bass_bus.put(bass(root, STEP * 0.7), base + k * STEP, 0.32 * (0.55 + 0.45 * (half * 8 + k) / 15))
+            elif b == BREAK:
                 bass_bus.put(bass(root, T.BAR / 2 * 0.95), base, 0.3)
-            elif b == 8:
-                if half == 0:
-                    bass_bus.put(bass(root, T.BAR / 2), base, 0.3)
-            elif b == 11:
+            elif b == SILENT:
+                continue
+            elif b == FINAL_BAR:
                 if half == 0:
                     bass_bus.put(bass(root, 1.6), base, 0.32)
                     bass_bus.put(bass(root + 12, 1.6), base, 0.12)
             else:
                 for k in range(4):
+                    if b == DIVE_BAR and half == 1 and k == 3:
+                        continue                           # the dive: one 8th of silence before inside the tube
                     m = root + (12 if k % 2 else 0)
                     bass_bus.put(bass(m, STEP * 1.6), base + k * 2 * STEP, 0.3)
     # ---- arpeggios (12.5 % pulse, quiet, left)
     for b, (c1, c2) in enumerate(BARS):
-        if b in (7, 8, 11):
+        if b in (BREAK, SILENT, FINAL_BAR):
             continue
         for half, name in ((0, c1), (1, c2)):
             root, iv = CHORD[name]
             base = b * T.BAR + half * T.BAR / 2
             tones = [root + 24 + iv[0], root + 24 + iv[1], root + 24 + iv[2], root + 36]
-            if b == 2:                                     # riser: one climb through F then G, ending a 16th early
+            if b == BUILD:                                 # riser: one climb through F then G, ending early
                 climb = [53, 57, 60, 65, 69, 72, 77, 81] if half == 0 else [79, 83, 86, 91, 95, 98]
                 for k, m in enumerate(climb):
                     arp_bus.put(chip_arp(m, STEP * 0.8, 0.25), base + k * STEP,
@@ -387,71 +389,76 @@ def music_part(lo, hi):
                 continue
             pat = [0, 1, 2, 3, 2, 1, 2, 3]
             for k in range(8):
-                arp_bus.put(chip_arp(tones[pat[k]], STEP * 0.85), base + k * STEP, 0.055 if b in (0, 1) else 0.065,
-                            -0.5)
-    # bar 7: slower 8th-note arp, darker
+                if b == DIVE_BAR and half == 1 and k >= 6:
+                    continue
+                if b == DIVE_BAR and half == 1:            # the dive climbs instead of turning around
+                    m = tones[k % 4] + 12 * (k // 4)
+                else:
+                    m = tones[pat[k]]
+                arp_bus.put(chip_arp(m, STEP * 0.85), base + k * STEP, 0.055 if b in (0, 1) else 0.065, -0.5)
+    # breakdown: slower 8th-note arp, darker
     for half, name in ((0, 'Am'), (1, 'F')):
         root, iv = CHORD[name]
         tones = [root + 12 + iv[0], root + 12 + iv[1], root + 12 + iv[2], root + 24]
         for k in range(4):
-            arp_bus.put(chip_arp(tones[k], STEP * 1.6, 0.5), bar_t(7) + half * 1.0 + k * 2 * STEP, 0.05, -0.4)
-    # ---- pads under the breakdown and the brake
-    pad_bus.put(pad([57, 60, 64], 1.0), bar_t(7), 0.07)
-    pad_bus.put(pad([53, 57, 60], 1.0), bar_t(7, 8), 0.07)
-    pad_bus.put(pad([55, 59, 62, 65], 0.9), bar_t(8), 0.08)
-    pad_bus.put(pad([60, 64, 67, 72], 1.7, 0.02), bar_t(11), 0.07)
+            arp_bus.put(chip_arp(tones[k], STEP * 1.6, 0.5), bar_t(BREAK) + half * 1.0 + k * 2 * STEP, 0.05, -0.4)
+    # ---- pads under the breakdown and the final chord
+    pad_bus.put(pad([57, 60, 64], 1.0), bar_t(BREAK), 0.07)
+    pad_bus.put(pad([53, 57, 60], 1.0), bar_t(BREAK, 8), 0.07)
+    pad_bus.put(pad([60, 64, 67, 72], 1.7, 0.02), bar_t(FINAL_BAR), 0.07)
     # ---- drums
     K, S, Hc, Ho, C = kick(), snare(), hat(False), hat(True), crash()
-    for b in range(12):
+    for b in range(len(BARS)):
         t0 = bar_t(b)
-        if b in (0, 3, 5, 9):
+        if b in CRASH_BARS:
             drum_bus.put(C, t0, 0.16, 0.25)
-        if b == 2:
+        if b == BUILD:
             for k in range(0, 16, 4):
                 drum_bus.put(K, t0 + k * STEP, 0.42)
             roll = [0, 2, 4, 6, 8, 9, 10, 11, 12, 13]
             for i, k in enumerate(roll):
                 drum_bus.put(snare(0.45 + 0.55 * i / len(roll)), t0 + k * STEP, 0.25, 0.08)
             continue
-        if b == 7:
+        if b == BREAK:
             drum_bus.put(C, t0, 0.13, -0.25)
             drum_bus.put(K, t0, 0.4)
             drum_bus.put(S, t0 + 8 * STEP, 0.22, 0.08)
             for k in (0, 4, 8, 12):
                 drum_bus.put(Hc, t0 + k * STEP, 0.06, 0.3)
-            drum_bus.put(K, t0 + 14 * STEP, 0.28)
             continue
-        if b == 8:
-            drum_bus.put(K, t0, 0.4)
+        if b == SILENT:
             continue
-        if b == 11:
+        if b == FINAL_BAR:
             drum_bus.put(C, t0, 0.18, 0.2)
             drum_bus.put(K, t0, 0.45)
             continue
+        last = 11 if b == DIVE_BAR else (12 if b == FILL_BAR else 16)
         for k in (0, 4, 8, 12):
-            drum_bus.put(K, t0 + k * STEP, 0.42)
+            if k < last:
+                drum_bus.put(K, t0 + k * STEP, 0.42)
         for k in (4, 12):
-            drum_bus.put(S, t0 + k * STEP, 0.25, 0.08)
-        for k in range(16):
-            if b == 6 and k >= 12:
-                continue
-            v = 0.1 if k % 4 == 2 else 0.045
-            drum_bus.put(Hc, t0 + k * STEP, v, 0.3)
-        if b in (1, 4, 10):
+            if k < last:
+                drum_bus.put(S, t0 + k * STEP, 0.25, 0.08)
+        for k in range(min(16, last)):
+            drum_bus.put(Hc, t0 + k * STEP, 0.1 if k % 4 == 2 else 0.045, 0.3)
+        if b in (1, 6, 12):
             drum_bus.put(Ho, t0 + 14 * STEP, 0.07, 0.3)
-        if b == 6:                                          # fill into the breakdown
+        if b == DIVE_BAR:                                   # snare roll into the tube, then one 8th of silence
+            for i, k in enumerate((11, 12, 13)):
+                drum_bus.put(snare(0.6 + 0.2 * i), t0 + k * STEP, 0.25, 0.08)
+        if b == FILL_BAR:                                   # tom fill into the breakdown
             for i, m in enumerate((52, 48, 45, 40)):
                 drum_bus.put(tom(m), t0 + (12 + i) * STEP, 0.26, 0.4 - 0.25 * i)
             drum_bus.put(snare(0.8), t0 + 15 * STEP, 0.2, 0.1)
-        if b == 9:                                          # the reveal hit on beat 4
+        if b == 11:                                         # the reveal hit on beat 4
             drum_bus.put(C, T.REVEAL, 0.17, -0.2)
             drum_bus.put(snare(1.0), T.REVEAL, 0.22)
-        if b == 10:
+        if b == 12:
             drum_bus.put(Ho, t0, 0.08, -0.2)
             drum_bus.put(Ho, t0 + 8 * STEP, 0.08, 0.2)
     # ---- final sparkle arpeggio (FM bells)
     for i, m in enumerate((84, 88, 91, 96, 100)):
-        pad_bus.put(bell(m, 1.0), bar_t(11) + i * STEP / 2, 0.07, -0.4 + 0.2 * i)
+        pad_bus.put(bell(m, 1.0), bar_t(FINAL_BAR) + i * STEP / 2, 0.07, -0.4 + 0.2 * i)
     # ---- mix the music buses: echo on the lead, light reverb on everything
     lead_st = lead_bus.x + harm_bus.x
     dl = np.stack([echo(lead_st.sum(0) * 0.5, 0.375, 0.32), echo(lead_st.sum(0) * 0.5, 0.25, 0.3)])
@@ -459,11 +466,36 @@ def music_part(lo, hi):
     return mus + 0.16 * reverb(mus - 0.9 * bass_bus.x - 0.6 * drum_bus.x)
 
 
+def bullet_time(st):
+    """Slow-motion feel: the music sinks under a lowpass during the bullet time, then opens up again on the dive."""
+    lo_f, hi_f = 650.0, 18000.0
+    t_a, t_b = T.SLOWMO[0] - 0.05, T.SLOWMO[0] + 0.3
+    t_c, t_d = T.DIVE[0] - 0.05, T.IRIS_IN[0] - 0.05
+
+    def fc(tt):
+        down = hi_f * (lo_f / hi_f) ** np.clip((tt - t_a) / (t_b - t_a), 0, 1)
+        up = lo_f * (hi_f / lo_f) ** (np.clip((tt - t_c) / (t_d - t_c), 0, 1) ** 2)
+        return np.where(tt < t_c, down, up)
+
+    def g(tt, ff):
+        return 1.0 / (1.0 + (ff / fc(tt)) ** 4)
+    s0, s1 = int((t_a - 0.5) * SR), int((t_d + 0.5) * SR)
+    out = st.copy()
+    for ch in range(2):
+        seg = stft_filter(st[ch, s0:s1], lambda tt, ff: g(tt + s0 / SR, ff))
+        fade = np.ones(s1 - s0)
+        r = int(0.2 * SR)
+        fade[:r] = np.linspace(0, 1, r)
+        fade[-r:] = np.linspace(1, 0, r)
+        out[ch, s0:s1] = st[ch, s0:s1] * (1 - fade) + seg * fade
+    return out
+
+
 def music():
-    """The score: everything up to the brake goes through a tape stop (the music winds down with the rotor);
-    the pickup, the reveal and the fanfare start clean after the silence."""
-    a = tape_stop(music_part(-1, T.STOP), T.STOP - 0.5, 0.55)
-    b = music_part(T.STOP, 1e9)
+    """The score. Everything up to the rotor stop goes through the bullet-time lowpass and then a tape stop (the music
+    winds down with the rotor); the pickup, the reveal and the fanfare start clean after the silence."""
+    a = tape_stop(bullet_time(music_part(-1, T.SLOW[1])), T.SLOW[1] - 0.5, 0.55)
+    b = music_part(T.SLOW[1], 1e9)
     return a + b
 
 
@@ -550,7 +582,12 @@ def motor():
         if w[e] < 6.0:
             c = click(int(e) % 97, 1800, 0.03) * (0.5 + 0.08 * w[e])
             y[e:e + len(c)] += c[:max(0, min(len(c), NT - e))] * 0.6
-    on = (t >= T.SPIN0 - 0.05) & (t <= T.STOP + 0.3)
+    cut = np.clip((t - T.OPEN[0]) / 0.2, 0, 1) * np.clip((T.IRIS_IN[0] - t) / 0.2, 0, 1) + \
+        np.clip((t - T.PULL[0]) / 0.3, 0, 1) * np.clip((T.CLOSE[1] - t) / 0.2, 0, 1)
+    coil = (np.sin(2 * math.pi * 100 * t) + 0.5 * np.sign(np.sin(2 * math.pi * 200 * t)) * 0.3
+            + 0.25 * np.sin(2 * math.pi * 300 * t)) * np.clip(k * 1.5, 0, 1)
+    y = y + 0.22 * coil * np.clip(cut, 0, 1)
+    on = (t >= T.SPIN0 - 0.05) & (t <= T.SLOW[1] + 0.3)
     y *= on
     # inside the tube: muffled and lower
     inside = np.clip((t - T.IRIS_IN[0]) / 0.25, 0, 1) * np.clip((T.IRIS_OUT[1] - t) / 0.25, 0, 1)
@@ -575,7 +612,7 @@ def micro_sounds(bus):
         x = np.arange(n) / SR
         f = rng.uniform(260, 520) * (1 + 1.2 * x / 0.07)
         b = np.sin(2 * math.pi * np.cumsum(f) / SR) * np.sin(math.pi * x / 0.07) ** 2
-        bus.put(b, t0, 0.07 * (1.2 - (t0 - 6) / 6), rng.uniform(-0.7, 0.7))
+        bus.put(b, t0, 0.07 * (1.2 - (t0 - T.IRIS_IN[0]) / 6), rng.uniform(-0.7, 0.7))
     lands = np.concatenate([micro.BACK.t_land, micro.FRONT.t_land])
     penta = [84, 86, 88, 91, 93, 96, 98, 100]
     steps = np.arange(T.SEP[0], T.SEP[1] + 0.25, STEP)
@@ -618,10 +655,42 @@ def sfx():
     bus.put(beep(2093.0, 0.09), T.START_BTN + 0.02, 0.1)
     # ---- the motor (spin up, run, brake) and the push into the window
     bus.put(motor(), 0.0, 0.38)
-    up = whoosh(0.55, 400, 5200, 12, 0.7, 0.92)
-    bus.put(up, T.ZOOM_IN[0] - 0.05, 0.36)
-    sw = sine(200 * (6.0 ** (np.arange(int(0.5 * SR)) / (0.5 * SR))), int(0.5 * SR)) * np.linspace(0, 1, int(0.5 * SR)) ** 2
-    bus.put(sw, T.ZOOM_IN[0], 0.08)
+    # ---- the cut: a laser line runs around the casing, sparks
+    n = int(0.26 * SR)
+    x = np.arange(n) / SR
+    las = sine(900 * (4.0 ** (x / 0.26)), n) * 0.7 + 0.3 * pulse(450 * (4.0 ** (x / 0.26)), n, 0.25)
+    bus.put(las * np.minimum(1, x / 0.01) * np.clip((0.26 - x) / 0.03, 0, 1), T.SLICE[0], 0.12, -0.3)
+    for i in range(7):
+        bus.put(click(40 + i, 3500, 0.02), T.SLICE[0] + 0.03 + i * 0.03, 0.12, -0.6 + 0.2 * i)
+    bus.put(whoosh(0.3, 600, 3000, 41, 0.7, 0.9), T.SPLIT_PUSH[0], 0.22)
+    # ---- the casing splits: ka-chunk, metal, two halves flying apart
+    bus.put(thump(150, 55, 0.45, 0.9, 42), T.OPEN[0], 0.55)
+    bus.put(glass_ping(660.0, 0.5, 43), T.OPEN[0] + 0.01, 0.16)
+    bus.put(click(44, 1600, 0.05), T.OPEN[0] + 0.05, 0.3)
+    bus.put(whoosh(0.45, 300, 2500, 45, 0.8, 0.3), T.OPEN[0] + 0.02, 0.26, -0.2)
+    bus.put(whoosh(0.45, 2500, 300, 46, 0.8, 0.3), T.OPEN[0] + 0.04, 0.22, 0.2)
+    # ---- labels in the cutaway
+    bus.put(blip(880.0, 1760.0, 0.08, 0.5), T.LABEL_ROTOR, 0.12, 0.0)
+    bus.put(blip(987.77, 1975.5, 0.08, 0.5), T.LABEL_MOTOR, 0.12, 0.4)
+    # ---- the buckets reach level: a little clatter of metal
+    t_level = next(tt for tt in np.arange(T.SWING[0], T.SPIN_FULL, 0.005) if T.swing(tt) > 1.55)
+    for i in range(4):
+        bus.put(click(50 + i, 2800 - 300 * i, 0.03), t_level + i * 0.025, 0.16, -0.5 + 0.33 * i)
+    bus.put(glass_ping(1320.0, 0.35, 54), t_level + 0.02, 0.08)
+    # ---- bullet time: a deep whoom and a frozen shimmer; the force arrows blink in
+    n = int(0.9 * SR)
+    x = np.arange(n) / SR
+    whoom = sine(170 * (0.28 ** (x / 0.9)), n) * np.minimum(1, x / 0.02) * np.exp(-x / 0.5)
+    bus.put(whoom, T.SLOWMO[0], 0.45)
+    for i, m in enumerate((93, 100, 105)):
+        bus.put(bell(m, 1.4, 1.2, 2.0), T.SLOWMO[0] + 0.02 + i * 0.07, 0.06, -0.4 + 0.4 * i)
+    for i in range(2):
+        bus.put(blip(1046.5, 1568.0, 0.06, 0.5), T.SLOWMO[0] + 0.3 + i * 0.12, 0.08, 0.3)
+    # ---- the dive into the tube
+    up = whoosh(0.62, 400, 5200, 12, 0.7, 0.92)
+    bus.put(up, T.DIVE[0] - 0.05, 0.36)
+    sw = sine(200 * (6.0 ** (np.arange(int(0.6 * SR)) / (0.6 * SR))), int(0.6 * SR)) * np.linspace(0, 1, int(0.6 * SR)) ** 2
+    bus.put(sw, T.DIVE[0], 0.08)
     # ---- entering the blood: a splash and a sub drop
     spl = bandnoise(0.5, lambda tt: 1800 * (0.15 ** (tt / 0.5)), 1.0, 13)
     bus.put(spl * env_exp(len(spl), 0.12, 0.003), T.IRIS_IN[0], 0.42)
@@ -629,9 +698,16 @@ def sfx():
     micro_sounds(bus)
     # ---- out again
     bus.put(whoosh(0.32, 3000, 500, 15, 0.8, 0.85), T.IRIS_OUT[0] - 0.05, 0.3)
-    bus.put(thump(70, 40, 0.45, 0.2, 16), T.ZOOM_OUT[0], 0.42)
+    bus.put(thump(70, 40, 0.45, 0.2, 16), T.PULL[0], 0.42)
+    # ---- braking in the cutaway: the buckets drop back, the rotor stops, the casing closes
+    t_hang = next(tt for tt in np.arange(T.SLOW[0], T.SLOW[1], 0.005) if T.swing(tt) < 0.05)
+    bus.put(click(60, 1400, 0.04), t_hang, 0.14)
+    bus.put(glass_ping(990.0, 0.3, 61), t_hang + 0.01, 0.06)
+    bus.put(click(62, 900, 0.05), T.SLOW[1], 0.18)
+    bus.put(whoosh(0.5, 2600, 400, 63, 0.8, 0.85), T.CLOSE[0], 0.24, -0.2)
+    bus.put(whoosh(0.5, 300, 2400, 64, 0.8, 0.85), T.CLOSE[0] + 0.02, 0.2, 0.2)
     # ---- the stop, the beeps, the lid
-    bus.put(thump(120, 50, 0.35, 1.0, 17), T.STOP, 0.5)
+    bus.put(thump(130, 48, 0.4, 1.0, 17), T.STOP, 0.58)
     bus.put(click(18, 1200, 0.05), T.STOP + 0.02, 0.3)
     for tb in T.DONE_BEEPS:
         bus.put(beep(1568.0, 0.075), tb, 0.12)
@@ -725,7 +801,7 @@ def duck_env():
 
     def win(a, b, r=0.25):
         return np.clip((t - a) / r, 0, 1) * np.clip((b - t) / r, 0, 1)
-    return 1 - 0.22 * win(T.SPIN0, T.ZOOM_IN[1] - 0.25) - 0.22 * win(T.SEP[0], T.SEP[1] + 0.3, 0.5)
+    return 1 - 0.2 * win(T.SWING[0], T.SPIN_FULL + 0.3) - 0.22 * win(T.SEP[0], T.SEP[1] + 0.3, 0.5)
 
 
 def master(mus, fx, target=-14.0):

@@ -309,19 +309,29 @@ def upscale(buf, scale=SCALE):
     return np.repeat(np.repeat(buf, scale, 0), scale, 1)
 
 
-def camera(buf, zoom=1.0, cx=W / 2, cy=H / 2, scale=SCALE, sx=0.0, sy=0.0):
+def camera(buf, zoom=1.0, cx=W / 2, cy=H / 2, scale=SCALE, sx=0.0, sy=0.0, rot=0.0):
     """Sample the pixel canvas through a camera centred on canvas point (cx, cy) with `zoom`, at output size.
 
     The pixels grow as one grid, so zooms stay crisp (no blur, no resampling filter). sx, sy shift the frame in
-    output pixels (screen shake)."""
-    if abs(zoom - 1) < 1e-6 and abs(cx - W / 2) < 1e-6 and abs(cy - H / 2) < 1e-6 and sx == 0 and sy == 0:
+    output pixels (screen shake); rot rolls the camera (radians; a world vector appears rotated by rot)."""
+    if abs(zoom - 1) < 1e-6 and abs(cx - W / 2) < 1e-6 and abs(cy - H / 2) < 1e-6 and sx == 0 and sy == 0 \
+            and abs(rot) < 1e-6:
         return upscale(buf, scale)
     OW, OH = W * scale, H * scale
-    xs = np.floor(cx + (np.arange(OW) + 0.5 - OW / 2 - sx) / (scale * zoom)).astype(np.int32)
-    ys = np.floor(cy + (np.arange(OH) + 0.5 - OH / 2 - sy) / (scale * zoom)).astype(np.int32)
-    np.clip(xs, 0, W - 1, out=xs)
-    np.clip(ys, 0, H - 1, out=ys)
-    return buf[ys[:, None], xs[None, :]]
+    dx = (np.arange(OW) + 0.5 - OW / 2 - sx) / (scale * zoom)
+    dy = (np.arange(OH) + 0.5 - OH / 2 - sy) / (scale * zoom)
+    if abs(rot) < 1e-6:
+        xs = np.floor(cx + dx).astype(np.int32)
+        ys = np.floor(cy + dy).astype(np.int32)
+        np.clip(xs, 0, W - 1, out=xs)
+        np.clip(ys, 0, H - 1, out=ys)
+        return buf[ys[:, None], xs[None, :]]
+    c, s = np.cos(rot), np.sin(rot)
+    X = np.floor(cx + c * dx[None, :] + s * dy[:, None]).astype(np.int32)
+    Y = np.floor(cy - s * dx[None, :] + c * dy[:, None]).astype(np.int32)
+    np.clip(X, 0, W - 1, out=X)
+    np.clip(Y, 0, H - 1, out=Y)
+    return buf[Y, X]
 
 
 def camera_mask(full_mask, zoom=1.0, cx=W / 2, cy=H / 2, scale=SCALE):
