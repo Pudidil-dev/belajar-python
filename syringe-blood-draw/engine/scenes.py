@@ -4,8 +4,10 @@ The world is fixed: the arm's skin is y = 0 and the needle enters at (0, 0). The
 (timeline.camera). It opens close on the empty syringe standing upright in front of soft light rays (a glint, sparkles,
 the tip flashing), pulls back while the syringe swings down to the needle angle, rides alongside it toward the arm,
 settles closer on the insertion site and follows the needle in slowly, zooms in on the needle opening, follows the blood
-up the needle and pulls back to the whole syringe. After 20 s the same film is shown at the rewind's source time, so
-the camera path and every motion run backward, with two brief pixel scanlines on top.
+up the needle and pulls back to the whole syringe. When it is full the needle slides out and the camera rides the
+syringe back up to the showcase, where it stands upright again, full of blood, with the same glint and sparkles. After
+20 s the same film is shown at the rewind's source time, so the camera path and every motion run backward, with two
+brief pixel scanlines on top.
 """
 import math
 import numpy as np
@@ -79,7 +81,7 @@ def big_star(buf, x, y, r, col, mid=None):
 
 def hero_backdrop(buf, ox, oy, t):
     """A soft glow and slowly turning rays behind the upright syringe; they fade as it swings away."""
-    a = 1 - T.smooth(T.u_of(t, (1.45, 2.1)))
+    a = max(1 - T.smooth(T.u_of(t, (1.45, 2.1))), T.smooth(T.u_of(t, (17.55, 18.1))))
     if a <= 0:
         return
     cx, cy = T.M0[0] - ox, T.M0[1] - oy
@@ -95,12 +97,10 @@ def hero_backdrop(buf, ox, oy, t):
 
 
 def hero_sparkles(buf, t, cx, cy):
-    """Sparkles that pop around the empty syringe while it is shown off."""
-    if not (T.TWINKLE[0] <= t < T.TWINKLE[1] + 0.4):
-        return
-    for i, (dx, dy, t0) in enumerate(T.TWINKLES):
+    """Sparkles that pop around the syringe while it is shown off: empty at the start, full at the end."""
+    for i, (dx, dy, t0) in enumerate(T.TWINKLES + T.FINAL_TWINKLES):
         k = (t - t0) / 0.42
-        if k < 0 or k >= 1 or t0 >= T.TWINKLE[1]:
+        if k < 0 or k >= 1:
             continue
         size = 1 if k < 0.15 else (3 if k < 0.45 else (2 if k < 0.75 else 1))
         star(buf, cx + dx, cy + dy, size, WHITE if i % 3 else CY[5])
@@ -120,18 +120,19 @@ def film(t, hero_fx=True):
     hl = None
     if hero_fx and T.HIGHLIGHT[0] <= t < T.HIGHLIGHT[1]:
         hl = T.lerp(214.0, -14.0, T.u_of(t, T.HIGHLIGHT))      # the glint runs from the thumb press to the tip
-    if T.FINAL_GLINT[0] <= t < T.FINAL_GLINT[1]:
-        hl = T.lerp(98.0, 188.0, T.smooth(T.u_of(t, T.FINAL_GLINT)))
+    if hero_fx and T.FINAL_GLINT[0] <= t < T.FINAL_GLINT[1]:
+        hl = T.lerp(T.L_FULL + 10.0, -14.0, T.u_of(t, T.FINAL_GLINT))   # the same glint, up the full syringe
     syringe.draw(buf, tx, ty, T.plunger(t), T.flow_front(t), T.barrel_fill(t), hl, ang)
     syringe.draw_cells(buf, tx, ty, t, ang)
-    if hero_fx and t < T.SWING[1]:
+    if hero_fx and (t < T.SWING[1] or t >= T.LAND - 0.1):
         pv = T.pivot(t)
         hero_sparkles(buf, t, pv[0] - ox, pv[1] - oy)
-        if T.TIP_STAR[0] <= t < T.TIP_STAR[1]:
-            k = T.u_of(t, T.TIP_STAR)
-            r = int(round(4 * math.sin(math.pi * k)))
-            if r >= 1:
-                big_star(buf, tx, ty - 1, r, WHITE)
+        for span in (T.TIP_STAR, T.TIP_STAR2):
+            if span[0] <= t < span[1]:
+                k = T.u_of(t, span)
+                r = int(round(4 * math.sin(math.pi * k)))
+                if r >= 1:
+                    big_star(buf, tx, ty - 1, r, WHITE)
     # a small glint rides the needle tip so it can be followed through the layers
     if T.TIP_GLINT[0] <= t < T.TIP_GLINT[1]:
         ph = (t * 2.4) % 1.0
@@ -143,15 +144,6 @@ def film(t, hero_fx=True):
         ow = T.opening_world()
         r = 2 + 14 * T.ease_out(k, 2.0)
         gfx.fill_dither(buf, gfx.ring(ow[0] - ox, ow[1] - oy, r, r, 1.0), None, CY[4], 1 - k)
-    # payoff sparkles around the full barrel
-    if T.CHIME <= t < T.CHIME + 0.9:
-        k = (t - T.CHIME) / 0.9
-        for i, (s_, v_) in enumerate(((118, 24), (158, -24), (140, 26), (172, 22))):
-            if k < 0.15 * i or k > 0.15 * i + 0.5:
-                continue
-            x, y = syringe.to_canvas(tx, ty, s_, v_, ang)
-            kk = (k - 0.15 * i) / 0.5
-            star(buf, x, y, 3 if kk < 0.4 else (2 if kk < 0.75 else 1), WHITE if i % 2 == 0 else CY[5])
     return buf, z
 
 

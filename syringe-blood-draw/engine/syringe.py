@@ -226,6 +226,6 @@ def draw_cells(buf, tx, ty, t, ang=T.ANGLE):
             sb = T.S_BARREL0 + 2 + (fill - 5) * BAR_R01[k] * settle
             vb = BAR_V[k] * settle + math.sin(t * 1.7 + k) * 0.6
             x, y = to_canvas(tx, ty, min(sb, T.S_BARREL0 + fill - 3), vb, ang)
-            spr = cells.pick(5.0, (BAR_TILT[k] + 0.3 * t * (1 if t < T.FULL else 0)) % 1.0, BAR_PSI[k])
+            spr = cells.pick(5.0, (BAR_TILT[k] + 0.3 * min(t, T.FULL)) % 1.0, BAR_PSI[k])
             h, w = spr[1].shape
             gfx.paste_sprite(buf, spr, x - w / 2, y - h / 2)

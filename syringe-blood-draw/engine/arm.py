@@ -273,10 +273,11 @@ def _vein_cells(buf, ox, oy, t):
     if t < T.FLOW_IN - 0.5:
         return
     ow = T.opening_world()
-    tt = min(t, T.FULL)
     for k in range(syringe.N_STREAM):
         t_k = syringe.STREAM_T0[k]
-        a = (tt - (t_k - 0.5)) / 0.5
+        if t_k > T.FULL:                                     # the flow stops with the plunger; none are left hanging
+            break
+        a = (t - (t_k - 0.5)) / 0.5
         if a < 0 or a >= 1:
             continue
         a = T.smooth(a)

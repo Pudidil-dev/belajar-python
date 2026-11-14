@@ -1,8 +1,9 @@
 """One timeline for picture and sound: 120 BPM, a bar is 2 s, every event sits on the 8th-note grid.
 
 0-20 s is the film: the empty syringe stands upright and is shown off -> it swings to the needle angle and shoots at
-the arm -> needle into the vein -> plunger pulls -> full syringe. 20-24 s plays the same film backward at about 5x and
-lands on the opening composition, so the 24 s video loops with no seam.
+the arm -> needle into the vein -> plunger pulls -> full syringe -> the needle comes out and the syringe flies back to
+the showcase, upright again and now full of blood. 20-24 s plays the same film backward at about 5x and lands on the
+opening composition, so the 24 s video loops with no seam.
 """
 import math
 import numpy as np
@@ -33,7 +34,7 @@ S_MID = (S_BARREL0 + S_BARREL1) / 2              # the barrel centre
 L_EMPTY = 204.0                                  # tip to thumb press with the plunger fully forward
 S_PIV = L_EMPTY / 2                              # the empty syringe's middle: it turns about this point
 P_FULL = 65.0                                    # plunger travel for a full barrel
-Z_HERO, Z_IN = 1.75, 2.5                         # camera zooms: the upright syringe, the needle opening
+Z_HERO, Z_IN, Z_FINAL = 1.75, 2.5, 1.5          # camera zooms: the upright syringe, the needle opening, the full one
 
 A_HERO = math.radians(-90)                       # upright, needle up, thumb press down
 A_WIND = math.radians(-102)                      # the wind-up before the swing
@@ -58,14 +59,20 @@ CAM_SETTLE = (3.0, 5.0)    # the camera stops tracking and settles, closer, on t
 INSERT = (5.0, 8.8)        # tip through skin and tissue into the vein
 TIP_GLINT = (4.6, 9.2)
 ZOOM_IN = (9.0, 10.0)
-PULL = (9.0, 18.8)         # plunger travel
+PULL = (9.0, 15.5)         # plunger travel
 FLOW_IN = 9.4              # blood reaches the opening
 FLOW_HUB = 11.9            # blood reaches the barrel
 FOLLOW = (10.0, 12.4)      # the camera follows the red flow up the needle
-ZOOM_OUT = (12.4, 15.5)    # back out to the whole syringe
-FULL = 18.8
-CHIME = 19.0
-FINAL_GLINT = (19.0, 19.45)
+ZOOM_OUT = (12.4, 14.5)    # back out to the whole syringe, the column still growing
+FULL = 15.5                # the plunger stops: the barrel is full
+RETURN = (15.9, 17.75)     # the needle slides out and the syringe flies back up to the showcase spot
+SWING_BACK = (17.35, 17.85)  # ... swinging upright again (needle up)
+FINAL_ZOOM = (17.45, 17.95)  # the camera closes in on it again
+LAND = 18.0                # back in the showcase, now full of blood
+FINAL_GLINT = (18.0, 18.45)  # a glint runs up the full syringe
+FINAL_TWINKLES = [(dx, dy * 1.25, t0 + 17.95) for dx, dy, t0 in TWINKLES]
+CHIME = 19.0               # the two-note chime on the F chord, with the needle tip shining
+TIP_STAR2 = (19.0, 19.4)
 REWIND = (20.0, 24.0)
 REWIND_END = -1.0 / 30     # the rewind lands one frame before t = 0: the opening pose, just before the opening glint
 
@@ -119,6 +126,10 @@ def axis_point(d_tip, s):
 
 
 # ---------------------------------------------------------------- motion
+L_FULL = L_EMPTY + P_FULL
+D_RET = D_START + L_FULL / 2 - S_PIV             # the return stops when the full syringe's middle is back at M0
+
+
 def tip_d(t):
     if t < MOVE0:
         return D_START
@@ -126,7 +137,9 @@ def tip_d(t):
         return lerp(D_START, D_ABOVE, ease_out(u_of(t, APPROACH), 2.4))
     if t < INSERT[0]:
         return lerp(D_ABOVE, -2.0, smooth(u_of(t, (APPROACH[1], INSERT[0]))))
-    return lerp(-2.0, D_IN, smooth(u_of(t, INSERT)))
+    if t < RETURN[0]:
+        return lerp(-2.0, D_IN, smooth(u_of(t, INSERT)))
+    return lerp(D_IN, D_RET, ease_in_out(u_of(t, RETURN), 2.2))     # slides out gently, then flies
 
 
 def syringe_angle(t):
@@ -137,25 +150,38 @@ def syringe_angle(t):
         return lerp(A_HERO, A_WIND, ease_in_out(u_of(t, WINDUP), 2.0))
     if t < SWING[1]:
         return lerp(A_WIND, A_AIM, back_out(u_of(t, SWING) ** 1.4, 1.6))
-    return A_AIM
+    if t < SWING_BACK[0]:
+        return A_AIM
+    if t < SWING_BACK[1]:
+        return lerp(A_AIM, A_HERO, back_out(u_of(t, SWING_BACK) ** 1.4, 1.6))
+    return A_HERO
 
 
-M0 = axis_point(D_START, S_PIV)                  # where the syringe's middle sits in the opening pose
+M0 = axis_point(D_START, S_PIV)                  # where the syringe's middle sits in the showcase
+
+
+def s_piv(t):
+    """The syringe's middle along its axis (it grows as the plunger is drawn back): what it turns about."""
+    return (L_EMPTY + plunger(t)) / 2
 
 
 def pivot(t):
-    """World position of the syringe's middle (s = S_PIV)."""
+    """World position of the syringe's middle."""
     if t < MOVE0:
         bob = 2.0 * math.sin(2 * math.pi * 0.9 * t) * (1 - smooth(u_of(t, BOB_OFF)))
         crouch = 3.0 * ease_in_out(u_of(t, WINDUP), 2.0) * (1 - ease_out(u_of(t, SWING), 2.0))
         return M0[0], M0[1] + bob + crouch
-    return axis_point(tip_d(t), S_PIV)
+    if t < RETURN[1]:
+        return axis_point(tip_d(t), s_piv(t))
+    bob = 2.0 * math.sin(2 * math.pi * 0.9 * (t - LAND)) * smooth(u_of(t, (LAND, LAND + 0.3)))
+    return M0[0], M0[1] + bob
 
 
 def tip_world(t):
     a = syringe_angle(t)
     px, py = pivot(t)
-    return px + S_PIV * math.cos(a), py + S_PIV * math.sin(a)
+    sp = s_piv(t)
+    return px + sp * math.cos(a), py + sp * math.sin(a)
 
 
 def plunger(t):
@@ -223,8 +249,16 @@ def camera(t):
         px, py = axis_point(D_IN, S_BARREL0 - 4)
         cx, cy = lerp(px, C_HOLD[0], k), lerp(py, C_HOLD[1], k)
         z = Z_IN ** (1 - k)
-    else:
+    elif t < RETURN[0]:
         cx, cy = C_HOLD
+    elif t < RETURN[1]:
+        px, py = pivot(t)
+        k = smooth(u_of(t, (RETURN[0], RETURN[0] + 0.8)))
+        cx, cy = lerp(C_HOLD[0], px, k), lerp(C_HOLD[1], py, k)
+        z = lerp(1.0, Z_FINAL, ease_in_out(u_of(t, FINAL_ZOOM), 3.0))
+    else:
+        cx, cy = M0
+        z = lerp(1.0, Z_FINAL, ease_in_out(u_of(t, FINAL_ZOOM), 3.0))
     return cx, cy, z
 
 

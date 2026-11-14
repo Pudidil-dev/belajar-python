@@ -585,27 +585,45 @@ def plunger_slide(dur, seed=5):
     return 0.8 * sq / (np.abs(sq).max() + 1e-9) + 0.25 * hiss
 
 
+def _chord_note(t, i):
+    """A bell note on the chord under time t (bar 0: F then C; bar 9: Bb then F)."""
+    if t < 1.0 or t >= T.CHIME:
+        tones = (89, 93, 96, 101)                            # F6 A6 C7 F7
+    elif t < 2.0:
+        tones = (84, 88, 91, 96)                             # C6 E6 G6 C7
+    else:
+        tones = (94, 98, 101, 106)                           # Bb6 D7 F7 Bb7
+    return tones[i % len(tones)]
+
+
+def _showcase(bus, t_glint, twinkles):
+    """A glint sweeps up the syringe and the sparkles around it ping on the chord."""
+    bus.put(bell(103, 0.35, 1.0, 2.0), t_glint + 0.02, 0.07, 0.2)
+    gl = bandnoise(0.45, lambda tt: 3500 + 5000 * tt / 0.45, 0.5, 31)
+    bus.put(gl * env_exp(len(gl), 0.14, 0.01), t_glint + 0.01, 0.035, 0.1)
+    for i, (dx, dy, t0) in enumerate(sorted(twinkles, key=lambda p: p[2])):
+        bus.put(bell(_chord_note(t0 + 0.06, i), 0.3, 0.8, 3.0), t0 + 0.06, 0.022, 0.6 * (1 if dx > 0 else -1))
+
+
+def _swing_sounds(bus, span):
+    """A rising 'dwip' with a little air as the syringe swings, then a two-beep lock as it settles."""
+    bus.put(blip(523.3, 1568.0, 0.2, 0.25), span[0], 0.08, -0.2)
+    bus.put(whoosh(0.45, 700, 2400, 33, 0.8, 0.45), span[0] + 0.02, 0.14, 0.2)
+    bus.put(beep(1318.5, 0.035, 0.25), span[1] - 0.14, 0.05, 0.3)
+    bus.put(beep(1760.0, 0.05, 0.25), span[1] - 0.07, 0.05, 0.3)
+
+
 def sfx_forward():
     bus = Bus()
     # the showcase: a glint runs up the empty syringe, sparkles ping around it, the needle tip shines
-    bus.put(bell(103, 0.35, 1.0, 2.0), T.HIGHLIGHT[0] + 0.02, 0.07, 0.2)
-    gl0 = bandnoise(T.HIGHLIGHT[1] - T.HIGHLIGHT[0], lambda tt: 3500 + 5000 * tt / 0.45, 0.5, 31)
-    bus.put(gl0 * env_exp(len(gl0), 0.14, 0.01), T.HIGHLIGHT[0] + 0.01, 0.035, 0.1)
-    notes = (89, 93, 96, 98, 101)                            # F6 A6 C7 D7 F7: the first bar's chord
-    for i, (dx, dy, t0) in enumerate(sorted(T.TWINKLES, key=lambda p: p[2])):
-        if t0 >= T.TWINKLE[1]:
-            continue
-        bus.put(bell(notes[i % len(notes)], 0.3, 0.8, 3.0), t0 + 0.06, 0.022, 0.6 * (1 if dx > 0 else -1))
+    _showcase(bus, T.HIGHLIGHT[0], T.TWINKLES)
     bus.put(bell(101, 0.6, 1.4, 2.0), T.TIP_STAR[0] + 0.08, 0.06, 0.0)
     bus.put(blip(2093.0, 2793.8, 0.05, 0.5), T.TIP_STAR[0] + 0.08, 0.03)
     # the wind-up (a soft drop), the swing to the needle angle (a rising 'dwip' + air), the lock-on tick
     n = int(0.25 * SR)
     x = np.arange(n) / SR
     bus.put(sine(620 * (0.5 ** (x / 0.25)), n) * np.sin(math.pi * x / 0.25) ** 1.5, T.WINDUP[0], 0.07)
-    bus.put(blip(523.3, 1568.0, 0.2, 0.25), T.SWING[0], 0.08, -0.2)
-    bus.put(whoosh(0.45, 700, 2400, 33, 0.8, 0.45), T.SWING[0] + 0.02, 0.14, 0.2)
-    bus.put(beep(1318.5, 0.035, 0.25), T.SWING[0] + 0.36, 0.05, 0.3)
-    bus.put(beep(1760.0, 0.05, 0.25), T.SWING[0] + 0.43, 0.05, 0.3)
+    _swing_sounds(bus, T.SWING)
     # the launch: the shup and the tracking whoosh
     bus.put(shup(), T.MOVE0 - 0.01, 0.5)
     w = whoosh(1.9, 1500, 500, 11, 0.8, 0.12)
@@ -649,16 +667,26 @@ def sfx_forward():
         bus.put(pl, st, 0.04, 0.5 * math.sin(j * 1.3))
     bus.put(blip(330.0, 660.0, 0.1, 0.5), T.FLOW_HUB + 0.05, 0.08)
     bus.put(whoosh(1.2, 1600, 450, 15, 0.8, 0.2), T.ZOOM_OUT[0], 0.1)
-    # the plunger stops; the two-note chime; the final glint
+    # the plunger stops: the barrel is full
     bus.put(click(16, 900, 0.04), T.FULL, 0.12)
+    # the needle slides out (three falling pips: vein, tissue, skin), the syringe lifts off and flies back up
+    def leaving(depth):
+        return next(tt for tt in np.arange(T.RETURN[0], T.RETURN[1], 0.005) if T.tip_d(tt) * T.U[1] <= depth)
+    for depth, (f0, f1) in ((T.DERM + T.VEIN_WALL, (1396.9, 1046.5)), (T.EPI, (1046.5, 880.0)),
+                            (0.0, (880.0, 698.5))):
+        bus.put(blip(f0, f1, 0.07, 0.5), leaving(depth), 0.06, 0.3)
+    t_out = leaving(0.0)
+    bus.put(shup(), t_out, 0.35, -0.1)
+    bus.put(whoosh(T.RETURN[1] - t_out, 500, 1700, 35, 0.8, 0.55), t_out + 0.02, 0.26, -0.2)
+    # it swings upright again and lands in the showcase, full: glint, sparkles, then the two-note chime
+    _swing_sounds(bus, T.SWING_BACK)
+    _showcase(bus, T.FINAL_GLINT[0], T.FINAL_TWINKLES)
     for i, m in enumerate((84, 89)):
         nn = int(0.5 * SR)
         xx = np.arange(nn) / SR
         ch = pulse(mtof(m), nn, 0.25) * np.minimum(1, xx / 0.003) * np.exp(-xx / 0.16)
         bus.put(ch, T.CHIME + i * 0.15, 0.16, -0.15 + 0.3 * i)
         bus.put(bell(m + 12, 0.6, 1.0, 2.0), T.CHIME + i * 0.15, 0.05)
-    gl = bandnoise(0.45, lambda tt: 6000 + 4000 * tt / 0.45, 0.5, 17)
-    bus.put(gl * env_exp(len(gl), 0.12, 0.01), T.FINAL_GLINT[0], 0.06, 0.2)
     return bus.x[:, :NT] + 0.1 * reverb(bus.x[:, :NT], 0.8, 21)
 
 

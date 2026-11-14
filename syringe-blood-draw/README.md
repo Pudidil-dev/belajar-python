@@ -11,7 +11,8 @@ side view, on a dark navy background.
    and pushes in.
 4. The plunger pulls back, the pressure in the syringe drops, and the cells swirl into the needle, ride up it and pour
    into the wide barrel.
-5. The camera pulls back to the whole syringe, now full.
+5. When the barrel is full, the needle slides out and the syringe flies back to where it was shown off. It stands
+   upright again in the same close-up, now full of blood, with the same glint and sparkles and a two-note chime.
 6. Then the tape rewinds the whole thing at about 5× and lands on the upright opening shot, so the video loops
    seamlessly.
 
@@ -38,7 +39,7 @@ side view, on a dark navy background.
   - Below the skin: soft tissue with collagen, small nuclei and lobules of round fat cells. Then a thick-walled vein,
     shaded as a round tube, with red cells flowing through it.
   - The camera shows off the upright syringe close up, tracks it, pushes in slowly during the insertion, zooms in on
-    the opening and pulls back, all on the big pixels.
+    the opening, pulls back, and rides the full syringe back to the close-up, all on the big pixels.
   - Palette: the repo's `navy` set (flat dark navy, cyan accent) plus blood red and skin.
 - **Sound.** All synthesized in code, no samples.
   - **Music.** A light chiptune loop: 120 BPM, F major, the I–V–vi–IV progression, with the hook
@@ -48,7 +49,9 @@ side view, on a dark navy background.
       a rising "dwip" as it swings, and a two-beep lock-on.
     - The flight and the needle: an arcade "shup", a tracking whoosh, and three rising pips as the tip enters the
       skin, the tissue and the vein.
-    - The blood draw: a soft plunger slide, a quiet flow with little plinks as cells pass, and a two-note chime.
+    - The blood draw: a soft plunger slide, and a quiet flow with little plinks as cells pass.
+    - The return: three falling pips as the needle comes out, a "shup" and a rising whoosh. The same swing and
+      showcase sounds as the opening follow, then a two-note chime.
   - **Rewind.** An arcade rewind cue, then a crunchy cassette rewind made of the film's own effects played backward.
     The music keeps moving forward, ducked under it, and is back up exactly as the loop restarts.
   - **Loudness.** The mix is −14 LUFS with true peak below −1 dBTP.
@@ -98,7 +101,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | `python render.py --fps 60` | 60 fps (smoother tracking and rewind) |
 | `python render.py --scale 8` | 2160×3840 (4K vertical); `--scale 2` gives 540×960 for a quick look |
 | `python render.py --from 9 --to 15` | only a slice of the film |
-| `python render.py --stills 0.25,8,19.25` | full-size PNG frames in `output/stills/` |
+| `python render.py --stills 0.25,8,19.1` | full-size PNG frames in `output/stills/` |
 | `python render.py --sheet 0:24:1` | one contact sheet of the whole film in `output/sheet.png` |
 | `python render.py --audio-only` | only the soundtrack (music, effects, mix) |
 | `python render.py --jobs 2` | fewer CPU cores (the default uses all) |
@@ -112,9 +115,10 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | 0–2 | **Empty syringe showcase.** The clear, empty syringe stands upright in the centre, close up: needle up, plunger fully in, slowly bobbing in front of soft light rays. A glint runs up it from the thumb press to the needle, sparkles pop around it and the needle tip flashes. It winds up, then swings down to the 30° needle angle with a little overshoot while the camera pulls back. | Glint, sparkle pings on the chord, a tip "ting", a soft wind-up, a rising "dwip", a two-beep lock-on |
 | 2–5 | **Launch and side cutaway.** On the bar line it shoots toward the arm with the camera alongside, and the arm rises into frame. A scan line wipes across the arm and reveals the layers: skin made of rows of individual cells, soft tissue with little fat cells, and a thick vein of flowing red cells. The camera slows and moves in on the insertion site. | Arcade "shup", tracking whoosh, scan sweep; the music calms down |
 | 5–9 | **Skin to vein.** The fine needle, its tip marked by a small glint, slides through the skin cells and the tissue and stops with its opening inside the vein. The camera follows slowly and pushes in. No blood outside the vein and no impact. | Three rising pips (skin, tissue, vein), a gentle two-note confirm |
-| 9–15 | **Follow the blood.** A slight zoom on the opening. The plunger pulls back and the cells swirl into the needle, ride up its channel and pour into the wide barrel. The camera follows them, then starts pulling out as the barrel fills. | Plunger slide, quiet flow with plinks, the groove returns |
-| 15–20 | **Full syringe payoff.** The whole syringe, centred, with the arm at the bottom. The red column grows in the wide barrel as the plunger draws back, then stops full and still. A glint and a two-note chime. | Cadence on F, two-note arcade chime |
-| 20–24 | **Retro rewind loop.** Everything runs backward at about 5×: the barrel empties, the blood flows back down the needle, the camera retreats from the vein, the arm slides away, and the syringe swings back upright. Two brief pixel scanlines cross the screen, and the rewind eases into the upright opening close-up. | Arcade rewind cue, crunchy cassette rewind; the music keeps going forward underneath and comes back up for the loop |
+| 9–15 | **Follow the blood.** A slight zoom on the opening. The plunger pulls back and the cells swirl into the needle, ride up its channel and pour into the wide barrel. The camera follows them, then pulls out to the whole syringe, centred with the arm at the bottom, while the red column keeps growing. | Plunger slide, quiet flow with plinks, the groove returns |
+| 15–18 | **Full, then lift and return.** The plunger stops and the wide barrel is full and still, with the needle still in the vein. Then the needle slides back out through the vein, the tissue and the skin. The camera rides the syringe back up, the arm drops away, and the syringe swings upright again exactly where it was shown off. | A soft click; three falling pips, a "shup", a rising whoosh, the swing "dwip" and the lock-on |
+| 18–20 | **Full syringe showcase (payoff).** The same close-up as the opening, but full of blood: the light rays come back, a glint runs up it, sparkles pop around it, and the needle tip flashes on the chime. | Glint, sparkle pings on the chord, then the two-note arcade chime on the F chord |
+| 20–24 | **Retro rewind loop.** Everything runs backward at about 5×: the full syringe swings down and flies back into the arm, the blood flows back down the needle into the vein, the needle withdraws, and the empty syringe flies back up and stands upright. Two brief pixel scanlines cross the screen, and the rewind eases into the upright opening close-up. | Arcade rewind cue, crunchy cassette rewind; the music keeps going forward underneath and comes back up for the loop |
 
 **The science.** Pulling the plunger back enlarges the space in the barrel and lowers the pressure inside it. The blood
 in the vein is at a higher pressure, so it is pushed in through the opening at the needle's bevel, up the needle and
@@ -126,7 +130,7 @@ far larger than life (a real epidermis is about a tenth of a millimetre thick) s
 - `render.py`: the command line (film, stills, contact sheets, audio only).
 - `engine/`:
   - `timeline.py`: one timeline for picture and sound (beats, layer depths, the upright showcase and swing, syringe
-    motion, plunger, flow, camera, rewind curve).
+    motion there and back, plunger, flow, camera, rewind curve).
   - `palette.py`, `gfx.py`: the navy palette and the pixel drawing kit (masks, dithering, camera).
   - `syringe.py`: the syringe shader at any angle (wide barrel, graduations, stopper, clear plunger rod, flange,
     thumb press, hub, fine needle in section) and the cells riding up it.
@@ -136,6 +140,6 @@ far larger than life (a real epidermis is about a tenth of a millimetre thick) s
   - `scenes.py`: what's on screen at each moment: the showcase (light rays, sparkles, tip star), the camera, and the
     rewind with its two scanlines.
   - `audio.py`: the synthesizer, the looping score, the effects, the cassette rewind and the master (−14 LUFS).
-- `镜头表.md`: the shot list (style lock, palette, 6 beats).
+- `镜头表.md`: the shot list (style lock, palette, 7 beats).
 - `output/交付说明.md`: delivery notes and the quality gate results.
 - `docs/storyboard.png`: frames from each beat.
