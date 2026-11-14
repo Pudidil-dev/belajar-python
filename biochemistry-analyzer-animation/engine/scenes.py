@@ -5,7 +5,7 @@ import numpy as np
 from . import gfx, palette as P
 from . import timeline as T
 from . import analyzer as AZ
-from . import shots, macro, cutaway, molecules, optics, screen
+from . import shots, macro, cutaway, molecules, optics, screen, explain
 from .view import tones
 
 W, H = gfx.W, gfx.H
@@ -31,8 +31,25 @@ def dissolve(a, b, u):
     return np.where(m, b, a)
 
 
-def render_canvas(t, fps=30):
+def view2d(t):
+    """The camera of the analyzer drawing at time t (the same choice render_canvas makes)."""
     t = t % T.TOTAL
+    if t < 0.95 or t >= 35.2:
+        return macro.cam_open(t)
+    if T.REJOIN <= t < 14.0:
+        return shots.open_view()
+    return shots.cam(t)
+
+
+def render_canvas(t, fps=30, info=True, lang='en'):
+    """The frame at time t on the 270x480 canvas. info=False is the clean cut (no captions, tags or HUD)."""
+    out = _artwork(t % T.TOTAL)
+    if info:
+        explain.draw(out, t % T.TOTAL, lang)
+    return out
+
+
+def _artwork(t):
     if t < 0.95:                                   # the opening, then follow the drop down to the front glass
         a = render2d(t, macro.cam_open(t), macro_detail=True)
         return a if t < 0.88 else dissolve(a, cutaway.render(t, 'preview'), (t - 0.88) / 0.07)
@@ -73,5 +90,5 @@ def render_canvas(t, fps=30):
     return render2d(t, macro.cam_open(t), macro_detail=True)
 
 
-def render(t, fps=30, scale=gfx.SCALE):
-    return gfx.upscale(render_canvas(t, fps), scale)
+def render(t, fps=30, scale=gfx.SCALE, info=True, lang='en'):
+    return gfx.upscale(render_canvas(t, fps, info, lang), scale)

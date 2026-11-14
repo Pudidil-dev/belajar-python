@@ -20,6 +20,7 @@ W, H = gfx.W, gfx.H
 _JJ, _II = np.mgrid[0:H, 0:W]
 BEAM_Y = 4.0
 TRANS = 0.42                   # fraction of the light that gets through the rose mixture (illustrative)
+VIEW = (0.0, -8.0, 4.0)        # camera centre (mm) and zoom (px/mm); leaves room for the caption box on top
 
 
 def _grid(view, bx):
@@ -48,7 +49,7 @@ def _box(buf, view, x0, y0, x1, y1, ramp, v=0.5, hatch=False, edge=True):
 
 def render(t):
     t = t % T.TOTAL
-    view = View(0.0, -2.0, 4.4)
+    view = View(*VIEW)
     view.apply()
     buf = np.zeros((H, W, 3), np.uint8)
     buf[...] = tones(P.NV, np.clip(0.34 + 0.0006 * (_JJ - 240), 0, 1), (0, 0, W, H))
@@ -156,9 +157,9 @@ def _comparison(buf, view, X, Y, grow, squash, t):
     base_y = -26.0
     full_h = 15.0
     x_ref, x_mea = -9.0, 9.0
-    panel = (np.abs(X) < 19) & (Y > base_y - full_h - 11.5) & (Y < base_y + 3)
+    panel = (np.abs(X) < 19) & (Y > base_y - full_h - 11.5) & (Y < base_y + 4.5)
     mix(buf, bx, panel, P.NV[1], 0.8)
-    put(buf, bx, panel & ((np.abs(np.abs(X) - 19) < 0.25) | (np.abs(Y - base_y - 3) < 0.25) |
+    put(buf, bx, panel & ((np.abs(np.abs(X) - 19) < 0.25) | (np.abs(Y - base_y - 4.5) < 0.25) |
                           (np.abs(Y - (base_y - full_h - 11.5)) < 0.25)), P.NV[6])
     sx = 1.0 - squash
     for x, level, fill in ((x_ref, 1.0, P.RG[7]), (x_mea, TRANS, P.RO[5])):

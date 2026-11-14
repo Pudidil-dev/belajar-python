@@ -337,3 +337,45 @@ def _flash(buf, view, x, y, u, col):
             px_, py_ = int(cx + rr * math.cos(a)), int(cy + rr * math.sin(a))
             if 0 <= px_ < W and 0 <= py_ < H and u < 0.9:
                 buf[py_, px_] = col
+
+
+def anchors(t):
+    """World positions of the named molecules at time t, for the part tags (same paths as render, no jitter)."""
+    t = t % T.TOTAL
+    out = {}
+    snap = T.SNAP
+    cx, cy = 20.0, 5.0
+    drift = min(max(0.0, t - 17.6) * 140.0, 175.0)
+    if t < snap:
+        out['ester_m'] = (cx, cy)
+    elif t < 19.0:
+        out['chol'] = (cx + drift, cy)
+    if t >= snap:
+        e = t - snap
+        out['fatty'] = (cx - 2 * math.sqrt(3) * S + 2 - 70 * e, cy + 18 + 40 * e)
+    ex_ = cx - math.sqrt(3) * S - S * 0.87 - 9
+    ey_ = cy + 0.5 * S + S * 0.5 + 6
+    if t < 18.2:
+        k = T.keys(t, [(16.3, 0.0), (16.95, 1.0), (17.25, 1.0), (18.0, 0.0)])
+        out['esterase'] = (ex_ - 10 + (1 - k) * -30, ey_ + 30 + (1 - k) * 90)
+    ox, oyy = 230.0, -6.0
+    if 17.9 <= t < 20.2:
+        k = T.keys(t, [(18.0, 0.0), (18.75, 1.0), (19.15, 1.0), (19.9, 0.0)])
+        ep = (ox - 6, oyy + 34 + (1 - k) * 80)
+        out['oxidase'] = ep
+        if t < T.OXI:
+            out['o2'] = (ep[0] + 18, ep[1] - 22 - (1 - k) * 10)
+    if T.OXI <= t < T.DYE:
+        e = t - T.OXI
+        out['h2o2'] = (ox + 12 + min(e, 1.5) * 155 + max(0.0, e - 1.5) * 20,
+                       oyy - 22 + math.sin(e * 4.0) * 6 - min(e, 1.5) * 6)
+    pxd, pyd = 470.0, 10.0
+    if 19.8 <= t < 22.6:
+        out['peroxidase'] = (pxd, pyd + 36)
+    if t >= T.DYE:
+        out['dye_t'] = (pxd - 4, pyd - 34 - min(t - T.DYE, 1.0) * 20)
+    return out
+
+
+def view(t):
+    return _cam(t % T.TOTAL)

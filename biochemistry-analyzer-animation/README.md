@@ -10,10 +10,18 @@ A 36-second looping, vertical medical-science short in 8-bit/16-bit pixel-art la
 
 The last frame leads straight into the first, so the video loops without a visible seam.
 
-There is no title card, narration or subtitles. The only text in the film is on the workstation screen
-("Total Cholesterol" and one illustrative value in mg/dL).
+There is no title card and no narration. A game-style explanation layer tells the viewer what is happening:
+- a typed caption box at the top, one or two short lines per step;
+- part tags with leader lines on the machine parts, the molecules and the photometer;
+- a small HUD plate with the zoom and a scale bar, or TIME-LAPSE, NOT TO SCALE and SCHEMATIC where the picture is not
+  a straight view.
+
+The captions are in English by default and in Bahasa Indonesia with `--lang id`. `--clean` renders the text-free cut,
+where the only text is on the workstation screen ("Total Cholesterol" and one illustrative value in mg/dL).
 
 ![storyboard](docs/storyboard.png)
+
+Indonesian captions (`--lang id`): [docs/storyboard_id.png](docs/storyboard_id.png)
 
 ## Ringkasan (Bahasa Indonesia)
 
@@ -38,6 +46,20 @@ There is no title card, narration or subtitles. The only text in the film is on 
    - Layar workstation menampilkan "Total Cholesterol 187 mg/dL" (angka ilustrasi, bunyi "ding" dua nada).
    - Kuvet baru maju ke posisi sampel. Pipet kembali ke komposisi pembuka, jadi video bisa diputar berulang.
 
+**Penjelasan di layar** (bisa dimatikan dengan `--clean`):
+
+- **Kotak teks ala game RPG** di atas, satu atau dua baris pendek per langkah. Contoh: "BERAPA BANYAK KOLESTEROL DI
+  SETETES SERUM INI?", "LANGKAH 2: PROBE REAGEN MENYEDOT REAGEN ENZIM", "PEROKSIDASE + H₂O₂ → ZAT WARNA PINK".
+- **Label nama bagian:**
+  - mesin: baki reagen, baki sampel, cincin reaksi, probe reagen, probe sampel, kuvet, pengaduk, fotometer;
+  - molekul: ester kolesterol, esterase, kolesterol, asam lemak, oksidase, O₂, H₂O₂, peroksidase, zat warna pink;
+  - optik: lampu, lensa, filter, detektor, elektronik, referensi/terukur;
+  - hasil: workstation, contoh nilai.
+- **HUD di kanan atas:** zoom dan garis skala. Tulisan DIPERCEPAT muncul saat time-lapse, BUKAN SKALA ASLI di bagian
+  molekul, dan SKEMA di bagian optik.
+
+Bahasa default adalah Inggris. Untuk versi Bahasa Indonesia, tambahkan `--lang id`.
+
 **Cara render (salin-tempel):** lihat bagian berikut. Video akhir tidak dirender di sini; kamu render sendiri.
 
 ## Render it yourself (copy-paste)
@@ -61,6 +83,17 @@ python render.py
   `belajar-python/biochemistry-analyzer-animation/output/How_a_Biochemistry_Analyzer_Measures_Cholesterol.mp4`
 
   This is H.264 1080×1920, 30 fps, 36.000 s, with AAC 48 kHz stereo audio. It takes a few minutes, using all CPU cores.
+
+Other versions (each gets its own file, so they do not overwrite each other):
+
+```bash
+python render.py --lang id      # captions and tags in Bahasa Indonesia
+python render.py --clean        # the text-free cut (only the workstation screen text)
+```
+
+- `--lang id` writes `output/How_a_Biochemistry_Analyzer_Measures_Cholesterol_ID.mp4`.
+- `--clean` writes `output/How_a_Biochemistry_Analyzer_Measures_Cholesterol_clean.mp4`.
+- `--preview` works with both (`output/preview_id.mp4`, `output/preview_clean.mp4`).
 
 Already have the repository? Use these commands instead of the clone:
 
@@ -146,6 +179,53 @@ the absorbance into a concentration. The film shows this as:
 - The workflow is shortened to one test. Real analyzers run many tests in parallel, read each cuvette several times
   and use calibrators and controls.
 
+## On-screen explanations
+
+The captions type in an SNES-style dialog box at the top, with a pale-gold serum drop as the narrator icon. The words
+are colour-coded:
+- teal for the machine and the reagent;
+- gold for the serum and cholesterol;
+- rose for the dye and the result.
+
+The opening question runs across the loop point (34.45 s → 1.0 s), so frame 0 follows on from the last frame.
+
+| Time (s) | Caption (English, default) | Caption (`--lang id`) |
+|---|---|---|
+| 34.45→1.0 (wraps) | HOW MUCH CHOLESTEROL IS IN / ONE DROP OF SERUM? | BERAPA BANYAK KOLESTEROL / DI SETETES SERUM INI? |
+| 1.05–3.8 | ENZYMES TURN CHOLESTEROL PINK: / THE ANALYZER MEASURES THE COLOUR | ENZIM MENGUBAH KOLESTEROL JADI PINK: / ALAT ANALISIS MENGUKUR WARNANYA |
+| 3.95–5.95 | STEP 1: THE REAGENT TRAY TURNS / TO THE CHOLESTEROL REAGENT | LANGKAH 1: BAKI REAGEN BERPUTAR / KE REAGEN KOLESTEROL |
+| 6.05–7.95 | STEP 2: THE REAGENT PROBE / DRAWS UP ENZYME REAGENT | LANGKAH 2: PROBE REAGEN / MENYEDOT REAGEN ENZIM |
+| 8.05–9.95 | ...AND FILLS AN EMPTY CUVETTE / ON THE REACTION RING | ...LALU MENGISI KUVET KOSONG / DI CINCIN REAKSI |
+| 10.05–11.95 | STEP 3: THE SAMPLE PROBE / DRAWS UP A LITTLE SERUM | LANGKAH 3: PROBE SAMPEL / MENYEDOT SEDIKIT SERUM |
+| 12.05–13.95 | ...AND ADDS IT TO THE REAGENT | ...LALU MENAMBAHKANNYA KE REAGEN |
+| 14.05–15.95 | STEP 4: THE STIRRER MIXES / SERUM AND REAGENT EVENLY | LANGKAH 4: PENGADUK MENCAMPUR / SERUM DAN REAGEN SAMPAI RATA |
+| 16.1–18 | INSIDE: ESTERASE CUTS THE / FATTY ACID OFF CHOLESTEROL | DI DALAM: ESTERASE MEMOTONG / ASAM LEMAK DARI KOLESTEROL |
+| 18.1–20.4 | OXIDASE USES O₂ ON CHOLESTEROL / AND RELEASES H₂O₂ (PEROXIDE) | OKSIDASE MEMAKAI O₂ PADA KOLESTEROL / DAN MELEPAS H₂O₂ (PEROKSIDA) |
+| 20.5–22.95 | PEROXIDASE + H₂O₂ → PINK DYE / MORE CHOLESTEROL = MORE PINK | PEROKSIDASE + H₂O₂ → ZAT WARNA PINK / MAKIN BANYAK KOLESTEROL = MAKIN PINK |
+| 23.05–25.45 | STEP 5: THE RING CARRIES THE / CUVETTE INTO THE PHOTOMETER | LANGKAH 5: CINCIN MEMBAWA KUVET / MASUK KE FOTOMETER |
+| 25.55–27.95 | LIGHT SHINES THROUGH THE DYE / THE DYE ABSORBS PART OF IT | CAHAYA MENEMBUS ZAT WARNA / SEBAGIAN CAHAYA DISERAP |
+| 28.05–29.95 | DETECTOR: LESS LIGHT GETS / THROUGH = MORE CHOLESTEROL | CAHAYA DI DETEKTOR MAKIN SEDIKIT / = KOLESTEROL MAKIN BANYAK |
+| 30.05–31.95 | STEP 6: A CALIBRATION TURNS IT / INTO A RESULT IN mg/dL | LANGKAH 6: KALIBRASI MENGUBAHNYA / JADI HASIL DALAM mg/dL |
+| 32.05–34.35 | ...THEN THE NEXT CUVETTE, / THE NEXT SAMPLE, THE NEXT TEST | ...LALU KUVET BERIKUTNYA, / SAMPEL DAN TES BERIKUTNYA |
+
+**Part tags** (a leader line from the part, then the name types in):
+- the parts of the analyzer in the reveal;
+- the reagent probe and the cholesterol reagent bottle;
+- the reagent and the serum in the aspiration cutaways;
+- the cuvette, the sample probe and the serum sample tube;
+- serum and reagent in the cuvette, and the stirrer;
+- each molecule: cholesterol ester, esterase, cholesterol, fatty acid, oxidase, O₂, H₂O₂, peroxidase, pink dye;
+- the photometer, its lamp, lens, filter, cuvette, detector and electronics, and the reference and measured light
+  levels;
+- the workstation and the example value;
+- the next cuvette.
+
+**HUD plate** (top right):
+- zoom (×1 = the wide shot of the whole analyzer) with a scale bar on the machine and cutaway views;
+- TIME-LAPSE during the colour preview;
+- NOT TO SCALE over the molecules;
+- SCHEMATIC over the optics cutaway.
+
 ## Shot by shot (120 BPM, one bar = 2 s)
 
 | Time (s) | Beat | What happens |
@@ -190,6 +270,9 @@ pulse leads, a triangle bass and noise drums.
 - The detector bip, comparison blips and the packet whoosh.
 - The two-note reward ding.
 - A carousel click that leads into the first beat.
+- With the explanation layer: soft dialog blips while a caption types, a two-note chime when a caption box opens, a
+  tick when a tag pops in. They are quiet and high, so they never cover the plip or the detector bip. `--clean` leaves
+  them out.
 
 The soundtrack is built on a circular bus: reverb and echo tails wrap around the loop point, so the loop has no gap
 or click. It is mastered to −14 LUFS integrated with a true-peak ceiling around −1 dBTP.
@@ -214,6 +297,8 @@ or click. It is mastered to −14 LUFS integrated with a true-peak ceiling aroun
   - rose dye #D45577;
   - teal (#5CC8E0) and amber (#F2A93B) arm accents.
 - Transitions: tracking moves, zooms, SNES-style dither dissolves and two match cuts (3.85 s and 13.25 s).
+- Captions, tags and HUD use the same 5×7 bitmap font, outlined in navy, inside SNES-style boxes. They stay below the
+  top edge and away from the bottom of the frame, where phone apps put their buttons.
 
 ## Files
 
@@ -222,7 +307,7 @@ or click. It is mastered to −14 LUFS integrated with a true-peak ceiling aroun
 | `render.py` | Command line: film, preview, stills, contact sheet, slices, audio only. |
 | `requirements.txt` | numpy, Pillow, imageio-ffmpeg. |
 | `镜头表.md` | The shot list (huashu-art-motion workflow) with style lock and lint notes. |
-| `docs/storyboard.png` | One frame per beat. |
+| `docs/storyboard.png`, `docs/storyboard_id.png` | One frame per beat, English and Indonesian captions. |
 | `engine/timeline.py` | The clock: 120 BPM grid, every event time, ring positions, arm and tray motion, cuvette states. |
 | `engine/analyzer.py` | The analyzer, drawn in 2D 3/4 view (trays, bottles, tubes, ring, cuvettes, arms, stirrer, optics, wash, workstation, lid). |
 | `engine/shots.py` | Camera keys for the analyzer shots (tracking, zooms, the two match-cut compositions). |
@@ -231,6 +316,7 @@ or click. It is mastered to −14 LUFS integrated with a true-peak ceiling aroun
 | `engine/molecules.py` | The molecular scene: esterase, oxidase, peroxidase, dye. |
 | `engine/optics.py` | The optics cutaway: lamp, lens, filter, cuvette, beam, detector, pulse, comparison, data packet. |
 | `engine/screen.py` | The workstation screen texture. |
+| `engine/explain.py` | The explanation layer: caption texts (English and Indonesian), timings, part tags, HUD. |
 | `engine/scenes.py` | Which artwork is on screen at each moment, and the transitions. |
 | `engine/audio.py`, `engine/synth.py` | Music and sound effects (synthesized from code, no samples). |
 | `engine/gfx.py`, `engine/view.py`, `engine/palette.py`, `engine/pixfont.py` | Pixel helpers, 2D camera, palette, pixel font. |
@@ -241,18 +327,23 @@ or click. It is mastered to −14 LUFS integrated with a true-peak ceiling aroun
 - **Shot list lint** (`storyboard_lint.py`): yellow, with reasons in `镜头表.md`:
   - the short opening beats are the brief's own timing;
   - the 8 colours are separate colour roles the brief asks for.
-- **Film gate** (`film_gate.py --no-template`) on a half-size preview: **pass**.
-  - Fast-motion frames 39%; blue-purple frames 1.4%; no empty frames mid-film.
-  - Yellow: about 22 push-ins per minute. This is the brief's structure: into the drop, the tip, the liquid, the
+- **Film gate** (`film_gate.py --no-template`) on a half-size preview with captions: **pass**.
+  - Fast-motion frames 40.6%; blue-purple frames 1.4%; no empty frames mid-film.
+  - Yellow: fixed frame 72%. The caption box and the HUD plate stay in place while the picture moves under them;
+    this is the explanation layer, and `--clean` removes it.
+  - Yellow: about 18 push-ins per minute. This is the brief's structure: into the drop, the tip, the liquid, the
     molecules and the optics. Each push is followed by a pull-back or a pan.
-- **Loop seam:** frame 0 and the last frame (35.967 s) differ only in the growing drop (0.1% of pixels). The image at
-  35.9999 s is identical to frame 0. The soundtrack wraps around the same point.
+- **Caption fit:** every caption line fits the box in both languages. Each caption is fully typed and then stays
+  readable for about 1 s or more before it closes.
+- **Loop seam:** frame 0 and the last frame (35.967 s) differ only in the growing drop and the blinking "continue"
+  marker of the caption box (0.07% of pixels). The soundtrack wraps around the same point.
 - **Determinism:** the same frame rendered twice is identical.
 - **Phone size:** at 360×640, the first frame reads clearly (probe, drop, highlighted cuvette). The two pipette paths
   are easy to tell apart: teal arm from the left tray, amber arm from the right tray.
-- **Audio:** 36.000 s, 48 kHz stereo; −14.0 LUFS, true peak −1.15 dBTP.
-  - The plip is about 9 dB above the pocket around it.
-  - The detector bip is about 13 dB above the thinned music.
+- **Audio** (English, Indonesian and clean versions): 36.000 s, 48 kHz stereo; −14.0 LUFS, true peak −1.15 dBTP.
+  - The plip stands about 6 dB above the quiet pocket around it.
+  - The detector bip is about 12 dB above the thinned music.
+  - The caption sounds alone peak at −18 dBFS.
 - **Preview streams:** H.264 540×960 30 fps + AAC 48 kHz stereo, both 36.000 s.
 - **Fresh clone:** the commands above were run from a fresh clone in a clean virtual environment, rendering a short
   full-size slice.

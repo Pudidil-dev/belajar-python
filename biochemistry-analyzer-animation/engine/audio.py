@@ -262,8 +262,27 @@ def combo(m, kind):
     return out / np.abs(out).max()
 
 
-def sfx():
+def ui_sounds(bus, lang):
+    """The explanation layer: soft dialog blips while a caption types, a two-note chime when a box opens, a tick
+    when a part tag pops in. Quiet and high, so they sit above the music without masking the machine sounds."""
+    from . import explain
+    k = 0
+    for t, kind in explain.typing_events(lang):
+        if kind == 'type':
+            f = (1046.5, 1174.7, 1318.5, 1174.7)[k % 4]
+            bus.put(S.blip(f, f * 0.94, 0.016, 0.5), t, 0.04, 0.15)
+            k += 1
+        elif kind == 'open':
+            bus.put(S.blip(1568.0, 1568.0, 0.03, 0.25), t, 0.045, -0.2)
+            bus.put(S.blip(2093.0, 2093.0, 0.05, 0.25), t + 0.045, 0.045, 0.2)
+        else:
+            bus.put(S.blip(2637.0, 1760.0, 0.022, 0.5), t, 0.05, 0.3)
+
+
+def sfx(info=True, lang='en'):
     bus = Loop()
+    if info:
+        ui_sounds(bus, lang)
     # ---- the opening: the drop plips in its pocket; the cutaway time-lapse whirs; the pull back
     bus.put(plip(), T.LAND, 0.55)
     ff = S.whoosh(1.0, 300, 2600, 3, 0.7, 0.85)
@@ -352,14 +371,14 @@ def master(mus, fx, target=-14.0):
     return mix
 
 
-def render(out_dir, log=print):
+def render(out_dir, log=print, info=True, lang='en'):
     from pathlib import Path
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     log('audio: score ...')
     mus = music()
     log('audio: effects ...')
-    fx = sfx()
+    fx = sfx(info, lang)
     mix = master(mus, fx)
     g = 10 ** ((-16.0 - S.lufs(mus)) / 20)
     S.write_wav(out / 'music.wav', np.clip(mus * g, -1, 1))
