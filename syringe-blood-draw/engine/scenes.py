@@ -1,15 +1,17 @@
 """What is on screen at film time t, where the camera is, and the rewind that closes the loop.
 
 The world is fixed: the arm's skin is y = 0 and the needle enters at (0, 0). The camera is a world point plus a zoom
-(timeline.camera): it rides alongside the syringe, settles on the insertion site, zooms in on the needle opening, follows
-the blood up the needle and pulls back to the opening composition. After 20 s the same film is shown at the rewind's
-source time, so the camera path and every motion run backward, with two brief pixel scanlines on top.
+(timeline.camera). It opens close on the empty syringe standing upright in front of soft light rays (a glint, sparkles,
+the tip flashing), pulls back while the syringe swings down to the needle angle, rides alongside it toward the arm,
+settles closer on the insertion site and follows the needle in slowly, zooms in on the needle opening, follows the blood
+up the needle and pulls back to the whole syringe. After 20 s the same film is shown at the rewind's source time, so
+the camera path and every motion run backward, with two brief pixel scanlines on top.
 """
 import math
 import numpy as np
 from . import gfx, syringe, arm
 from . import timeline as T
-from .palette import BG, CY, GL, INK, OUTLINE, WHITE
+from .palette import BG, CY, INK, WHITE
 
 W, H = gfx.W, gfx.H
 _Y, _X = np.mgrid[0:H, 0:W]
@@ -60,40 +62,94 @@ def star(buf, x, y, size, col):
             buf[y + dy, x + dx] = col if (dx, dy) == (0, 0) or size < 3 else (CY[4] if abs(dx) + abs(dy) == 2 else col)
 
 
-def film(t, opening_glint=True):
-    """The film at time t: (canvas, zoom)."""
+def big_star(buf, x, y, r, col, mid=None):
+    """A 4-point star with arms of r px (and a 1-px diagonal halo when r >= 3)."""
+    x, y = int(round(x)), int(round(y))
+    mid = CY[4] if mid is None else mid
+    pts = [(0, 0, col)]
+    for k in range(1, r + 1):
+        c = col if k < r else mid
+        pts += [(k, 0, c), (-k, 0, c), (0, k, c), (0, -k, c)]
+    if r >= 3:
+        pts += [(1, 1, mid), (-1, 1, mid), (1, -1, mid), (-1, -1, mid)]
+    for dx, dy, c in pts:
+        if 0 <= x + dx < W and 0 <= y + dy < H:
+            buf[y + dy, x + dx] = c
+
+
+def hero_backdrop(buf, ox, oy, t):
+    """A soft glow and slowly turning rays behind the upright syringe; they fade as it swings away."""
+    a = 1 - T.smooth(T.u_of(t, (1.45, 2.1)))
+    if a <= 0:
+        return
+    cx, cy = T.M0[0] - ox, T.M0[1] - oy
+    dx, dy = _X + 0.5 - cx, _Y + 0.5 - cy
+    ang = np.arctan2(dy, dx) + t * 0.35
+    r = np.hypot(dx, dy * 0.62)
+    wedge = np.cos(ang * 10) > 0.6
+    fade = np.clip(1.0 - r / 150.0, 0, 1) * a * 0.9
+    buf[wedge & (fade > gfx.BAYER[:H, :W])] = BG[4]
+    g = np.clip(1 - np.hypot(dx / 62.0, dy / 104.0), 0, 1) * 2.2 * a + gfx.BAYER[:H, :W]
+    buf[g > 1.0] = BG[4]
+    buf[g > 2.0] = BG[5]
+
+
+def hero_sparkles(buf, t, cx, cy):
+    """Sparkles that pop around the empty syringe while it is shown off."""
+    if not (T.TWINKLE[0] <= t < T.TWINKLE[1] + 0.4):
+        return
+    for i, (dx, dy, t0) in enumerate(T.TWINKLES):
+        k = (t - t0) / 0.42
+        if k < 0 or k >= 1 or t0 >= T.TWINKLE[1]:
+            continue
+        size = 1 if k < 0.15 else (3 if k < 0.45 else (2 if k < 0.75 else 1))
+        star(buf, cx + dx, cy + dy, size, WHITE if i % 3 else CY[5])
+
+
+def film(t, hero_fx=True):
+    """The film at time t: (canvas, zoom). hero_fx=False drops the opening glint and sparkles (used by the rewind)."""
     cx, cy, z = T.camera(t)
     ox, oy = cx - W / 2, cy - H / 2
     buf = np.empty((H, W, 3), np.uint8)
     background(buf, ox, oy, t)
+    hero_backdrop(buf, ox, oy, t)
     arm.draw(buf, ox, oy, t)
+    ang = T.syringe_angle(t)
     tw = T.tip_world(t)
     tx, ty = tw[0] - ox, tw[1] - oy
     hl = None
-    if opening_glint and T.HIGHLIGHT[0] <= t < T.HIGHLIGHT[1]:
-        hl = T.lerp(205.0, 95.0, T.u_of(t, T.HIGHLIGHT))
+    if hero_fx and T.HIGHLIGHT[0] <= t < T.HIGHLIGHT[1]:
+        hl = T.lerp(214.0, -14.0, T.u_of(t, T.HIGHLIGHT))      # the glint runs from the thumb press to the tip
     if T.FINAL_GLINT[0] <= t < T.FINAL_GLINT[1]:
-        hl = T.lerp(96.0, 200.0, T.smooth(T.u_of(t, T.FINAL_GLINT)))
-    syringe.draw(buf, tx, ty, T.plunger(t), T.flow_front(t), T.barrel_fill(t), hl)
-    syringe.draw_cells(buf, tx, ty, t)
+        hl = T.lerp(98.0, 188.0, T.smooth(T.u_of(t, T.FINAL_GLINT)))
+    syringe.draw(buf, tx, ty, T.plunger(t), T.flow_front(t), T.barrel_fill(t), hl, ang)
+    syringe.draw_cells(buf, tx, ty, t, ang)
+    if hero_fx and t < T.SWING[1]:
+        pv = T.pivot(t)
+        hero_sparkles(buf, t, pv[0] - ox, pv[1] - oy)
+        if T.TIP_STAR[0] <= t < T.TIP_STAR[1]:
+            k = T.u_of(t, T.TIP_STAR)
+            r = int(round(4 * math.sin(math.pi * k)))
+            if r >= 1:
+                big_star(buf, tx, ty - 1, r, WHITE)
     # a small glint rides the needle tip so it can be followed through the layers
     if T.TIP_GLINT[0] <= t < T.TIP_GLINT[1]:
         ph = (t * 2.4) % 1.0
         size = 3 if ph < 0.35 else (2 if ph < 0.7 else 1)
-        star(buf, tx + 1.5, ty + 0.5, size, WHITE)
+        star(buf, tx + 1.0, ty + 0.5, size, WHITE)
     # the opening reaches the vein: one soft ring
     if T.INSERT[1] <= t < T.INSERT[1] + 0.45:
         k = (t - T.INSERT[1]) / 0.45
-        ow = arm.opening_world()
-        r = 2 + 12 * T.ease_out(k, 2.0)
+        ow = T.opening_world()
+        r = 2 + 14 * T.ease_out(k, 2.0)
         gfx.fill_dither(buf, gfx.ring(ow[0] - ox, ow[1] - oy, r, r, 1.0), None, CY[4], 1 - k)
     # payoff sparkles around the full barrel
     if T.CHIME <= t < T.CHIME + 0.9:
         k = (t - T.CHIME) / 0.9
-        for i, (s_, v_) in enumerate(((120, 16), (160, -15), (140, 18), (175, 14))):
+        for i, (s_, v_) in enumerate(((118, 24), (158, -24), (140, 26), (172, 22))):
             if k < 0.15 * i or k > 0.15 * i + 0.5:
                 continue
-            x, y = syringe.to_canvas(tx, ty, s_, v_)
+            x, y = syringe.to_canvas(tx, ty, s_, v_, ang)
             kk = (k - 0.15 * i) / 0.5
             star(buf, x, y, 3 if kk < 0.4 else (2 if kk < 0.75 else 1), WHITE if i % 2 == 0 else CY[5])
     return buf, z
@@ -131,7 +187,7 @@ def render(t, fps=30, scale=gfx.SCALE):
     """The finished frame at video time t: (H*scale, W*scale, 3) uint8."""
     s = T.source_time(t)
     rew = t >= T.REWIND[0]
-    low, z = film(s, opening_glint=not rew)
+    low, z = film(s, hero_fx=not rew)
     out = gfx.camera(low, z, W / 2, H / 2, scale)
     if rew:
         out = rewind_fx(out, t, fps, scale)
@@ -140,7 +196,8 @@ def render(t, fps=30, scale=gfx.SCALE):
 
 def warm():
     from . import cells
-    cells.sprites(5.0)
-    cells.sprites(5.0, True)
+    for d in (6.0, 5.0):
+        cells.sprites(d)
+        cells.sprites(d, True)
     cells.sprites(3.5)
-    cells.sprites(4.25)
+    cells.sprites(2.5)

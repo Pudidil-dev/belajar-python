@@ -11,15 +11,20 @@ from . import gfx, cells
 from . import timeline as T
 from .palette import GL, RB, ST, HB, CY, BL, BG, INK, OUTLINE
 
-NEEDLE_L, NEEDLE_R, LUMEN_R, BEVEL = 84.0, 3.5, 1.8, 10.0
-HUB0, HUB1, HUB_R0, HUB_R1 = 84.0, 96.0, 4.0, 6.5
-NOZ0, NOZ1, NOZ_R, NOZ_IN = 96.0, 102.0, 3.0, 1.6
-BAR0, BAR1, BAR_R, BAR_IN = T.S_BARREL0, T.S_BARREL1, 14.0, 12.2
-FLA0, FLA1, FLA_R = 186.0, 190.0, 24.0
-STOP_L, ROD_L, ROD_R, THUMB_L, THUMB_R = 8.0, 96.0, 7.5, 4.0, 17.0
+NEEDLE_L, NEEDLE_R, LUMEN_R, BEVEL = 84.0, 2.4, 1.2, 7.0          # a fine needle
+HUB0, HUB1, HUB_R0, HUB_R1 = 84.0, 96.0, 3.6, 7.5
+NOZ0, NOZ1, NOZ_R, NOZ_IN = 96.0, 101.0, 3.6, 1.6
+BAR0, BAR1, BAR_R, BAR_IN = T.S_BARREL0, T.S_BARREL1, 20.0, 18.2     # a wide barrel: more room for blood
+SHOULDER = 2.4                                                       # the barrel's front shoulder slope
+FLA0, FLA1, FLA_R = BAR1, BAR1 + 5.0, 31.0
+STOP_L, ROD_R, THUMB_L, THUMB_R = 9.0, 9.0, 5.0, 22.0                # rod fins span 18 px; seen through the barrel
+ROD_L = T.L_EMPTY - BAR0 - STOP_L - THUMB_L                          # 89: the thumb press sits 13 px behind the flange
 
-UX, UY = T.U
-NX, NY = T.N
+
+def axes(ang=T.ANGLE):
+    """(ux, uy, nx, ny): the tip direction and the syringe's top side for an axis at angle ang (radians)."""
+    c, s = math.cos(ang), math.sin(ang)
+    return c, s, s, -c
 
 
 def _tone(rmp, v, th):
@@ -28,22 +33,24 @@ def _tone(rmp, v, th):
     return np.asarray(rmp, np.uint8)[idx]
 
 
-def to_canvas(tx, ty, s, v):
+def to_canvas(tx, ty, s, v, ang=T.ANGLE):
     """Canvas point at axis coordinates (s, v) for a tip at canvas (tx, ty)."""
-    return tx - s * UX + v * NX, ty - s * UY + v * NY
+    ux, uy, nx, ny = axes(ang)
+    return tx - s * ux + v * nx, ty - s * uy + v * ny
 
 
 def length(plunger):
     return BAR0 + plunger + STOP_L + ROD_L + THUMB_L
 
 
-def draw(buf, tx, ty, plunger=0.0, front=0.0, fill=0.0, highlight=None):
-    """Draw the syringe with its needle tip at canvas (tx, ty).
+def draw(buf, tx, ty, plunger=0.0, front=0.0, fill=0.0, highlight=None, ang=T.ANGLE):
+    """Draw the syringe with its needle tip at canvas (tx, ty) and its axis at angle ang.
 
     plunger: stopper travel (px); front: how far blood has come up from the tip (px); fill: blood column in the barrel
     (px); highlight: axis position of a sweeping glint (or None)."""
+    UX, UY, NX, NY = axes(ang)
     s_end = length(plunger)
-    pts = [to_canvas(tx, ty, s, v) for s in (0.0, s_end) for v in (-FLA_R - 2, FLA_R + 2)]
+    pts = [to_canvas(tx, ty, s, v, ang) for s in (0.0, s_end) for v in (-FLA_R - 2, FLA_R + 2)]
     x0 = max(int(math.floor(min(p[0] for p in pts))) - 2, 0)
     x1 = min(int(math.ceil(max(p[0] for p in pts))) + 3, gfx.W)
     y0 = max(int(math.floor(min(p[1] for p in pts))) - 2, 0)
@@ -72,7 +79,7 @@ def draw(buf, tx, ty, plunger=0.0, front=0.0, fill=0.0, highlight=None):
     hub_in = hub & (av < hub_r - 1.4)
     noz = (s > NOZ0) & (s <= NOZ1) & (av <= NOZ_R)
     noz_in = noz & (av < NOZ_IN)
-    shoulder = np.clip(NOZ_R + (s - BAR0) * 2.0, NOZ_R, BAR_R)
+    shoulder = np.clip(NOZ_R + (s - BAR0) * SHOULDER, NOZ_R, BAR_R)
     barrel = (s > BAR0) & (s <= BAR1) & (av <= shoulder)
     bar_in = barrel & (av < np.minimum(shoulder - 1.6, BAR_IN)) & (s > BAR0 + 1.2)
     bwall = barrel & ~bar_in
@@ -91,15 +98,16 @@ def draw(buf, tx, ty, plunger=0.0, front=0.0, fill=0.0, highlight=None):
     blood_b = bar_in & (s < BAR0 + fill + 0.5)
     stopper = bar_in & (s >= sf) & (s < sf + STOP_L)
     rod_in = bar_in & (s >= rod0) & (av <= ROD_R)
-    air = bar_in & ~(blood_b | stopper | rod_in)
+    air = bar_in & ~(blood_b | stopper)
     if air.any():                                            # see-through plastic: the navy shows, slightly lifted
         f = out[air].astype(np.float32)
         out[air] = (f * 0.72 + np.asarray(GL[1], np.float32) * 0.28 + 3).clip(0, 255).astype(np.uint8)
     if blood_b.any():
         vb = np.clip(0.5 + 0.45 * np.clip(v / BAR_IN, -1, 1), 0, 1)
         out[blood_b] = _tone(BL[3:8], vb[blood_b], th[blood_b])
-        streak = blood_b & (v > 7.0) & (v < 8.8)
+        streak = blood_b & (v > 0.58 * BAR_IN) & (v < 0.7 * BAR_IN)
         out[streak] = BL[8]
+        out[blood_b & (v > 0.36 * BAR_IN) & (v < 0.42 * BAR_IN)] = BL[7]
         meniscus = blood_b & (s > BAR0 + fill - 0.6)
         out[meniscus & ~stopper] = BL[7]
     if stopper.any():
@@ -107,22 +115,23 @@ def draw(buf, tx, ty, plunger=0.0, front=0.0, fill=0.0, highlight=None):
         vs = np.where((np.abs(s - sf - 2.6) < 0.7) | (np.abs(s - sf - 5.4) < 0.7), vs - 0.3, vs)
         vs = np.where(s < sf + 0.9, vs + 0.25, vs)
         out[stopper] = _tone(RB[1:6], np.clip(vs[stopper], 0, 1), th[stopper])
-    if rod_in.any():
-        vr = np.where(av < 1.0, 0.95, 0.55 + 0.3 * vn)
-        out[rod_in] = _tone(GL[3:7], np.clip(vr[rod_in], 0, 1), th[rod_in])
+    if rod_in.any():                                         # the clear plastic rod inside: translucent fins, solid rib
+        f = out[rod_in].astype(np.float32)
+        out[rod_in] = (f * 0.6 + np.asarray(GL[4], np.float32) * 0.4).astype(np.uint8)
+        out[rod_in & ((av < 1.2) | (np.abs(av - ROD_R) < 0.7))] = GL[5]
     # barrel wall, graduations, glass streaks
     if bwall.any():
         out[bwall] = _tone(GL[3:7], lit[bwall], th[bwall])
     ticks = bar_in & (v > 0) & (s > BAR0 + 2) & (s < BAR1 - 2)
     k = np.round((s - (BAR0 + 2)) / 6.0)
     on_tick = np.abs(s - (BAR0 + 2) - k * 6.0) < 0.55
-    tick_len = np.where((k % 3) == 0, 6.0, 3.4)
+    tick_len = np.where((k % 3) == 0, 4.8, 2.8)
     ticks &= on_tick & (v > BAR_IN - tick_len)
     out[ticks & ~blood_b] = INK
     out[ticks & blood_b] = BL[8]
-    glare = bar_in & (v > 9.6) & (v < 10.9) & ~ticks & ~stopper
+    glare = bar_in & (v > 10.4) & (v < 11.8) & ~stopper
     out[glare & ~blood_b] = GL[5]
-    low = bar_in & (v < -9.8) & (v > -10.9) & ~stopper
+    low = bar_in & (v < -14.8) & (v > -16.2) & ~stopper
     out[low & ~blood_b] = GL[3]
 
     # ---- flange, rod outside, thumb press
@@ -181,21 +190,23 @@ STREAM_T0 = T.FLOW_IN + np.arange(N_STREAM) * 0.135
 STREAM_V = _rng.uniform(-0.5, 0.5, N_STREAM)
 STREAM_SPEED = T.S_BARREL0 / (T.FLOW_HUB - T.FLOW_IN)
 BAR_R01 = _rng.uniform(0.15, 1.0, N_STREAM)
-BAR_V = _rng.uniform(-7.0, 7.0, N_STREAM)
+BAR_V = _rng.uniform(-13.5, 13.5, N_STREAM)
 BAR_TILT = _rng.uniform(0, 1, N_STREAM)
 BAR_PSI = _rng.integers(0, 4, N_STREAM)
 
 
-def _mini_cell(buf, x, y):
+def _mini_cell(buf, x, y, ux, uy):
+    """A red cell squeezed into the fine needle: a bright dot with a darker tail pointing back down the needle."""
     x, y = int(round(x)), int(round(y))
-    for dx, dy, c in ((0, 0, BL[7]), (1, 0, BL[6]), (-1, 0, BL[6]), (0, 1, BL[5]), (0, -1, BL[6]),
-                      (1, 1, BL[4]), (-1, 1, BL[4])):
-        if 0 <= x + dx < gfx.W and 0 <= y + dy < gfx.H:
-            buf[y + dy, x + dx] = c
+    bx, by = int(round(x + ux * 1.2)), int(round(y + uy * 1.2))
+    for (px, py, c) in ((bx, by, BL[4]), (x, y, BL[8])):
+        if 0 <= px < gfx.W and 0 <= py < gfx.H:
+            buf[py, px] = c
 
 
-def draw_cells(buf, tx, ty, t):
+def draw_cells(buf, tx, ty, t, ang=T.ANGLE):
     """Cells riding up the needle into the barrel, then drifting in the growing column."""
+    ux, uy = math.cos(ang), math.sin(ang)
     if t < T.FLOW_IN:
         return
     tt = min(t, T.FULL)                                     # the flow stops when the plunger stops
@@ -208,13 +219,13 @@ def draw_cells(buf, tx, ty, t):
         if s < T.S_BARREL0 - 1:
             if s > T.flow_front(t) - 1:
                 continue
-            x, y = to_canvas(tx, ty, s + 1.0, STREAM_V[k] * 0.6)
-            _mini_cell(buf, x, y)
-        elif fill > 4 and k % 3 == 0:
+            x, y = to_canvas(tx, ty, s + 1.0, STREAM_V[k] * 0.5, ang)
+            _mini_cell(buf, x, y, ux, uy)
+        elif fill > 4 and k % 2 == 0:
             settle = T.clamp01((s - T.S_BARREL0) / 30.0)
             sb = T.S_BARREL0 + 2 + (fill - 5) * BAR_R01[k] * settle
             vb = BAR_V[k] * settle + math.sin(t * 1.7 + k) * 0.6
-            x, y = to_canvas(tx, ty, min(sb, T.S_BARREL0 + fill - 3), vb)
+            x, y = to_canvas(tx, ty, min(sb, T.S_BARREL0 + fill - 3), vb, ang)
             spr = cells.pick(5.0, (BAR_TILT[k] + 0.3 * t * (1 if t < T.FULL else 0)) % 1.0, BAR_PSI[k])
             h, w = spr[1].shape
             gfx.paste_sprite(buf, spr, x - w / 2, y - h / 2)

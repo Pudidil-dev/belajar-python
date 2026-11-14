@@ -587,8 +587,26 @@ def plunger_slide(dur, seed=5):
 
 def sfx_forward():
     bus = Bus()
-    # hook: the glint, the shup, the tracking whoosh
+    # the showcase: a glint runs up the empty syringe, sparkles ping around it, the needle tip shines
     bus.put(bell(103, 0.35, 1.0, 2.0), T.HIGHLIGHT[0] + 0.02, 0.07, 0.2)
+    gl0 = bandnoise(T.HIGHLIGHT[1] - T.HIGHLIGHT[0], lambda tt: 3500 + 5000 * tt / 0.45, 0.5, 31)
+    bus.put(gl0 * env_exp(len(gl0), 0.14, 0.01), T.HIGHLIGHT[0] + 0.01, 0.035, 0.1)
+    notes = (89, 93, 96, 98, 101)                            # F6 A6 C7 D7 F7: the first bar's chord
+    for i, (dx, dy, t0) in enumerate(sorted(T.TWINKLES, key=lambda p: p[2])):
+        if t0 >= T.TWINKLE[1]:
+            continue
+        bus.put(bell(notes[i % len(notes)], 0.3, 0.8, 3.0), t0 + 0.06, 0.022, 0.6 * (1 if dx > 0 else -1))
+    bus.put(bell(101, 0.6, 1.4, 2.0), T.TIP_STAR[0] + 0.08, 0.06, 0.0)
+    bus.put(blip(2093.0, 2793.8, 0.05, 0.5), T.TIP_STAR[0] + 0.08, 0.03)
+    # the wind-up (a soft drop), the swing to the needle angle (a rising 'dwip' + air), the lock-on tick
+    n = int(0.25 * SR)
+    x = np.arange(n) / SR
+    bus.put(sine(620 * (0.5 ** (x / 0.25)), n) * np.sin(math.pi * x / 0.25) ** 1.5, T.WINDUP[0], 0.07)
+    bus.put(blip(523.3, 1568.0, 0.2, 0.25), T.SWING[0], 0.08, -0.2)
+    bus.put(whoosh(0.45, 700, 2400, 33, 0.8, 0.45), T.SWING[0] + 0.02, 0.14, 0.2)
+    bus.put(beep(1318.5, 0.035, 0.25), T.SWING[0] + 0.36, 0.05, 0.3)
+    bus.put(beep(1760.0, 0.05, 0.25), T.SWING[0] + 0.43, 0.05, 0.3)
+    # the launch: the shup and the tracking whoosh
     bus.put(shup(), T.MOVE0 - 0.01, 0.5)
     w = whoosh(1.9, 1500, 500, 11, 0.8, 0.12)
     bus.put(w, T.MOVE0 + 0.02, 0.3, 0.2)
@@ -600,10 +618,12 @@ def sfx_forward():
     bus.put(bandnoise(1.0, lambda tt: 1200 + 2400 * tt, 0.6, 12) * np.sin(math.pi * x / 1.0) ** 2, T.CUTAWAY[0], 0.06)
     # the needle: a soft tick at the tip glint, gentle pips at the skin and the vein, a confirm when it is in
     bus.put(blip(1396.9, 2093.0, 0.06, 0.5), T.TIP_GLINT[0], 0.05, 0.3)
-    t_skin = next(tt for tt in np.arange(T.INSERT[0], T.INSERT[1], 0.005) if T.tip_d(tt) >= 0.0)
-    t_vein = next(tt for tt in np.arange(T.INSERT[0], T.INSERT[1], 0.005) if T.tip_d(tt) >= 42.0)
-    bus.put(blip(698.5, 880.0, 0.07, 0.5), t_skin, 0.07, 0.3)
-    bus.put(blip(880.0, 1046.5, 0.07, 0.5), t_vein, 0.07, 0.3)
+    # three rising pips as the tip crosses into the skin cells, the dermis and the vein
+    def crossing(depth):
+        return next(tt for tt in np.arange(T.INSERT[0], T.INSERT[1], 0.005) if T.tip_d(tt) * T.U[1] >= depth)
+    for depth, (f0, f1) in ((0.0, (698.5, 880.0)), (T.EPI, (880.0, 1046.5)),
+                            (T.DERM + T.VEIN_WALL, (1046.5, 1396.9))):
+        bus.put(blip(f0, f1, 0.07, 0.5), crossing(depth), 0.07, 0.3)
     bus.put(bell(84, 0.5, 1.2, 2.0), T.INSERT[1], 0.09, 0.2)
     bus.put(bell(89, 0.5, 1.2, 2.0), T.INSERT[1] + 0.12, 0.09, 0.2)
     # zoom in, plunger slide, blood flow, zoom out
