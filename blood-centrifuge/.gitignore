@@ -1,0 +1,6 @@
+build/
+__pycache__/
+output/*.mp4
+output/*.wav
+output/stills/
+output/sheet.png
