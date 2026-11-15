@@ -12,8 +12,10 @@ image → focus → moving the stage → the white blood cell → back to the op
 - **Format.** 1080×1920 (9:16), 30 fps, exactly 36.0 s (18 bars at 120 BPM), H.264 video with 48 kHz stereo AAC.
   The default export is `./out/light-microscope.mp4`, relative to this folder.
 - **Loop.** At the end the stage glides from the white cell back to the opening field and the focus softens, so the last
-  frame flows straight into the first: no cut, no fade, no freeze. The music's last bar (a D7 turnaround) resolves
-  into the first.
+  frame flows straight into the first: no cut, no fade, no freeze (last vs first frame: 0.014/255). The music's last
+  bar (a D7 turnaround) resolves into the first, with no click at the join. Platforms that replay the video (TikTok,
+  Reels, Shorts) play it as an endless loop. `python render.py --loops 3` also writes the loop three times back to back
+  (`out/light-microscope-loop3x.mp4`, 108 s) for players that don't loop.
 - **Three moments worth replaying:** the cells snapping into focus (the hook), the glass swipe, and the plum-stained
   white cell sliding into view.
 - **Captions.** Short context captions (8 words or fewer) sit at the top of the frame, in a 5×7 pixel font. The x-ray
@@ -79,6 +81,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | `python render.py --from 12 --to 22` | only a slice of the film |
 | `python render.py --fps 60` | 60 fps |
 | `python render.py --scale 8` | 2160×3840 (4K vertical) |
+| `python render.py --loops 3` | also `out/light-microscope-loop3x.mp4`: the seamless loop played 3 times (any N) |
 | `python render.py --audio-only` | only the soundtrack (music, effects, mix) |
 | `python render.py --jobs 2` | fewer CPU cores (the default uses all) |
 

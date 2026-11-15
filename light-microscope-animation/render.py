@@ -9,6 +9,7 @@ chiptune music, 1080x1920 (9:16), 30 fps, H.264 + stereo AAC.
     python render.py --from 12 --to 22    # just a slice
     python render.py --fps 60             # smoother motion (twice the frames)
     python render.py --audio-only         # only the soundtrack (music.wav, sfx.wav, mix.wav)
+    python render.py --loops 3            # also out/light-microscope-loop3x.mp4: the loop played 3 times (108 s)
 
 Needs Python 3.9+, numpy, Pillow and ffmpeg (on PATH, or `pip install imageio-ffmpeg` and it is found automatically).
 Every frame is drawn on a 270x480 pixel canvas and scaled exactly 4x (nearest neighbour) to 1080x1920.
@@ -107,6 +108,37 @@ def render_film(a):
     if proc.returncode != 0:
         sys.exit(f'ffmpeg failed ({proc.returncode})')
     print(f'done -> {out}  ({time.time() - st:.0f}s)')
+    if a.loops > 1:
+        if a.t0 > 0 or a.t1 is not None:
+            print('--loops needs the whole film (no --from/--to); skipped')
+        else:
+            export_loops(out, a.loops, None if a.no_audio else out.parent / 'mix.wav')
+
+
+def export_loops(film, n, mix_wav):
+    """The film n times back to back in one MP4. The picture is stream-copied (no re-render, no quality loss); the
+    sound is the mix repeated sample for sample and encoded once, so every join is as seamless as the loop itself."""
+    import wave
+    ff = find_ffmpeg()
+    looped = film.with_name(f'{film.stem}-loop{n}x{film.suffix}')
+    cmd = [ff, '-y', '-v', 'error', '-stream_loop', str(n - 1), '-i', str(film)]
+    tiled = None
+    if mix_wav is not None and mix_wav.exists():
+        tiled = film.with_name(f'{film.stem}-loop{n}x-mix.wav')
+        with wave.open(str(mix_wav)) as w:
+            params, data = w.getparams(), w.readframes(w.getnframes())
+        with wave.open(str(tiled), 'wb') as w:
+            w.setparams(params)
+            w.writeframes(data * n)
+        cmd += ['-i', str(tiled), '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k',
+                '-shortest']
+    else:
+        cmd += ['-map', '0:v', '-c:v', 'copy']
+    cmd += ['-movflags', '+faststart', str(looped)]
+    subprocess.run(cmd, check=True)
+    if tiled is not None:
+        tiled.unlink()
+    print(f'loop x{n} -> {looped}')
 
 
 def render_stills(a):
@@ -162,6 +194,7 @@ def main():
     ap.add_argument('--no-audio', action='store_true')
     ap.add_argument('--audio-only', action='store_true')
     ap.add_argument('--preview', action='store_true', help='540x960 with a fast encode, for a quick look')
+    ap.add_argument('--loops', type=int, default=1, help='also write the film N times back to back (seamless)')
     ap.add_argument('--stills')
     ap.add_argument('--sheet')
     ap.add_argument('--cols', type=int, default=6)
