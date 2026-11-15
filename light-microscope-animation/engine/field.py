@@ -23,10 +23,10 @@ ABS_GRN = np.array([0.30, 0.62, 0.30])    # its fine granules
 ABS_PLT = np.array([0.62, 1.25, 0.80])    # platelets
 
 # ---- where things sit on the slide (micrometres)
-V_GLIMPSE = (-372.0, -6.0)            # scene 2: a small group of cells near the thin end
+V_HOOK = (80.0, 6.0)                  # the opening field: dense red cells, the white cell just out of view
 V_FOCUS = (-132.0, 0.0)               # scene 7
 WBC_C = (6.0, -5.0)                   # the neutrophil
-V_FINAL = (0.0, 0.0)                  # scenes 9-10: the white cell sits just off centre
+V_FINAL = (0.0, 0.0)                  # scene 9: the white cell sits just off centre
 
 
 def _cells():
@@ -62,11 +62,6 @@ def _cells():
         d = rng.uniform(7.2, 8.5)
         if ok(x, y, d * rng.uniform(0.86, 0.98)):
             add(x, y, d)
-    # the glimpse: a small group of cells on clear plasma
-    gx0, gy0 = V_GLIMPSE
-    for (dx, dy) in ((0, 0), (8.2, 2.5), (-7.6, 3.4), (3.5, -8.0), (-4.2, -7.4), (11.5, -6.0), (-11.8, -4.0),
-                     (6.2, 10.4), (-3.0, 11.0), (15.6, 4.8), (-15.0, 7.2)):
-        add(gx0 + dx + rng.uniform(-0.6, 0.6), gy0 + dy + rng.uniform(-0.6, 0.6), rng.uniform(7.3, 8.3))
     rbc = np.array(pts[1:], np.float64)
     n = len(rbc)
     ell = rng.uniform(1.0, 1.09, n)

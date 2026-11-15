@@ -1,22 +1,23 @@
 # What One Drop of Blood Looks Like Under a Microscope
 
 A 36-second looping, vertical medical-science short in 16-bit pixel-art "lab game" style, with an original chiptune
-soundtrack. One drop of blood goes from a glass slide to the view through a compound light microscope:
+soundtrack. It opens inside the microscope, where red blood cells snap into focus. Then it shows how that image was
+made:
 
-drop → thin film → stained slide → microscope → an x-ray view of how the lenses make the image → focus →
-individual cells → back to the drop.
+cells in the eyepiece → the drop → thin film → stained slide → microscope → an x-ray view of how the lenses make the
+image → focus → moving the stage → the white blood cell → back to the opening cells.
 
 ![storyboard](docs/storyboard.png)
 
 - **Format.** 1080×1920 (9:16), 30 fps, exactly 36.0 s (18 bars at 120 BPM), H.264 video with 48 kHz stereo AAC.
   The default export is `./out/light-microscope.mp4`, relative to this folder.
-- **Loop.** The last frame is the eyepiece circle, still shrinking, at the exact size and place of the opening drop.
-  The video cuts back to the drop on the downbeat, with the glass spreader already approaching: no fade, no freeze, no
-  reversal. The music's last bar (a D7 turnaround) resolves into the first.
-- **Three moments worth replaying:** the glass swipe, the cells snapping into focus, and the plum-stained white cell
-  sliding into view.
+- **Loop.** At the end the stage glides from the white cell back to the opening field and the focus softens, so the last
+  frame flows straight into the first: no cut, no fade, no freeze. The music's last bar (a D7 turnaround) resolves
+  into the first.
+- **Three moments worth replaying:** the cells snapping into focus (the hook), the glass swipe, and the plum-stained
+  white cell sliding into view.
 - **Captions.** Short context captions (8 words or fewer) sit at the top of the frame, in a 5×7 pixel font. The x-ray
-  steps get numbered badges. The first half-second has no text, so the hook is a scene, not a title.
+  steps get numbered badges. The first half-second has no text, so the hook is the cells themselves, not a title.
 
 ## Render it yourself
 
@@ -87,9 +88,9 @@ On Windows, use `py render.py` if `python` is not on PATH.
 
 | Time | Picture | Caption | Sound |
 |---|---|---|---|
-| 0–2 | **The glass swipe.** Macro: a red drop on a slide. The edge of a second slide comes back onto it, the blood runs sideways along the edge, and one smooth swipe draws it into a film that thins to a feathered far end. A quick push toward the thin end. | SMEAR IT THIN | a glassy tink, the "shhk" swipe |
-| 2–3 | **First glimpse.** Match cut to the round eyepiece view: a small group of pink red cells, slightly blurred, snaps into focus. | FULL OF CELLS! | a crisp arcade "tik" |
-| 3–6 | **The prepared slide.** The same slide at the same angle. A dithered match dissolve brings in the dried, stained slide while the light's reflection crosses the glass: time has passed. | LET IT DRY · STAINED SMEAR | a soft glassy swell |
+| 0–2 | **The hook: inside the microscope.** The round eyepiece view of a crowded field of pink red blood cells, soft at first, snaps into focus. The pale centres pop. Only the sharpness changes. | ONE DROP OF BLOOD | a crisp arcade "tik" on the beat |
+| 2–4 | **How it was made: the glass swipe.** Macro: a red drop on a slide. The edge of a second slide comes back onto it, the blood runs sideways along the edge, and one smooth swipe draws it into a film that thins to a feathered far end. | HOW? SMEAR IT THIN | a glassy tink, the "shhk" swipe |
+| 4–6 | **The prepared slide.** The same slide at the same angle. A dithered match dissolve brings in the dried, stained slide while the light's reflection crosses the glass: time has passed. | DRY IT, STAIN IT | a soft glassy swell |
 | 6–9 | **Reveal the microscope.** The slide slides onto the stage, the spring clip closes, and the camera pulls back to the whole white microscope in three-quarter view. The lamp glows below, the condenser sits under the stage, the slide is on the stage and the objectives are above. | ONTO THE STAGE · LIGHT MICROSCOPE | glass on metal, a light metallic "tik" |
 | 9–12 | **The objective clicks in.** Closer to the nosepiece: it turns until the blue-banded 40× objective sits right above the smear and locks. The camera drops toward the lamp. | 40× OBJECTIVE | a ratchet, one firm "click" |
 | 12–15 | **X-ray, step 1.** A scan line turns the microscope see-through. Light from the filament is made parallel by the collector lens and focused by the condenser to a point on the thin film. | 1 LAMP + CONDENSER | x-ray buzz, a rising arcade whoosh with the light |
@@ -99,7 +100,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | 22–26 | **Find the focus.** The fine-focus knob turns slightly; match cut into the eyepiece. The fuzzy pink discs sharpen in place until their pale centres show. Only the sharpness changes, not the zoom. | FINE FOCUS · RED BLOOD CELLS | knob ticks; the music thins; a crisp high note at 24.5 |
 | 26–30 | **Move across the sample.** A small turn of the stage control, then the whole field glides sideways together and a larger plum-stained cell enters from the edge. | MOVE THE STAGE | knob ticks, a soft glide |
 | 30–33 | **The reveal.** The field stops on a white blood cell (a neutrophil: plum, lobed nucleus, pale granular cytoplasm) among the smaller pink red cells. | WHITE BLOOD CELL | a two-note chime |
-| 33–36 | **The loop.** The eyepiece view pulls back into a small circle the size and place of the opening drop, and cuts to the drop on the downbeat. | ALL FROM ONE DROP | a rising whoosh into the loop |
+| 33–36 | **The loop.** The stage glides on, the white cell leaves at the side, the opening field comes back and the focus softens into the very first frame. | ALL FROM ONE DROP | a soft glide, the focus sinking, the D7 turnaround |
 
 **The science (as drawn).**
 - **Preparation.** A wedge smear spreads the blood into a thin film. Its thin end is one cell thick, which is where you
@@ -145,7 +146,7 @@ Sources checked for the optics:
 
 - `render.py`: the command line (film, preview, stills, contact sheets, audio only).
 - `engine/`:
-  - `timeline.py`: one timeline for picture and sound (scenes, events, easing, the drop/eyepiece match).
+  - `timeline.py`: one timeline for picture and sound (scenes, events, easing, canvas places).
   - `palette.py`, `gfx.py`, `pixfont.py`: the palette, the pixel drawing kit, the bitmap font.
   - `slide.py`: macro glass slide, drop, spreader, fresh and stained films.
   - `rt.py`: the small vectorized ray tracer (solids, camera, outlines).

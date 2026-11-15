@@ -50,17 +50,11 @@ def lift(t):
 
 
 def camera(t):
-    """(slide y at the canvas anchor, zoom): the camera rides up the slide with the edge, then eases onto the thin end."""
-    if t < 3.0:
-        y = T.lerp(0.0, Y_MID, T.smooth(T.u_of(t, (0.5, 1.85))))
-        y = T.lerp(y, Y_THIN, T.ease_in(T.u_of(t, (1.8, 2.0)), 2.0))
-        z = T.lerp(1.0, 1.35, T.ease_in(T.u_of(t, (1.8, 2.0)), 2.0))
-        return y, z
-    return Y_MID, 1.0
+    """(slide y at the canvas anchor, zoom): the camera rides up the slide with the edge and settles on the film."""
+    return T.lerp(0.0, Y_MID, T.smooth(T.u_of(t, (T.SWIPE[0], T.SWIPE[1] + 0.1)))), 1.0
 
 
 Y_MID = 15.0                             # the camera's resting place: the whole film in view
-Y_THIN = 27.0                            # the thin end, where the cells lie in one layer
 
 
 def film_reach(t):

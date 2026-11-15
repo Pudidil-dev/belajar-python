@@ -452,7 +452,8 @@ REVEAL = [(4, 2, 91), (6, 2, 93), (8, 4, 90), (12, 4, 86)]                  # af
 SOFT = [(0, 6, 88), (6, 2, 86), (8, 8, 84)]
 TURN = [(0, 4, 81), (4, 2, 86), (6, 2, 90), (8, 1, 93), (9, 1, 90), (10, 1, 86), (11, 1, 81), (12, 1, 84),
         (13, 1, 86), (14, 1, 88), (15, 1, 90)]                              # D7 turnaround into the top of the loop
-LEAD = {0: HOOK_A, 1: HOOK_B, 2: HOOK_A2, 3: HOOK_C, 4: MACH_1, 5: MACH_2, 6: XR_1, 7: XR_2, 8: XR_3, 9: XR_4,
+HOOK_A0 = [n for n in HOOK_A if n[0] != 4] + [(5, 1, 91)]                 # bar 0 leaves the snap's beat alone
+LEAD = {0: HOOK_A0, 1: HOOK_B, 2: HOOK_A2, 3: HOOK_C, 4: MACH_1, 5: MACH_2, 6: XR_1, 7: XR_2, 8: XR_3, 9: XR_4,
         10: XR_5, 12: PICKUP, 13: HOOK_A, 14: HOOK_B, 15: REVEAL, 16: SOFT, 17: TURN}
 SOFT_BARS = (6, 7, 8, 9, 16)
 _THIRD = {0: 4, 2: 3, 4: 3, 5: 4, 7: 4, 9: 3, 11: 3, 6: 3}                # G major: a diatonic third below
@@ -623,21 +624,21 @@ def ratchet(bus, t0, t1, gain, f0=2200, f1=3000, step=STEP):
 
 def sfx_forward():
     bus = Bus()
-    # 1. the drop: the edge touches it (a glassy tink), the blood runs along the edge, the swipe ("shhk")
+    # 1. the hook: inside the microscope the red cells snap into focus on a crisp arcade "tik"
+    bus.put(blip(2637.0, 3136.0, 0.05, 0.5), T.HOOK_SNAP, 0.11, 0.0)
+    bus.put(click(7, 6000, 0.012), T.HOOK_SNAP, 0.08)
+    # 2. how it was made: the edge touches the drop (a glassy tink), the blood runs along the edge, the swipe ("shhk")
     bus.put(glass_ping(3300, 0.25, 3), T.TOUCH, 0.05, 0.1)
     wk = bandnoise(0.25, lambda tt: 900 + 400 * tt / 0.25, 0.6, 4)
     bus.put(wk * env_exp(len(wk), 0.12, 0.02), T.TOUCH + 0.02, 0.06)
     bus.put(shhk(T.SWIPE[1] - T.SWIPE[0] - 0.1), T.SWIPE[0], 0.32, -0.1)
     bus.put(whoosh(0.3, 2400, 900, 5, 0.8, 0.3), T.LIFT[0], 0.08, 0.3)
-    # 2. first glimpse: the cells snap into focus on a crisp arcade "tik"
-    bus.put(blip(2637.0, 3136.0, 0.05, 0.5), T.GLIMPSE_SNAP, 0.11, 0.0)
-    bus.put(click(7, 6000, 0.012), T.GLIMPSE_SNAP, 0.08)
     # 3. time passes: a soft glassy swell under the dissolve; the slide is slid away
     sw = bandnoise(1.0, lambda tt: 2500 + 3500 * tt, 0.7, 8)
     xs = np.arange(len(sw)) / SR
     bus.put(sw * np.clip(xs / 0.8, 0, 1) ** 2 * np.clip((1.0 - xs) / 0.15, 0, 1), T.DISSOLVE[0], 0.05, -0.2)
     bus.put(bell(91, 0.9, 1.2, 2.0), T.DISSOLVE[1], 0.035, 0.2)
-    bus.put(whoosh(0.45, 900, 2200, 9, 0.8, 0.7), 5.55, 0.1, -0.4)
+    bus.put(whoosh(0.45, 900, 2200, 9, 0.8, 0.7), 5.55, 0.1, -0.4)          # the slide is slid away
     # 4. onto the stage: glass sliding on metal, the clip settles ("tik"), the camera pulls back
     sl = bandnoise(T.SLIDE_IN[1] - T.SLIDE_IN[0], lambda tt: 1400 - 600 * tt, 0.5, 10)
     xs = np.arange(len(sl)) / SR
@@ -704,8 +705,16 @@ def sfx_forward():
         ch = pulse(mtof(m), nn, 0.25) * np.minimum(1, xx / 0.003) * np.exp(-xx / 0.17)
         bus.put(ch, T.CHIME + i * 0.15, 0.15, -0.15 + 0.3 * i)
         bus.put(bell(m + 12, 0.7, 1.0, 2.0), T.CHIME + i * 0.15, 0.05)
-    # 10. the view pulls back into a small circle, ready to become the drop again
-    bus.put(whoosh(T.PULLOUT[1] - T.PULLOUT[0] - 0.1, 600, 2600, 23, 0.8, 0.85), T.PULLOUT[0] + 0.05, 0.09)
+    # 10. the stage glides back to the opening field and the focus softens into the loop
+    gd = T.GLIDE_BACK[1] - T.GLIDE_BACK[0]
+    gb = bandnoise(gd, lambda tt: 700 + 500 * np.sin(math.pi * tt / gd), 0.9, 24)
+    xg = np.arange(len(gb)) / SR
+    bus.put(gb * np.sin(math.pi * np.clip(xg / gd, 0, 1)), T.GLIDE_BACK[0], 0.04, 0.3)
+    ratchet(bus, T.GLIDE_BACK[0] - 0.4, T.GLIDE_BACK[0], 0.02, 2300, 2300, STEP)
+    dn = int((T.DEFOCUS[1] - T.DEFOCUS[0]) * SR)
+    xd = np.arange(dn) / SR
+    dd = T.DEFOCUS[1] - T.DEFOCUS[0]
+    bus.put(sine(1200 * (0.5 ** (xd / dd)), dn) * (xd / dd) * np.clip((dd - xd) / 0.05, 0, 1), T.DEFOCUS[0], 0.025)
     # a soft pop each time a caption drops in
     from .captions import CAPTIONS
     for t0, t1, title, note in CAPTIONS:
@@ -718,7 +727,7 @@ def duck_env():
     """The music dips a little under each main action so the sound effect has room."""
     t = np.arange(NT) / SR
     g = np.ones(NT)
-    for t0, depth in ((T.GLIMPSE_SNAP, 0.35), (T.CLIP[1], 0.3), (T.TURN[1], 0.4), (T.FOCUS[1], 0.35),
+    for t0, depth in ((T.HOOK_SNAP, 0.35), (T.CLIP[1], 0.3), (T.TURN[1], 0.4), (T.FOCUS[1], 0.35),
                       (T.CHIME, 0.4), (T.SWIPE[0], 0.2)):
         a = np.clip((t - (t0 - 0.03)) / 0.03, 0, 1) * np.clip(1 - (t - t0) / 0.45, 0, 1)
         g -= depth * a * (t >= t0 - 0.03)

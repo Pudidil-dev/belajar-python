@@ -10,10 +10,9 @@ from .palette import BG, CY, INK, OUTLINE
 
 # (start, end, title, note). '*' is the multiplication sign. Every caption is 8 words or fewer.
 CAPTIONS = [
-    (0.5, 2.0, 'SMEAR IT THIN', ''),                      # the opening stays a scene, not a title
-    (2.0, 3.0, 'FULL OF CELLS!', ''),
-    (3.0, 4.6, 'LET IT DRY', 'THEN STAIN IT'),
-    (4.6, 6.0, 'STAINED SMEAR', 'CELLS TAKE UP COLOUR'),
+    (0.6, 2.0, 'ONE DROP OF BLOOD', ''),                  # short: the opening stays a scene, not a title
+    (2.0, 4.0, 'HOW? SMEAR IT THIN', ''),
+    (4.0, 6.0, 'DRY IT, STAIN IT', 'CELLS TAKE UP COLOUR'),
     (6.0, 7.5, 'ONTO THE STAGE', ''),
     (7.5, 9.0, 'LIGHT MICROSCOPE', 'LAMP BELOW, LENSES ABOVE'),
     (9.0, 10.5, 'TURN THE NOSEPIECE', ''),
