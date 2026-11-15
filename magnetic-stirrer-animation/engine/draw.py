@@ -169,6 +169,13 @@ def stirrer(pen, t):
             th = gfx.bayer_at(g_bx[0], g_bx[1], g_bx[3] - g_bx[1], g_bx[2] - g_bx[0])
             led = (GU + 36.0) ** 2 + (GV + 1.0) ** 2 <= 2.6 ** 2
             mix(buf, g_bx, g_m & ~led & (th < 0.35), P.AM[6], 0.45)
+    e = (t - T.KNOB - 0.05) / 0.4
+    if 0 <= e < 1:                                            # power-on shine across the front panel
+        bx, m, U, V = pen.rect(-50, -13.5, 50, 12.0)
+        if bx is not None:
+            xs = -70 + 140 * e
+            band = m & (np.abs(U - 0.5 * V - xs) < 5.0)
+            mix(buf, bx, band, P.WHITE, 0.22)
     knob(pen, t, 32.0, -1.0)
 
 
@@ -181,10 +188,18 @@ def knob(pen, t, cu, cv):
     bx, m, U, V = pen.ell(cu, cv + 0.6, 8.2, 8.2)
     if bx is not None:
         put(buf, bx, m, P.GR[1])
-    bx, m, U, V = pen.ell(cu, cv, 7.6, 7.6)
+    e = (t - T.KNOB) / 0.2
+    kr = 7.6 * (1 - 0.14 * math.sin(math.pi * e)) if 0 <= e < 1 else 7.6
+    if 0 <= e < 1:                                            # burst rays round the knob
+        for k in range(8):
+            a = k * math.pi / 4 + 0.2
+            r0, r1 = 9.5 + 4 * e, 12.0 + 7 * e
+            pen.seg((cu + r0 * math.cos(a), cv + r0 * math.sin(a)), (cu + r1 * math.cos(a), cv + r1 * math.sin(a)),
+                    P.AM[7] if e < 0.6 else P.AM[5])
+    bx, m, U, V = pen.ell(cu, cv, kr, kr)
     if bx is None:
         return
-    rr = np.sqrt((U - cu) ** 2 + (V - cv) ** 2) / 7.6
+    rr = np.sqrt((U - cu) ** 2 + (V - cv) ** 2) / kr
     sh = 0.55 + 0.25 * (-(U - cu) - (V - cv)) / 7.6 / 1.4 - 0.15 * rr ** 4
     put(buf, bx, m, tones(P.GR, np.clip(sh * 0.62, 0, 1), bx))
     grip = m & (rr > 0.86) & ((np.floor(np.arctan2(V - cv, U - cu) / (2 * math.pi) * 24) % 2) == 0)
@@ -423,14 +438,14 @@ def liquid(pen, t, cut=False):
     a_top = 0.16 + 0.70 * turb ** 0.7
     shade = 0.62 + 0.16 * (1 - (U / ri) ** 2) - 0.10 * np.clip((V - surf_front) / 60.0, 0, 1)
     # the swirl made visible: bands in the suspension ride round with the liquid (they cross the front face)
-    th_c = np.arcsin(np.clip(U / ri, -1, 1)) - T.swirl_angle(t)
+    th_c = np.arcsin(np.clip(U / ri, -1, 1)) - T.swirl_angle_w(t)
     band = np.sin(3 * th_c + 0.10 * V + 1.4 * np.sin(2 * th_c - 0.06 * V + 0.7))
     shade = shade + 0.11 * band * min(1.0, turb * 1.4)
     col_side = tones(P.CL, np.clip(shade, 0, 1), bx) if turb > 0.02 else np.broadcast_to(
         np.asarray(P.GR[7], np.uint8), side.shape + (3,))
     _blend(buf, bx, side, col_side, a_side)
     if turb < 0.6:
-        th2 = np.arcsin(np.clip(U / ri, -1, 1)) - T.swirl_angle(t) * 1.1
+        th2 = np.arcsin(np.clip(U / ri, -1, 1)) - T.swirl_angle_w(t) * 1.1
         streak = side & (np.sin(5 * th2 + 0.05 * V) > 0.93)
         mix(buf, bx, streak, P.WHITE, 0.10 * (1 - turb / 0.6))
     col_top = tones(P.CL, np.clip(0.78 + 0.08 * (1 - (U / ri) ** 2), 0, 1), bx) if turb > 0.02 else \
@@ -447,7 +462,7 @@ def liquid(pen, t, cut=False):
         mix(buf, bx, vm, P.CL[3] if turb > 0.4 else P.GR[4], 0.30 + 0.35 * min(1.0, d / 3.0))
         hl = vm & ((U / rx) ** 2 + ((V + top + 0.8) / (rx * K)) ** 2 > 0.75) & (V < -top)
         mix(buf, bx, hl, P.WHITE, 0.5)
-    sw = T.swirl_angle(t)
+    sw = T.swirl_angle_w(t)
     if L > 3:
         for rad, off in ((13.0, 0.0), (13.0, math.pi), (23.5, 1.1), (23.5, 1.1 + math.pi)):
             for k in range(14):
@@ -488,7 +503,7 @@ def liquid_cut(pen, t):
     back = inside_u & (V >= -top - K * sq) & (V < -(top + d / 3.0))  # far half of the surface; the dip is air
     _blend(buf, bx, back, tones(P.CL, np.full(back.shape, 0.80), bx), 0.2 + 0.6 * turb)
     face = inside_u & (V >= -hs) & (V <= -T.FLOOR)
-    sw = T.swirl_angle(t)
+    sw = T.swirl_angle_w(t)
     streak = 0.5 + 0.5 * np.sin(U * 0.45 + V * 0.05 + sw * 2.2) * np.sin(V * 0.35 - sw * 0.6)
     col = tones(P.CL, np.clip(0.54 + 0.20 * streak + 0.10 * (1 - (U / ri) ** 2), 0, 1), bx)
     _blend(buf, bx, face, col, 0.25 + 0.65 * turb)
@@ -511,26 +526,52 @@ def beaker_cut(pen, t):
 
 
 # ------------------------------------------------------------------ the stir bar
-def stir_bar(pen, t, shadow=True):
-    (cx, ch, cz), tilt, head = T.bar_pose(t)
+def _bar_ends(pose):
+    (cx, ch, cz), tilt, head = pose
     hl = T.BAR_L / 2 - T.BAR_R
     dx = hl * math.cos(tilt) * math.cos(head)
     dz = hl * math.cos(tilt) * math.sin(head)
     dh = hl * math.sin(tilt)
-    a = proj(cx - dx, ch - dh, cz - dz)
-    b = proj(cx + dx, ch + dh, cz + dz)
-    r = T.BAR_R
-    if shadow and t >= T.SETTLE:
-        sb, sm, _, _ = pen.ell(cx, -T.FLOOR + K * cz + 0.4, hl + 4.0, (abs(dz) + 4.0) * K + 1.2)
-        if sb is not None:
-            mix(pen.buf, sb, sm, P.NV[1], 0.25)
+    return proj(cx - dx, ch - dh, cz - dz), proj(cx + dx, ch + dh, cz + dz)
+
+
+def _capsule(pen, a, b, r):
     bx = pen.box(min(a[0], b[0]) - r, min(a[1], b[1]) - r, max(a[0], b[0]) + r, max(a[1], b[1]) + r)
     if bx is None:
-        return
+        return None, None, None, None
     U, V = pen.grid(bx)
     d = sd_capsule(U, V, a[0], a[1], b[0], b[1], r)
-    m = d <= 0
-    if not m.any():
+    return bx, d <= 0, d, (U, V)
+
+
+def ghost(pen, pose, alpha):
+    a, b = _bar_ends(pose)
+    bx, m, d, _ = _capsule(pen, a, b, T.BAR_R)
+    if bx is not None and m.any():
+        mix(pen.buf, bx, m, P.WB[6], alpha)
+
+
+def stir_bar(pen, t, shadow=True, xray=0.0):
+    pose = T.bar_pose(t)
+    (cx, ch, cz), tilt, head = pose
+    hl = T.BAR_L / 2 - T.BAR_R
+    r = T.BAR_R
+    if shadow and t >= T.SETTLE:
+        sb, sm, _, _ = pen.ell(cx, -T.FLOOR + K * cz + 0.4, hl + 4.0, (abs(hl * math.sin(head)) + 4.0) * K + 1.2)
+        if sb is not None:
+            mix(pen.buf, sb, sm, P.NV[1], 0.25)
+    # speed: a trail while it falls and zips to the middle, a blur while time runs fast
+    if 0.12 < t < T.LAND + 0.02:
+        for k, al in ((2, 0.14), (1, 0.28)):
+            ghost(pen, T.bar_pose(t - 0.03 * k), al)
+    wr = T.warp_rate(t)
+    if t >= T.LAND and wr > 1.3:
+        step = T.W_MAX * wr / 30.0 / 6.0
+        for k in range(5, 0, -1):
+            ghost(pen, ((cx, ch, cz), tilt, head - k * step), 0.10 + 0.05 * (5 - k) / 5 * min(1.0, (wr - 1.3) / 2))
+    a, b = _bar_ends(pose)
+    bx, m, d, (U, V) = _capsule(pen, a, b, r)
+    if bx is None or not m.any():
         return
     # light from the upper left: shade by the offset across the bar's axis
     ax, ay = b[0] - a[0], b[1] - a[1]
@@ -544,12 +585,46 @@ def stir_bar(pen, t, shadow=True):
     off = ((U - (a[0] + b[0]) / 2) * nx + (V - (a[1] + b[1]) / 2) * ny) / r
     v = 0.60 + 0.30 * np.clip(off, -1, 1) + 0.08 * np.clip(-d / r, 0, 1)
     put(pen.buf, bx, m, tones(P.WB, np.clip(v, 0, 1), bx))
-    # a bright highlight line along the top, the pivot ring in the middle
     put(pen.buf, bx, m & (np.abs(off - 0.55) < 0.12 + 0.4 * pen.o / r) & (d < -0.6), P.WHITE)
     if ln > 1e-6:
         along = ((U - (a[0] + b[0]) / 2) * ax + (V - (a[1] + b[1]) / 2) * ay) / ln
         put(pen.buf, bx, m & (np.abs(along) < 0.75 * max(0.35, ln / (2 * hl))) & (d < -0.4), P.WB[4])
+        if xray > 0:
+            # x-ray: the magnet sealed inside the white plastic (S half above the drive magnet's N, N above its S)
+            core = sd_capsule(U, V, a[0], a[1], b[0], b[1], r * 0.55) <= 0
+            mix(pen.buf, bx, core & (along >= 0), P.GR[4], 0.85 * xray)
+            mix(pen.buf, bx, core & (along < 0), P.MR[4], 0.85 * xray)
+            put(pen.buf, bx, core & (np.abs(along) < 0.45 * pen.o + 0.05) & (xray > 0.5), P.WB[2])
     pen.outline(bx, m, P.WB[1])
+
+
+def field_lines(pen, t, alpha):
+    """The magnet's pull drawn as flowing dotted lines: from the drive magnet's N end up through the plate and the
+    glass to the bar's S end, and from the bar's N end back down to the magnet's S end."""
+    if alpha <= 0.02:
+        return
+    ph = T.magnet_angle(t)
+    th = T.bar_angle_w(t)
+    hm = (T.MAG_H0 + T.MAG_H1) / 2
+    for sgn in (1, -1):
+        mu, mv = proj(sgn * T.MAG_L * 0.85 * math.cos(ph), hm, sgn * T.MAG_L * 0.85 * math.sin(ph))
+        bu, bv = proj(sgn * (T.BAR_L / 2 - 2.5) * math.cos(th), T.BAR_H, sgn * (T.BAR_L / 2 - 2.5) * math.sin(th))
+        mid_u = (mu + bu) / 2
+        out = 1.0 if mid_u > 0.8 else (-1.0 if mid_u < -0.8 else sgn)
+        up = sgn > 0                                          # field runs magnet N -> bar S, bar N -> magnet S
+        for k in range(3):
+            bulge = 3.0 + 4.5 * k
+            c_u, c_v = mid_u + out * bulge, (mv + bv) / 2
+            n = 34
+            for i in range(n + 1):
+                f = i / n
+                if ((i - int(t * 20) * (1 if up else -1)) % 3) != 0:
+                    continue
+                u = (1 - f) ** 2 * mu + 2 * (1 - f) * f * c_u + f * f * bu
+                v = (1 - f) ** 2 * mv + 2 * (1 - f) * f * c_v + f * f * bv
+                if alpha < 0.98 and ((i * 7 + k) % 10) / 10.0 > alpha:
+                    continue
+                pen.dot(u, v, P.AM[8] if k != 1 else P.WHITE, 2 if pen.z > 3.5 else 1)
 
 
 def sparkle(pen, u, v, e, col=None):
@@ -591,6 +666,30 @@ def sparkles(pen, t):
             for w in which:
                 u, v = ends[w]
                 sparkle(pen, u, v - 8.0, e ** 0.7)
+    # the landing: a ripple on the glass bottom under the bar, a puff where the lower end hits first
+    e = (t - T.LAND) / 0.32
+    if 0 <= e < 1:
+        rx = 9.0 + 20.0 * e
+        bx, m, U, V = pen.ell(0.0, -T.FLOOR, rx, rx * K + 0.5)
+        if bx is not None:
+            ring = m & ((U / rx) ** 2 + ((V + T.FLOOR) / (rx * K + 0.5)) ** 2 > 0.62)
+            put(pen.buf, bx, ring & dither_ok(bx, 1.0 - e), P.GR[9])
+    e = (t - T.FLOOR_HIT) / 0.14
+    if 0 <= e < 1:
+        x0 = -(T.R_IN - T.BAR_R) + (T.BAR_L - 2 * T.BAR_R) * math.cos(math.radians(72.0))
+        for k in (-1, 1):
+            pen.dot(x0 + k * (2 + 6 * e), -T.FLOOR - 1.5 - 3 * math.sin(math.pi * e), P.WHITE)
+    # the reveal: a burst of stars from the bar on the chime
+    e = (t - T.CHIME) / 0.65
+    if 0 <= e < 1:
+        (cx, ch, cz), _, _ = T.bar_pose(t)
+        u0, v0 = proj(cx, ch, cz)
+        for k in range(10):
+            a = k * 2 * math.pi / 10 + 0.3
+            rr = 8 + 34 * (1 - (1 - e) ** 2)
+            if (k + int(e * 12)) % 3 != 0 or e < 0.5:
+                sparkle(pen, u0 + rr * math.cos(a), v0 + rr * 0.55 * math.sin(a) - 6, 0.45 * (1 - e),
+                        P.AM[7] if k % 2 else P.WHITE)
     # the reveal: an amber ring bursts out from the bar on the chime
     e = (t - T.CHIME) / 0.4
     if 0 <= e < 1:

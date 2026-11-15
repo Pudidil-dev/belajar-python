@@ -17,24 +17,26 @@ BAR = 4 * BEAT
 TOTAL = 24.0
 
 # ---------------------------------------------------------------- events (seconds)
-SLIDE0 = -0.40                      # the bar started sliding just before frame 0: it is already moving on frame 0
-GLINT = 0.80                        # a highlight catches the bar just before it lands
-SETTLE = 0.86                       # its lower end reaches the bottom; it tips over flat
-LAND = 1.00                         # flat on the glass bottom: "tik"
+SLIDE0 = -0.45                      # the bar started sliding just before frame 0: it is already moving on frame 0
+FLOOR_HIT = 0.58                    # its lower end reaches the bottom ("tk"), the top end still on the wall
+SETTLE = FLOOR_HIT
+GLINT = 0.76                        # a highlight catches it as it tips, just before it lies flat
+FLAT = 0.86                         # flat on the glass ("tok"), near the wall
+LAND = 1.00                         # the hidden magnet has pulled it to the middle: "tik"
 FLASK = (1.05, 1.40, 2.75, 3.20)    # enter upright, tilted and pouring, stop pouring, gone
 POUR1 = (1.42, 2.75)
 KNOB = 4.00                         # the knob turns: "click", the power light comes on
-WIPE_IN = (4.40, 4.90)              # horizontal pixel wipe into the side cutaway
-MOTOR = 4.50                        # the motor starts
+WIPE_IN = (4.25, 4.75)              # horizontal pixel (scanner) wipe into the side cutaway
+MOTOR = 4.75                        # the motor starts once the cutaway is open
 WIPE_OUT = (10.00, 10.45)           # wipe back to the outside view
 BOTTLE = (10.25, 10.60, 11.45, 11.95)
 POUR2 = (10.62, 11.45)
 FIZZ = 11.60                        # the first CO2 bubbles
 PUSH = (11.60, 14.60)               # gentle push in on the bubbles
+FF = (14.90, 15.20)                 # "fast-forward" glitch into the time-lapse
 CLEAR = (15.00, 20.80)              # time-lapse: the cloudiness fades
 PULL = (15.00, 21.00)               # slow pull back to the full beaker
 CHIME = 21.00                       # the bar is back in clear view: two-note chime
-LOCK = 5.375                        # the bar has caught the magnet (sparkle + sound; see lock_time())
 HOLD = 23.00                        # the last second on the full beaker
 
 # ---------------------------------------------------------------- geometry (mm; h up from the bench, z toward us)
@@ -96,6 +98,7 @@ def _simulate():
     wl = np.zeros(n)
     k_mag, drag, stick = 650.0, 8.0, 0.30                 # torque, liquid drag, static grip of the glass
     t_on, w, a, free, lq = 0.0, 0.0, 0.0, False, 0.0
+    t_free = None
     for i in range(1, n):
         t = ts[i]
         lag = phim[i] - a
@@ -103,6 +106,7 @@ def _simulate():
         if t >= LAND:
             if not free and abs(math.sin(lag)) > stick:   # it sits still until the pull beats the grip, then snaps
                 free = True
+                t_free = t
             if free:
                 w += (tq - drag * w) / SIM
                 a += w / SIM
@@ -116,10 +120,10 @@ def _simulate():
         lq += ((target + pour) - lq) / (0.75 * SIM)
         wl[i] = lq
     phil = np.cumsum(wl) / SIM
-    return ts, phim, th, wb, wl, phil, wm
+    return ts, phim, th, wb, wl, phil, wm, t_free
 
 
-_TS, _PHIM, _TH, _WB, _WL, _PHIL, _WM = _simulate()
+_TS, _PHIM, _TH, _WB, _WL, _PHIL, _WM, SNAP = _simulate()      # SNAP: the bar breaks its grip and starts to turn
 
 
 def _at(arr, t):
@@ -159,6 +163,51 @@ def lock_time():
     ok = np.abs(_WB - _WM) <= 0.04 * W_MAX
     bad = np.nonzero(~ok[i0:int(9 * SIM)])[0]
     return (i0 + (bad[-1] + 1 if len(bad) else 0)) / SIM
+
+
+LOCK = round(lock_time() * 8) / 8          # the bar has caught the magnet (sparkle + sound)
+
+# ---------------------------------------------------------------- the time-lapse: a fast-forward clock
+TL_UP = (14.90, 15.45)              # speeding up
+TL_DOWN = (20.15, 20.80)            # slowing back to real time just before the bar is clear
+TL_RATE = 6.0                       # how much faster the reaction world runs at full fast-forward
+
+
+def warp_rate(t):
+    if t < TL_UP[0] or t >= TL_DOWN[1]:
+        return 1.0
+    if t < TL_UP[1]:
+        return 1 + (TL_RATE - 1) * smooth((t - TL_UP[0]) / (TL_UP[1] - TL_UP[0]))
+    if t < TL_DOWN[0]:
+        return TL_RATE
+    return 1 + (TL_RATE - 1) * (1 - smooth((t - TL_DOWN[0]) / (TL_DOWN[1] - TL_DOWN[0])))
+
+
+_TAU = np.cumsum(np.array([warp_rate(x) for x in _TS])) / SIM
+
+
+def tau(t):
+    """Fast-forward clock: equals t, except that it runs up to 6x faster during the time-lapse."""
+    return _at(_TAU, t)
+
+
+def tau_inv(x):
+    return float(np.interp(x, _TAU, _TS))
+
+
+def _extrap(arr, speed, x):
+    if x <= TOTAL:
+        return _at(arr, x)
+    return _at(arr, TOTAL) + speed * (x - TOTAL)
+
+
+def bar_angle_w(t):
+    """The bar's angle on the fast-forward clock (it spins faster during the time-lapse)."""
+    return _extrap(_TH, W_MAX, tau(t))
+
+
+def swirl_angle_w(t):
+    return _extrap(_PHIL, float(_WL[-2]), tau(t))
 
 
 def vortex(t):
@@ -227,35 +276,37 @@ def particles(t):
     if not alive.any():
         return None
     r, hf = P_R[alive], P_HF[alive]
-    phi = P_PHI[alive] + swirl_angle(t) * (0.8 + 0.35 * (1 - r / R_IN))
+    phi = P_PHI[alive] + swirl_angle_w(t) * (0.8 + 0.35 * (1 - r / R_IN))
     x, z = r * np.cos(phi), r * np.sin(phi)
-    h = FLOOR + 0.6 + hf * (L - 1.2) + 0.5 * np.sin(t * 2.3 + P_BOB[alive])
+    h = FLOOR + 0.6 + hf * (L - 1.2) + 0.5 * np.sin(tau(t) * 2.3 + P_BOB[alive])
     size = np.clip((P_GONE[alive] - t) / 1.4, 0, 1)
     return x, h, z, size, P_SHADE[alive], P_BIG[alive]
+
+
+def bubble_rate_seen(t):
+    """Bubbles per real second on screen: the reaction rate times the fast-forward (capped so it stays readable)."""
+    return bubble_rate(t) * min(warp_rate(t), 4.0)
 
 
 def _make_bubbles():
     rng = np.random.default_rng(2718)
     out = []
-    step = 1 / 240.0
+    step = 1 / 480.0
     t = FIZZ
     while t < TOTAL:
-        lam = bubble_rate(t) * step
+        lam = bubble_rate_seen(t) * step
         for _ in range(rng.poisson(lam) if lam > 0 else 0):
             alive = np.nonzero(t < P_GONE)[0]
-            if len(alive) == 0:
-                k = int(rng.integers(0, N_P))
-            else:
-                k = int(alive[rng.integers(0, len(alive))])
-            phi0 = P_PHI[k] + swirl_angle(t) * (0.8 + 0.35 * (1 - P_R[k] / R_IN))
+            k = int(alive[rng.integers(0, len(alive))]) if len(alive) else int(rng.integers(0, N_P))
+            phi0 = P_PHI[k] + swirl_angle_w(t) * (0.8 + 0.35 * (1 - P_R[k] / R_IN))
             h0 = FLOOR + 0.6 + P_HF[k] * (level(t) - 1.2)
             size = rng.uniform(0.45, 1.15) * (1.15 if t < 13.0 else 1.0)
             v0 = rng.uniform(16.0, 30.0)
             acc = rng.uniform(10.0, 22.0)
-            surf = FLOOR + level(t) - 0.6
-            dh = max(surf - h0, 0.5)
-            tt = (-v0 + math.sqrt(v0 * v0 + 2 * acc * dh)) / acc      # time to reach the surface
-            out.append((t, P_R[k], phi0, h0, size, v0, acc, t + tt, rng.uniform(0, 6.28), k))
+            dh = max(FLOOR + level(t) - 0.6 - h0, 0.5)
+            ttau = (-v0 + math.sqrt(v0 * v0 + 2 * acc * dh)) / acc      # time to the surface, fast clock
+            t1 = tau_inv(tau(t) + ttau)
+            out.append((t, P_R[k], phi0, h0, size, v0, acc, t1, rng.uniform(0, 6.28), k))
         t += step
     return out
 
@@ -269,12 +320,13 @@ def bubbles(t):
     """Bubbles in the liquid at t: list of (x, h, z, radius) and the ones popping now: list of (x, h, z, age)."""
     live, pops = [], []
     idx = np.nonzero((_B_T0 <= t) & (t < _B_T1 + 0.1))[0]
-    s0 = swirl_angle(t)
+    s0 = swirl_angle_w(t)
+    ta = tau(t)
     for i in idx:
         t0, r, phi0, h0, size, v0, acc, t1, wob, _ = BUBBLES[i]
-        e = min(t, t1) - t0
-        phi = phi0 + (s0 - swirl_angle(t0)) * 0.7
-        rr = r * (1 - 0.1 * e)
+        e = min(ta, tau(t1)) - tau(t0)
+        phi = phi0 + (s0 - swirl_angle_w(t0)) * 0.7
+        rr = r * (1 - 0.1 * min(e, 1.0))
         x = rr * math.cos(phi) + 0.35 * math.sin(wob + 9 * e)
         z = rr * math.sin(phi)
         h = h0 + v0 * e + 0.5 * acc * e * e
@@ -290,27 +342,53 @@ def pop_times():
 
 
 # ---------------------------------------------------------------- the stir bar's fall into the beaker
+def ease_out_back(x, k=1.6):
+    x = clamp01(x) - 1.0
+    return 1 + (k + 1) * x ** 3 + k * x ** 2
+
+
 def bar_pose(t):
-    """Stir bar centre (x, h, z), tilt from horizontal (rad) and heading (rad)."""
+    """Stir bar centre (x, h, z), tilt from horizontal (rad) and heading (rad, constant until it starts to turn).
+
+    0 -> FLOOR_HIT  it slides down the left inside wall like a ladder, top end on the glass, gaining speed;
+    -> FLAT         its lower end on the bottom, it tips over (the top end slides down the wall) and lies flat;
+    -> LAND         the magnet under the plate pulls it to the middle: a quick zip with a little overshoot, "tik"."""
+    seg = BAR_L - 2 * BAR_R                                  # distance between the two end-cap centres
+    xw = -(R_IN - BAR_R)                                     # an end cap touching the left wall
+    a0 = math.radians(72.0)
+    zb = -4.0
     if t >= LAND:
         bounce = 0.0
         if t < LAND + 0.16:
             e = (t - LAND) / 0.16
             bounce = 1.6 * math.sin(math.pi * e) * (1 - e)
-        return (0.0, BAR_H + bounce, 0.0), 0.0, bar_angle(t)
-    alpha = math.radians(68.0)
-    # sliding down the left inner wall, end first, picking up speed
-    s = (t - SLIDE0) / (SETTLE - SLIDE0)
-    hb = 92.0 + (BAR_H - 92.0) * s * s                        # lower end height
-    xb = -15.5
-    cx, ch = xb - BAR_L / 2 * math.cos(alpha), hb + BAR_L / 2 * math.sin(alpha)
-    if t < SETTLE:
-        return (cx, ch, -6.0), alpha, math.pi
-    # it tips over and lands flat in the middle
-    e = (t - SETTLE) / (LAND - SETTLE)
-    f = e * e
-    a = alpha * (1 - f)
-    return (cx + (0.0 - cx) * f, ch + (BAR_H - ch) * f, -6.0 * (1 - f)), a, math.pi * (1 - f)
+        return (0.0, BAR_H + bounce, 0.0), 0.0, bar_angle_w(t)
+    if t < FLOOR_HIT:
+        s = clamp01((t - SLIDE0) / (FLOOR_HIT - SLIDE0))
+        low_h = 104.0 + (BAR_H - 104.0) * s * s
+        low_x = xw + seg * math.cos(a0)
+        top_h = low_h + seg * math.sin(a0)
+        return ((xw + low_x) / 2, (low_h + top_h) / 2, zb), a0, math.pi
+    if t < FLAT:
+        s = (t - FLOOR_HIT) / (FLAT - FLOOR_HIT)
+        a = a0 * (1 - s * s)
+        low_x = xw + seg * math.cos(a)
+        top_h = BAR_H + seg * math.sin(a)
+        return ((xw + low_x) / 2, (BAR_H + top_h) / 2, zb), a, math.pi
+    s = (t - FLAT) / (LAND - FLAT)
+    x0 = xw + seg / 2
+    f = ease_out_back(s, 1.2)
+    hop = 0.9 * math.sin(math.pi * clamp01((t - FLAT) / 0.07)) if t < FLAT + 0.07 else 0.0
+    return (x0 * (1 - f), BAR_H + hop, zb * (1 - f)), 0.0, math.pi
+
+
+def pulse(t):
+    """A tiny punch on the big hits (landing, click, lock, first fizz, chime): 0..1, decays fast."""
+    p = 0.0
+    for t0, a in ((LAND, 1.0), (KNOB, 0.8), (LOCK, 0.6), (FIZZ, 0.7), (CHIME, 1.0)):
+        if t0 <= t < t0 + 0.4:
+            p = max(p, a * math.exp(-(t - t0) / 0.09))
+    return p
 
 
 # ---------------------------------------------------------------- camera
@@ -318,20 +396,37 @@ BASE = (0.0, -70.0, 2.25)           # centre (u, v) and zoom px/mm of the full v
 PUSHED = (0.0, -64.0, 2.95)
 
 
+EXPLAIN = (5.00, 5.80, 8.70, 9.55)  # zoom in on magnet + bar, hold for the explanation, zoom back out
+CLOSE = (0.0, -41.0, 5.0)
+
+
+def _lerp_cam(a, b, u):
+    z = math.exp(math.log(a[2]) + (math.log(b[2]) - math.log(a[2])) * u)
+    w = (1 / z - 1 / a[2]) / (1 / b[2] - 1 / a[2]) if abs(b[2] - a[2]) > 1e-9 else u
+    return a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w, z
+
+
 def camera(t):
-    if t < PUSH[0]:
-        return BASE
-    if t < PUSH[1]:
-        u = smoother((t - PUSH[0]) / (PUSH[1] - PUSH[0]))
+    e0, e1, e2, e3 = EXPLAIN
+    if t < e0:
+        c = BASE
+    elif t < e1:
+        c = _lerp_cam(BASE, CLOSE, smoother((t - e0) / (e1 - e0)))
+    elif t < e2:
+        c = (CLOSE[0], CLOSE[1], CLOSE[2] * (1 + 0.04 * (t - e1) / (e2 - e1)))
+    elif t < e3:
+        c = _lerp_cam((CLOSE[0], CLOSE[1], CLOSE[2] * 1.04), BASE, smoother((t - e2) / (e3 - e2)))
+    elif t < PUSH[0]:
+        c = BASE
+    elif t < PUSH[1]:
+        c = _lerp_cam(BASE, PUSHED, smoother((t - PUSH[0]) / (PUSH[1] - PUSH[0])))
     elif t < PULL[0]:
-        u = 1.0
+        c = PUSHED
     elif t < PULL[1]:
-        u = 1.0 - smoother((t - PULL[0]) / (PULL[1] - PULL[0]))
+        c = _lerp_cam(PUSHED, BASE, smoother((t - PULL[0]) / (PULL[1] - PULL[0])))
     else:
-        u = 0.0
-    z = math.exp(math.log(BASE[2]) + (math.log(PUSHED[2]) - math.log(BASE[2])) * u)
-    w = (1 / z - 1 / BASE[2]) / (1 / PUSHED[2] - 1 / BASE[2])
-    return BASE[0] + (PUSHED[0] - BASE[0]) * w, BASE[1] + (PUSHED[1] - BASE[1]) * w, z
+        c = BASE
+    return c[0], c[1], c[2] * (1 + 0.022 * pulse(t))
 
 
 def knob_angle(t):

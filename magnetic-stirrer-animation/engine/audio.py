@@ -139,6 +139,12 @@ def music():
         if b == 9:
             for k in range(4):
                 drum_b.put(S.snare(0.5 + 0.1 * k), bar_t(9, 6) + k * E8 / 2, 0.16 + 0.03 * k)
+        for k in range(8):                                     # double-time hats while time runs fast
+            t1 = bar_t(b, k) + E8 / 2
+            if T.TL_UP[1] <= t1 < T.TL_DOWN[0]:
+                drum_b.put(S.hat(False, 0.5), t1, 0.12, -0.3)
+    for t0, g in ((T.KNOB, 0.10), (T.WIPE_OUT[0], 0.09), (22.0, 0.13)):
+        drum_b.put(S.crash(1.4), t0, g, 0.2)
     lead = lead_b.x
     lead = lead + 0.32 * np.stack([np.roll(S.echo(lead[0], 0.375, 0.3), 0), S.echo(lead[1], 0.375, 0.3)])
     mus = lead + 0.9 * bass_b.x + arp_b.x + drum_b.x
@@ -179,7 +185,9 @@ def whirr(t_arr):
     """The motor: a buzzy hum that rises with speed, with a 4 Hz magnet throb."""
     sp = np.array([T.motor_speed(x) for x in t_arr[::480]])
     sp = np.interp(np.arange(len(t_arr)), np.arange(0, len(t_arr), 480)[:len(sp)], sp)
-    f = 55 + 95 * sp
+    wf = np.array([T.warp_rate(x) for x in t_arr[::480]])
+    wf = np.interp(np.arange(len(t_arr)), np.arange(0, len(t_arr), 480)[:len(wf)], wf)
+    f = (55 + 95 * sp) * (1 + 0.55 * (wf - 1) / (T.TL_RATE - 1))
     ph = 2 * math.pi * np.cumsum(f) / SR
     y = 0.6 * np.sign(np.sin(ph)) * 0.5 + 0.4 * np.sin(2 * ph) + 0.25 * np.sin(3.01 * ph)
     y = S.lowpass(y, 1400, 127)
@@ -189,13 +197,13 @@ def whirr(t_arr):
 
 def fizz(t_arr):
     """Carbon dioxide fizz: crackly high noise that follows the bubble rate."""
-    rate = np.array([T.bubble_rate(x) for x in t_arr[::240]])
+    rate = np.array([T.bubble_rate_seen(x) for x in t_arr[::240]])
     rate = np.interp(np.arange(len(t_arr)), np.arange(0, len(t_arr), 240)[:len(rate)], rate)
     nz = S.highpass(S.white(len(t_arr), 77), 3800, 63)
     rng = np.random.default_rng(78)
     crack = (rng.uniform(0, 1, len(t_arr)) < 0.0035 * np.clip(rate / 60, 0, 2)).astype(float)
     crack = S.highpass(crack * rng.uniform(0.5, 1, len(t_arr)), 2500, 31)
-    amp = np.clip(rate / 110.0, 0, 1) ** 0.8
+    amp = np.clip(rate / 150.0, 0, 1) ** 0.8
     return (0.35 * nz + 1.6 * crack) * amp
 
 
@@ -207,12 +215,35 @@ def chime_note(f, dur=0.5):
     return y * np.minimum(1, t / 0.002)
 
 
-def sfx():
+def ui_sounds(bus, lang):
+    from . import explain
+    k = 0
+    for t, kind in explain.typing_events(lang):
+        if kind == 'type':
+            f = (1046.5, 1174.7, 1318.5, 1174.7)[k % 4]
+            bus.put(S.blip(f, f * 0.94, 0.016, 0.5), t, 0.035, 0.15)
+            k += 1
+        elif kind == 'open':
+            bus.put(S.blip(1568.0, 1568.0, 0.03, 0.25), t, 0.045, -0.2)
+            bus.put(S.blip(2093.0, 2093.0, 0.05, 0.25), t + 0.045, 0.045, 0.2)
+        else:
+            bus.put(S.blip(2637.0, 1760.0, 0.022, 0.5), t, 0.05, 0.3)
+
+
+def sfx(info=True, lang='en'):
     bus = Bus()
+    if info:
+        ui_sounds(bus, lang)
     # ---- the hook: glassy slide, glint, landing tik, small bounce
-    sl = S.bandnoise(0.9, lambda tt: 1800 + 1600 * tt / 0.9, 0.5, 5)
-    sl *= np.minimum(1, tv(len(sl)) / 0.05) * np.exp(-np.maximum(0, tv(len(sl)) - 0.75) / 0.05)
-    bus.put(sl, 0.0, 0.06, -0.3)
+    sl = S.bandnoise(T.FLOOR_HIT, lambda tt: 1700 + 1900 * tt / T.FLOOR_HIT, 0.5, 5)
+    sl *= np.minimum(1, tv(len(sl)) / 0.04) * np.minimum(1, (T.FLOOR_HIT - tv(len(sl))) / 0.03)
+    bus.put(sl, 0.0, 0.07, -0.35)
+    bus.put(S.blip(1760, 1500, 0.04, 0.5), T.FLOOR_HIT, 0.16, -0.3)                     # tk
+    sc = S.bandnoise(T.FLAT - T.FLOOR_HIT, lambda tt: 2600 - 900 * tt, 0.6, 6)
+    bus.put(sc * np.minimum(1, tv(len(sc)) / 0.03), T.FLOOR_HIT + 0.02, 0.05, -0.2)
+    bus.put(S.blip(1318, 1100, 0.05, 0.5), T.FLAT, 0.18, -0.1)                           # tok
+    zp = S.blip(500, 2600, T.LAND - T.FLAT, 0.125)
+    bus.put(zp * np.linspace(0.3, 1.0, len(zp)), T.FLAT + 0.01, 0.10)                  # the magnet pulls: zip
     bus.put(S.blip(3136, 4186, 0.12, 0.125), T.GLINT - 0.03, 0.12, -0.3)
     bus.put(tik(), T.LAND, 0.9)
     bus.put(tik()[:int(0.05 * SR)], T.LAND + 0.13, 0.3)
@@ -237,7 +268,10 @@ def sfx():
     vis = np.where(t_arr < T.WIPE_IN[1], 0.7, np.where(t_arr < T.WIPE_OUT[0], 1.0,
                                                          np.where(t_arr < T.WIPE_OUT[1], 0.6, 0.38)))
     bus.put(wr * vis, T.MOTOR, 0.16)
-    bus.put(S.click(31, 1800, 0.025), 4.78, 0.35, 0.1)
+    bus.put(S.click(31, 1800, 0.025), T.SNAP, 0.35, 0.1)
+    # the zoom into the magnet and back out
+    bus.put(S.whoosh(0.8, 300, 1800, 33, 0.7, 0.8), T.EXPLAIN[0], 0.10)
+    bus.put(S.whoosh(0.85, 1800, 300, 34, 0.7, 0.3), T.EXPLAIN[2], 0.09)
     bus.put(S.thump(160, 70, 0.12, 0.3, 32), T.LOCK, 0.4)
     bus.put(S.blip(1568, 3136, 0.09, 0.25), T.LOCK + 0.02, 0.16)
     # ---- the vinegar
@@ -260,6 +294,17 @@ def sfx():
         g = 0.10 if tp < 13.0 else 0.06
         bus.put(S.blip(S.mtof(m), S.mtof(m + 7), 0.03, 0.5), tp, g, rng.uniform(-0.5, 0.5))
     bus.put(S.blip(1046.5, 2093, 0.07, 0.25), T.FIZZ, 0.24)          # the playful "pop!" that starts the fizz
+    # ---- the time-lapse: tape speeds up (rising sweep + arpeggio), later slows down
+    bus.put(S.whoosh(0.55, 250, 4200, 50, 0.6, 0.85), T.TL_UP[0], 0.16)
+    for j, m in enumerate((60, 64, 67, 72, 76, 79, 84, 88)):
+        bus.put(S.blip(S.mtof(m), S.mtof(m), 0.04, 0.25), T.TL_UP[0] + j * 0.05, 0.06, -0.5 + 0.13 * j)
+    n = int(0.5 * SR)
+    tt = tv(n)
+    down = S.pulse(900 * np.exp(-tt / 0.25) + 120, n, 0.25) * np.exp(-tt / 0.3) * np.minimum(1, tt / 0.01)
+    bus.put(down, T.TL_DOWN[0] + 0.25, 0.07)
+    bus.put(S.whoosh(0.5, 3500, 300, 51, 0.6, 0.2), T.TL_DOWN[0] + 0.2, 0.12)
+    for j, m in enumerate((96, 100, 103, 108, 103, 108)):
+        bus.put(S.blip(S.mtof(m), S.mtof(m), 0.05, 0.25), T.CHIME + 0.45 + j * 0.06, 0.035, -0.5 + 0.2 * j)
     # ---- the chime: two notes when the bar is back in clear view
     bus.put(chime_note(1567.98), T.CHIME, 0.28, -0.15)
     bus.put(chime_note(2349.32, 0.8), T.CHIME + 0.25, 0.28, 0.15)
@@ -283,14 +328,14 @@ def master(mus, fx, target=-14.0):
     return mix
 
 
-def render(out_dir, log=print):
+def render(out_dir, log=print, info=True, lang='en'):
     from pathlib import Path
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     log('audio: music ...')
     mus = music()
     log('audio: effects ...')
-    fx = sfx()
+    fx = sfx(info, lang)
     mix = master(mus, fx)
     S.write_wav(out / 'music.wav', np.clip(mus * 10 ** ((-16.0 - S.lufs(mus)) / 20), -1, 1))
     S.write_wav(out / 'sfx.wav', np.clip(fx * 10 ** ((-16.0 - S.lufs(fx)) / 20), -1, 1))
