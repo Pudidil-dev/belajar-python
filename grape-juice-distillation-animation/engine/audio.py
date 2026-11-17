@@ -1,13 +1,16 @@
 """Score and sound effects, synthesized in code (no samples): an 8-bit RPG lab loop and arcade foley.
 
 Chip voices: band-limited pulse waves (PolyBLEP), a triangle bass, LFSR noise percussion, a short echo and FM bells
-(the synth core is shared with the repo's other pixel films). 120 BPM in C major, 13 bars of 4/4 = exactly 26 s. The
-square-wave hook (E5 G5 C6 B5 G5 | A5 C6 E6 D6 C6) opens the loop and comes back for the payoff. The last bar's G7
-turnaround resolves into the first, and echo and reverb tails wrap onto the start, so the music loops seamlessly.
+(the synth core is shared with the repo's other pixel films). 120 BPM in C major, 16 bars of 4/4 = exactly 32 s. The
+square-wave hook (E5 G5 C6 B5 G5 | A5 C6 E6 D6 C6) opens the loop and comes back for the payoff; an item-get fanfare
+follows the bright final plip. The last bar's G7 turnaround resolves into the first, and echo and reverb tails wrap
+onto the start, so the music loops seamlessly.
 
-Effects sit on the beat grid of engine/timeline.py: the grape "squish", the purple "plip", the mantle "click", the
-"blub-blub" of the boil, a soft heat tone, the bead "tik", the bright clear "plip" and the two-note reward chime. The
-music dips under the squeeze, the merge and the final drop so each has room.
+Effects sit on the beat grid of engine/timeline.py: the grape "squish", the purple "plip", the flask's spring hop and
+thunk, a clunk and a pitched blip as each part of the still drops in, the water rushing in, the x-ray scan, the switch
+"click", a soft electric hum (no zap), warm swells as heat soaks in, the "!" blips, the "blub-blub" boil, the bead
+"tik", the bright clear "plip", the two-note chime and a sparkle as the drop turns back into the grape. The music
+dips under the squeeze, the merge and the final drop so each has room.
 """
 import math
 import wave
@@ -433,7 +436,7 @@ def write_wav(path, st):
 
 
 
-# ---------------------------------------------------------------- the score (C major, 13 bars, loops)
+# ---------------------------------------------------------------- the score (C major, 16 bars, loops)
 _PC = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
 
@@ -460,22 +463,26 @@ def seq(s):
 
 LEAD = {
     0: seq('E5 -  .  .  G5 -  C6 -  B5 -  -  G5 -  -  .  G5'),    # gaps for the squish (0.3) and the plip (1.75)
-    1: seq('A5 -  C6 -  E6 -  -  D6 C6 -  -  -  A5 -  G5 -'),
-    2: seq('E5 -  G5 C6 -  -  B5 -  G5 -  -  -  A5 -  B5 -'),    # the match cut lands on the downbeat
-    3: seq('C6 -  -  -  -  -  .  .  .  .  .  .  D6 E6 F6 G6'),    # the mantle click; the time jump is the arp's run
-    4: seq('E6 .  E6 C6 .  A5 .  C6 .  .  F6 .  E6 .  C6 .'),    # the boil: staccato and bubbly
-    5: seq('G5 .  C6 .  E6 .  G6 .  .  .  B5 .  D6 .  G6 .'),    # climbing with the vapour
-    6: seq('A6 -  -  F6 -  -  D6 -  B5 -  -  D6 -  -  G5 -'),    # the cutaway: the line runs downhill like the vapour
-    7: seq('B5 -  -  -  -  -  G5 -  C6 -  -  -  -  -  E6 -'),    # heat: warm and held
-    8: seq('C6 -  -  -  -  -  -  -  D6 -  -  -  -  -  -  -'),    # beads: the bead pips carry the tune
-    9: seq('E6 -  -  -  -  .  .  .  .  .  A5 -  G5 -  F5 -'),    # silence from the merge (18.75) to the follow (19.2)
-    10: seq('E5 -  -  -  D5 -  .  .  .  .  .  .  C5 -  D5 -'),   # the drop hangs and falls; the plip (21.0) alone
-    11: seq('E5 -  G5 -  C6 -  -  -  .  .  .  .  E5 -  G5 -'),   # the payoff; the chime (23.0) answers
-    12: seq('A5 -  C6 -  E6 -  -  D6 C6 -  B5 -  G5 -  F5 -'),   # G7 turnaround: the F resolves to bar 0's E
+    1: seq('A5 -  C6 -  E6 -  -  D6 C6 -  -  -  .  .  G5 A5'),    # the hop: held in the air, silent on the landing
+    2: seq('C6 .  .  .  G5 .  .  .  D6 .  .  .  B5 C6 D6 B5'),    # build: a stab as each part drops in
+    3: seq('C6 -  -  -  A5 -  C6 -  D6 -  -  -  .  .  .  .'),    # the water runs; the push onto the heater
+    4: seq('.  .  E5 .  A5 .  C6 .  .  .  B5 -  -  -  .  .'),    # x-ray: a quiet minor figure; the switch at 9.0
+    5: seq('C6 .  C6 .  F6 .  E6 .  D6 .  D6 .  G6 .  F6 E6'),    # current, the coil heats: pulsing staccato
+    6: seq('E6 .  E6 C6 .  A5 .  C6 .  .  F6 .  E6 .  C6 .'),    # the boil: staccato and bubbly
+    7: seq('G5 .  C6 .  E6 .  G6 .  .  .  B5 .  D6 .  G6 .'),    # climbing with the vapour
+    8: seq('C6 -  -  -  E6 -  -  -  G6 -  -  -  -  -  .  .'),    # into the condenser
+    9: seq('A6 -  -  F6 -  -  D6 -  B5 -  -  D6 -  -  G5 -'),    # the cutaway: the line runs downhill like the vapour
+    10: seq('B5 -  -  -  -  -  G5 -  C6 -  -  -  -  -  E6 -'),   # heat: warm and held
+    11: seq('C6 -  -  -  -  -  -  -  D6 -  -  -  .  .  .  .'),   # beads; silence for the merge (23.75)
+    12: seq('.  .  .  .  A5 -  G5 -  F5 -  E5 -  D5 -  -  -'),   # the pause, then downhill with the drop
+    13: seq('.  .  G5 C6 E6 G6 -  C7 -  -  -  G6 A6 B6 -  -'),   # item-get fanfare after the plip (26.0)
+    14: seq('E5 -  G5 -  C6 -  -  -  B5 -  G5 -  .  .  .  .'),   # the payoff; the chime (29.5) answers
+    15: seq('A5 -  C6 -  E6 -  -  D6 C6 -  B5 -  G5 -  F5 -'),   # G7 turnaround: the F resolves to bar 0's E
 }
-B_HOOK, B_BUILD, B_BOIL, B_PATHS, B_HEAT, B_BEADS, B_MERGE, B_DROP, B_PAYOFF, B_TURN = \
-    (0, 1, 2), 3, (4, 5), 6, 7, 8, 9, 10, 11, 12
-SOFT_BARS = (6, 7, 8, 9, 10)
+B_BUILD, B_WATER, B_XRAY, B_ELEC, B_BOIL, B_CLIMB, B_PATHS = 2, 3, 4, 5, (6, 7), 8, 9
+B_HEAT, B_BEADS, B_MERGE, B_ITEM, B_PAYOFF, B_TURN = 10, 11, 12, 13, 14, 15
+SOFT_BARS = (B_XRAY, B_PATHS, B_HEAT, B_BEADS, B_MERGE)
+STACCATO = (B_ELEC,) + B_BOIL
 _THIRD = {0: 3, 2: 3, 4: 4, 5: 3, 7: 3, 9: 4, 11: 4}                      # C major: a diatonic third below
 
 
@@ -483,11 +490,11 @@ def third_below(m):
     return m - _THIRD[m % 12]
 
 
-HARM = {b: [(s, l, third_below(m)) for s, l, m in LEAD[b]] for b in (2, B_PAYOFF, B_TURN)}
+HARM = {b: [(s, l, third_below(m)) for s, l, m in LEAD[b]] for b in (B_BUILD, B_ITEM, B_PAYOFF, B_TURN)}
 CHORD = {'C': (48, (0, 4, 7)), 'G': (43, (0, 4, 7)), 'Am': (45, (0, 3, 7)), 'F': (41, (0, 4, 7)),
          'Dm': (50, (0, 3, 7)), 'Em': (40, (0, 3, 7)), 'G7': (43, (0, 4, 7, 10))}
-BARS = [('C', 'G'), ('Am', 'F'), ('C', 'G'), ('F', 'G'), ('Am', 'F'), ('C', 'G'), ('Dm', 'G'), ('Em', 'Am'),
-        ('F', 'G'), ('Am', 'Dm'), ('F', 'G'), ('C', 'G'), ('F', 'G7')]
+BARS = [('C', 'G'), ('Am', 'F'), ('C', 'G'), ('F', 'G'), ('Am', 'Em'), ('F', 'G'), ('Am', 'F'), ('C', 'G'),
+        ('C', 'G'), ('Dm', 'G'), ('Em', 'Am'), ('F', 'G'), ('Am', 'Dm'), ('C', 'G'), ('C', 'G'), ('F', 'G7')]
 N_BARS = len(BARS)
 assert N_BARS * T.BAR == T.TOTAL
 
@@ -496,115 +503,133 @@ def bar_t(b, step=0.0):
     return b * T.BAR + step * STEP
 
 
+def _bass_notes(b, half, root):
+    base = 8 * half
+    bounce = [(base + 2 * k, 1.6, root + iv, 0.28) for k, iv in enumerate((0, 12, 7, 12))]
+    drive = [(base + st, 0.8, root + iv, 0.3 if st in (0, 4) else 0.2)
+             for st, iv in ((0, 0), (2, 0), (3, 12), (4, 0), (6, 7), (7, 12))]
+    soft = [(base, 3.6, root, 0.26), (base + 4, 1.6, root + 7, 0.2), (base + 6, 1.6, root + 12, 0.2)]
+    if b in (0, 1, B_CLIMB, B_PAYOFF) or (b == B_TURN and half == 0):
+        notes = bounce
+        if b == 0:
+            notes = [n for n in notes if n[0] not in (2, 14)]               # room for the squish and the plip
+        if b == 1:
+            notes = [n for n in notes if n[0] != 12]                        # the landing thunk
+        return notes
+    if b == B_BUILD or b in B_BOIL:
+        return drive
+    if b == B_WATER:
+        return soft if half == 0 else [(8, 3.6, root, 0.28), (12, 3.6, root + 12, 0.18)]
+    if b == B_XRAY:
+        return [(base, 7.0, root, 0.24)]
+    if b == B_ELEC:                                                         # current: a pulsing 8th-note bass
+        return [(base + k, 0.7, root + (12 if k % 4 == 2 else 0), 0.26 if k % 2 == 0 else 0.15) for k in range(8)]
+    if b == B_PATHS:
+        return [(base, 2.0, root, 0.27), (base + 3, 1.5, root + 7, 0.2), (base + 6, 1.5, root + 12, 0.2)]
+    if b == B_HEAT:
+        return soft
+    if b == B_BEADS:
+        return soft if half == 0 else [(8, 3.6, root, 0.26), (12, 1.4, root + 7, 0.2)]   # quiet before the merge
+    if b == B_MERGE:                                                        # the pause, then walking down
+        return [] if half == 0 else [(4, 1.7, 45, 0.26), (6, 1.7, 43, 0.26), (8, 1.7, 41, 0.26),
+                                     (10, 1.7, 40, 0.26), (12, 3.6, 38, 0.25)]
+    if b == B_ITEM:
+        return [(2, 1.6, 48, 0.28), (4, 1.6, 55, 0.26), (6, 1.6, 60, 0.26)] if half == 0 else \
+            [(8, 1.6, 43, 0.28), (10, 1.6, 47, 0.28), (12, 1.6, 50, 0.28), (14, 1.6, 55, 0.26)]
+    if b == B_TURN:                                                         # G7 arpeggio up into the top of the loop
+        return [(8, 1.6, 43, 0.28), (10, 1.6, 47, 0.28), (12, 1.6, 50, 0.28), (14, 1.6, 53, 0.28)]
+    return bounce
+
+
 def music():
     lead_bus, harm_bus, arp_bus, bass_bus, drum_bus, pad_bus = (Bus() for _ in range(6))
-    # lead: square hook; staccato in the boil; soft and round from the cutaway to the drop
     for b, notes in LEAD.items():
         for s, l, m in notes:
             t0 = bar_t(b, s)
             dur = l * STEP * (0.9 if l <= 2 else 0.96)
-            if b in B_BOIL:
+            if b in STACCATO:
                 lead_bus.put(lead(m, STEP * 0.7, 0.125, vib=0.0), t0, 0.17, 0.12 * (1 if s % 4 else -1))
             elif b == B_PATHS:                     # pans left to right: downhill, flask side to receiver side
                 lead_bus.put(lead(m, dur, 0.5, vib=0.14), t0, 0.15, -0.5 + s / 15.0)
             elif b in SOFT_BARS:
                 lead_bus.put(lead(m, dur, 0.5, vib=0.14), t0, 0.14, 0.05)
+            elif b == B_ITEM:
+                lead_bus.put(lead(m, dur, 0.25, vib=0.2), t0, 0.2, 0.05)
             else:
                 lead_bus.put(lead(m, dur, 0.25), t0, 0.19, 0.05)
     for b, notes in HARM.items():
         for s, l, m in notes:
             harm_bus.put(lead(m, l * STEP * 0.9, 0.125, vib=0.1), bar_t(b, s), 0.085, -0.3)
-    # bass: bouncy octaves; galloping in the boil; held and walking through the slow middle
     for b, (c1, c2) in enumerate(BARS):
         for half, name in ((0, c1), (1, c2)):
-            root = CHORD[name][0]
-            base = 8 * half
-            notes = []                                                  # (step in bar, length, midi, gain)
-            if b in B_HOOK + (B_PAYOFF,) or (b == B_TURN and half == 0):
-                for k, iv in enumerate((0, 12, 7, 12)):
-                    notes.append((base + 2 * k, 1.6, root + iv, 0.28))
-                if b == 0:                                              # room for the squish and the plip
-                    notes = [n for n in notes if n[0] not in (2, 14)]
-            elif b == B_BUILD:
-                if half == 0:
-                    notes += [(0, 3.6, root, 0.3), (4, 1.6, root + 12, 0.26), (6, 1.6, root + 7, 0.26)]
-                else:
-                    notes += [(base + 2 * k, 1.5, root + (12 if k % 2 else 0), 0.28) for k in range(4)]
-            elif b in B_BOIL:
-                for st, iv in ((0, 0), (2, 0), (3, 12), (4, 0), (6, 7), (7, 12)):
-                    notes.append((base + st, 0.8, root + iv, 0.3 if st in (0, 4) else 0.2))
-            elif b == B_PATHS:
-                notes += [(base, 2.0, root, 0.27), (base + 3, 1.5, root + 7, 0.2), (base + 6, 1.5, root + 12, 0.2)]
-            elif b in (B_HEAT, B_BEADS):
-                notes += [(base, 3.6, root, 0.26), (base + 4, 1.6, root + 7, 0.2), (base + 6, 1.6, root + 12, 0.2)]
-            elif b == B_MERGE:
-                if half == 0:
-                    notes.append((0, 4.5, root, 0.26))                  # then nothing: the merge and its pause
-                else:                                                   # walking down with the drop
-                    notes += [(10, 1.7, 50, 0.26), (12, 1.7, 48, 0.26), (14, 1.7, 45, 0.26)]
-            elif b == B_DROP:
-                if half == 0:
-                    notes.append((0, 7.0, root, 0.25))                  # held while the drop hangs and falls
-                else:
-                    notes += [(10, 1.6, 43, 0.27), (12, 1.6, 45, 0.27), (14, 1.6, 47, 0.27)]   # in after the plip
-            elif b == B_TURN:                                           # G7 arpeggio up into the top of the loop
-                notes += [(8, 1.6, 43, 0.28), (10, 1.6, 47, 0.28), (12, 1.6, 50, 0.28), (14, 1.6, 53, 0.28)]
-            for st, l, m, g in notes:
+            for st, l, m, g in _bass_notes(b, half, CHORD[name][0]):
                 bass_bus.put(bass(m, l * STEP), bar_t(b, st), g)
-    # arpeggios (pulse 12.5%)
+    # arpeggios (pulse 12.5% / 25%)
     for b, (c1, c2) in enumerate(BARS):
         for half, name in ((0, c1), (1, c2)):
             root, iv = CHORD[name]
             base = 8 * half
             tones = [root + 24 + iv[0], root + 24 + iv[1], root + 24 + iv[2], root + 36]
-            if b in (2, B_PAYOFF) + B_BOIL or (b == B_BUILD and half == 1) or (b == B_TURN and half == 0):
+            if b in (B_BUILD, B_CLIMB, B_PAYOFF) + B_BOIL or (b == B_TURN and half == 0):
                 for k, p in enumerate((0, 1, 2, 3, 2, 1, 2, 3)):
                     arp_bus.put(chip_arp(tones[p], STEP * 0.85), bar_t(b, base + k), 0.05, -0.5)
-            elif b in (0, 1):
+            elif b in (0, 1, B_WATER):
                 for k in range(4):
-                    if b == 0 and base + 2 * k in (2, 14):
+                    st = base + 2 * k
+                    if (b == 0 and st in (2, 14)) or (b == 1 and st == 12):
                         continue
-                    arp_bus.put(chip_arp(tones[k], STEP * 1.6, 0.25), bar_t(b, base + 2 * k), 0.035, -0.45)
-            elif b == B_BUILD:                     # the time jump: a fast run up two octaves, 6.0 -> 6.75
-                run = [root + 12 + o + i for o in (12, 24, 36) for i in iv][:9]
-                for k, m in enumerate(run):
-                    arp_bus.put(chip_arp(m, STEP * 0.5, 0.25), bar_t(b, k * 0.75), 0.045, -0.4 + 0.1 * k)
+                    arp_bus.put(chip_arp(tones[k], STEP * 1.6, 0.25), bar_t(b, st), 0.035, -0.45)
+            elif b == B_XRAY:                      # slow, high and wide: something hidden is being revealed
+                for k in range(2):
+                    arp_bus.put(chip_arp(tones[(k * 2 + half) % 4] + 12, STEP * 3.4, 0.25), bar_t(b, base + 4 * k),
+                                0.03, -0.6 if k == 0 else 0.6)
+            elif b == B_ELEC:                      # current: a buzzing 16th figure that climbs
+                for k, p in enumerate((0, 1, 2, 3, 1, 2, 3, 3)):
+                    arp_bus.put(chip_arp(tones[p] + (12 if k >= 6 else 0), STEP * 0.6), bar_t(b, base + k), 0.045,
+                                -0.4 + 0.1 * k)
             elif b == B_PATHS:                     # runs uphill, right to left, like the cooling water
                 up = [root + 12 + o + i for o in (0, 12, 24) for i in iv[:3]][:8]
                 for k, m in enumerate(up):
                     arp_bus.put(chip_arp(m, STEP * 0.85, 0.25), bar_t(b, base + k), 0.04, 0.5 - k / 7.0)
             elif b in (B_HEAT, B_BEADS):
                 for k in range(4):
-                    arp_bus.put(chip_arp(tones[k] + 12, STEP * 1.6, 0.25), bar_t(b, base + 2 * k), 0.03, -0.45)
-            elif b == B_MERGE and half == 0:
-                for k in range(3):
-                    arp_bus.put(chip_arp(tones[k] + 12, STEP * 1.6, 0.25), bar_t(b, 2 * k), 0.03, -0.45)
-            elif b == B_DROP and half == 1:        # sparkle back in after the plip, rising into the payoff
-                for k, p in enumerate((0, 1, 2, 3, 1, 2, 3)):
-                    arp_bus.put(chip_arp(tones[p] + 12, STEP * 0.8), bar_t(b, 9 + k), 0.03, -0.4)
+                    st = base + 2 * k
+                    if b == B_BEADS and st >= 12:
+                        continue
+                    arp_bus.put(chip_arp(tones[k] + 12, STEP * 1.6, 0.25), bar_t(b, st), 0.03, -0.45)
+            elif b == B_ITEM:                      # bright sparkle under the fanfare
+                for k, p in enumerate((0, 1, 2, 3, 1, 2, 3, 3)):
+                    if base + k < 2:
+                        continue
+                    arp_bus.put(chip_arp(tones[p] + 12, STEP * 0.8), bar_t(b, base + k), 0.035, 0.4)
             elif b == B_TURN and half == 1:
                 for k, p in enumerate((0, 1, 2, 3, 0, 1, 2, 3)):
                     arp_bus.put(chip_arp(tones[p] + (12 if k >= 4 else 0), STEP * 0.85), bar_t(b, 8 + k), 0.05, -0.5)
-    # pads under the cutaway, the heat, the beads, the merge and the drop
+    # pads under the x-ray and the slow middle (the cutaway, heat, beads, the merge)
     for b in SOFT_BARS:
         for half in (0, 1):
             root, iv = CHORD[BARS[b][half]]
-            if b == B_DROP and half == 1:                          # the plip (21.0) first, then the pad
-                pad_bus.put(pad([root + 24 + i for i in iv[:3]], 0.7, 0.2), bar_t(b, 10), 0.04)
-                continue
-            pad_bus.put(pad([root + 24 + i for i in iv[:3]], 0.95, 0.15), bar_t(b, 8 * half), 0.045)
-    # drums: light kit (kick, snare, hats, a crash at the section starts)
+            ms = [root + 24 + i for i in iv[:3]]
+            if b == B_BEADS and half == 1:
+                pad_bus.put(pad(ms, 0.6, 0.15), bar_t(b, 8), 0.04)              # out before the merge
+            elif b == B_MERGE and half == 0:
+                pad_bus.put(pad(ms, 0.55, 0.2), bar_t(b, 3), 0.04)              # in after the pause
+            else:
+                pad_bus.put(pad(ms, 0.95, 0.15), bar_t(b, 8 * half), 0.045)
+    # drums: a light kit, a crash at the big moments
     K, S, Hc, Ho, C = kick(), snare(), hat(False), hat(True), crash()
     for b in range(N_BARS):
         t0 = bar_t(b)
-        if b in (0, 2, 4, B_PAYOFF):
+        if b in (0, B_BUILD, 6, B_PAYOFF):
             drum_bus.put(C, t0, 0.14, 0.25)
-        if b in B_HOOK + (B_PAYOFF, B_TURN):
+        if b in (0, 1, B_CLIMB, B_PAYOFF, B_TURN):
             kicks, snares = [0, 8, 10], [4, 12]
             if b == 0:
                 snares = [12]                      # the squish owns beat 2
+            if b == 1:
+                snares = [4]                       # the landing owns beat 4
             if b == B_PAYOFF:
-                kicks = [0, 10]                    # the chime owns beat 3
+                snares = [4]                       # the chime owns beat 4
             if b == B_TURN:
                 snares = [4]
             for k in kicks:
@@ -612,19 +637,36 @@ def music():
             for k in snares:
                 drum_bus.put(S, t0 + k * STEP, 0.22, 0.08)
             for k in range(0, 16, 2):
-                if (b == 0 and k in (2, 14)) or (b == B_TURN and k >= 12):
+                if (b == 0 and k in (2, 14)) or (b == 1 and k == 12) or (b == B_TURN and k >= 12):
                     continue
                 drum_bus.put(Hc, t0 + k * STEP, 0.09 if k % 4 == 2 else 0.045, 0.3)
-            if b in (1, 2):
+            if b == 1:
                 drum_bus.put(Ho, t0 + 14 * STEP, 0.06, 0.3)
             if b == B_TURN:                        # a tom fill back into the top of the loop
                 for i, m in enumerate((57, 55, 52, 48)):
                     drum_bus.put(tom(m), t0 + (12 + i) * STEP, 0.22, 0.4 - 0.25 * i)
-        elif b == B_BUILD:                         # the mantle clicks on the downbeat; a build into the boil
-            drum_bus.put(K, t0, 0.42)
+        elif b == B_BUILD:                         # a kick as each part drops in
+            for k in (0, 4, 8):
+                drum_bus.put(K, t0 + k * STEP, 0.42)
+            drum_bus.put(S, t0 + 12 * STEP, 0.22, 0.08)
+            for k in range(0, 16, 2):
+                drum_bus.put(Hc, t0 + k * STEP, 0.08 if k % 4 == 2 else 0.04, 0.3)
+        elif b == B_WATER:
+            drum_bus.put(K, t0, 0.36)
             drum_bus.put(K, t0 + 8 * STEP, 0.36)
-            for k in range(4, 16):
-                drum_bus.put(Hc, t0 + k * STEP, 0.02 + 0.06 * (k - 4) / 11, 0.3)
+            drum_bus.put(S, t0 + 4 * STEP, 0.15, 0.08)
+            for k in range(0, 8, 2):
+                drum_bus.put(Hc, t0 + k * STEP, 0.05 if k % 4 == 2 else 0.03, 0.3)
+        elif b == B_XRAY:
+            drum_bus.put(K, t0, 0.3)
+            drum_bus.put(K, t0 + 8 * STEP, 0.3)
+            for k in range(0, 16, 4):
+                drum_bus.put(Hc, t0 + (k + 2) * STEP, 0.03, 0.3)
+        elif b == B_ELEC:                          # building toward the boil
+            for k in (0, 4, 8, 12):
+                drum_bus.put(K, t0 + k * STEP, 0.3 + 0.03 * k / 4)
+            for k in range(16):
+                drum_bus.put(Hc, t0 + k * STEP, 0.02 + 0.06 * k / 15, 0.3)
             for i, k in enumerate((12, 13, 14, 15)):
                 drum_bus.put(S, t0 + k * STEP, 0.08 + 0.05 * i, 0.08)
         elif b in B_BOIL:                          # four on the floor, 16th hats
@@ -644,18 +686,18 @@ def music():
             drum_bus.put(K, t0, 0.32)
             if b == B_HEAT:
                 drum_bus.put(K, t0 + 8 * STEP, 0.24)
-            for k in range(0, 16, 2):
+            for k in range(0, 12 if b == B_BEADS else 16, 2):
                 drum_bus.put(Hc, t0 + k * STEP, 0.035 if k % 4 == 2 else 0.02, 0.3)
-        elif b == B_MERGE:                         # out from the merge (step 6) until the drop moves (step 10)
-            drum_bus.put(K, t0, 0.3)
-            for k in (2, 4, 10, 12, 14):
-                drum_bus.put(Hc, t0 + k * STEP, 0.03, 0.3)
-        elif b == B_DROP:                          # nothing on the plip (step 8); a snare lift into the payoff
-            for k in (0, 2, 4):
+        elif b == B_MERGE:                         # silent through the pause, soft ticks while the drop moves
+            for k in (4, 6, 8, 10, 12, 14):
                 drum_bus.put(Hc, t0 + k * STEP, 0.025, 0.3)
-            drum_bus.put(K, t0 + 10 * STEP, 0.3)
-            for i, k in enumerate((12, 13, 14, 15)):
-                drum_bus.put(S, t0 + k * STEP, 0.07 + 0.04 * i, 0.08)
+        elif b == B_ITEM:                          # nothing on the plip; the fanfare gets a crash and a groove
+            drum_bus.put(C, t0 + 2 * STEP, 0.13, -0.25)
+            for k in (2, 8, 10):
+                drum_bus.put(K, t0 + k * STEP, 0.38)
+            drum_bus.put(S, t0 + 12 * STEP, 0.2, 0.08)
+            for k in range(2, 16, 2):
+                drum_bus.put(Hc, t0 + k * STEP, 0.07 if k % 4 == 2 else 0.04, 0.3)
     lead_st = lead_bus.x + harm_bus.x
     dl = np.stack([echo(lead_st.sum(0) * 0.5, 0.375, 0.3), echo(lead_st.sum(0) * 0.5, 0.25, 0.28)])
     mus = lead_st + 0.4 * dl + arp_bus.x + bass_bus.x + drum_bus.x + pad_bus.x
@@ -763,50 +805,92 @@ def ticks(bus, t0, t1, n, gain, f=3200.0, pan=0.25, accel=2.0):
 
 
 def boil_level(t):
-    """How loud the boil is: full on the surface (micro-shot A), softer as the camera leaves the flask."""
-    pts = [(T.BOIL, 0.0), (T.SURFACE[0] + 0.2, 1.0), (T.TILT[0], 1.0), (T.TRACK[0], 0.35), (T.PATHS[0], 0.14),
-           (T.COMPARE[0], 0.12), (T.COMPARE[1], 0.3), (T.LOOP_PUSH[0], 0.3), (T.LOOP_PUSH[0] + 0.5, 0.0)]
+    """How loud the boil is: up as the bubbles start, full on the surface (micro-shot A), softer as the camera leaves."""
+    pts = [(T.BOIL, 0.0), (T.BOIL + 0.3, 0.6), (T.SURFACE[1], 1.0), (T.TILT[0], 1.0), (T.TRACK[0], 0.35),
+           (T.PATHS[0], 0.14), (T.COMPARE[0], 0.12), (T.COMPARE[1], 0.3), (T.LOOP_PUSH[0], 0.3),
+           (T.LOOP_PUSH[0] + 0.5, 0.0)]
     xs, ys = zip(*pts)
     return float(np.interp(t, xs, ys, left=0.0, right=0.0))
+
+
+def spring(f0=180.0, f1=560.0, dur=0.2):
+    """A cartoon spring: a triangle wave whose pitch shoots up with a wobble (the flask's hop)."""
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    f = f0 * (f1 / f0) ** np.clip(t / (dur * 0.7), 0, 1) * (1 + 0.08 * np.sin(2 * math.pi * 28 * t))
+    return tri(f, n) * np.minimum(1, t / 0.004) * np.exp(-t / (dur / 2.5))
 
 
 def sfx_forward():
     from . import rig
     bus = Bus()
     rng = np.random.default_rng(9)
-    # A. grape to flask: a glint, the squish, a trickle, the purple plip, the pour filling up
+    # A. grape to flask: a glint, the squish, a trickle, the purple plip, the pour filling up (fast-forward ticks)
     bus.put(bell(100, 0.35, 0.9, 2.0), 0.03, 0.03, 0.1)
     bus.put(blip(3136.0, 4186.0, 0.05, 0.5), 0.05, 0.02, 0.1)
     bus.put(squish(), T.SQUASH[0] + 0.01, 0.42)
-    bus.put(click(5, 3800, 0.012), T.SQUASH[0] + 0.08, 0.08)                         # the skin splits
+    bus.put(click(5, 3800, 0.012), T.SQUASH[0] + 0.08, 0.08)
     tr_d = T.PLIP1 - T.STREAM0
     tr = bandnoise(tr_d, lambda tt: 1500 + 300 * np.sin(2 * math.pi * 3 * tt), 0.45, 6)
     bus.put(fade(tr, 0.08, 0.04), T.STREAM0, 0.035)
     bus.put(plip(330, 820, 0.24, body=0.5, splash=0.2, seed=7), T.PLIP1, 0.34)
     fill_d = T.POUR[1] - T.PLIP1
     fl = bandnoise(fill_d, lambda tt: 380 * (900 / 380) ** np.clip(tt / fill_d, 0, 1), 0.35, 8)
-    bus.put(fade(fl, 0.06, 0.15), T.PLIP1 + 0.05, 0.05)                             # the pitch rises as it fills
-    for i, tt in enumerate((2.0, 2.25, 2.5, 2.75)):
-        bus.put(plip(rng.uniform(380, 480), 900, 0.12, 0.3, 0.1, 20 + i), tt, 0.1 * (1 - 0.18 * i))
-    # B. onto the mantle; the joint clinks on the match cut; the water already runs; the mantle clicks on
-    bus.put(whoosh(T.MOVE[1] - T.MOVE[0], 500, 1400, 11, 0.8, 0.5), T.MOVE[0], 0.07, -0.2)
-    bus.put(thump(120, 60, 0.25, 0.2, 12), T.MOVE[1] - 0.03, 0.14)
-    bus.put(whoosh(0.32, 900, 2600, 13, 0.7, 0.9), T.NECK_PUSH[0], 0.05)
-    bus.put(glass_ping(2637, 0.35, 14), T.MATCH, 0.1, 0.0)
-    bus.put(click(15, 4200, 0.015), T.MATCH, 0.07)
-    bus.put(whoosh(1.0, 700, 1600, 16, 0.8, 0.5), T.REVEAL[0] + 0.05, 0.035, 0.2)
-    bus.put(whoosh(1.0, 1600, 600, 17, 0.8, 0.4), T.WIDE[0], 0.035, -0.1)
-    bus.put(fade(burble(2.4, 14, 18), 0.6, 0.6), T.WIDE[0] - 0.6, 0.03, 0.45)       # cooling water, before the heat
-    bus.put(click(19, 2200, 0.03), T.MANTLE_ON, 0.24, -0.35)
-    bus.put(thump(220, 90, 0.12, 0.6, 20), T.MANTLE_ON, 0.12, -0.35)
-    bus.put(beep(1568.0, 0.06, 0.25), T.MANTLE_ON + 0.03, 0.03, -0.35)             # the red indicator
-    hn = int(1.6 * SR)
+    bus.put(fade(fl, 0.06, 0.15), T.PLIP1 + 0.05, 0.05)
+    for i, tt in enumerate((2.0, 2.25, 2.5)):
+        bus.put(plip(rng.uniform(380, 480), 900, 0.12, 0.3, 0.1, 20 + i), tt, 0.1 * (1 - 0.2 * i))
+    for span in T.FAST_FORWARD:
+        ticks(bus, span[0], span[1] - 0.05, 9, 0.025)
+    # B. the hop: a spring, a whoosh in the air, a soft thunk on the heater with a puff
+    bus.put(spring(), T.HOP[0], 0.09, -0.2)
+    bus.put(whoosh(T.HOP_LAND - T.HOP[0] - 0.08, 600, 1600, 11, 0.8, 0.45), T.HOP[0] + 0.08, 0.05, 0.0)
+    bus.put(thump(130, 55, 0.3, 0.3, 12), T.HOP_LAND, 0.2)
+    bus.put(glass_ping(2093, 0.25, 13), T.HOP_LAND + 0.005, 0.04)
+    pf = bandnoise(0.25, lambda tt: 900 - 500 * tt / 0.25, 0.7, 14)
+    bus.put(pf * env_exp(len(pf), 0.06, 0.004), T.HOP_LAND, 0.05)
+    bus.put(whoosh(T.NECK_PUSH[1] - T.NECK_PUSH[0], 900, 2600, 15, 0.7, 0.9), T.NECK_PUSH[0], 0.05)
+    # the still is built: each part whistles down and lands with a clunk and a pitched "placed!" blip
+    for i, (t0, m, ping) in enumerate(((T.PART_HEAD, 72, 3136), (T.PART_COND, 76, 1568), (T.PART_RECV, 79, 2637))):
+        bus.put(glide(1300, 700, 0.28, 0.0, 0.25), t0 - 0.12, 0.012, -0.2 + 0.25 * i)
+        land = t0 + 0.18
+        bus.put(thump(170, 70, 0.2, 0.5, 16 + i), land, 0.14, -0.2 + 0.25 * i)
+        bus.put(glass_ping(ping, 0.3, 19 + i), land + 0.004, 0.05, -0.2 + 0.25 * i)
+        bus.put(blip(mtof(m + 12), mtof(m + 24), 0.07, 0.5), land + 0.02, 0.03, -0.2 + 0.25 * i)
+    # the cooling water runs in from the lower port before any heat
+    gush = bandnoise(0.7, lambda tt: 500 + 900 * np.clip(tt / 0.7, 0, 1), 0.6, 22)
+    bus.put(fade(gush, 0.05, 0.3), T.WATER_ON, 0.05, 0.45)
+    bus.put(fade(burble(2.2, 14, 23), 0.3, 0.6), T.WATER_ON, 0.03, 0.45)
+    # C. the heater x-ray: push in, a scan beep sweeping down, the switch, the current hum, the warm-up
+    bus.put(whoosh(T.HEATER_PUSH[1] - T.HEATER_PUSH[0], 1800, 700, 24, 0.8, 0.4), T.HEATER_PUSH[0], 0.06)
+    xd = T.XRAY_ON[1] - T.XRAY_ON[0]
+    xn = int(xd * SR)
+    xx = np.arange(xn) / SR
+    scan = pulse(1400 * (0.35 ** (xx / xd)), xn, 0.125) * np.sin(math.pi * np.clip(xx / xd, 0, 1)) ** 2
+    bus.put(lowpass(scan, 3500, 63), T.XRAY_ON[0], 0.035, -0.2)
+    bus.put(bandnoise(xd, lambda tt: 5000 - 3000 * tt / xd, 0.5, 25) * np.sin(math.pi * xx / xd) ** 2,
+            T.XRAY_ON[0], 0.03, 0.2)
+    od = T.XRAY_OFF[1] - T.XRAY_OFF[0]
+    on_ = int(od * SR)
+    ox = np.arange(on_) / SR
+    bus.put(lowpass(pulse(500 * (2.8 ** (ox / od)), on_, 0.125) * np.sin(math.pi * ox / od) ** 2, 3500, 63),
+            T.XRAY_OFF[0], 0.025, 0.2)
+    bus.put(click(26, 2200, 0.03), T.SWITCH, 0.24, -0.35)
+    bus.put(thump(220, 90, 0.12, 0.6, 27), T.SWITCH, 0.1, -0.35)
+    bus.put(beep(1568.0, 0.06, 0.25), T.SWITCH + 0.03, 0.03, 0.35)                   # the red indicator
+    hd = T.HEAT_IN[1] + 0.4 - T.SWITCH
+    hn = int(hd * SR)
     xh = np.arange(hn) / SR
-    hum = (0.6 * tri(98, hn) + 0.4 * sine(196, hn)) * np.clip(xh / 0.5, 0, 1) * np.clip((1.6 - xh) / 0.8, 0, 1)
-    bus.put(lowpass(hum, 900, 63), T.MANTLE_ON, 0.03, -0.35)                        # the mantle warming (electric)
-    ticks(bus, T.JUMP[0] + 0.1, T.JUMP[1] - 0.15, 12, 0.035)                        # the time jump
-    bus.put(glide(420, 1100, 0.8), T.MANTLE_ON + 0.2, 0.012, -0.3)                 # the thermometer climbs
-    # C. the boil: rhythmic blub-blub on the 16th grid, loud on the surface, softer as the camera leaves
+    grow = np.clip((xh - (T.GLOW[0] - T.SWITCH)) / (T.GLOW[1] - T.GLOW[0]), 0.25, 1.0)
+    hum = (0.6 * tri(98, hn) + 0.4 * sine(196, hn)) * grow * np.clip(xh / 0.2, 0, 1) * np.clip((hd - xh) / 0.4, 0, 1)
+    bus.put(lowpass(hum, 900, 63), T.SWITCH, 0.035, -0.2)                            # electric hum, no zap
+    bus.put(glide(220, 330, T.GLOW[1] - T.GLOW[0]), T.GLOW[0], 0.02, 0.0)            # the coil warms up
+    k = 0
+    while T.HEAT_IN[0] + 0.75 * k < T.HEAT_IN[1]:                                     # heat soaking in, wave by wave
+        bus.put(warm_tone(64 + (0, 3, 7)[k % 3], 0.7), T.HEAT_IN[0] + 0.75 * k, 0.045, 0.0)
+        k += 1
+    bus.put(blip(mtof(84), mtof(96), 0.06, 0.25), T.BOIL, 0.05, 0.4)                 # the "!": bwip-bwip
+    bus.put(blip(mtof(91), mtof(103), 0.06, 0.25), T.BOIL + 0.08, 0.05, 0.4)
+    # the boil: rhythmic blub-blub on the 16th grid, loud on the surface, softer as the camera leaves
     t = T.BOIL
     k = int(round(T.BOIL / STEP))
     while t < T.LOOP_PUSH[0] + 0.5:
@@ -818,80 +902,81 @@ def sfx_forward():
                     float(rng.uniform(-0.45, -0.15)))
         k += 1
         t = k * STEP
-    for _ in range(90):                                                              # a few off-grid ones
+    for _ in range(90):
         tt = rng.uniform(T.BOIL, T.LOOP_PUSH[0])
         lv = boil_level(tt)
         if lv > 0.05:
             bus.put(blub(rng.uniform(450, 900), 0.05), tt, 0.06 * lv, float(rng.uniform(-0.5, -0.1)))
-    # the vapour: a soft hiss that climbs with the camera, then runs downhill in the cutaway
+    # D. the vapour: a soft hiss that climbs with the camera, then a bright slice into the cutaway
     vd = T.CUT_ON[1] - T.SURFACE[0]
-    vh = bandnoise(vd, lambda tt: 5200 + 2400 * np.clip((tt - 2.0) / 2.5, 0, 1), 0.5, 22)
-    vl = np.interp(np.arange(len(vh)) / SR, [0, 0.6, 2.0, 4.4, 4.6, vd], [0, 0.5, 0.6, 1.0, 1.0, 0.0])
+    vh = bandnoise(vd, lambda tt: 5200 + 2400 * np.clip((tt - 2.5) / 2.5, 0, 1), 0.5, 28)
+    vl = np.interp(np.arange(len(vh)) / SR, [0, 0.6, 2.5, vd - 0.4, vd - 0.2, vd], [0, 0.5, 0.6, 1.0, 1.0, 0.0])
     put_pan(bus, vh * vl, T.SURFACE[0], 0.03, -0.4, 0.1)
-    # into the cutaway: a bright slice along the glass
-    bus.put(whoosh(T.CUT_ON[1] - T.CUT_ON[0], 2500, 7000, 23, 0.5, 0.8), T.CUT_ON[0], 0.05, 0.1)
-    bus.put(glass_ping(3520, 0.3, 24), T.CUT_ON[1], 0.04, 0.2)
-    # D. two paths: water uphill (right to left), vapour downhill (left to right); they never mix
+    bus.put(whoosh(T.CUT_ON[1] - T.CUT_ON[0], 2500, 7000, 29, 0.5, 0.8), T.CUT_ON[0], 0.05, 0.1)
+    bus.put(glass_ping(3520, 0.3, 30), T.CUT_ON[1], 0.04, 0.2)
+    # E. two paths: water uphill (right to left), vapour downhill (left to right); they never mix
     pd = T.PATHS[1] - T.PATHS[0]
-    put_pan(bus, fade(burble(pd, 20, 25), 0.3, 0.5), T.PATHS[0], 0.05, 0.6, -0.6)
-    ph = bandnoise(pd, lambda tt: 6000 - 1500 * tt / pd, 0.5, 26)
+    put_pan(bus, fade(burble(pd, 20, 31), 0.3, 0.5), T.PATHS[0], 0.05, 0.6, -0.6)
+    ph = bandnoise(pd, lambda tt: 6000 - 1500 * tt / pd, 0.5, 32)
     put_pan(bus, fade(ph, 0.3, 0.5), T.PATHS[0], 0.025, -0.6, 0.6)
-    bus.put(whoosh(T.HEAT_PUSH[1] - T.HEAT_PUSH[0], 600, 1800, 27, 0.8, 0.7), T.HEAT_PUSH[0], 0.05)
-    # the heat cue: one soft warm swell per amber pulse (no zap)
+    bus.put(whoosh(T.HEAT_PUSH[1] - T.HEAT_PUSH[0], 600, 1800, 33, 0.8, 0.7), T.HEAT_PUSH[0], 0.05)
     for i, m in enumerate((64, 67, 71, 76, 69)):
         bus.put(warm_tone(m, 0.7), T.HEAT[0] + 0.15 * i, 0.06, -0.25 if i % 2 == 0 else 0.25)
-    # the beads: one tiny pitched pip as each appears (chord tones, so they play along)
     order = sorted(range(len(rig.BEADS)), key=lambda i: rig.BEADS[i][3])
-    pips = {0: (93, 96), 1: (89, 93, 96, 93, 89), 2: (95, 98)}
+    pips = {0: (91, 95), 1: (89, 93, 96, 93, 89), 2: (95, 98)}
     used = {0: 0, 1: 0, 2: 0}
     for i in order:
         a, side, r, t0 = rig.BEADS[i]
-        sect = 0 if t0 < 16.0 else (1 if t0 < 17.0 else 2)
+        sect = 0 if t0 < 22.0 else (1 if t0 < 23.0 else 2)
         m = pips[sect][used[sect] % len(pips[sect])]
         used[sect] += 1
-        bus.put(plip(mtof(m) * 0.7, mtof(m), 0.08, 0.0, 0.05, 30 + i), t0 + 0.04, 0.07,
+        bus.put(plip(mtof(m) * 0.7, mtof(m), 0.08, 0.0, 0.05, 40 + i), t0 + 0.04, 0.07,
                 0.3 * side + 0.02 * (a - rig.SEC))
-    # the merge: the bead creeps over, "tik", then a pause
     bus.put(glide(700, 1400, 0.3), T.MERGE - 0.3, 0.012, 0.1)
-    bus.put(click(40, 4200, 0.02), T.MERGE, 0.13, 0.1)
+    bus.put(click(50, 4200, 0.02), T.MERGE, 0.13, 0.1)
     bus.put(blip(2637.0, 3520.0, 0.04, 0.5), T.MERGE, 0.05, 0.1)
-    bus.put(plip(1400, 2200, 0.07, 0.0, 0.1, 41), T.MERGE + 0.01, 0.07, 0.1)
-    # follow the drop downhill, it waits at the tip, falls, and lands: the bright clear plip
+    bus.put(plip(1400, 2200, 0.07, 0.0, 0.1, 51), T.MERGE + 0.01, 0.07, 0.1)
     fd = T.FOLLOW[1] - 0.45 - T.FOLLOW[0]
     put_pan(bus, glide(1050, 560, fd, 0.01), T.FOLLOW[0], 0.025, -0.1, 0.35)
-    bus.put(glide(300, 330, 0.4, 0.04), T.FOLLOW[1] - 0.45, 0.012, 0.35)            # it swells at the tip
+    bus.put(glide(300, 330, 0.4, 0.04), T.FOLLOW[1] - 0.45, 0.012, 0.35)
     bus.put(glide(1600, 700, T.PLIP2 - T.DROP_FALL[0], 0.0, 0.25), T.DROP_FALL[0], 0.02, 0.35)
-    bus.put(plip(900, 2400, 0.2, 0.0, 0.3, 42), T.PLIP2, 0.32, 0.3)
+    bus.put(plip(900, 2400, 0.2, 0.0, 0.3, 52), T.PLIP2, 0.32, 0.3)
     bus.put(bell(96, 0.8, 1.2, 2.0), T.PLIP2 + 0.005, 0.05, 0.3)
     for i, dt in enumerate((0.04, 0.09, 0.15, 0.22)):
         bus.put(blip(mtof(100 + 2 * i), mtof(103 + 2 * i), 0.03, 0.5), T.PLIP2 + dt, 0.018, 0.1 + 0.15 * i)
-    # E. both flasks: zoom out, a time-lapse (fast clock, the clear level filling up), the two-note chime
-    bus.put(whoosh(T.COMPARE[1] - T.COMPARE[0], 1400, 500, 43, 0.8, 0.35), T.COMPARE[0], 0.04)
-    ticks(bus, T.LAPSE[0], T.LAPSE[1], 10, 0.025)
+    # F. item-get twinkles, the zoom out, the time-lapse, the chime, the push, and the magic fade into the grape
+    for i in range(10):
+        tt = T.ITEM[0] + 0.1 + i * (T.ITEM[1] - T.ITEM[0] - 0.3) / 10
+        bus.put(blip(mtof(98 + (i * 5) % 9), mtof(105 + (i * 5) % 9), 0.03, 0.5), tt, 0.012, 0.2 + 0.05 * (i % 4))
+    bus.put(whoosh(T.COMPARE[1] - T.COMPARE[0], 1400, 500, 53, 0.8, 0.35), T.COMPARE[0], 0.04)
     ld = T.LAPSE[1] - T.LAPSE[0]
-    lf = bandnoise(ld, lambda tt: 600 * (1500 / 600) ** np.clip(tt / ld, 0, 1), 0.35, 44)
+    lf = bandnoise(ld, lambda tt: 600 * (1500 / 600) ** np.clip(tt / ld, 0, 1), 0.35, 54)
     bus.put(fade(lf, 0.2, 0.3), T.LAPSE[0], 0.03, 0.35)
-    bus.put(fade(burble(2.6, 10, 45), 0.4, 0.6), T.COMPARE[0], 0.02, 0.4)
+    bus.put(fade(burble(2.0, 10, 55), 0.4, 0.6), T.COMPARE[0], 0.02, 0.4)
     for i, (m, g) in enumerate(((86, 0.14), (91, 0.16))):
         nn = int((0.18 if i == 0 else 0.7) * SR)
         xx = np.arange(nn) / SR
         note = pulse(mtof(m), nn, 0.25) * np.minimum(1, xx / 0.003) * np.exp(-xx / (0.06 if i == 0 else 0.2))
         bus.put(note, T.CHIME + i * STEP, g, -0.15 + 0.3 * i)
         bus.put(bell(m + 12, 0.8, 1.0, 2.0), T.CHIME + i * STEP, 0.05)
-    # the push in on the next hanging drop: a rising whoosh that lands on the loop's downbeat
     pd = T.LOOP_PUSH[1] - T.LOOP_PUSH[0]
-    bus.put(whoosh(pd, 350, 2600, 46, 0.8, 0.94), T.LOOP_PUSH[0], 0.07, 0.15)
-    bus.put(glide(420, 560, pd - 0.3, 0.03), T.LOOP_PUSH[0] + 0.1, 0.01, 0.2)       # the drop swelling
+    bus.put(whoosh(pd + 0.3, 350, 2200, 56, 0.8, 0.8), T.LOOP_PUSH[0], 0.06, 0.15)
+    dd = T.DISSOLVE[1] - T.DISSOLVE[0]
+    for i, m in enumerate((72, 76, 79, 84, 88, 91, 96, 100)):                         # the drop turns into the grape
+        bus.put(blip(mtof(m), mtof(m + 7), 0.06, 0.25), T.DISSOLVE[0] + dd * i / 8, 0.016 + 0.003 * i, -0.3 + 0.08 * i)
+    sw = bandnoise(dd, lambda tt: 1500 + 5000 * (tt / dd) ** 2, 0.5, 57)
+    xs = np.arange(len(sw)) / SR
+    bus.put(sw * (xs / dd) ** 2 * np.clip((dd - xs) / 0.03, 0, 1), T.DISSOLVE[0], 0.04)
     fx = wrap(bus.x)
     return fx + 0.1 * wrap(np.concatenate([reverb(fx, 0.8, 21), np.zeros((2, N - NT))], 1))
 
 
 def duck_env():
-    """The music dips under the squeeze, the plips, the merge (held through its pause) and the chime."""
+    """The music dips under the squeeze, the plips, the landing, the merge (held through its pause) and the chime."""
     t = np.arange(NT) / SR
     g = np.ones(NT)
-    for t0, depth, hold in ((T.SQUASH[0] + 0.01, 0.4, 0.15), (T.PLIP1, 0.3, 0.0), (T.MATCH, 0.15, 0.0),
-                            (T.MANTLE_ON, 0.25, 0.0), (T.MERGE, 0.5, T.FOLLOW[0] - T.MERGE - 0.1),
+    for t0, depth, hold in ((T.SQUASH[0] + 0.01, 0.4, 0.15), (T.PLIP1, 0.3, 0.0), (T.HOP_LAND, 0.2, 0.0),
+                            (T.SWITCH, 0.2, 0.0), (T.BOIL, 0.15, 0.0), (T.MERGE, 0.5, T.FOLLOW[0] - T.MERGE - 0.1),
                             (T.PLIP2, 0.5, 0.2), (T.CHIME, 0.35, 0.1)):
         a = np.clip((t - (t0 - 0.03)) / 0.03, 0, 1) * np.clip(1 - (t - t0 - hold) / 0.45, 0, 1)
         g -= depth * a * (t >= t0 - 0.03)

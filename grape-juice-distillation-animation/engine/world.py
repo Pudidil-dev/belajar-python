@@ -23,6 +23,30 @@ class Cam:
         return mm * self.s
 
 
+class Squash:
+    """A camera that squashes and stretches everything around an anchor point: squash-and-stretch for one sprite."""
+
+    def __init__(self, c, ax, ay, sx, sy):
+        self.cx, self.cy, self.s = c.cx, c.cy, c.s
+        self.X = ax + (c.X - ax) / sx
+        self.Y = ay + (c.Y - ay) / sy
+        self._c, self._a, self._k = c, (ax, ay), (sx, sy)
+
+    def to(self, x, y):
+        (ax, ay), (sx, sy) = self._a, self._k
+        return self._c.to(ax + (x - ax) * sx, ay + (y - ay) * sy)
+
+    def px(self, mm):
+        return mm * self.s
+
+
+def lifted(c, dy):
+    """The same camera, with what it draws shifted up by dy mm (a part dropping into place)."""
+    if not dy:
+        return c
+    return Cam(c.cx, c.cy - dy, c.s)
+
+
 def circle(c, x, y, r):
     return (c.X - x) ** 2 + (c.Y - y) ** 2 <= r * r
 

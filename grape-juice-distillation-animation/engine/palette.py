@@ -2,7 +2,7 @@
 
 Dark navy background; deep grape purple for the juice (red-leaning, hue ~308-325, so it never reads as blue-violet);
 violet only as a highlight on the grapes; cyan only for the cooling water; white edges for clear liquid and glass
-glints; amber only for the heat cue; a grey mantle with a red indicator.
+glints; amber only for the heat cue; a grey mantle with a red indicator; yellow only for electric current.
 """
 
 
@@ -34,3 +34,5 @@ VAPOR = hx('#dfe7f2')
 CLEAR = ramp('#24406a', '#36577f', '#4d6f96')                      # clear liquid: the navy behind, lifted (not cyan)
 BENCH = ramp('#0a1220', '#141f33', '#22324d')
 SILVER = ramp('#8b94a3', '#d4d9e1')
+FABRIC = ramp('#6f6658', '#9a8f7a', '#c9bda3')                     # the heater's glass-fibre bowl
+ELEC = hx('#fff35c')                                               # electric current, inside the heater x-ray only

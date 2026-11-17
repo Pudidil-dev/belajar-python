@@ -50,12 +50,30 @@ def p_on(along, across=0.0):
 
 # ---------------------------------------------------------------- states over time
 def flask_pos(t):
-    if t < T.MOVE[0]:
+    """On its cork ring, then one game-style hop onto the heating mantle: a crouch, a jump arc, a landing."""
+    t0 = T.HOP[0] + 0.08
+    if t < t0:
         return F_START
-    k = T.ease_in_out(T.u_of(t, T.MOVE), 2.0)
-    x = T.lerp(F_START[0], F_HOME[0], k)
-    y = T.lerp(F_START[1], F_HOME[1], k) + 22 * math.sin(math.pi * k)
-    return (x, y)
+    if t < T.HOP_LAND:
+        u = (t - t0) / (T.HOP_LAND - t0)
+        x = T.lerp(F_START[0], F_HOME[0], T.ease_in_out(u, 1.3))
+        y = T.lerp(F_START[1], F_HOME[1], u) + 46.0 * 4 * u * (1 - u)
+        return (x, y)
+    return F_HOME
+
+
+def flask_squash(t):
+    """(sx, sy) of the flask: it crouches before the hop, stretches in the air, squashes on landing and wobbles."""
+    if t < T.HOP[0] or t >= T.HOP[1]:
+        return 1.0, 1.0
+    if t < T.HOP[0] + 0.08:
+        k = (t - T.HOP[0]) / 0.08
+        return 1 + 0.10 * k, 1 - 0.14 * k
+    if t < T.HOP_LAND:
+        return 0.95, 1.07
+    u = (t - T.HOP_LAND) / (T.HOP[1] - T.HOP_LAND)
+    w = math.cos(u * math.pi * 2.5) * (1 - u)
+    return 1 + 0.14 * w, 1 - 0.18 * w
 
 
 def assembled(t):
@@ -77,12 +95,8 @@ def clear_depth(t):
     return 1.2 + 21.0 * T.smooth(T.u_of(t, T.LAPSE))
 
 
-def mantle_heat(t):
-    return T.smooth(T.u_of(t, (T.MANTLE_ON, T.JUMP[1])))
-
-
 def thermo_level(t):
-    return T.lerp(195.0, 236.0, T.ease_in_out(T.u_of(t, (T.MANTLE_ON + 0.2, T.JUMP[1])), 2.0))
+    return T.lerp(195.0, 236.0, T.ease_in_out(T.u_of(t, (T.GLOW[0], T.JUMP[1])), 2.0))
 
 
 def cut_along(t):
@@ -94,8 +108,11 @@ def cut_along(t):
     return -10.0 + (L_IN + 20) * T.smooth(T.u_of(t, T.CUT_ON))
 
 
-def water_flow(t):
-    return t >= T.MATCH
+def water_front(t):
+    """Along-position of the cooling water's front: it enters at the lower port and fills the jacket uphill."""
+    if t < T.WATER_ON:
+        return JACKET[1] + 30.0
+    return T.lerp(PORT_LO + 4.0, JACKET[0] - 2.0, T.ease_in_out(T.u_of(t, (T.WATER_ON, T.WATER_ON + 0.6)), 1.5))
 
 
 # ---------------------------------------------------------------- drawing
@@ -161,48 +178,10 @@ def draw_clamp_jaws(buf, c, t):
 
 
 def draw_cork(buf, c, t):
-    if t >= T.MOVE[1]:
-        return
     ck = ellipse(c, F_START[0], 21.0 - 4.0, 21.0, 5.0)
     buf[Wd.full(ck)] = CORK[1]
     buf[Wd.full(ck & (c.Y > 18.5))] = CORK[2]
     buf[edge(ck)] = OUTLINE
-
-
-def draw_mantle(buf, c, t):
-    if t < T.MOVE[0]:
-        return
-    h = mantle_heat(t)
-    body = rect(c, MX - 44, MX + 44, 0.0, 52.0) & ~circle(c, F_HOME[0], F_HOME[1], R_F + 1.0)
-    body &= ~(rect(c, MX - 44, MX - 40, 46, 52) | rect(c, MX + 40, MX + 44, 46, 52))
-    buf[Wd.full(body)] = MANTLE[1]
-    buf[Wd.full(body & (c.Y > 44))] = MANTLE[2]
-    buf[Wd.full(body & (c.Y < 6))] = MANTLE[0]
-    lining = circle(c, F_HOME[0], F_HOME[1], R_F + 4.0) & ~circle(c, F_HOME[0], F_HOME[1], R_F + 1.0) & (c.Y < 52)
-    lining = Wd.full(lining)
-    if h > 0:
-        buf[lining] = GLOW[0]
-        buf[lining & CHECK] = GLOW[1] if h < 0.7 else GLOW[2]
-    else:
-        buf[lining] = MANTLE[0]
-    buf[edge(body)] = OUTLINE
-    # front panel: dial, indicator light, vents
-    dial = circle(c, MX - 25, 22.0, 6.0)
-    buf[Wd.full(dial)] = MANTLE[3]
-    buf[edge(dial)] = OUTLINE
-    if c.s >= 1.6:
-        ang = math.radians(130 - 210 * h)
-        k = band(c, (MX - 25, 22.0), (math.cos(ang), math.sin(ang)), 0, 5.0, 0.6)
-        buf[Wd.full(k)] = MANTLE[0]
-    led = circle(c, MX + 24, 24.0, 2.6)
-    buf[Wd.full(led)] = LED_ON if t >= T.MANTLE_ON else LED_OFF
-    if t >= T.MANTLE_ON:
-        buf[Wd.full(circle(c, MX + 23.2, 24.8, 0.9))] = WHITE
-    buf[edge(led)] = OUTLINE
-    if c.s >= 1.4:
-        for k in range(3):
-            v = rect(c, MX + 8, MX + 34, 10.0 + k * 4.0, 11.4 + k * 4.0)
-            buf[Wd.full(v)] = MANTLE[0]
 
 
 def _glass_interior(buf, m):
@@ -226,6 +205,9 @@ def flask_shapes(c, f):
 
 def draw_flask(buf, c, t, bubbles=True):
     fx, fy = flask_pos(t)
+    sx, sy = flask_squash(t)
+    if (sx, sy) != (1.0, 1.0):
+        c = Wd.Squash(c, fx, fy - R_F, sx, sy)
     sphere, neck = flask_shapes(c, (fx, fy))
     body = Wd.full(sphere | neck)
     _glass_interior(buf, body)
@@ -268,7 +250,7 @@ def draw_flask(buf, c, t, bubbles=True):
 
 def _sparkle(buf, c, t, x, y, phase, period=3.2):
     """A small glint that blinks on the glass now and then."""
-    k = ((t + phase) % period) / period
+    k = ((T.anim(t) + phase) % period) / period
     if k < 0.12:
         px, py = c.to(x, y)
         r = 2 if k < 0.06 else 1
@@ -282,6 +264,7 @@ _BUB = [(_rng_b.uniform(-24, 24), _rng_b.uniform(0, 1), _rng_b.uniform(0.9, 1.7)
 
 
 def _bubbles(buf, c, t, fx, fy, lvl):
+    t = T.anim(t)
     on = T.smooth(T.u_of(t, (T.BOIL, T.BOIL + 0.4)))
     bottom = fy - R_F + 3.0
     for i, (dx, ph, r, sp) in enumerate(_BUB):
@@ -340,14 +323,17 @@ def draw_condenser(buf, c, t):
     in_jacket = Wd.full((al >= JACKET[0]) & (al <= JACKET[1]) & (aac <= R_OUT))
     tube = Wd.full((al >= -0.5) & (al <= L_IN) & (aac <= R_IN_O))
     bore = Wd.full((al >= -0.5) & (al <= L_IN + 0.5) & (aac <= R_IN))
-    water = in_jacket & Wd.full((aac <= R_JW) & (aac > R_IN_O))
+    front = water_front(t)
+    jacket_space = in_jacket & Wd.full((aac <= R_JW) & (aac > R_IN_O))
+    water = jacket_space & Wd.full(al >= front)
     # ports (water out at the top near the flask, in at the bottom near the receiver)
     port_u = Wd.full(band(c, p_on(PORT_UP, R_OUT - 1), NRM, 0, 9.0, 2.6))
     port_l = Wd.full(band(c, p_on(PORT_LO, -(R_OUT - 1)), (-NRM[0], -NRM[1]), 0, 9.0, 2.6))
-    flow = (t * 26.0)
+    flow = (T.anim(t) * 26.0)
     stripes = Wd.full(((al + flow) % 9.0) < 1.6)
     # --- the outside view: water seen through the glass
     seen = ~cut
+    _glass_interior(buf, jacket_space & ~water & seen)
     w_out = water & seen
     buf[w_out] = WATER[0]
     buf[w_out & CHECK] = WATER[1]
@@ -361,6 +347,7 @@ def draw_condenser(buf, c, t):
         outer_wall = in_jacket & Wd.full(aac > R_JW) & cut
         inner_wall = Wd.full((al >= -0.5) & (al <= L_IN) & (aac <= R_IN_O) & (aac > R_IN)) & cut
         w_cut = water & cut
+        buf[jacket_space & ~water & cut] = NAVY[2]
         buf[w_cut] = WATER[1]
         buf[w_cut & stripes & Wd.full(aac > R_IN_O + 0.8)] = WATER[2]
         buf[w_cut & Wd.full((aac > R_JW - 0.6) | (aac < R_IN_O + 0.5))] = WATER[0]
@@ -371,6 +358,10 @@ def draw_condenser(buf, c, t):
         buf[bore & cut] = NAVY[2]
     # ports and the water running through them
     for pm, sgn in ((port_u, 1), (port_l, -1)):
+        if (sgn > 0 and front > PORT_UP) or t < T.WATER_ON:      # the outlet runs only once the jacket is full
+            _glass_interior(buf, pm)
+            buf[ring(pm) & ~in_jacket] = GLASS[2]
+            continue
         buf[pm] = WATER[1]
         if c.s >= 1.5:
             ps = Wd.full(((ac * sgn - flow * (1 if sgn > 0 else -1)) % 5.0) < 1.2) & pm
@@ -477,6 +468,7 @@ def vapour_path(dist, x0, off, lvl, fx):
 
 
 def draw_vapour(buf, c, t):
+    t = T.anim(t)
     if t < T.BOIL or not assembled(t):
         return
     fx, fy = flask_pos(t)
@@ -535,9 +527,10 @@ def draw_heat(buf, c, t):
 
 # beads on the inner wall: (along, side (-1 floor / +1 ceiling), radius mm, appear time)
 _rng_d = np.random.default_rng(5)
-BEADS = [(SEC - 4.2, -1, 1.0, 15.55), (SEC + 2.4, -1, 1.15, 15.8), (SEC - 11.0, -1, 0.8, 16.1),
-         (SEC + 8.6, -1, 0.9, 16.35), (SEC - 7.0, 1, 0.75, 16.0), (SEC + 5.0, 1, 0.8, 16.6),
-         (SEC - 14.0, 1, 0.7, 16.9), (SEC + 12.5, -1, 0.75, 17.2)]
+_B0 = T.BEADS[0]
+BEADS = [(SEC - 4.2, -1, 1.0, _B0 + 0.05), (SEC + 2.4, -1, 1.15, _B0 + 0.25), (SEC - 11.0, -1, 0.8, _B0 + 0.5),
+         (SEC + 8.6, -1, 0.9, _B0 + 0.7), (SEC - 7.0, 1, 0.75, _B0 + 0.4), (SEC + 5.0, 1, 0.8, _B0 + 0.9),
+         (SEC - 14.0, 1, 0.7, _B0 + 1.1), (SEC + 12.5, -1, 0.75, _B0 + 1.35)]
 A_IDX, B_IDX = 0, 1                                    # the two that merge
 R_MERGED = (BEADS[0][2] ** 3 + BEADS[1][2] ** 3) ** (1 / 3)
 
@@ -660,20 +653,36 @@ def draw_hanging_drop(buf, c, t):
 
 
 def draw_rig(buf, c, t):
-    """All the apparatus at time t (the grape and its stream are drawn by grape.py)."""
+    """All the apparatus at time t (the grape and its stream are drawn by grape.py). From the match cut the still is
+    built around the flask: each part drops into place on the beat (see timeline.drop_in)."""
+    from . import heater
     background(buf, c)
-    draw_stand(buf, c, t)
+    built = assembled(t)
+    h_head = T.drop_in(t, T.PART_HEAD) if built else None
+    h_cond = T.drop_in(t, T.PART_COND) if built else None
+    h_recv = T.drop_in(t, T.PART_RECV) if built else None
+    c_head, c_cond, c_recv = (Wd.lifted(c, h) for h in (h_head, h_cond, h_recv))
+    if h_cond is not None:
+        draw_stand(buf, c_cond, t)
+    heater.draw_cord(buf, c, t)
     draw_cork(buf, c, t)
-    draw_hoses(buf, c, t)
-    draw_mantle(buf, c, t)
-    draw_receiver(buf, c, t)
-    draw_condenser(buf, c, t)
-    draw_adapter(buf, c, t)
+    if h_cond is not None:
+        draw_hoses(buf, c_cond, t)
+    heater.draw_mantle(buf, c, t)
+    if h_recv is not None:
+        draw_receiver(buf, c_recv, t)
+    if h_cond is not None:
+        draw_condenser(buf, c_cond, t)
+    if h_recv is not None:
+        draw_adapter(buf, c_recv, t)
     draw_flask(buf, c, t)
-    draw_still_head(buf, c, t)
+    heater.draw_heat_in(buf, c, t)
+    if h_head is not None:
+        draw_still_head(buf, c_head, t)
     draw_vapour(buf, c, t)
     draw_heat(buf, c, t)
     draw_beads(buf, c, t)
     draw_splash(buf, c, t)
     draw_hanging_drop(buf, c, t)
-    draw_clamp_jaws(buf, c, t)
+    if h_cond is not None:
+        draw_clamp_jaws(buf, c_cond, t)
