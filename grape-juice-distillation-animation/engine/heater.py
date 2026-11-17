@@ -24,12 +24,17 @@ N_ZIG = 13
 
 # ---------------------------------------------------------------- states over time
 def dial(t):
-    """The dial's setting (0 off .. 1 full); it clicks round to about three quarters."""
-    return 0.72 * T.back_out(T.u_of(t, (T.SWITCH, T.SWITCH + 0.22)), 2.0)
+    """The dial's setting (0 off .. 1 full); it clicks round to about three quarters, and back to off at the end."""
+    on = 0.72 * T.back_out(T.u_of(t, (T.SWITCH, T.SWITCH + 0.22)), 2.0)
+    return on * (1 - T.back_out(T.u_of(t, (T.HEAT_OFF, T.HEAT_OFF + 0.22)), 2.0))
 
 
 def coil_heat(t):
-    return T.smooth(T.u_of(t, T.GLOW))
+    return T.smooth(T.u_of(t, T.GLOW)) * (1 - T.smooth(T.u_of(t, (T.HEAT_OFF, T.HEAT_OFF + 1.5))))
+
+
+def is_on(t):
+    return T.SWITCH <= t < T.HEAT_OFF
 
 
 def xray_line(t):
@@ -151,7 +156,7 @@ def draw_mantle(buf, c, t):
             buf[seg] = col
         buf[edge(inside) & ~Wd.full(c.Y < 0.4)] = GLASS[2]           # the x-ray outline of the case
         # current: yellow dots running cord -> regulator -> coil -> back
-        if t >= T.SWITCH:
+        if is_on(t):
             _current_dots(buf, c, t, current, xr)
     else:
         buf[edge(body)] = OUTLINE
@@ -177,7 +182,7 @@ def draw_mantle(buf, c, t):
         k = band(c, (mx - 25, 22.0), (math.cos(ang), math.sin(ang)), 0, 5.0, 0.6)
         buf[Wd.full(k)] = MANTLE[0]
     led = circle(c, mx + 24, 24.0, 2.6)
-    on = t >= T.SWITCH
+    on = is_on(t)
     buf[Wd.full(led)] = LED_ON if on else LED_OFF
     if on:
         buf[Wd.full(circle(c, mx + 23.2, 24.8, 0.9))] = WHITE

@@ -49,8 +49,13 @@ def p_on(along, across=0.0):
 
 
 # ---------------------------------------------------------------- states over time
+P_UP = (-102.0, 95.0)             # where the flask hovers to pour into the crystallizing dish
+TILT_MAX = 150.0
+
+
 def flask_pos(t):
-    """On its cork ring, then one game-style hop onto the heating mantle: a crouch, a jump arc, a landing."""
+    """On its cork ring, then one game-style hop onto the heating mantle: a crouch, a jump arc, a landing. Later it
+    rises over the crystallizing dish to pour out the syrup, and hops back."""
     t0 = T.HOP[0] + 0.08
     if t < t0:
         return F_START
@@ -59,11 +64,48 @@ def flask_pos(t):
         x = T.lerp(F_START[0], F_HOME[0], T.ease_in_out(u, 1.3))
         y = T.lerp(F_START[1], F_HOME[1], u) + 46.0 * 4 * u * (1 - u)
         return (x, y)
+    if T.FLASK_UP[0] <= t < T.FLASK_UP[1]:
+        u = T.ease_in_out(T.u_of(t, T.FLASK_UP), 1.5)
+        return (T.lerp(F_HOME[0], P_UP[0], u), T.lerp(F_HOME[1], P_UP[1], u) + 16.0 * math.sin(math.pi * u))
+    if T.FLASK_UP[1] <= t < T.FLASK_DOWN[0]:
+        return P_UP
+    if T.FLASK_DOWN[0] <= t < T.FLASK_DOWN[1]:
+        u = T.u_of(t, T.FLASK_DOWN)
+        return (T.lerp(P_UP[0], F_HOME[0], T.ease_in_out(u, 1.3)),
+                T.lerp(P_UP[1], F_HOME[1], u) + 22.0 * 4 * u * (1 - u))
     return F_HOME
+
+
+def flask_angle(t):
+    """How far the flask is tipped (degrees, counter-clockwise), in 8-bit steps of 30."""
+    if not (T.POUR_TILT[0] <= t < T.UNTILT[1]):
+        return 0.0
+    if t < T.POUR_TILT[1]:
+        k = T.u_of(t, T.POUR_TILT)
+    elif t < T.UNTILT[0]:
+        k = 1.0
+    else:
+        k = 1.0 - T.u_of(t, T.UNTILT)
+    return math.floor(k * 5 + 1e-6) / 5.0 * TILT_MAX
+
+
+def transferring(t):
+    return T.FLASK_UP[0] <= t < T.FLASK_DOWN[1]
+
+
+def mouth(t):
+    """World position of the flask's mouth (it moves as the flask tips)."""
+    fx, fy = flask_pos(t)
+    a = math.radians(flask_angle(t))
+    return fx - NECK_TOP * math.sin(a), fy + NECK_TOP * math.cos(a)
 
 
 def flask_squash(t):
     """(sx, sy) of the flask: it crouches before the hop, stretches in the air, squashes on landing and wobbles."""
+    if T.FLASK_DOWN[1] - 0.06 <= t < T.FLASK_DOWN[1] + 0.25:              # landing back in the mantle
+        u = T.u_of(t, (T.FLASK_DOWN[1] - 0.06, T.FLASK_DOWN[1] + 0.25))
+        w = math.cos(u * math.pi * 2.5) * (1 - u)
+        return 1 + 0.1 * w, 1 - 0.13 * w
     if t < T.HOP[0] or t >= T.HOP[1]:
         return 1.0, 1.0
     if t < T.HOP[0] + 0.08:
@@ -80,23 +122,66 @@ def assembled(t):
     return t >= T.MATCH
 
 
+SYRUP_D, FILM_D = 16.0, 1.2       # juice depth once it has become a thick syrup; the film left after pouring
+
+
+def cap_volume(h, r=R_F):
+    return math.pi * h * h * (3 * r - h) / 3.0
+
+
+def cap_depth(v, r=R_F):
+    lo, hi = 0.0, 2 * r
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if cap_volume(mid, r) < v:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+def pour_fraction(t):
+    return T.smooth(T.u_of(t, T.SYRUP_POUR))
+
+
 def pool_depth(t):
-    """Juice depth above the flask's lowest point (mm)."""
+    """Juice depth above the flask's lowest point (mm): it fills, most of its water is distilled off (a thick syrup),
+    and the syrup is poured into the crystallizing dish, leaving a film."""
     if t < T.PLIP1:
         return 0.0
+    if t >= T.SYRUP_POUR[0]:
+        v = cap_volume(SYRUP_D) * (1 - pour_fraction(t)) + cap_volume(FILM_D) * pour_fraction(t)
+        return cap_depth(v)
     d = POOL * T.ease_out(T.u_of(t, T.POUR), 1.8)
-    return d - 6.0 * T.smooth(T.u_of(t, T.LAPSE))        # a little water leaves as vapour
+    return d - (POOL - SYRUP_D) * T.smooth(T.u_of(t, T.LAPSE))
+
+
+def syrup(t):
+    """0 for fresh juice .. 1 for the thick, dark syrup."""
+    return T.smooth(T.u_of(t, T.LAPSE))
 
 
 def clear_depth(t):
     """Distillate depth in the receiver (mm)."""
     if t < T.PLIP2:
         return 0.0
-    return 1.2 + 21.0 * T.smooth(T.u_of(t, T.LAPSE))
+    return 1.2 + 31.0 * T.smooth(T.u_of(t, T.LAPSE))
 
 
 def thermo_level(t):
-    return T.lerp(195.0, 236.0, T.ease_in_out(T.u_of(t, (T.GLOW[0], T.JUMP[1])), 2.0))
+    up = T.ease_in_out(T.u_of(t, (T.GLOW[0], T.JUMP[1])), 2.0)
+    down = T.smooth(T.u_of(t, (T.HEAT_OFF, T.HEAT_OFF + 3.0)))
+    return T.lerp(195.0, 236.0, up) - 26.0 * down
+
+
+def head_lift(t):
+    """Height (mm) of the still head above its place: it drops in when the still is built, lifts off so the syrup
+    can be poured out, hovers, and drops back on."""
+    if t < T.HEAD_LIFT[0]:
+        return T.drop_in(t, T.PART_HEAD)
+    if t < T.HEAD_BACK - 0.12:
+        return 70.0 * T.back_out(T.u_of(t, T.HEAD_LIFT), 1.4) + 2.0 * math.sin(T.anim(t) * 9.0)
+    return T.drop_in(t, T.HEAD_BACK, 70.0)
 
 
 def cut_along(t):
@@ -147,7 +232,7 @@ def draw_stand(buf, c, t):
         buf[edge(base)] = METAL[0]
         buf[edge(rod)] = METAL[0]
     # clamp arms (behind the glass): to the flask neck and to the condenser
-    fx, fy = flask_pos(t)
+    fx, fy = F_HOME
     arm1 = rect(c, STAND_L, fx - NECK_HW - 2, fy + 52, fy + 56)
     cm = p_on(CLAMP_AL)
     arm2 = rect(c, cm[0] - 2, STAND_R, cm[1] - 2.0, cm[1] + 2.0)
@@ -165,7 +250,7 @@ def draw_clamp_jaws(buf, c, t):
     """The clamp jaws in front of the glass."""
     if not assembled(t) or c.s > 3.2:
         return
-    fx, fy = flask_pos(t)
+    fx, fy = F_HOME
     for jx in (fx - NECK_HW - 2.6, fx + NECK_HW + 0.4):
         jaw = rect(c, jx, jx + 2.2, fy + 50.5, fy + 57.5)
         buf[Wd.full(jaw)] = METAL[3]
@@ -178,6 +263,11 @@ def draw_clamp_jaws(buf, c, t):
 
 
 def draw_cork(buf, c, t):
+    if t >= T.CORK_OUT[1]:
+        return
+    if t >= T.CORK_OUT[0]:
+        u = T.u_of(t, T.CORK_OUT)
+        c = Wd.Cam(c.cx + 60.0 * u, c.cy - 26.0 * 4 * u * (1 - u), c.s)       # it hops off to the left
     ck = ellipse(c, F_START[0], 21.0 - 4.0, 21.0, 5.0)
     buf[Wd.full(ck)] = CORK[1]
     buf[Wd.full(ck & (c.Y > 18.5))] = CORK[2]
@@ -206,14 +296,24 @@ def flask_shapes(c, f):
 def draw_flask(buf, c, t, bubbles=True):
     fx, fy = flask_pos(t)
     sx, sy = flask_squash(t)
+    world = c
     if (sx, sy) != (1.0, 1.0):
         c = Wd.Squash(c, fx, fy - R_F, sx, sy)
+    ang = flask_angle(t)
+    if ang:
+        c = Wd.Rotate(c, fx, fy, ang)
     sphere, neck = flask_shapes(c, (fx, fy))
     body = Wd.full(sphere | neck)
     _glass_interior(buf, body)
     # the juice
     dep = pool_depth(t)
-    if dep > 0:
+    k_syr = syrup(t)
+    if ang:                                    # tipped: the syrup's surface stays level in the world
+        liq = body & Wd.full(world.Y <= fy - R_F + dep)
+        buf[liq] = JUICE[1]
+        buf[liq & CHECK] = JUICE[0]
+        buf[edge(liq) & Wd.full(world.Y > fy - R_F + dep - 1.5 / world.s - 0.3)] = JUICE[2]
+    elif dep > 0:
         lvl = fy - R_F + dep
         X = Wd.full(c.X)
         ripple = 0.0
@@ -225,9 +325,11 @@ def draw_flask(buf, c, t, bubbles=True):
                 bump = np.exp(-((X - cx_r) / 2.2) ** 2) * 1.6 * (1 - u)
                 juice = juice | Wd.full(sphere & (c.Y <= lvl + bump))
         buf[juice] = JUICE[1]
-        buf[juice & Wd.full(c.Y < fy - R_F + dep * 0.32)] = JUICE[0]
+        buf[juice & Wd.full(c.Y < fy - R_F + dep * (0.32 + 0.5 * k_syr))] = JUICE[0]
+        if k_syr > 0.5:                         # the syrup darkens as it concentrates
+            buf[juice & CHECK] = JUICE[0]
         surf = edge(juice) & Wd.full(c.Y > lvl - 2.0 / c.s - 0.4)
-        buf[surf] = JUICE[3]
+        buf[surf] = JUICE[3] if k_syr < 0.6 else JUICE[2]
         if t >= T.BOIL:
             _bubbles(buf, c, t, fx, fy, lvl)
         # boiling chips on the bottom
@@ -265,11 +367,16 @@ _BUB = [(_rng_b.uniform(-24, 24), _rng_b.uniform(0, 1), _rng_b.uniform(0.9, 1.7)
 
 def _bubbles(buf, c, t, fx, fy, lvl):
     t = T.anim(t)
-    on = T.smooth(T.u_of(t, (T.BOIL, T.BOIL + 0.4)))
+    on = T.smooth(T.u_of(t, (T.BOIL, T.BOIL + 0.4))) * (1 - T.smooth(T.u_of(t, (T.HEAT_OFF, T.HEAT_OFF + 0.6))))
+    k_syr = syrup(t)
     bottom = fy - R_F + 3.0
+    if lvl - bottom < 2.0:
+        return
     for i, (dx, ph, r, sp) in enumerate(_BUB):
-        if i / len(_BUB) > on:
+        if i / len(_BUB) > on * (1 - 0.5 * k_syr):
             continue
+        r = r * (1 + 0.9 * k_syr)
+        sp = sp * (1 - 0.55 * k_syr)
         period = (lvl - bottom) / (24.0 * sp)
         k = ((t - T.BOIL) / period + ph) % 1.0
         y = bottom + (lvl - bottom) * k
@@ -477,7 +584,7 @@ def draw_vapour(buf, c, t):
     rise = 111.0 - lvl
     for k in range(N_V):
         age = t - V_T0[k]
-        if age < 0:
+        if age < 0 or V_T0[k] > T.HEAT_OFF:
             continue
         dist = age * V_SP[k]
         limit = rise + (J[1] - 111.0) + 20 + V_LIFE[k]
@@ -652,13 +759,26 @@ def draw_hanging_drop(buf, c, t):
     buf[Wd.full(gl)] = WHITE
 
 
+def draw_lapse_drips(buf, c, t):
+    """While the distillation runs on (the time-lapse), drops keep falling from the outlet into the receiver."""
+    if not (T.LAPSE[0] <= t < T.HEAT_OFF + 0.6):
+        return
+    ta = T.anim(t)
+    surf = 1.0 + clear_depth(t)
+    for k in range(4):
+        ph = ((ta - T.LAPSE[0]) / 0.36 + k / 4.0) % 1.0
+        y = T.lerp(TIP[1] - 1.0, surf, ph * ph)
+        px, py = c.to(TIP[0], y)
+        dot(buf, px, py, WHITE, 2 if c.s >= 1.6 else 1)
+
+
 def draw_rig(buf, c, t):
     """All the apparatus at time t (the grape and its stream are drawn by grape.py). From the match cut the still is
     built around the flask: each part drops into place on the beat (see timeline.drop_in)."""
-    from . import heater
+    from . import heater, crystal
     background(buf, c)
     built = assembled(t)
-    h_head = T.drop_in(t, T.PART_HEAD) if built else None
+    h_head = head_lift(t) if built else None
     h_cond = T.drop_in(t, T.PART_COND) if built else None
     h_recv = T.drop_in(t, T.PART_RECV) if built else None
     c_head, c_cond, c_recv = (Wd.lifted(c, h) for h in (h_head, h_cond, h_recv))
@@ -666,6 +786,7 @@ def draw_rig(buf, c, t):
         draw_stand(buf, c_cond, t)
     heater.draw_cord(buf, c, t)
     draw_cork(buf, c, t)
+    crystal.draw_dish(buf, c, t)
     if h_cond is not None:
         draw_hoses(buf, c_cond, t)
     heater.draw_mantle(buf, c, t)
@@ -676,6 +797,7 @@ def draw_rig(buf, c, t):
     if h_recv is not None:
         draw_adapter(buf, c_recv, t)
     draw_flask(buf, c, t)
+    crystal.draw_stream(buf, c, t)
     heater.draw_heat_in(buf, c, t)
     if h_head is not None:
         draw_still_head(buf, c_head, t)
@@ -683,6 +805,7 @@ def draw_rig(buf, c, t):
     draw_heat(buf, c, t)
     draw_beads(buf, c, t)
     draw_splash(buf, c, t)
+    draw_lapse_drips(buf, c, t)
     draw_hanging_drop(buf, c, t)
     if h_cond is not None:
         draw_clamp_jaws(buf, c_cond, t)

@@ -1,15 +1,16 @@
-"""One timeline for picture and sound: 120 BPM, a bar is 2 s, 16 bars = 32 s; the main hits sit on the beat grid.
+"""One timeline for picture and sound: 120 BPM, a bar is 2 s, 22 bars = 44 s; the main hits sit on the beat grid.
 
-Six chunks: grape to flask (0-4), build the still (4-7), the heater x-ray (7-12.5), follow the vapour (12.5-17.75),
-why clear drops form (17.75-26), payoff and loop (26-32). The film ends by dissolving the next hanging drop into the
-grape with an 8-bit dithered opacity fade, so the last frame flows into the first.
+Seven chunks: grape to flask (0-4), build the still (4-7), the heater x-ray (7-12.5), follow the vapour (12.5-17.75),
+why clear drops form (17.75-26), the payoff and more distilling (26-31), from syrup to sugar crystals (31-41), then the
+loop (41-44). The film ends by dissolving the last hanging drop into the grape with an 8-bit dithered opacity fade, so
+the last frame flows into the first.
 """
 import math
 
 BPM = 120
 BEAT = 60.0 / BPM          # 0.5 s
 BAR = 4 * BEAT             # 2.0 s
-TOTAL = 32.0
+TOTAL = 44.0
 
 # ---- A. grape to flask
 GLINT = (0.0, 0.3)         # a bright pixel highlight sweeps the grape
@@ -52,15 +53,31 @@ MERGE = 23.75              # one bead slides into another ("tik")
 FOLLOW = (24.25, 25.6)     # track the bigger drop downhill and out
 DROP_FALL = (25.6, 26.0)   # it falls from the outlet ...
 PLIP2 = 26.0               # ... and lands in the receiver ("plip")
-# ---- F. payoff and loop
-ITEM = (26.25, 28.0)       # "YOU GOT WATER-RICH DISTILLATE!"
+# ---- F. payoff and more distilling
+ITEM = (26.25, 28.0)       # "WATER-RICH DISTILLATE" (item get)
 COMPARE = (28.0, 28.75)    # zoom out to both flasks
-LAPSE = (28.25, 29.5)      # time-lapse (fast-forward): purple a little lower, clear higher
+LAPSE = (28.75, 31.0)      # keep distilling (fast-forward): the juice turns to a thick syrup, the receiver fills
 CHIME = 29.5               # both liquids hold together: a two-note chime
-LOOP_PUSH = (30.0, 31.0)   # push in on the next hanging drop ...
-DISSOLVE = (31.0, 32.0)    # ... which fades into the grape (dithered opacity) and the film loops
+# ---- G. from syrup to sugar crystals
+HEAT_OFF = 31.0            # the heater clicks off before the syrup can scorch
+CORK_OUT = (31.3, 31.7)    # the cork ring hops away ...
+DISH_IN = 31.75            # ... and a crystallizing dish drops in on the bench
+HEAD_LIFT = (31.75, 32.1)  # the still head lifts off the neck and hovers
+FLASK_UP = (32.1, 32.5)    # the flask rises out of the mantle and over the dish
+POUR_TILT = (32.5, 32.85)  # tips toward the dish in 8-bit steps
+SYRUP_POUR = (32.8, 33.9)  # the thick syrup pours into the dish
+UNTILT = (33.9, 34.15)
+FLASK_DOWN = (34.15, 34.6) # back into the mantle (lands with a squash)
+HEAD_BACK = 34.75          # the still head drops back on
+SEED = (35.0, 35.5)        # a few seed crystals sprinkle into the syrup
+CRYSTAL = (35.5, 38.0)     # cooling for days (fast-forward): glucose crystals grow in the purple syrup
+ITEM2 = (38.0, 39.75)      # "GRAPE SUGAR" (item get)
+FINAL = (39.75, 40.5)      # zoom out: both products of the run
+# ---- H. the loop
+LOOP_PUSH = (41.0, 42.5)   # push in on the last hanging drop at the outlet ...
+DISSOLVE = (42.5, 44.0)    # ... which fades into the grape (dithered opacity) and the film loops
 
-FAST_FORWARD = (FF_POUR, JUMP, LAPSE)
+FAST_FORWARD = (FF_POUR, JUMP, LAPSE, CRYSTAL)
 
 
 # ---------------------------------------------------------------- easing

@@ -10,7 +10,7 @@ opacity fade), so the last frame flows into the first. Flask on the left, receiv
 """
 import math
 import numpy as np
-from . import gfx, rig, grape, fx, captions
+from . import gfx, rig, grape, fx, captions, crystal
 from . import world as Wd
 from . import timeline as T
 
@@ -29,13 +29,18 @@ INLET = (-20.0, 160.0, 3.0)
 COND = (rig.p_on(85.0)[0], rig.p_on(85.0)[1], 1.55)
 SEC = (rig.p_on(rig.SEC)[0], rig.p_on(rig.SEC)[1], 10.0)
 RECV = (rig.TIP[0], 20.0, 2.6)
+TR = (-98.0, 72.0, 1.9)                      # the flask, the mantle and the crystallizing dish
+DISH = (crystal.DX, 12.0, 3.6)
+CRYS = (-128.0, 4.0, 9.0)                    # micro-shot C: the crystals in the syrup
+FIN = (-14.0, 110.0, 0.84)                   # both products of the run, dish to receiver
 R_END = 3.0
 S_END = T.MATCH_R / R_END
 
 # screen shakes: (time, amplitude in canvas px, duration)
 SHAKES = [(T.SQUASH[0] + 0.02, 2, 0.25), (T.PLIP1, 1, 0.2), (T.HOP_LAND, 2, 0.3), (T.PART_HEAD + 0.18, 1, 0.15),
           (T.PART_COND + 0.18, 1, 0.15), (T.PART_RECV + 0.18, 1, 0.15), (T.SWITCH, 1, 0.15), (T.BOIL, 1, 0.25),
-          (T.PLIP2, 2, 0.3)]
+          (T.PLIP2, 2, 0.3), (T.HEAT_OFF, 1, 0.15), (T.DISH_IN + 0.18, 1, 0.15), (T.FLASK_DOWN[1], 2, 0.25),
+          (T.HEAD_BACK + 0.18, 1, 0.15)]
 _JIT = [(1, 0), (-1, 1), (1, -1), (0, 1), (-1, 0), (0, -1)]
 
 
@@ -92,11 +97,21 @@ def camera(t):
         x0, y0, r0 = rig.drop_track(T.DROP_FALL[0] - 1e-3)
         a = (T.lerp(x0, rig.TIP[0], 0.25), T.lerp(y0, RECV[1], 0.25) - 6.0, RECV[2])
         return _mix(a, RECV, k)
-    if t < T.LOOP_PUSH[0]:
+    if t < T.LAPSE[1] - 0.3:                                 # both flasks while the distillation runs on
         return _mix(RECV, WIDE, T.snap(T.u_of(t, T.COMPARE)))
+    if t < T.HEAD_BACK + 0.1:                                # the heater, the flask and the dish
+        return _mix(WIDE, TR, T.snap(T.u_of(t, (T.LAPSE[1] - 0.3, T.LAPSE[1] + 0.3))))
+    if t < 36.6:
+        return _mix(TR, DISH, T.snap(T.u_of(t, (T.HEAD_BACK + 0.1, T.HEAD_BACK + 0.65))))
+    if t < T.ITEM2[0]:                                       # micro-shot C
+        return _mix(DISH, CRYS, T.snap(T.u_of(t, (36.6, 37.1))))
+    if t < T.FINAL[0]:
+        return _mix(CRYS, DISH, T.snap(T.u_of(t, (T.ITEM2[0], T.ITEM2[0] + 0.5))))
+    if t < T.LOOP_PUSH[0]:
+        return _mix(DISH, FIN, T.snap(T.u_of(t, T.FINAL)))
     x, y, r = rig.hanging_drop(t)
     k = T.ease_in_out(T.u_of(t, T.LOOP_PUSH), 2.2)
-    return _push_to(WIDE, (x, y), T.MATCH_XY, S_END, k)
+    return _push_to(FIN, (x, y), T.MATCH_XY, S_END, k)
 
 
 def shake(t):

@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 from . import world as Wd
-from . import rig, grape, heater
+from . import rig, grape, heater, crystal
 from . import timeline as T
 from .palette import NAVY
 
@@ -109,8 +109,13 @@ SPRITES = [
     ('condenser-section-beads', 'cutaway section: beads on the wall', [_section], (*SEC_MID, 10.0), 23.3),
     ('receiver-splash', 'receiver, close-up: the first drop lands', [_receiver], (rig.TIP[0], 20.0, 2.6), 26.08),
     ('receiver-wide', 'receiver, wide: distillate collected', [_receiver], (rig.TIP[0], 30.0, 1.0), 29.7),
-    ('hanging-drop', 'the next hanging drop (loop frame)', [rig.draw_hanging_drop, rig.draw_adapter],
-     (rig.TIP[0], rig.TIP[1] - 3.0, T.MATCH_R / 3.0), 30.95),
+    ('syrup-pour', 'tipping the syrup into the crystallizing dish', [crystal.draw_dish, rig.draw_flask,
+                                                                     crystal.draw_stream], (-112.0, 66.0, 1.9), 33.3),
+    ('dish-crystals', 'crystallizing dish: glucose crystals in the syrup', [crystal.draw_dish],
+     (crystal.DX, 10.0, 3.6), 39.0),
+    ('sugar-crystals-closeup', 'close-up: faceted glucose crystals', [crystal.draw_dish], (-128.0, 4.0, 9.0), 39.0),
+    ('hanging-drop', 'the last hanging drop (loop frame)', [rig.draw_hanging_drop, rig.draw_adapter],
+     (rig.TIP[0], rig.TIP[1] - 3.0, T.MATCH_R / 3.0), 42.45),
     ('apparatus-wide', 'the whole apparatus, wide', [_rig_wide], (12.0, 128.0, 1.0), 29.7),
 ]
 

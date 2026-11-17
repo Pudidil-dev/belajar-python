@@ -10,7 +10,7 @@ A small fast-forward mark (two triangles) sits in the top-right corner while tim
 """
 import math
 import numpy as np
-from . import gfx, pixfont, rig, grape
+from . import gfx, pixfont, rig, grape, crystal
 from . import world as Wd
 from . import timeline as T
 from .palette import WHITE, OUTLINE, GLASS
@@ -46,6 +46,10 @@ def _stream(t):
     if hy is None:
         return grape.G[0] + 1.5, grape.G_BOTTOM - 4.0
     return grape.G[0] + 1.5, (max(hy, grape.FLOOR) + grape.tail_y(t)) / 2
+
+
+def _mouth(t):
+    return rig.mouth(t)
 
 
 def _bead():
@@ -96,6 +100,19 @@ LABELS = [
     (26.2, 28.0, 'WATER-RICH\nDISTILLATE', _fixed(rig.RX + 18.0, 6.0), (6, -14), 'l', True),
     (28.6, 29.9, 'COLOUR STAYS', _fixed(rig.MX, -4.0), (0, 6), 'm', False),
     (28.6, 29.9, 'MOSTLY WATER', _fixed(rig.RX, -4.0), (0, 6), 'm', False),
+    (29.9, 30.9, 'JUICE TURNS TO SYRUP', _fixed(rig.MX, -4.0), (0, 6), 'm', False),
+    (29.9, 30.9, 'MORE DISTILLATE', _fixed(rig.RX, -4.0), (0, 6), 'm', False),
+    (31.0, 32.0, 'HEATER OFF', _fixed(rig.MX, -4.0), (0, 6), 'm', False),
+    (31.2, 32.2, 'BEFORE IT BURNS', _flask(rig.R_F * 0.72, 10.0), (6, 0), 'l', False),
+    (31.95, 33.2, 'CRYSTALLIZING DISH', _fixed(crystal.DX, -4.0), (0, 6), 'm', False),
+    (32.7, 34.1, 'POUR THE SYRUP', _mouth, (10, -6), 'l', False),
+    (35.0, 36.4, 'ADD SEED CRYSTALS', _fixed(crystal.DX, crystal.DH + 4.0), (0, -10), 'm', False),
+    (35.7, 37.0, 'COOL FOR DAYS', _fixed(crystal.DX, -3.0), (0, 6), 'm', False),
+    (37.15, 38.0, 'GLUCOSE CRYSTALS', _fixed(crystal.SEEDS[1][0], 2.4), (0, 44), 'm', True),
+    (37.15, 38.0, 'FRUCTOSE STAYS\nIN THE SYRUP', _fixed(-121.0, 6.5), (0, -40), 'm', True),
+    (38.1, 39.7, 'GRAPE SUGAR!', _fixed(crystal.DX, crystal.DH + 3.0), (0, -12), 'm', False),
+    (40.1, 41.2, 'SUGAR\nCRYSTALS', _fixed(crystal.DX, -4.0), (0, 6), 'm', False),
+    (40.1, 41.2, 'WATER-RICH\nDISTILLATE', _fixed(rig.RX, -4.0), (0, 6), 'm', False),
 ]
 
 

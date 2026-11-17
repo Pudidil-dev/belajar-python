@@ -1,15 +1,16 @@
 """Score and sound effects, synthesized in code (no samples): an 8-bit RPG lab loop and arcade foley.
 
 Chip voices: band-limited pulse waves (PolyBLEP), a triangle bass, LFSR noise percussion, a short echo and FM bells
-(the synth core is shared with the repo's other pixel films). 120 BPM in C major, 16 bars of 4/4 = exactly 32 s. The
-square-wave hook (E5 G5 C6 B5 G5 | A5 C6 E6 D6 C6) opens the loop and comes back for the payoff; an item-get fanfare
-follows the bright final plip. The last bar's G7 turnaround resolves into the first, and echo and reverb tails wrap
+(the synth core is shared with the repo's other pixel films). 120 BPM in C major, 22 bars of 4/4 = exactly 44 s. The
+square-wave hook (E5 G5 C6 B5 G5 | A5 C6 E6 D6 C6) opens the loop and comes back for the payoff; item-get fanfares
+follow the bright clear plip and the sugar crystals. The last bar's G7 turnaround resolves into the first, and echo and reverb tails wrap
 onto the start, so the music loops seamlessly.
 
 Effects sit on the beat grid of engine/timeline.py: the grape "squish", the purple "plip", the flask's spring hop and
 thunk, a clunk and a pitched blip as each part of the still drops in, the water rushing in, the x-ray scan, the switch
 "click", a soft electric hum (no zap), warm swells as heat soaks in, the "!" blips, the "blub-blub" boil, the bead
-"tik", the bright clear "plip", the two-note chime and a sparkle as the drop turns back into the grape. The music
+"tik", the bright clear "plip", the two-note chime, the heater clicking off, the syrup glugging into the dish, a glassy
+chime for each sugar crystal, and a sparkle as the drop turns back into the grape. The music
 dips under the squeeze, the merge and the final drop so each has room.
 """
 import math
@@ -477,12 +478,19 @@ LEAD = {
     12: seq('.  .  .  .  A5 -  G5 -  F5 -  E5 -  D5 -  -  -'),   # the pause, then downhill with the drop
     13: seq('.  .  G5 C6 E6 G6 -  C7 -  -  -  G6 A6 B6 -  -'),   # item-get fanfare after the plip (26.0)
     14: seq('E5 -  G5 -  C6 -  -  -  B5 -  G5 -  .  .  .  .'),   # the payoff; the chime (29.5) answers
-    15: seq('A5 -  C6 -  E6 -  -  D6 C6 -  B5 -  G5 -  F5 -'),   # G7 turnaround: the F resolves to bar 0's E
+    15: seq('E6 .  E6 C6 .  A5 .  C6 .  .  A5 -  -  -  .  .'),   # distilling on into syrup; the heater clicks off (31.0)
+    16: seq('C6 .  G5 .  C6 .  .  .  B5 .  .  .  G5 .  .  .'),   # lift, tip, pour: stabs between the glugs
+    17: seq('A5 -  C6 -  F6 -  -  -  G6 -  F6 -  D6 -  B5 -'),   # back into the mantle; the seeds go in
+    18: seq('E6 -  -  -  -  -  C6 -  B5 -  -  -  -  -  G5 -'),   # crystals growing: soft and slow
+    19: seq('.  .  G5 C6 E6 G6 -  C7 -  -  -  D7 C7 B6 C7 -'),   # item-get fanfare: grape sugar
+    20: seq('E5 -  G5 -  C6 -  -  -  B5 -  G5 -  A5 -  B5 -'),   # both products
+    21: seq('A5 -  C6 -  E6 -  -  D6 C6 -  B5 -  G5 -  F5 -'),   # G7 turnaround: the F resolves to bar 0's E
 }
 B_BUILD, B_WATER, B_XRAY, B_ELEC, B_BOIL, B_CLIMB, B_PATHS = 2, 3, 4, 5, (6, 7), 8, 9
-B_HEAT, B_BEADS, B_MERGE, B_ITEM, B_PAYOFF, B_TURN = 10, 11, 12, 13, 14, 15
-SOFT_BARS = (B_XRAY, B_PATHS, B_HEAT, B_BEADS, B_MERGE)
-STACCATO = (B_ELEC,) + B_BOIL
+B_HEAT, B_BEADS, B_MERGE, B_ITEM, B_PAYOFF = 10, 11, 12, 13, 14
+B_SYRUP, B_TRANSFER, B_BACK, B_CRYSTAL, B_ITEM2, B_FINAL, B_TURN = 15, 16, 17, 18, 19, 20, 21
+SOFT_BARS = (B_XRAY, B_PATHS, B_HEAT, B_BEADS, B_MERGE, B_CRYSTAL)
+STACCATO = (B_ELEC, B_SYRUP, B_TRANSFER) + B_BOIL
 _THIRD = {0: 3, 2: 3, 4: 4, 5: 3, 7: 3, 9: 4, 11: 4}                      # C major: a diatonic third below
 
 
@@ -490,11 +498,13 @@ def third_below(m):
     return m - _THIRD[m % 12]
 
 
-HARM = {b: [(s, l, third_below(m)) for s, l, m in LEAD[b]] for b in (B_BUILD, B_ITEM, B_PAYOFF, B_TURN)}
+HARM = {b: [(s, l, third_below(m)) for s, l, m in LEAD[b]] for b in (B_BUILD, B_ITEM, B_PAYOFF, B_ITEM2, B_FINAL,
+                                                                      B_TURN)}
 CHORD = {'C': (48, (0, 4, 7)), 'G': (43, (0, 4, 7)), 'Am': (45, (0, 3, 7)), 'F': (41, (0, 4, 7)),
          'Dm': (50, (0, 3, 7)), 'Em': (40, (0, 3, 7)), 'G7': (43, (0, 4, 7, 10))}
 BARS = [('C', 'G'), ('Am', 'F'), ('C', 'G'), ('F', 'G'), ('Am', 'Em'), ('F', 'G'), ('Am', 'F'), ('C', 'G'),
-        ('C', 'G'), ('Dm', 'G'), ('Em', 'Am'), ('F', 'G'), ('Am', 'Dm'), ('C', 'G'), ('C', 'G'), ('F', 'G7')]
+        ('C', 'G'), ('Dm', 'G'), ('Em', 'Am'), ('F', 'G'), ('Am', 'Dm'), ('C', 'G'), ('C', 'G'), ('Am', 'F'),
+        ('C', 'G'), ('F', 'G'), ('Am', 'Em'), ('C', 'G'), ('C', 'G'), ('F', 'G7')]
 N_BARS = len(BARS)
 assert N_BARS * T.BAR == T.TOTAL
 
@@ -509,7 +519,7 @@ def _bass_notes(b, half, root):
     drive = [(base + st, 0.8, root + iv, 0.3 if st in (0, 4) else 0.2)
              for st, iv in ((0, 0), (2, 0), (3, 12), (4, 0), (6, 7), (7, 12))]
     soft = [(base, 3.6, root, 0.26), (base + 4, 1.6, root + 7, 0.2), (base + 6, 1.6, root + 12, 0.2)]
-    if b in (0, 1, B_CLIMB, B_PAYOFF) or (b == B_TURN and half == 0):
+    if b in (0, 1, B_CLIMB, B_PAYOFF, B_TRANSFER, B_BACK, B_FINAL) or (b == B_TURN and half == 0):
         notes = bounce
         if b == 0:
             notes = [n for n in notes if n[0] not in (2, 14)]               # room for the squish and the plip
@@ -518,6 +528,12 @@ def _bass_notes(b, half, root):
         return notes
     if b == B_BUILD or b in B_BOIL:
         return drive
+    if b == B_SYRUP:                                                        # the heater goes off on beat 3
+        return drive if half == 0 else [(8, 1.2, root, 0.26), (10, 3.0, root - 12, 0.2)]
+    if b == B_CRYSTAL:
+        return soft
+    if b == B_ITEM2:
+        return _bass_notes(B_ITEM, half, root)
     if b == B_WATER:
         return soft if half == 0 else [(8, 3.6, root, 0.28), (12, 3.6, root + 12, 0.18)]
     if b == B_XRAY:
@@ -553,7 +569,7 @@ def music():
                 lead_bus.put(lead(m, dur, 0.5, vib=0.14), t0, 0.15, -0.5 + s / 15.0)
             elif b in SOFT_BARS:
                 lead_bus.put(lead(m, dur, 0.5, vib=0.14), t0, 0.14, 0.05)
-            elif b == B_ITEM:
+            elif b in (B_ITEM, B_ITEM2):
                 lead_bus.put(lead(m, dur, 0.25, vib=0.2), t0, 0.2, 0.05)
             else:
                 lead_bus.put(lead(m, dur, 0.25), t0, 0.19, 0.05)
@@ -570,10 +586,11 @@ def music():
             root, iv = CHORD[name]
             base = 8 * half
             tones = [root + 24 + iv[0], root + 24 + iv[1], root + 24 + iv[2], root + 36]
-            if b in (B_BUILD, B_CLIMB, B_PAYOFF) + B_BOIL or (b == B_TURN and half == 0):
+            if b in (B_BUILD, B_CLIMB, B_PAYOFF, B_TRANSFER, B_FINAL) + B_BOIL or (b == B_TURN and half == 0) or \
+                    (b == B_SYRUP and half == 0):
                 for k, p in enumerate((0, 1, 2, 3, 2, 1, 2, 3)):
                     arp_bus.put(chip_arp(tones[p], STEP * 0.85), bar_t(b, base + k), 0.05, -0.5)
-            elif b in (0, 1, B_WATER):
+            elif b in (0, 1, B_WATER, B_BACK):
                 for k in range(4):
                     st = base + 2 * k
                     if (b == 0 and st in (2, 14)) or (b == 1 and st == 12):
@@ -597,7 +614,11 @@ def music():
                     if b == B_BEADS and st >= 12:
                         continue
                     arp_bus.put(chip_arp(tones[k] + 12, STEP * 1.6, 0.25), bar_t(b, st), 0.03, -0.45)
-            elif b == B_ITEM:                      # bright sparkle under the fanfare
+            elif b == B_CRYSTAL:                   # crystals: high, slow, glassy notes from side to side
+                for k in range(4):
+                    arp_bus.put(chip_arp(tones[k] + 24, STEP * 1.8, 0.125), bar_t(b, base + 2 * k), 0.03,
+                                -0.6 + 0.4 * k)
+            elif b in (B_ITEM, B_ITEM2):           # bright sparkle under the fanfare
                 for k, p in enumerate((0, 1, 2, 3, 1, 2, 3, 3)):
                     if base + k < 2:
                         continue
@@ -620,9 +641,9 @@ def music():
     K, S, Hc, Ho, C = kick(), snare(), hat(False), hat(True), crash()
     for b in range(N_BARS):
         t0 = bar_t(b)
-        if b in (0, B_BUILD, 6, B_PAYOFF):
+        if b in (0, B_BUILD, 6, B_PAYOFF, B_FINAL):
             drum_bus.put(C, t0, 0.14, 0.25)
-        if b in (0, 1, B_CLIMB, B_PAYOFF, B_TURN):
+        if b in (0, 1, B_CLIMB, B_PAYOFF, B_TURN, B_TRANSFER, B_BACK, B_FINAL):
             kicks, snares = [0, 8, 10], [4, 12]
             if b == 0:
                 snares = [12]                      # the squish owns beat 2
@@ -691,7 +712,18 @@ def music():
         elif b == B_MERGE:                         # silent through the pause, soft ticks while the drop moves
             for k in (4, 6, 8, 10, 12, 14):
                 drum_bus.put(Hc, t0 + k * STEP, 0.025, 0.3)
-        elif b == B_ITEM:                          # nothing on the plip; the fanfare gets a crash and a groove
+        elif b == B_SYRUP:                         # bubbling on, then the heater clicks off and the kit stops
+            for k in (0, 4):
+                drum_bus.put(K, t0 + k * STEP, 0.38)
+            drum_bus.put(S, t0 + 4 * STEP, 0.2, 0.08)
+            for k in range(8):
+                drum_bus.put(Hc, t0 + k * STEP, 0.08 if k % 4 == 2 else 0.04, 0.3)
+            drum_bus.put(K, t0 + 8 * STEP, 0.3)
+        elif b == B_CRYSTAL:
+            drum_bus.put(K, t0, 0.3)
+            for k in range(2, 16, 4):
+                drum_bus.put(Hc, t0 + k * STEP, 0.03, 0.3)
+        elif b in (B_ITEM, B_ITEM2):               # nothing on the plip; the fanfare gets a crash and a groove
             drum_bus.put(C, t0 + 2 * STEP, 0.13, -0.25)
             for k in (2, 8, 10):
                 drum_bus.put(K, t0 + k * STEP, 0.38)
@@ -807,8 +839,8 @@ def ticks(bus, t0, t1, n, gain, f=3200.0, pan=0.25, accel=2.0):
 def boil_level(t):
     """How loud the boil is: up as the bubbles start, full on the surface (micro-shot A), softer as the camera leaves."""
     pts = [(T.BOIL, 0.0), (T.BOIL + 0.3, 0.6), (T.SURFACE[1], 1.0), (T.TILT[0], 1.0), (T.TRACK[0], 0.35),
-           (T.PATHS[0], 0.14), (T.COMPARE[0], 0.12), (T.COMPARE[1], 0.3), (T.LOOP_PUSH[0], 0.3),
-           (T.LOOP_PUSH[0] + 0.5, 0.0)]
+           (T.PATHS[0], 0.14), (T.COMPARE[0], 0.12), (T.COMPARE[1], 0.3), (T.LAPSE[1] - 0.3, 0.5),
+           (T.HEAT_OFF + 0.5, 0.0)]
     xs, ys = zip(*pts)
     return float(np.interp(t, xs, ys, left=0.0, right=0.0))
 
@@ -897,7 +929,12 @@ def sfx_forward():
         lv = boil_level(t)
         if lv > 0.01 and k % 4 in (0, 1, 3):
             big = k % 16 == 0
-            f0 = rng.uniform(170, 230) if big else rng.uniform(260, 520)
+            thick = rig.syrup(t)                            # a thick syrup: lower, slower "blorps"
+            if thick > 0.4 and k % 4 == 1:
+                k += 1
+                t = k * STEP
+                continue
+            f0 = (rng.uniform(170, 230) if big else rng.uniform(260, 520)) * (1 - 0.45 * thick)
             bus.put(blub(f0, 0.14 if big else 0.09), t + rng.uniform(0, 0.012), 0.16 * lv * (1.25 if big else 1.0),
                     float(rng.uniform(-0.45, -0.15)))
         k += 1
@@ -967,6 +1004,51 @@ def sfx_forward():
     sw = bandnoise(dd, lambda tt: 1500 + 5000 * (tt / dd) ** 2, 0.5, 57)
     xs = np.arange(len(sw)) / SR
     bus.put(sw * (xs / dd) ** 2 * np.clip((dd - xs) / 0.03, 0, 1), T.DISSOLVE[0], 0.04)
+    # G. from syrup to sugar crystals
+    bus.put(click(60, 2200, 0.03), T.HEAT_OFF, 0.22, -0.3)                            # the heater clicks off
+    pn = int(0.4 * SR)
+    xp = np.arange(pn) / SR
+    bus.put(pulse(900 * (0.18 ** (xp / 0.4)), pn, 0.25) * np.exp(-xp / 0.16), T.HEAT_OFF + 0.02, 0.05, -0.3)
+    bus.put(spring(220, 520, 0.18), T.CORK_OUT[0], 0.06, -0.5)                         # the cork hops away
+    bus.put(glide(1300, 700, 0.28, 0.0, 0.25), T.DISH_IN - 0.12, 0.012, -0.5)          # the dish drops in
+    bus.put(thump(170, 70, 0.2, 0.5, 61), T.DISH_IN + 0.18, 0.12, -0.5)
+    bus.put(glass_ping(2349, 0.3, 62), T.DISH_IN + 0.185, 0.05, -0.5)
+    bus.put(blip(mtof(84), mtof(96), 0.07, 0.5), T.DISH_IN + 0.2, 0.03, -0.5)
+    pop = highpass(white(int(0.05 * SR), 63), 1200, 63) * env_exp(int(0.05 * SR), 0.008, 0.001)
+    bus.put(pop, T.HEAD_LIFT[0], 0.12, 0.0)                                            # the still head pops off
+    bus.put(blip(500, 1400, 0.12, 0.25), T.HEAD_LIFT[0] + 0.01, 0.05, 0.0)
+    bus.put(whoosh(T.FLASK_UP[1] - T.FLASK_UP[0], 600, 1700, 64, 0.8, 0.5), T.FLASK_UP[0], 0.05, -0.2)
+    for i in range(5):                                                                  # tipping in 8-bit steps
+        bus.put(click(65 + i, 2600 + 150 * i, 0.015), T.POUR_TILT[0] + i * (T.POUR_TILT[1] - T.POUR_TILT[0]) / 5,
+                0.08, -0.35)
+        bus.put(click(70 + i, 2900 - 150 * i, 0.015), T.UNTILT[0] + i * (T.UNTILT[1] - T.UNTILT[0]) / 5, 0.06, -0.35)
+    pd2 = T.SYRUP_POUR[1] - T.SYRUP_POUR[0]
+    gl = bandnoise(pd2, lambda tt: 450 + 120 * np.sin(2 * math.pi * 4 * tt), 0.5, 66)
+    bus.put(fade(gl, 0.05, 0.15), T.SYRUP_POUR[0], 0.05, -0.45)                        # thick syrup pouring
+    g = T.SYRUP_POUR[0] + 0.05
+    while g < T.SYRUP_POUR[1] - 0.05:                                                   # glug-glug on the 8ths
+        bus.put(blub(rng.uniform(150, 210), 0.16), g, 0.13, -0.45)
+        g += STEP * 2
+    bus.put(thump(130, 55, 0.3, 0.3, 67), T.FLASK_DOWN[1], 0.18)                       # back in the mantle
+    bus.put(glass_ping(2093, 0.25, 68), T.FLASK_DOWN[1] + 0.005, 0.04)
+    bus.put(glide(1300, 700, 0.28, 0.0, 0.25), T.HEAD_BACK - 0.12, 0.012, 0.0)         # the still head drops back
+    bus.put(thump(170, 70, 0.2, 0.5, 69), T.HEAD_BACK + 0.18, 0.12, 0.0)
+    bus.put(glass_ping(3136, 0.3, 70), T.HEAD_BACK + 0.185, 0.05, 0.0)
+    bus.put(blip(mtof(84), mtof(96), 0.07, 0.5), T.HEAD_BACK + 0.2, 0.03, 0.0)
+    for i in range(4):                                                                  # seed crystals tinkle in
+        bus.put(blip(mtof(100 + 3 * i), mtof(105 + 3 * i), 0.04, 0.5), T.SEED[0] + 0.1 * i + 0.3, 0.025,
+                -0.4 + 0.25 * i)
+        bus.put(plip(1600, 2600, 0.06, 0.0, 0.05, 71 + i), T.SEED[0] + 0.1 * i + 0.35, 0.03, -0.4 + 0.25 * i)
+    from . import crystal
+    scale = (84, 86, 88, 91, 93, 96, 98, 100)
+    for i, (x, y, size, ang, born, grow) in enumerate(crystal.CRYSTALS):               # each crystal: a glassy chime
+        if born < T.CRYSTAL[1]:
+            bus.put(bell(scale[i % len(scale)], 0.5, 0.8, 3.0), born + 0.05, 0.012,
+                    max(-0.8, min(0.8, (x - crystal.DX) / 40.0)))
+    for i in range(10):                                                                 # item-get twinkles
+        tt = T.ITEM2[0] + 0.1 + i * (T.ITEM2[1] - T.ITEM2[0] - 0.3) / 10
+        bus.put(blip(mtof(98 + (i * 5) % 9), mtof(105 + (i * 5) % 9), 0.03, 0.5), tt, 0.012, -0.3 + 0.06 * (i % 4))
+    bus.put(whoosh(T.FINAL[1] - T.FINAL[0], 1500, 450, 72, 0.8, 0.35), T.FINAL[0], 0.04)
     fx = wrap(bus.x)
     return fx + 0.1 * wrap(np.concatenate([reverb(fx, 0.8, 21), np.zeros((2, N - NT))], 1))
 
@@ -977,7 +1059,8 @@ def duck_env():
     g = np.ones(NT)
     for t0, depth, hold in ((T.SQUASH[0] + 0.01, 0.4, 0.15), (T.PLIP1, 0.3, 0.0), (T.HOP_LAND, 0.2, 0.0),
                             (T.SWITCH, 0.2, 0.0), (T.BOIL, 0.15, 0.0), (T.MERGE, 0.5, T.FOLLOW[0] - T.MERGE - 0.1),
-                            (T.PLIP2, 0.5, 0.2), (T.CHIME, 0.35, 0.1)):
+                            (T.PLIP2, 0.5, 0.2), (T.CHIME, 0.35, 0.1), (T.HEAT_OFF, 0.2, 0.0),
+                            (T.FLASK_DOWN[1], 0.2, 0.0)):
         a = np.clip((t - (t0 - 0.03)) / 0.03, 0, 1) * np.clip(1 - (t - t0 - hold) / 0.45, 0, 1)
         g -= depth * a * (t >= t0 - 0.03)
     return np.clip(g, 0.4, 1)

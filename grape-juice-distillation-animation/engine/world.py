@@ -40,6 +40,27 @@ class Squash:
         return mm * self.s
 
 
+class Rotate:
+    """A camera that turns everything it draws by `deg` (counter-clockwise) about an anchor point: a sprite tipping."""
+
+    def __init__(self, c, ax, ay, deg):
+        a = math.radians(deg)
+        ca, sa = math.cos(a), math.sin(a)
+        dx, dy = c.X - ax, c.Y - ay
+        self.cx, self.cy, self.s = c.cx, c.cy, c.s
+        self.X = ax + ca * dx + sa * dy                 # world -> the sprite's own (unrotated) frame
+        self.Y = ay - sa * dx + ca * dy
+        self._c, self._a, self._cs = c, (ax, ay), (ca, sa)
+
+    def to(self, x, y):
+        (ax, ay), (ca, sa) = self._a, self._cs
+        dx, dy = x - ax, y - ay
+        return self._c.to(ax + ca * dx - sa * dy, ay + sa * dx + ca * dy)
+
+    def px(self, mm):
+        return mm * self.s
+
+
 def lifted(c, dy):
     """The same camera, with what it draws shifted up by dy mm (a part dropping into place)."""
     if not dy:

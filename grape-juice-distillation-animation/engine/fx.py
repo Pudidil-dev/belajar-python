@@ -6,7 +6,7 @@ They are drawn in canvas pixels at a world anchor, so they keep their pixel size
 import math
 from . import world as Wd
 from . import timeline as T
-from . import rig
+from . import rig, crystal
 from .palette import WHITE, OUTLINE, LED_ON, SILVER, MANTLE, GLASS
 
 
@@ -53,8 +53,9 @@ def emote(buf, c, t):
 
 
 def puffs(buf, c, t):
-    """Two dust puffs from under the flask when it lands on the heater."""
-    u = (t - T.HOP_LAND) / 0.3
+    """Two dust puffs from under the flask when it lands on the heater (and when it lands back after pouring)."""
+    land = T.HOP_LAND if t < T.FLASK_DOWN[0] else T.FLASK_DOWN[1]
+    u = (t - land) / 0.3
     if not (0 <= u < 1):
         return
     fx, fy = rig.flask_pos(t)
@@ -79,7 +80,9 @@ def clicks(buf, c, t):
     """A tiny star where each part of the still lands."""
     spots = ((T.PART_HEAD, (rig.J[0] + 9, rig.F_HOME[1] + rig.NECK_TOP)),
              (T.PART_COND, rig.p_on(rig.CLAMP_AL, rig.R_OUT + 2)),
-             (T.PART_RECV, (rig.RX + 13, 60.0)))
+             (T.PART_RECV, (rig.RX + 13, 60.0)),
+             (T.DISH_IN, (crystal.DX + crystal.DW + 2, crystal.DH)),
+             (T.HEAD_BACK, (rig.J[0] + 9, rig.F_HOME[1] + rig.NECK_TOP)))
     for t0, (x, y) in spots:
         u = (t - (t0 + 0.18)) / 0.25
         if 0 <= u < 1:
@@ -88,16 +91,19 @@ def clicks(buf, c, t):
 
 
 def sparkles(buf, c, t):
-    """Item-get sparkles twinkling around the receiver's new clear liquid."""
-    if not (T.ITEM[0] <= t < T.ITEM[1]):
+    """Item-get sparkles: around the receiver's first clear liquid, and later around the sugar crystals."""
+    if T.ITEM[0] <= t < T.ITEM[1]:
+        t0, cx, spots = T.ITEM[0], rig.RX, ((-24, 30), (22, 36), (-10, 52), (30, 14), (-30, 8), (8, 64))
+    elif T.ITEM2[0] <= t < T.ITEM2[1]:
+        t0, cx, spots = T.ITEM2[0], crystal.DX, ((-26, 22), (24, 26), (-8, 30), (30, 10), (-34, 6), (10, 24))
+    else:
         return
     ta = T.anim(t)
-    spots = ((-24, 30), (22, 36), (-10, 52), (30, 14), (-30, 8), (8, 64))
     for i, (dx, dy) in enumerate(spots):
-        ph = ((ta - T.ITEM[0]) * 2.2 + i * 0.37) % 1.0
+        ph = ((ta - t0) * 2.2 + i * 0.37) % 1.0
         n = (0, 1, 2, 3, 2, 1, 0, 0)[int(ph * 8)]
         if n:
-            px, py = _px(c, rig.RX + dx, dy)
+            px, py = _px(c, cx + dx, dy)
             _star(buf, px, py, n, WHITE if n > 1 else GLASS[3])
 
 
