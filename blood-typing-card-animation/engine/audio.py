@@ -184,16 +184,11 @@ def chime_note(f, dur=0.6):
 
 
 def ui_sounds(bus, lang):
+    """A soft two-step pop when a tracking label appears (no per-letter typing: the labels are short)."""
     from . import explain
-    k = 0
-    for t, kind in explain.typing_events(lang):
-        if kind == 'type':
-            f = (1046.5, 1174.7, 1318.5, 1174.7)[k % 4]
-            bus.put(S.blip(f, f * 0.94, 0.016, 0.5), t, 0.03, 0.15)
-            k += 1
-        else:
-            bus.put(S.blip(1568.0, 1568.0, 0.03, 0.25), t, 0.035, -0.2)
-            bus.put(S.blip(2093.0, 2093.0, 0.04, 0.25), t + 0.04, 0.035, 0.2)
+    for k, t in enumerate(explain.events(lang)):
+        f = (1568.0, 1760.0, 2093.0)[k % 3]
+        bus.put(S.blip(f, f * 1.12, 0.025, 0.25), t, 0.035, -0.3 + 0.2 * (k % 4))
 
 
 def sfx(info=True, lang='en'):

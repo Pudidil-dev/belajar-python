@@ -26,36 +26,117 @@ def background(pen, t):
     put(buf, bx, spec, P.RED[1])
 
 
-def cell(pen, x, y, r=T.R_CELL, tabs=True):
-    if pen.view.box(x - r - 4, y - r - 4, x + r + 4, y + r + 4, 1) is None:
-        return
-    if tabs:
-        for k in range(T.TAB_N):
-            a = math.radians(k * 360.0 / T.TAB_N)
-            ca, sa = math.cos(a), math.sin(a)
-            w = 2.0
-            pts = [(x + ca * (r - 1) - sa * w, y + sa * (r - 1) + ca * w),
-                   (x + ca * (r + T.TAB_LEN) - sa * w, y + sa * (r + T.TAB_LEN) + ca * w),
-                   (x + ca * (r + T.TAB_LEN) + sa * w, y + sa * (r + T.TAB_LEN) - ca * w),
-                   (x + ca * (r - 1) + sa * w, y + sa * (r - 1) - ca * w)]
-            bx, m = pen.poly(pts)
-            if bx is not None and m.any():
+# red blood cell thickness profile (Evans & Fung): D(rho) = sqrt(1 - rho^2) (C0 + C2 rho^2 + C4 rho^4), R0 = 3.91 um
+_EF = (0.81, 7.83, -4.39, 3.91)
+_LIGHT = np.array([-0.52, -0.64, 0.56])
+_LIGHT = _LIGHT / np.linalg.norm(_LIGHT)
+_HMAX = 0.31
+
+
+def half_thickness(rho2):
+    """Half thickness of a red blood cell (in units of its radius) at squared normalised radius rho2."""
+    c0, c2, c4, r0 = _EF
+    rho2 = np.clip(rho2, 0.0, 1.0)
+    return np.sqrt(1.0 - rho2) * (c0 + c2 * rho2 + c4 * rho2 * rho2) / (2 * r0)
+
+
+_A_S = np.linspace(-1.0, 1.0, 81)
+_Y_S = np.linspace(0.0, 1.0, 41)
+_SIL = {}
+
+
+def _silhouette(tilt):
+    """Half-height of the outline of a tilted cell across its long axis: a surface point (a, y, +-h) projects to
+    y*cos(tilt) + h*sin(tilt); take the largest over the face."""
+    if tilt not in _SIL:
+        ct, st = math.cos(tilt), math.sin(tilt)
+        A = _A_S[:, None]
+        Y = _Y_S[None, :] * np.sqrt(np.clip(1 - A * A, 0, 1))
+        _SIL[tilt] = (Y * ct + half_thickness(A * A + Y * Y) * st).max(axis=1)
+        if len(_SIL) > 400:
+            _SIL.pop(next(iter(_SIL)))
+    return _SIL[tilt]
+
+
+def _markers(pen, x, y, r, ct, cp, sp):
+    """A markers: small gold 'lollipops' (a short stalk and a knob) along the rim, every 30 degrees."""
+    for k in range(T.TAB_N):
+        th = math.radians(k * 360.0 / T.TAB_N)
+        la, lb = math.cos(th), math.sin(th) * ct                  # rim direction in the disc's frame
+        na, nb = math.cos(th), math.sin(th) / max(ct, 0.25)        # outward normal (ellipse)
+        nl = math.hypot(na, nb)
+        na, nb = na / nl, nb / nl
+        rx, ry = x + r * (la * cp - lb * sp), y + r * (la * sp + lb * cp)
+        ux, uy = na * cp - nb * sp, na * sp + nb * cp
+        kx, ky = rx + ux * 2.2, ry + uy * 2.2
+        n = max(2, int(2.2 * pen.z) + 1)
+        for j in range(n):
+            f = j / n * 1.6
+            pen.dot(rx + ux * f, ry + uy * f, P.GOLD[0])
+        if pen.z >= 0.8:
+            bx, m, U, V = pen.disc(kx, ky, 1.25, 0)
+            if bx is not None:
                 put(pen.buf, bx, m, P.GOLD[1])
-                if pen.z >= 0.8:
-                    pen.outline(bx, m, P.GOLD[0])
-                    tx, ty = x + ca * (r + T.TAB_LEN - 1), y + sa * (r + T.TAB_LEN - 1)
-                    pen.dot(tx, ty, P.GOLD[2])
-    bx, m, U, V = pen.disc(x, y, r)
+            pen.dot(kx - 0.5, ky - 0.6, P.GOLD[2])
+        else:
+            pen.dot(kx, ky, P.GOLD[1])
+
+
+def cell(pen, x, y, r=T.R_CELL, tabs=True, tilt=0.0, psi=0.0):
+    """A red blood cell: a biconcave disc (thick rim, thin pale centre), tilted by `tilt` about an axis at angle
+    `psi` (0 = seen face-on; near 90 deg it shows the dumbbell side profile). Flat 8-bit shading in four reds: the
+    rim is lit on the upper left, and inside the dimple the shading is reversed, which is what makes it read as a
+    dent and not a bump."""
+    ext = r + 4.5
+    if pen.view.box(x - ext, y - ext, x + ext, y + ext, 1) is None:
+        return
+    ct, st = math.cos(tilt), math.sin(tilt)
+    cp, sp = math.cos(psi), math.sin(psi)
+    if tabs:
+        _markers(pen, x, y, r, max(ct, 0.25), cp, sp)
+    bx = pen.box(x - r - 1, y - r - 1, x + r + 1, y + r + 1, 1)
     if bx is None:
         return
+    U, V = pen.grid(bx)
     dx, dy = U - x, V - y
-    rr = np.sqrt(dx * dx + dy * dy)
-    put(pen.buf, bx, m, P.RED[3])
-    put(pen.buf, bx, m & (rr > r * 0.62) & (dx + dy > r * 0.35), P.RED[2])       # shadow side
-    put(pen.buf, bx, m & (rr > r * 0.66) & (dx + dy < -r * 0.55), P.RED[4])      # lit rim
-    put(pen.buf, bx, m & (rr <= r * 0.46), P.RED[4])                             # the dimple ...
-    put(pen.buf, bx, m & ((dx + 1.0) ** 2 + (dy + 1.0) ** 2 <= (r * 0.36) ** 2), P.RED[5])   # ... pale centre
+    a = (dx * cp + dy * sp) / r
+    b = (-dx * sp + dy * cp) / r
+    face = np.sqrt(np.clip(1 - a * a, 0, 1))
+    minor = np.interp(a, _A_S, _silhouette(round(tilt, 3)))       # true outline of the tilted thick disc
+    m = (np.abs(a) <= 1) & (np.abs(b) <= minor)
+    if not m.any():
+        return
+    yb = np.where(minor > 1e-6, b / np.maximum(minor, 1e-6) * face, 0.0)
+    rho2 = np.clip(a * a + yb * yb, 0, 0.9999)
+    rho = np.sqrt(rho2)
+    e = 0.02
+    dh = (half_thickness((rho + e) ** 2) - half_thickness(np.maximum(rho - e, 0) ** 2)) / (2 * e)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        nx = np.where(rho > 1e-4, -dh * a / rho, 0.0)
+        ny = np.where(rho > 1e-4, -dh * yb / rho, 0.0)
+    nz = np.ones_like(nx)
+    ln = np.sqrt(nx * nx + ny * ny + nz * nz)
+    nx, ny, nz = nx / ln, ny / ln, nz / ln
+    ny2, nz2 = ny * ct + nz * st, -ny * st + nz * ct              # tilt about the disc's own a-axis
+    sx, sy = nx * cp - ny2 * sp, nx * sp + ny2 * cp               # back to the screen
+    lit = np.clip(sx * _LIGHT[0] + sy * _LIGHT[1] + nz2 * _LIGHT[2], 0, 1)
+    pallor = 1 - half_thickness(rho2) / _HMAX                      # the thin centre lets more light through
+    v = 0.50 * lit + 0.25 * pallor * ct + 0.26
+    w = min(1.0, max(0.0, (tilt - 0.85) / 0.55))                  # nearly edge-on: shade the rim like a tube
+    if w > 0:
+        vb = np.where(minor > 1e-6, b / np.maximum(minor, 1e-6), 0.0)
+        v_edge = 0.56 - 0.22 * vb - 0.10 * np.abs(a) ** 3 + 0.14 * (np.abs(a) > 0.55) * (vb < -0.2)
+        v = (1 - w) * v + w * v_edge
+    col = np.where(v[..., None] < 0.42, np.array(P.RED[2], np.uint8),
+                   np.where(v[..., None] < 0.60, np.array(P.RED[3], np.uint8),
+                            np.where(v[..., None] < 0.73, np.array(P.RED[4], np.uint8), np.array(P.RED[5], np.uint8))))
+    put(pen.buf, bx, m, col)
     pen.outline(bx, m, P.RED[1])
+
+
+def _tumble(k, t, amp=0.55):
+    """Tilt and axis of a free-floating cell that slowly tumbles."""
+    return 0.55 + amp * math.sin(0.7 * t + k * 1.7), k * 1.3 + 0.22 * t
 
 
 def antibody(pen, x, y, rot, ramp, hi=(), square=False):
@@ -134,10 +215,14 @@ def _group(pen, t):
 def _anti_a(pen, t):
     _group(pen, t)
     for k, (x, y) in enumerate(T.LOOSE):
-        cell(pen, x + 2 * math.sin(t * 0.9 + k), y + 2 * math.cos(t * 0.8 + k))
+        tl, ps = _tumble(k, t)
+        cell(pen, x + 2 * math.sin(t * 0.9 + k), y + 2 * math.cos(t * 0.8 + k), tilt=tl, psi=ps)
     for k in range(len(T.NEIGHBOURS)):
         x, y = T.neighbour_pos(k, t)
-        cell(pen, x, y)
+        tb = T.NEIGHBOURS[k][2]
+        tl, ps = _tumble(k + 3, t, 0.4)
+        f = 1 - T.smooth((t - (tb - 0.7)) / 0.6)                  # it settles face-on as it is pulled into the clump
+        cell(pen, x, y, tilt=tl * f, psi=ps)
     cell(pen, *T.C1)
     cx2, cy2 = T.c2_pos(t)
     cell(pen, cx2, cy2)
@@ -156,10 +241,12 @@ def _anti_a(pen, t):
 def _anti_b(pen, t):
     e = t - T.CUT_B
     for k, (x, y) in enumerate(T.LOOSE):
-        cell(pen, x + 2 * math.sin(t * 0.9 + k), y + 2 * math.cos(t * 0.8 + k))
+        tl, ps = _tumble(k, t)
+        cell(pen, x + 2 * math.sin(t * 0.9 + k), y + 2 * math.cos(t * 0.8 + k), tilt=tl, psi=ps)
     for k in range(len(T.NEIGHBOURS)):
         x, y = T.neighbour_pos(k, t, bridged=False)
-        cell(pen, x + 4 * e * math.cos(k), y + 4 * e * math.sin(k))
+        tl, ps = _tumble(k + 3, t, 0.4)
+        cell(pen, x + 4 * e * math.cos(k), y + 4 * e * math.sin(k), tilt=tl, psi=ps)
     cell(pen, T.C1[0] - 5 * e, T.C1[1] + 2 * e)
     cell(pen, T.C2_START[0] + 6 * e, T.C2_START[1] - 3 * e)
     if T.B_PASS[0] <= t < T.B_PASS[1]:

@@ -1,9 +1,11 @@
-"""Text: the clean caption layer (an RPG dialog box at the top, one or two short lines per step) and the result line.
+"""Text: the tracking explanations (small labels pinned to the things they explain, following them on screen) and
+the result line.
 
 The result line "His blood type is A" is part of the film in every version; the captions are on by default and off
 with render.py --clean. lang='id' writes the captions (and the result line) in Bahasa Indonesia.
 Markers inside a line: [cyan] = Anti-A antibody, {gold} = A markers, <mint> = Anti-B; they are not drawn.
 """
+import math
 import numpy as np
 from . import gfx, palette as P, pixfont
 from . import timeline as T
@@ -13,50 +15,85 @@ CPS = 55.0
 
 TEXT = {
     'en': {
-        'drops': ['ONE BLOOD SAMPLE, FOUR DROPS', 'THEY ALL LOOK THE SAME'],
-        'reagents': ['EACH SPOT GETS ITS TEST LIQUID', 'CONTROL: NO TYPING ANTIBODIES'],
-        'later': ['MOMENTS LATER...', 'ONLY ANTI-A TURNS GRAINY'],
-        'dive': ['WHAT HAPPENS INSIDE ANTI-A?'],
-        'cells': ['RED BLOOD CELLS', 'GOLD TABS = {A MARKERS}'],
-        'bind1': ['AN [ANTI-A ANTIBODY]', 'GRABS ONE {A MARKER}'],
-        'bind2': ['ITS OTHER ARM GRABS', 'A 2ND CELL: A [BRIDGE]'],
-        'clump': ['MANY [BRIDGES] = A CLUMP', 'AGGLUTINATION, NOT A CLOT'],
-        'antib': ['<ANTI-B> NEEDS B MARKERS', 'NONE HERE: NO BRIDGES'],
-        'smooth': ['THE CELLS STAY APART: SMOOTH'],
-        'compare': ['ONLY ANTI-A CLUMPED', 'THE OTHER THREE STAY SMOOTH'],
+        'sample': 'SAME BLOOD SAMPLE', 'same': '4 DROPS, ALL THE SAME', 'testliquid': 'ANTI-A REAGENT',
+        'noab': 'CONTROL: NO ANTIBODIES', 'clumped': 'CLUMPS = GRAINY', 'smooth': 'SMOOTH',
+        'speck': 'ONE DARK SPECK...', 'rbc': 'RED BLOOD CELL', 'marker': 'A MARKER (ANTIGEN)',
+        'antiA': 'ANTI-A ANTIBODY', 'grabs': 'GRABS AN A MARKER', 'cell2': '2ND CELL',
+        'bridge': 'BRIDGE: 2 CELLS LINKED', 'clump': 'MANY BRIDGES = A CLUMP', 'agglut': 'AGGLUTINATION, NOT A CLOT',
+        'antiB': 'ANTI-B ANTIBODY', 'nogrip': 'NO B MARKERS: NO GRIP', 'staysmooth': 'STAYS SMOOTH',
+        'f_clumped': 'CLUMPED', 'f_smooth': 'SMOOTH',
         'result1': 'His blood type is', 'result2': 'A',
     },
     'id': {
-        'drops': ['SATU SAMPEL DARAH, 4 TETES', 'SEMUANYA TAMPAK SAMA'],
-        'reagents': ['TIAP TITIK DIBERI CAIRAN UJI', 'KONTROL: TANPA ANTIBODI'],
-        'later': ['BEBERAPA SAAT KEMUDIAN...', 'HANYA ANTI-A JADI BERBUTIR'],
-        'dive': ['APA YANG TERJADI DI ANTI-A?'],
-        'cells': ['SEL DARAH MERAH', 'TONJOLAN EMAS = {PENANDA A}'],
-        'bind1': ['[ANTIBODI ANTI-A]', 'MENGIKAT SATU {PENANDA A}'],
-        'bind2': ['LENGAN LAINNYA MENGIKAT', 'SEL KEDUA: JADI [JEMBATAN]'],
-        'clump': ['BANYAK [JEMBATAN] = GUMPALAN', 'AGLUTINASI, BUKAN BEKU'],
-        'antib': ['<ANTI-B> BUTUH PENANDA B', 'DI SINI TIDAK ADA'],
-        'smooth': ['SEL TETAP TERPISAH: HALUS'],
-        'compare': ['HANYA ANTI-A MENGGUMPAL', 'TIGA LAINNYA TETAP HALUS'],
+        'sample': 'SAMPEL DARAH SAMA', 'same': '4 TETES, SEMUA SAMA', 'testliquid': 'REAGEN ANTI-A',
+        'noab': 'KONTROL: TANPA ANTIBODI', 'clumped': 'MENGGUMPAL = BERBUTIR', 'smooth': 'HALUS',
+        'speck': 'SATU BINTIK GELAP...', 'rbc': 'SEL DARAH MERAH', 'marker': 'PENANDA A (ANTIGEN)',
+        'antiA': 'ANTIBODI ANTI-A', 'grabs': 'MENGIKAT PENANDA A', 'cell2': 'SEL KEDUA',
+        'bridge': 'JEMBATAN: 2 SEL TERHUBUNG', 'clump': 'BANYAK JEMBATAN = GUMPALAN',
+        'agglut': 'AGLUTINASI, BUKAN BEKU DARAH', 'antiB': 'ANTIBODI ANTI-B', 'nogrip': 'TAK ADA PENANDA B',
+        'staysmooth': 'TETAP HALUS', 'f_clumped': 'MENGGUMPAL', 'f_smooth': 'HALUS',
         'result1': 'Golongan darahnya', 'result2': 'A',
     },
 }
 
-CAPTIONS = [
-    (0.15, 2.90, 'drops'),
-    (3.00, 4.95, 'reagents'),
-    (5.05, 6.15, 'later'),
-    (6.25, 7.40, 'dive'),
-    (7.55, 9.00, 'cells'),
-    (9.10, 11.45, 'bind1'),
-    (11.55, 13.45, 'bind2'),
-    (13.55, 15.95, 'clump'),
-    (16.05, 17.75, 'antib'),
-    (17.85, 18.95, 'smooth'),
-    (19.05, 20.30, 'compare'),
+
+# ------------------------------------------------------------------ anchors (world coordinates of the explained thing)
+def _body(tip):
+    x, y, a = tip
+    r = math.radians(a)
+    return x + 30 * math.sin(r), y - 30 * math.cos(r)
+
+
+def _sample(t):
+    d = T.sample_dropper(t)
+    return None if d is None else _body(d)
+
+
+def _reagent(sp):
+    def f(t):
+        for s_, x, y, a in T.reagent_droppers(t):
+            if s_ == sp:
+                return _body((x, y, a))
+        return None
+    return f
+
+
+def _spot(sp, dx=0.0, dy=0.0):
+    return lambda t: (T.SPOTS[sp][0] + dx, T.SPOTS[sp][1] + dy)
+
+
+def _fixed(x, y):
+    return lambda t: (x, y)
+
+
+C_RED, C_GOLD, C_CYAN, C_MINT, C_GLASS, C_IVORY = P.RED[5], P.GOLD[2], P.CYAN[3], P.MINT[3], P.GLASS[3], P.IVORY[3]
+_C1x = T.C1[0]
+# (start, end, key, space, anchor(t) -> world (x, y), label offset (dx, dy) in px or None = centred, accent, on card)
+CALLOUTS = [
+    (0.30, 2.15, 'sample', 'card', _sample, (16, -10), C_RED, False),
+    (2.20, 2.95, 'same', 'card', _fixed(0.0, 10.0), None, C_RED, True),
+    (2.95, 4.50, 'testliquid', 'card', _reagent('A'), (14, -16), C_GLASS, False),
+    (3.55, 4.50, 'noab', 'card', _reagent('C'), (14, -16), C_GLASS, False),
+    (5.15, 6.20, 'clumped', 'card', _spot('A', 0.0, -T.SPOT_R), (-30, -22), C_RED, True),
+    (5.30, 6.20, 'smooth', 'card', _spot('B', 0.0, -T.SPOT_R), (-20, -22), C_IVORY, True),
+    (6.35, 7.30, 'speck', 'card', lambda t: T.SPECK, (18, -26), C_RED, False),
+    (7.60, 9.00, 'rbc', 'cell', _fixed(_C1x - 18.0, 12.0), (-60, 34), C_RED, False),
+    (8.10, 10.35, 'marker', 'cell', _fixed(_C1x, -T.R_CELL - 2.2), (-36, -40), C_GOLD, False),
+    (9.10, 10.45, 'antiA', 'cell', lambda t: T.hero_antibody(t)[0], (18, -22), C_CYAN, False),
+    (10.55, 11.50, 'grabs', 'cell', _fixed(_C1x + T.R_CELL + T.TAB_LEN, 0.0), (-50, 36), C_CYAN, False),
+    (11.55, 12.45, 'cell2', 'cell', lambda t: T.c2_pos(t), (-10, 40), C_RED, False),
+    (12.55, 13.45, 'bridge', 'cell', _fixed(8.0, -6.0), (-60, -46), C_CYAN, False),
+    (13.60, 15.95, 'clump', 'cell', _fixed(8.0, -60.0), (-66, -40), C_CYAN, False),
+    (14.30, 15.95, 'agglut', 'cell', _fixed(8.0, 80.0), (-76, 36), C_RED, False),
+    (16.15, 16.95, 'antiB', 'cell', lambda t: T.anti_b(t)[0], (18, -16), C_MINT, False),
+    (16.95, 17.70, 'nogrip', 'cell', lambda t: T.anti_b(t)[0], (18, -16), C_MINT, False),
+    (17.95, 18.95, 'staysmooth', 'card', _spot('B', 0.0, -T.SPOT_R), (-30, -22), C_IVORY, True),
+    (19.10, 20.30, 'f_clumped', 'card', _spot('A', 0.0, -T.SPOT_R - 6), (-22, -18), C_RED, True),
+    (19.20, 20.30, 'f_smooth', 'card', _spot('B', 0.0, -T.SPOT_R), (-18, -18), C_IVORY, True),
+    (19.25, 20.30, 'f_smooth', 'card', _spot('D', 0.0, -T.SPOT_R), (-18, -18), C_IVORY, True),
+    (19.30, 20.30, 'f_smooth', 'card', _spot('C', 0.0, -T.SPOT_R), (-18, -18), C_IVORY, True),
 ]
-BOX_X0, BOX_X1, BOX_Y0 = 8, 262, 12
-_ICON = ['.##.', '####', '####', '.##.']
+CPS = 75.0
 
 
 def _parse(line):
@@ -93,45 +130,72 @@ def _rich(buf, segs, x, y, scale=1, outline=True):
             run += ch
 
 
-def _box(buf, x0, x1, y0, y1):
-    sub = buf[y0:y1, x0:x1]
-    sub[...] = P.NAVY[1]
-    buf[y0, x0 + 1:x1 - 1] = P.IVORY[3]
-    buf[y1 - 1, x0 + 1:x1 - 1] = P.IVORY[3]
-    buf[y0 + 1:y1 - 1, x0] = P.IVORY[3]
-    buf[y0 + 1:y1 - 1, x1 - 1] = P.IVORY[3]
-    buf[y0 + 1, x0 + 1:x1 - 1] = P.NAVY[3]
-
-
-def caption(buf, t, lang):
-    for t0, t1, key in CAPTIONS:
-        if not t0 <= t < t1:
+def _line(buf, x0, y0, x1, y1, col, dotted=True):
+    n = int(max(abs(x1 - x0), abs(y1 - y0))) + 1
+    for i in range(n):
+        if dotted and i % 2:
             continue
-        lines = TEXT[lang][key]
-        el, left = t - t0, t1 - t
-        n = len(lines)
-        h = 10 + 7 * n + 3 * (n - 1)
-        if el < 0.07 or left < 0.07:                        # the box opens and closes in two frames
-            cx = (BOX_X0 + BOX_X1) // 2
-            _box(buf, cx - 40, cx + 40, BOX_Y0 + h // 2 - 2, BOX_Y0 + h // 2 + 3)
-            return
-        _box(buf, BOX_X0, BOX_X1, BOX_Y0, BOX_Y0 + h)
-        iy = BOX_Y0 + (h - 4) // 2                          # narrator icon: a red cell
-        for r, row in enumerate(_ICON):
-            for c, ch in enumerate(row):
-                if ch == '#':
-                    buf[iy + r, BOX_X0 + 6 + c] = P.RED[3] if (r, c) not in ((1, 1), (1, 2)) else P.RED[5]
-        shown = int((el - 0.07) * CPS)
-        y = BOX_Y0 + 5
-        for line in lines:
-            segs = _parse(line)
-            k = max(0, min(len(segs), shown))
-            _rich(buf, segs[:k], BOX_X0 + 16, y)
-            if k < len(segs):
-                break
-            shown -= len(segs)
-            y += 10
+        u = i / max(n - 1, 1)
+        x, y = int(round(x0 + (x1 - x0) * u)), int(round(y0 + (y1 - y0) * u))
+        if 0 <= x < W and 0 <= y < H:
+            buf[y, x] = col
+
+
+def _plate(buf, x0, y0, x1, y1, accent):
+    x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, W), min(y1, H)
+    if x1 <= x0 or y1 <= y0:
         return
+    sub = buf[y0:y1, x0:x1].astype(np.float32)
+    col = np.asarray(P.NAVY[0], np.float32)
+    buf[y0:y1, x0:x1] = (sub + (col - sub) * 0.86).astype(np.uint8)
+    buf[y1 - 1, x0:x1] = accent
+
+
+def callouts(buf, space, view, card_off, t, lang):
+    """Tracking explanations: a small dark label pinned to the thing it explains by a dotted leader line. The anchor
+    is recomputed every frame through the camera on screen, so the label follows the object."""
+    for t0, t1, key, sp, anchor, off, accent, on_card in CALLOUTS:
+        if sp != space or not t0 <= t < t1:
+            continue
+        p = anchor(t)
+        if p is None:
+            continue
+        el, left = t - t0, t1 - t
+        if left < 0.1 and int(left / 0.034) % 2 == 0:
+            continue                                             # blink out
+        x, y = p
+        if on_card:
+            x += card_off
+        ax, ay = view.px(x, y)
+        if not (-30 < ax < W + 30 and -30 < ay < H + 30):
+            continue
+        text = TEXT[lang][key]
+        w, h = pixfont.text_size(text)
+        if off is None:
+            lx, ly = int(round(ax - w / 2)), int(round(ay - h / 2))
+        else:
+            dx, dy = off
+            lx = ax + dx if ax + dx + w < W - 4 else ax - abs(dx) - w     # flip sides near the right edge
+            if lx < 4:
+                lx = ax + abs(dx)
+            ly = ay + dy
+            lx, ly = int(round(lx)), int(round(ly))
+        lx = min(max(lx, 4), W - 4 - w)
+        ly = min(max(ly, 6), H - 10 - h)
+        g = min(1.0, el / 0.08)
+        if off is not None:
+            tx = min(max(ax, lx - 2), lx + w + 1)
+            ty = ly + h + 2 if ay > ly + h else ly - 3
+            _line(buf, ax, ay, ax + (tx - ax) * g, ay + (ty - ay) * g, accent)
+            for ddx, ddy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                xx, yy = int(ax) + ddx - 1, int(ay) + ddy - 1
+                if 0 <= xx < W and 0 <= yy < H:
+                    buf[yy, xx] = accent
+        if g < 1.0:
+            continue
+        n = int((el - 0.08) * CPS) + 1
+        _plate(buf, lx - 3, ly - 3, lx + w + 3, ly + h + 3, accent)
+        _rich(buf, [(c, P.INK) for c in text[:n]], lx, ly, outline=False)
 
 
 def result(buf, t, lang, dx=0):
@@ -166,11 +230,6 @@ def result(buf, t, lang, dx=0):
             buf[max(y0, 0):max(min(y0 + scale, H), 0), max(x0, 0):max(min(x0 + 2, W), 0)] = P.GOLD[2]
 
 
-def typing_events(lang='en'):
-    ev = []
-    for t0, t1, key in CAPTIONS:
-        ev.append((t0, 'open'))
-        n = sum(len(_parse(l)) for l in TEXT[lang][key])
-        for i in range(0, n, 2):
-            ev.append((t0 + 0.07 + i / CPS, 'type'))
-    return sorted(ev)
+def events(lang='en'):
+    """When each tracking label appears (for a soft pop in the soundtrack)."""
+    return sorted(t0 + 0.08 for t0, *_ in CALLOUTS)

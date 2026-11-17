@@ -28,8 +28,13 @@ Video 24 detik, vertikal, pixel art 8-bit gaya lab RPG, berulang (loop):
 6. **19–24 dtk.** Kartu utuh: Anti-A diberi bingkai emas, lalu muncul "His blood type is A" dengan huruf A besar dan
    "ding" dua nada. Kartu bergeser keluar dan video mulai lagi dari tetes pertama.
 
-**Teks penjelasan:** caption singkat (default bahasa Inggris, `--lang id` untuk Bahasa Indonesia). `--clean`
-menghapus caption, sehingga hanya label kartu dan kalimat hasil yang tersisa (sesuai brief).
+**Teks penjelasan:** label pendek yang menempel dan ikut bergerak bersama bendanya (tracking), bukan caption di atas
+layar. Contohnya "SAMPEL DARAH SAMA" pada pipet, "ANTIBODI ANTI-A" pada antibodi yang melayang, dan "MENGGUMPAL" /
+"HALUS" pada tiap titik. Default bahasa Inggris; `--lang id` untuk Bahasa Indonesia. `--clean` menghapus label,
+sehingga hanya label kartu dan kalimat hasil yang tersisa (sesuai brief).
+
+**Sel darah merah** digambar sebagai cakram bikonkaf: tepi tebal, tengah tipis dan pucat, dengan bentuk ketebalan
+sel darah merah sungguhan. Sel yang bebas berputar pelan, jadi ada yang terlihat miring atau dari samping.
 
 **Cara render:** lihat bagian berikut. Video akhir tidak dirender di sini; kamu render sendiri.
 
@@ -67,8 +72,8 @@ cd blood-typing-card-animation
 Other versions (each writes its own file):
 
 ```bash
-python render.py --lang id      # captions and result line in Bahasa Indonesia -> out/blood-typing-card_ID.mp4
-python render.py --clean        # no captions: card labels + result line only -> out/blood-typing-card_clean.mp4
+python render.py --lang id      # labels and result line in Bahasa Indonesia -> out/blood-typing-card_ID.mp4
+python render.py --clean        # no tracking labels: card labels + result line only -> out/blood-typing-card_clean.mp4
 python render.py --assets       # sprite sheets -> assets/sprites/, audio stems -> assets/audio/
 ```
 
@@ -95,20 +100,36 @@ python render.py --audio-only                    # soundtrack only -> out/music.
 | 16–19 | 5 Compare Anti-B | Match cut at the same scale. A mint Anti-B antibody, whose square tips fit B markers, passes the same gold-tabbed cells without attaching. The cells stay apart. Pull back through the smooth red surface to the Anti-B circle and the whole card. | soft pass, rising whoosh |
 | 19–24 | 6 His blood type is A | Hold to compare: Anti-A grainy, Anti-B, Anti-D and Control smooth. A blocky gold outline draws round Anti-A in four steps. The card shifts down, and "His blood type is A" appears with a big gold A that scales up once and settles on the chime. Hold, then the card slides out; on the next downbeat a new card slides in. | four outline blips, **two-note reward chime** (21.0) |
 
-## Captions (default; `--clean` removes them)
+## Tracking explanations (default; `--clean` removes them)
 
-A small RPG dialog box at the top types one or two lines per step. It steps aside before the result line.
+There is no caption box at the top. Each explanation is a short label on a small dark plate, pinned to the thing it
+explains by a dotted leader line. Its position is recomputed every frame through the camera on screen, so it follows
+the object through slides, zooms and drifts. Labels flip sides near the frame edge and type in quickly. The accent
+colour matches the subject:
+- red: blood and cells;
+- gold: A markers;
+- cyan: Anti-A;
+- mint: Anti-B;
+- ivory: smooth spots.
 
-The words are colour-coded:
-- cyan: the Anti-A antibody;
-- gold: the A markers;
-- mint: Anti-B.
+| Time (s) | Label | Pinned to |
+|---|---|---|
+| 0.3–2.2 | SAME BLOOD SAMPLE | the sample dropper (it moves from spot to spot) |
+| 2.2–3.0 | 4 DROPS, ALL THE SAME | the middle of the card |
+| 3.0–4.5 | ANTI-A REAGENT · CONTROL: NO ANTIBODIES | the Anti-A and Control droppers |
+| 5.2–6.2 | CLUMPS = GRAINY · SMOOTH | the Anti-A and Anti-B spots |
+| 6.4–7.3 | ONE DARK SPECK... | the speck the camera dives into |
+| 7.6–10.4 | RED BLOOD CELL · A MARKER (ANTIGEN) | the first cell and one of its gold markers |
+| 9.1–10.5 | ANTI-A ANTIBODY | the antibody as it drifts in |
+| 10.6–11.5 | GRABS AN A MARKER | the first contact point |
+| 11.6–12.5 | 2ND CELL | the second cell as it drifts close |
+| 12.6–13.5 | BRIDGE: 2 CELLS LINKED | the antibody between the two cells |
+| 13.6–16.0 | MANY BRIDGES = A CLUMP · AGGLUTINATION, NOT A CLOT | the growing clump (through the pull back) |
+| 16.2–17.7 | ANTI-B ANTIBODY → NO B MARKERS: NO GRIP | the Anti-B antibody as it passes |
+| 18.0–19.0 | STAYS SMOOTH | the Anti-B spot (through the pull back) |
+| 19.1–20.3 | CLUMPED · SMOOTH · SMOOTH · SMOOTH | the four spots |
 
-ONE BLOOD SAMPLE, FOUR DROPS / THEY ALL LOOK THE SAME → EACH SPOT GETS ITS TEST LIQUID / CONTROL: NO TYPING
-ANTIBODIES → MOMENTS LATER... / ONLY ANTI-A TURNS GRAINY → WHAT HAPPENS INSIDE ANTI-A? → RED BLOOD CELLS / GOLD TABS
-= A MARKERS → AN ANTI-A ANTIBODY / GRABS ONE A MARKER → ITS OTHER ARM GRABS / A 2ND CELL: A BRIDGE → MANY BRIDGES =
-A CLUMP / AGGLUTINATION, NOT A CLOT → ANTI-B NEEDS B MARKERS / NONE HERE: NO BRIDGES → THE CELLS STAY APART: SMOOTH →
-ONLY ANTI-A CLUMPED / THE OTHER THREE STAY SMOOTH → **His blood type is A**.
+Then **His blood type is A**.
 
 ## The science shown
 
@@ -121,6 +142,12 @@ ONLY ANTI-A CLUMPED / THE OTHER THREE STAY SMOOTH → **His blood type is A**.
 - **Anti-B.** Anti-B looks for B markers. These cells have only A markers, so it passes by and the spot stays smooth.
 - **Anti-D and the result.** Anti-D does not clump in this example, so the person is RhD-negative. The headline
   intentionally shows only the ABO group: **A**, with no plus sign.
+- **Red blood cells are biconcave discs.** They use the measured thickness profile of a red cell (Evans & Fung):
+  a thick rim and a thin centre. Face-on, the rim is lit on the upper left, and the dent shows reversed shading: a
+  shadow on its upper-left wall and a pale lower right. Free cells tumble slowly, so some are seen tilted (an oval
+  with an off-centre dent) or edge-on (a rounded bar: from the side, the rim hides the thin middle). Cells in a
+  bridge stay face-on so the bridge is easy to read. The A antigens are small surface markers, drawn as gold
+  lollipops (a stalk and a knob) along the rim.
 - **Positive vs negative.** All four drops use the same red. A positive spot differs only by texture (small,
   irregular clusters); a negative spot stays even and smooth.
 - **Simplified on purpose.**
@@ -191,16 +218,16 @@ with a −1 dBTP ceiling.
 | `assets/sprites/` | Exported sprites: card states, macro drop, cell views, result, and a sheet with the red cell, both antibodies, both droppers and both drops. |
 | `engine/timeline.py` | The clock and choreography: events on the beat grid, card slide, droppers, time-lapse, cameras, cell and antibody positions, the exact bridge geometry. |
 | `engine/card.py` | Overhead and macro artwork: bench, card, wells, labels, blood, clusters, swirl, ripples, droppers, outline. |
-| `engine/cells.py` | Cellular artwork: red cells with A markers, Anti-A and Anti-B antibodies, contact flashes. |
-| `engine/scene.py` | Which view is on screen, the stepped pixel cuts, captions and result. |
-| `engine/explain.py` | Caption texts (English and Indonesian), the caption box, the result line with the big A. |
+| `engine/cells.py` | Cellular artwork: biconcave red cells (any tilt) with A markers, Anti-A and Anti-B antibodies, contact flashes. |
+| `engine/scene.py` | Which view is on screen, the stepped pixel cuts, the tracking labels and the result. |
+| `engine/explain.py` | The tracking labels (English and Indonesian, anchors, placement), the result line with the big A. |
 | `engine/audio.py`, `engine/synth.py` | Music and sound effects. |
 | `engine/gfx.py`, `engine/view.py`, `engine/palette.py`, `engine/pixfont.py` | Pixel helpers, camera, palette, bitmap font. |
 
 ## Checks run on this project
 
 - **Shot list lint** (`storyboard_lint.py`): green, 7 shots, 24 s.
-- **Film gate** (`film_gate.py --no-template`) on a half-size preview: **pass**. Fast-motion frames 18.1%, no empty
+- **Film gate** (`film_gate.py --no-template`) on a half-size preview: **pass**. Fast-motion frames 16.9%, no empty
   frames, no blue-purple.
 - **Muted, phone-size check** (360×640 frames):
   - all four drops look the same at first;

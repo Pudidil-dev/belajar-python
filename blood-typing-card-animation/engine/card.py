@@ -166,12 +166,19 @@ _EVEN = {sp: _even_cells(0, 0, T.FILL_R, 50 + i) for i, sp in enumerate(T.ORDER)
 
 
 def _mini_cell(pen, x, y, r):
+    """A tiny red cell for the macro view: lit rim on the upper left, a dent in the middle (shadow on its upper
+    left, pale on its lower right), dark outline."""
     bx, m, U, V = pen.disc(x, y, r, 0)
     if bx is None:
         return
     put(pen.buf, bx, m, P.RED[3])
     if r * pen.z >= 3.0:
-        put(pen.buf, bx, m & ((U - x) ** 2 + (V - y) ** 2 <= (r * 0.42) ** 2), P.RED[5])
+        dx, dy = U - x, V - y
+        rr = dx * dx + dy * dy
+        put(pen.buf, bx, m & (rr > (r * 0.6) ** 2) & (dx + dy < -r * 0.45), P.RED[4])
+        dent = rr <= (r * 0.5) ** 2
+        put(pen.buf, bx, m & dent, P.RED[5])
+        put(pen.buf, bx, m & dent & (dx + dy < -r * 0.15), P.RED[2])
     pen.outline(bx, m, P.RED[1])
 
 

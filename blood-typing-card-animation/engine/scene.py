@@ -45,18 +45,21 @@ def stepped_cut(a, b, p):
 
 def render_canvas(t, info=True, lang='en'):
     t = t % T.TOTAL
+    space, cam = None, None
     if T.CUT_IN[0] <= t < T.CUT_IN[1]:
         frame = stepped_cut(card_view(t, T.card_camera(t)), cell_view(t, T.cell_camera(t)),
                             (t - T.CUT_IN[0]) / (T.CUT_IN[1] - T.CUT_IN[0]))
     elif T.in_cells(t):
-        frame = cell_view(t, T.cell_camera(t))
+        cam = T.cell_camera(t)
+        frame, space = cell_view(t, cam), 'cell'
     elif T.CUT_OUT[0] <= t < T.CUT_OUT[1]:
         frame = stepped_cut(cell_view(t, T.cell_camera(t)), card_view(t, T.card_camera(t)),
                             (t - T.CUT_OUT[0]) / (T.CUT_OUT[1] - T.CUT_OUT[0]))
     else:
-        frame = card_view(t, T.card_camera(t))
-    if info and t < T.SHIFT[0] + 0.35:
-        X.caption(frame, t, lang)
+        cam = T.card_camera(t)
+        frame, space = card_view(t, cam), 'card'
+    if info and space is not None:
+        X.callouts(frame, space, View(*cam), T.card_offset(t), t, lang)
     X.result(frame, t, lang, dx=T.card_offset(t))
     return frame
 
