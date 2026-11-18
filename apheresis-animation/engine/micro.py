@@ -134,7 +134,7 @@ def _clear_parcel():
     qx0, qy = T.X_Q0, T.Y_Q
     for arr, rad in ((S_RBC, 11.0), (S_PLT, 4.0), (S_WBC, 15.0)):
         for i in range(len(arr)):
-            for t in np.linspace(12.0, 20.5, 60):
+            for t in np.linspace(T.DIVE_MOL[0] - 0.8, T.OUT_MOL[0] + 1.2, 60):
                 e = t - T.IN_TUBE[0]
                 d = (arr[i, 0] + _v(arr[i, 1]) * e) - (qx0 + _v(qy) * e)
                 d = (d + WRAP / 2) % WRAP - WRAP / 2

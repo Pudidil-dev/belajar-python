@@ -1,4 +1,4 @@
-"""The clock, the clinic layout and the choreography (120 BPM, one bar = 2 s, 28 bars = 56 s).
+"""The clock, the clinic layout and the choreography (137 BPM, one bar = 1.75 s, 20 bars = 35 s).
 
 World space (canvas px at zoom 1, y down): the reclining donor on the left, the apheresis machine on the right, the
 tubing between them. One camera travels through the whole film without a cut: it pans along the tubing and zooms in
@@ -17,43 +17,43 @@ of the donation: the sealed platelet bag.
 import math
 import numpy as np
 
-BPM = 120
-BEAT = 60.0 / BPM
-BAR = 4 * BEAT
-TOTAL = 56.0
+BAR = 1.75                         # 20 bars of 1.75 s = 35 s
+BEAT = BAR / 4
+BPM = 60.0 / BEAT                  # about 137 BPM
+TOTAL = 35.0
 FPS = 30
 
 # ---------------------------------------------------------------- events (seconds)
-HOLD = (0.0, 1.5)                  # the arm, still
-TRACK = (1.5, 5.0)                 # follow the blood along the tube to the anticoagulant Y fitting
-AC_SHOT = (5.0, 7.0)               # the anticoagulant line (from its own pump) joins the donor line
-DIVE_TUBE = (7.0, 9.5)             # zoom into the tube just after the Y fitting
-IN_TUBE = (9.5, 13.0)              # inside: red cells, platelets, a white cell, plasma, citrate
-DIVE_MOL = (13.0, 15.0)            # zoom further, into the plasma
-IN_MOL = (15.0, 18.0)              # citrate holds a calcium ion
-BIND = 16.2
-OUT_MOL = (18.0, 21.0)             # zoom all the way back out
-TO_PUMP = (21.0, 22.5)             # up the line, past the drip chamber and the clamps
-PUMP_HOLD = (22.5, 26.0)
-TO_LID = (26.0, 27.5)
-SPIN_UP = (27.5, 30.0)             # pull out to the whole machine while the rotor spins up
-DIVE_CH = (30.0, 32.5)             # zoom into the lid; the camera tilts down over the channel
-SEPARATE = (32.5, 39.0)            # the separation channel
-SEP_PROGRESS = (33.2, 36.4)
-DIVERT = (36.4, 39.0)              # the platelet band takes its own exit
-OUT_CH = (39.0, 41.5)
-TO_BAG = (41.5, 44.0)
-TILT = (32.45, 33.75)              # over the channel the camera tilts down to look straight in...
-UNTILT = (37.85, 38.95)            # ...and back up before it pulls out
-BAG_FILL = (40.5, 46.0)
-RETURN = (46.0, 49.0)              # the single needle switches to RETURN: the rest goes back to the donor
-TO_FINALE = (49.0, 50.8)
-FINALE = (50.8, 56.0)              # the donation is done: the platelet bag, sealed, as a rare item
-SEAL = 50.95
-LIFT = (51.2, 52.0)
-BURST = 52.0                       # the fanfare hit: a shockwave and a burst of gold around the bag
-REWARD = 45.4                      # the bag is full enough: a small reward tone
-DONE = 49.0
+HOLD = (0.0, 0.8)                  # the arm, still
+TRACK = (0.8, 3.0)                 # follow the blood along the tube to the anticoagulant Y fitting
+AC_SHOT = (3.0, 4.3)               # the anticoagulant line (from its own pump) joins the donor line
+DIVE_TUBE = (4.3, 5.9)             # zoom into the tube just after the Y fitting
+IN_TUBE = (5.9, 8.1)               # inside: red cells, platelets, a white cell, plasma, citrate
+DIVE_MOL = (8.1, 9.3)              # zoom further, into the plasma
+IN_MOL = (9.3, 11.0)               # citrate holds a calcium ion
+BIND = 5 * BAR + 3 * BEAT          # on the beat (about 10.06 s)
+OUT_MOL = (11.0, 12.8)             # zoom all the way back out
+TO_PUMP = (12.8, 13.8)             # up the line, past the drip chamber and the clamps
+PUMP_HOLD = (13.8, 15.9)
+TO_LID = (15.9, 16.8)
+SPIN_UP = (16.8, 18.3)             # pull out to the whole machine while the rotor spins up
+DIVE_CH = (18.3, 19.8)             # zoom into the lid; the camera tilts down over the channel
+SEPARATE = (19.8, 23.9)            # the separation channel
+TILT = (19.75, 20.55)              # over the channel the camera tilts down to look straight in...
+SEP_PROGRESS = (20.3, 22.3)
+DIVERT = (22.2, 23.9)              # the platelet band takes its own exit
+UNTILT = (23.1, 23.85)             # ...and back up before it pulls out
+OUT_CH = (23.9, 25.3)
+TO_BAG = (25.3, 26.6)
+BAG_FILL = (24.6, 28.0)
+REWARD = 27.6                      # the bag is full enough: a small reward tone
+RETURN = (16 * BAR, 17 * BAR)      # 28.0-29.75: the single needle switches to RETURN, the rest goes back
+DONE = RETURN[1]
+TO_FINALE = (DONE, 30.7)
+FINALE = (30.7, TOTAL)             # the donation is done: the platelet bag, sealed, as a rare item
+SEAL = 30.75
+LIFT = (30.9, 18 * BAR)
+BURST = 18 * BAR                   # 31.5, on the downbeat: the fanfare hit, a shockwave and a burst of gold
 
 
 def clamp01(x):
@@ -213,7 +213,8 @@ def pump_speed(t):
     counter-clockwise to draw, the other way to return the blood, and stops when the donation is done."""
     if done(t):
         return 0.0
-    return 2.0 if returning(t) else -2.0
+    w = 1.0 / BEAT                                      # two rollers: one passes the inlet every eighth note
+    return w if returning(t) else -w
 
 
 def ac_pump_speed(t):
@@ -249,7 +250,7 @@ def spin_speed(t):
         return 0.0
     if t < RETURN[1]:
         return 3.2 * smooth((t - SPIN_UP[0]) / (SPIN_UP[1] - SPIN_UP[0]))
-    return 3.2 * (1 - smooth((t - RETURN[1]) / 2.0))
+    return 3.2 * (1 - smooth((t - RETURN[1]) / 1.5))
 
 
 _SPIN_TAB = _angle_table(spin_speed)
@@ -289,7 +290,6 @@ K_S = R_IN / TUBE_R                # world units per stream unit
 STREAM_Z = 1.7                     # the stream seen at its reading scale (stream px per stream unit)
 CAM_V = 58.0                       # inside the tube the camera drifts with the flow (stream units per second)
 Y_Q = 2.0                          # the plasma parcel we dive into (stream lane, and its start)
-X_Q0 = -96.0
 K_M = 0.04                         # stream units per molecule unit
 MOL_Z = 2.2
 MOL_C = (-6.0, 8.0)                # the molecule view's centre (molecule units)
@@ -301,6 +301,9 @@ CH_Z = 4.8                         # the channel seen at its reading scale
 def flow_speed(y):
     """Speed of the plasma across the tube (stream units per second): fastest in the middle."""
     return 22.0 + 64.0 * (1 - (y / TUBE_R) ** 2)
+
+
+X_Q0 = (CAM_V - (22.0 + 64.0 * (1 - (Y_Q / TUBE_R) ** 2))) * (DIVE_MOL[0] - IN_TUBE[0])
 
 
 def stream_cam_u(t):
@@ -387,7 +390,7 @@ def world_camera(t):
         return c
     end_track = (*path_point('draw1', F_FLOOR), 2.6)
     if t < AC_SHOT[1]:                                         # frame the anticoagulant joining
-        return _lerp_cam(end_track, AC_CAM, smoother((t - AC_SHOT[0]) / 1.2))
+        return _lerp_cam(end_track, AC_CAM, smoother((t - AC_SHOT[0]) / (AC_SHOT[1] - AC_SHOT[0])))
     if t < DIVE_TUBE[1]:                                       # zoom into the tube
         return _lerp_cam(AC_CAM, stream_target(t), sine_io((t - DIVE_TUBE[0]) / (DIVE_TUBE[1] - DIVE_TUBE[0])))
     if t < IN_TUBE[1]:
@@ -415,13 +418,13 @@ def world_camera(t):
         return _lerp_cam(channel_target(t), plt0, sine_io((t - OUT_CH[0]) / (OUT_CH[1] - OUT_CH[0])))
     if t < TO_BAG[1]:                                          # follow the platelets up to the bag
         u = smoother((t - TO_BAG[0]) / (TO_BAG[1] - TO_BAG[0]))
-        c = _follow('plt', 0.04, 0.86, u, 4.0 - 1.3 * math.sin(math.pi * u) - 0.8 * u)
+        c = _follow('plt', 0.04, 0.86, u, 4.0 - 1.9 * math.sin(math.pi * u) - 0.8 * u)
         return _lerp_cam(c, BAG_CAM, smoother((t - (TO_BAG[1] - 0.7)) / 0.7))
     if t < RETURN[0]:
         return BAG_CAM[0] - 0.3 * (t - TO_BAG[1]), BAG_CAM[1], BAG_CAM[2]
     bag_end = (BAG_CAM[0] - 0.3 * (RETURN[0] - TO_BAG[1]), BAG_CAM[1], BAG_CAM[2])
     if t < RETURN[1]:                                          # pull out: the rest goes back to the donor
-        return _lerp_cam(bag_end, WIDE, smoother((t - RETURN[0]) / 2.0))
+        return _lerp_cam(bag_end, WIDE, smoother((t - RETURN[0]) / 1.2))
     if t < TO_FINALE[1]:                                       # push in on the result of the donation
         return _lerp_cam(WIDE, FINALE_CAM, sine_io((t - TO_FINALE[0]) / (TO_FINALE[1] - TO_FINALE[0])))
     return FINALE_CAM

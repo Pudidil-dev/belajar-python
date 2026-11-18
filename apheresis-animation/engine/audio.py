@@ -1,8 +1,8 @@
-"""Original soundtrack: a 28-bar, 120 BPM chiptune in F major (square-wave lead, bouncy triangle bass, light arcade
+"""Original soundtrack: a 20-bar, 137 BPM chiptune in F major (square-wave lead, bouncy triangle bass, light arcade
 drums) with the machine sounds, synthesized from code. The film does not loop: the score builds through the last
 bars into an original "rare item" fanfare and ends on a held F major chord.
 
-Chords: F Dm Bb C | F Dm Bb C | Dm Bb F C | F Dm Bb C | Bb C Am Dm | Bb C F Dm | Bb C F F.
+Chords: F Dm Bb C | F Dm Bb C | Dm Bb F C | Bb C Am Dm | Bb C F F.
 Effects follow the one continuous camera: a soft pulse and a gentle flow on the opening, a soft rising shimmer for
 every zoom in and a falling one for every zoom out, sparkle tones in the stream, one tik for citrate holding
 calcium, the pump clicks (one per roller), the spin-up whirr and its steady tone, ticks as the layers separate, a
@@ -44,8 +44,8 @@ def tv(n):
 
 
 # ------------------------------------------------------------------ music
-CHORDS = ['F', 'Dm', 'Bb', 'C', 'F', 'Dm', 'Bb', 'C', 'Dm', 'Bb', 'F', 'C', 'F', 'Dm', 'Bb', 'C',
-          'Bb', 'C', 'Am', 'Dm', 'Bb', 'C', 'F', 'Dm', 'Bb', 'C', 'F', 'F']
+CHORDS = ['F', 'Dm', 'Bb', 'C', 'F', 'Dm', 'Bb', 'C', 'Dm', 'Bb', 'F', 'C',
+          'Bb', 'C', 'Am', 'Dm', 'Bb', 'C', 'F', 'F']
 ROOT = {'F': 41, 'Dm': 38, 'Bb': 34, 'C': 36, 'Am': 33}
 TONES = {'F': (65, 69, 72), 'Dm': (62, 65, 69), 'Bb': (58, 62, 65), 'C': (60, 64, 67), 'Am': (69, 72, 76)}
 MOTIF = {
@@ -57,12 +57,13 @@ MOTIF = {
 }
 E8 = T.BEAT / 2
 CALM = (0,)                        # the arm: no melody yet
-MOL_BARS = (7, 8)                  # the molecules: soft held chords, the tik
-PUMP_BARS = (11, 12)               # the pump: an arpeggio locked to the clicks
-SPIN_BARS = (16, 17, 18, 19)       # the separation: a spinning arpeggio
-BAG_BARS = (21, 22)                # the bag fills: little bell answers
-BUILD = 25                         # seal and lift: a build-up
-FANFARE = (26, 27)                 # the rare item
+MOL_BARS = (5,)                    # the molecules: a soft held chord, the tik
+PUMP_BARS = (8,)                   # the pump: an arpeggio locked to the clicks
+SPIN_BARS = (11, 12, 13)           # the separation: a spinning arpeggio
+BAG_BARS = (15,)                   # the bag fills: little bell answers
+RETURN_BAR = 16
+BUILD = 17                         # seal and lift: a build-up
+FANFARE = (18, 19)                 # the rare item
 
 
 def bar_t(b, e=0):
@@ -93,7 +94,7 @@ def music():
                     continue
                 nxt = next((j for j in range(k + 1, 8) if mot[j] is not None), 8)
                 lead_b.put(S.lead(m, (nxt - k) * E8 * 0.85, duty=0.25 if b not in SPIN_BARS else 0.125),
-                           bar_t(b, k), 0.28 if b == 23 else 0.34)
+                           bar_t(b, k), 0.28 if b == RETURN_BAR else 0.34)
         if b in SPIN_BARS:                                     # 16th-note arpeggio: the rotor turning
             for k in range(16):
                 arp_b.put(S.chip_arp(TONES[ch][k % 3] + 12, E8 / 2 * 0.8), bar_t(b) + k * E8 / 2, 0.1,
@@ -137,18 +138,18 @@ def music():
             drum_b.put(S.hat(k % 4 == 3, 0.6), t0, 0.15 if k % 2 else 0.1, 0.3)
     # ---- the fanfare (original): F hit, Bb, C, a big F with a sparkle run, then a last "ta-da"
     b0 = T.BURST
-    for t0, dur, chord in ((b0, 0.42, (77, 81, 84)), (b0 + 0.5, 0.22, (74, 77, 82)), (b0 + 0.75, 0.22, (76, 79, 84)),
-                           (b0 + 1.0, 1.35, (77, 81, 84, 89)), (b0 + 2.5, 0.16, (79, 84, 88)),
-                           (b0 + 2.7, 1.25, (77, 81, 84, 89))):
+    for t0, dur, chord in ((b0, 0.34, (77, 81, 84)), (b0 + 0.4, 0.18, (74, 77, 82)), (b0 + 0.6, 0.18, (76, 79, 84)),
+                           (b0 + 0.8, 1.1, (77, 81, 84, 89)), (b0 + 2.0, 0.13, (79, 84, 88)),
+                           (b0 + 2.16, 1.15, (77, 81, 84, 89))):
         for k, m in enumerate(chord):
             fan_b.put(brass(m, dur), t0, 0.16, -0.3 + 0.2 * k)
         low = 41 if chord[0] in (77, 79) else (34 if chord[0] == 74 else 36)
         bass_b.put(S.bass(low, dur), t0, 0.8)
         bass_b.put(S.bass(low + 12, dur), t0, 0.5)
     for k in range(12):                                        # sparkle run over the big chord
-        arp_b.put(S.chip_arp((89, 93, 96, 101)[k % 4], E8 / 2 * 0.7, 0.25), b0 + 1.05 + k * E8 / 2, 0.07,
+        arp_b.put(S.chip_arp((89, 93, 96, 101)[k % 4], E8 / 2 * 0.7, 0.25), b0 + 0.85 + k * E8 / 2, 0.07,
                   -0.5 + (k % 4) / 3)
-    for t0, g in ((b0, 0.75), (b0 + 1.0, 0.7), (b0 + 2.7, 0.75)):
+    for t0, g in ((b0, 0.75), (b0 + 0.8, 0.7), (b0 + 2.16, 0.75)):
         drum_b.put(S.kick(), t0, g)
         drum_b.put(S.crash(1.6), t0, 0.12, 0.2)
     for k in range(4):                                         # a tom fill into the shockwave
@@ -268,16 +269,16 @@ def sfx(info=True):
         t0 += 0.32
     bus.put(tik(), T.BIND, 0.6)
     # ---- the pump: one click per roller, fading in as the camera arrives and out as it leaves
-    t0 = T.TO_PUMP[0]
+    t0 = math.ceil(T.TO_PUMP[0] / E8) * E8                       # on the eighth notes, where the rollers pass
     while t0 < T.TO_LID[1]:
-        g = min(1.0, (t0 - T.TO_PUMP[0]) / 1.2, max(0.0, (T.TO_LID[1] - t0) / 1.2))
+        g = min(1.0, (t0 - T.TO_PUMP[0]) / 0.8, max(0.0, (T.TO_LID[1] - t0) / 0.8))
         bus.put(click(int(t0 * 10)), t0, 0.7 * g, 0.15)
         bus.put(S.thump(160, 80, 0.06, 0.2, int(t0 * 10)), t0, 0.28 * g)
-        t0 += 0.25
+        t0 += E8
     n = int((T.TO_LID[1] - T.TO_PUMP[0]) * SR)
     tt = tv(n)
     hum = (0.6 * np.sign(np.sin(2 * math.pi * 92 * tt)) + 0.4 * np.sin(2 * math.pi * 184 * tt))
-    bus.put(S.lowpass(hum, 900, 63) * np.minimum(1, tt / 1.2) * np.minimum(1, (n / SR - tt) / 1.2), T.TO_PUMP[0], 0.11)
+    bus.put(S.lowpass(hum, 900, 63) * np.minimum(1, tt / 0.8) * np.minimum(1, (n / SR - tt) / 0.8), T.TO_PUMP[0], 0.11)
     # ---- the centrifuge: a rising spin-up whirr, then a steady spin tone
     d = T.OUT_CH[1] + 1.0 - T.SPIN_UP[0]
     n = int(d * SR)
@@ -292,7 +293,7 @@ def sfx(info=True):
     k, t0 = 0, T.SEP_PROGRESS[0]
     while t0 <= T.SEP_PROGRESS[1] + 1e-6:                        # small ticks as the layers separate
         bus.put(S.blip(S.mtof(86 + 2 * k), S.mtof(86 + 2 * k), 0.03, 0.25), t0, 0.6, -0.4 + 0.12 * k)
-        k, t0 = k + 1, t0 + 0.5
+        k, t0 = k + 1, t0 + T.BEAT
     bus.put(S.blip(523.3, 1046.5, 0.6, 0.25) * np.linspace(1, 0.3, int(0.6 * SR)), T.DIVERT[0] + 0.4, 0.12)
     # ---- the bag: a plip for each drop that lands, a small reward tone
     for k, tl in enumerate(_drop_landings(T.TO_BAG[1] - 0.6, T.RETURN[0])):
@@ -302,10 +303,10 @@ def sfx(info=True):
     # ---- return: the phase switch, the pump clicking backwards, the flow back to the arm; then done
     bus.put(click(int(T.RETURN[0] * 7), 2200), T.RETURN[0], 1.0)
     bus.put(S.blip(1318.5, 988.0, 0.06, 0.25), T.RETURN[0] + 0.05, 0.25)
-    t0 = T.RETURN[0] + 0.25
+    t0 = T.RETURN[0] + E8
     while t0 < T.RETURN[1] - 0.2:
         bus.put(click(int(t0 * 13), 1500), t0, 0.45, 0.1)
-        t0 += 0.25
+        t0 += E8
     bus.put(flow(T.RETURN[1] - T.RETURN[0] - 0.4, 71, 520), T.RETURN[0] + 0.3, 0.32, -0.2)
     for k, f_ in enumerate((1046.5, 1568.0)):
         bus.put(chime_note(f_, 0.5 if k else 0.3), T.DONE + k * 0.14, 0.14, -0.1 + 0.2 * k)

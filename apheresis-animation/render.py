@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Render "How an Apheresis Machine Takes Platelets and Returns Your Blood": a 56-second 8-bit pixel-art medical-tech short.
+"""Render "How an Apheresis Machine Takes Platelets and Returns Your Blood": a 35-second 8-bit pixel-art medical-tech short.
 
     python render.py                      # the film -> out/apheresis.mp4 (1080x1920, 30 fps, stereo)
     python render.py --preview            # quick half-size check -> out/preview.mp4 (540x960)
-    python render.py --stills 0,11.6,37.6,55    # full-size PNG frames -> out/stills/
-    python render.py --sheet 0:56:2       # one contact sheet (canvas size) -> out/sheet.png
+    python render.py --stills 0,7.4,23,34       # full-size PNG frames -> out/stills/
+    python render.py --sheet 0:35:1       # one contact sheet (canvas size) -> out/sheet.png
     python render.py --from 4 --to 10 --out out/slice.mp4   # just a slice
     python render.py --audio-only         # only the soundtrack -> out/music.wav, out/sfx.wav, out/mix.wav
     python render.py --lang id            # the short explanation in Bahasa Indonesia -> out/apheresis_ID.mp4
@@ -149,9 +149,9 @@ def export_assets(a):
     sp = ROOT / 'assets' / 'sprites'
     sp.mkdir(parents=True, exist_ok=True)
     big = lambda im: Image.fromarray(im).resize((im.shape[1] * 4, im.shape[0] * 4), Image.NEAREST)
-    for name, t in (('arm_draw', 0.0), ('anticoagulant', 6.4), ('blood_stream', 11.6), ('citrate_calcium', 17.0),
-                    ('pump', 24.0), ('machine', 29.2), ('separation', 37.6), ('platelet_bag', 44.6),
-                    ('return', 48.0), ('rare_item', 55.0)):
+    for name, t in (('arm_draw', 0.0), ('anticoagulant', 3.9), ('blood_stream', 7.6), ('citrate_calcium', 10.7),
+                    ('pump', 14.9), ('machine', 17.9), ('separation', 23.0), ('platelet_bag', 27.5),
+                    ('return', 29.3), ('rare_item', 34.0)):
         big(scene.render_canvas(t, False, a.lang)).save(sp / f'{name}.png')
 
     def tile(draw, w=64, h=64, z=3.0, bg=P.PLASMA[2]):

@@ -58,9 +58,9 @@ def _visible(kind, n, t0, t1, x0=36, x1=W - 70):
     return best
 
 
-_RBC_I = _visible('rbc', M._N_RBC, 9.9, 12.8)
-_PLT_I = _visible('plt', M._N_PLT, 10.2, 12.8)
-_CIT_I = _visible('cit', M._N_CIT, 11.2, 12.8)
+_RBC_I = _visible('rbc', M._N_RBC, 6.1, 8.0)
+_PLT_I = _visible('plt', M._N_PLT, 6.3, 8.0)
+_CIT_I = _visible('cit', M._N_CIT, 6.9, 8.0)
 
 
 def _path(name, f):
@@ -80,25 +80,25 @@ def _fixed(x, y):
 
 # (start, end, key, space, anchor(t) -> point in that space, plate offset px, accent)
 LABELS = [
-    (2.20, 4.80, 'draw', 'world', _cam_point(14, -2), (12, -40), C_TEAL),
-    (5.40, 6.90, 'ac', 'world', _path('ac2', 0.55), (10, -18), C_MINT),
-    (9.90, 12.80, 'rbc', 'stream', lambda t: M.stream_pos('rbc', _RBC_I, t), (10, -34), C_RED),
-    (10.20, 12.80, 'plt', 'stream', lambda t: M.stream_pos('plt', _PLT_I, t), (10, 30), C_GOLD),
-    (10.60, 12.80, 'plasma', 'stream', lambda t: (M.stream_camera(t).cx - 30, 52.0), (-20, 40), C_PLASMA),
-    (11.20, 12.80, 'cit', 'stream', lambda t: M.stream_pos('cit', _CIT_I, t), (10, -92), C_MINT),
-    (15.30, 16.20, 'citrate', 'molecule', lambda t: M.citrate_pos(t), (-40, 34), C_MINT),
-    (15.40, 16.20, 'calcium', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (14, -40), C_ION),
-    (16.40, 17.90, 'bound', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (-60, -60), C_MINT),
-    (23.00, 25.80, 'pump', 'world', _fixed(T.PUMP[0] - 4, T.PUMP[1] - 6), (-74, -64), C_RED),
-    (28.20, 29.90, 'spin', 'world', _fixed(T.CENTRIFUGE[0] - 22, T.CENTRIFUGE[1] + 2), (-78, 46), C_TEAL),
-    (33.60, 38.80, 'rbc_ch', 'channel', lambda t: M.channel_point('rbc', t), (-10, -52), C_RED),
-    (34.20, 36.60, 'plt_ch', 'channel', lambda t: M.channel_point('plt', t), (-4, 40), C_GOLD),
-    (34.80, 38.80, 'plasma_ch', 'channel', lambda t: M.channel_point('plasma', t), (-16, 62), C_PLASMA),
-    (37.00, 38.80, 'plt_out', 'channel', lambda t: M.channel_port_point(), (-110, 20), C_GOLD),
-    (44.30, 45.90, 'bag', 'world', lambda t: (T.BAG[0] + T.BAG_W / 2, T.BAG[1] - 6), (6, -60), C_GOLD),
-    (46.80, 48.90, 'ret', 'world', _fixed(T.NEEDLE[0] + 6, T.NEEDLE[1] - 4), (-30, -64), C_TEAL),
+    (1.20, 2.95, 'draw', 'world', _cam_point(14, -2), (12, -40), C_TEAL),
+    (3.20, 4.25, 'ac', 'world', _path('ac2', 0.55), (10, -18), C_MINT),
+    (6.10, 8.00, 'rbc', 'stream', lambda t: M.stream_pos('rbc', _RBC_I, t), (10, -34), C_RED),
+    (6.30, 8.00, 'plt', 'stream', lambda t: M.stream_pos('plt', _PLT_I, t), (10, 30), C_GOLD),
+    (6.60, 8.00, 'plasma', 'stream', lambda t: (M.stream_camera(t).cx - 30, 52.0), (-20, 40), C_PLASMA),
+    (6.90, 8.00, 'cit', 'stream', lambda t: M.stream_pos('cit', _CIT_I, t), (10, -92), C_MINT),
+    (9.40, 10.00, 'citrate', 'molecule', lambda t: M.citrate_pos(t), (-40, 34), C_MINT),
+    (9.45, 10.00, 'calcium', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (14, -40), C_ION),
+    (10.15, 10.95, 'bound', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (-60, -60), C_MINT),
+    (14.10, 15.80, 'pump', 'world', _fixed(T.PUMP[0] - 4, T.PUMP[1] - 6), (-74, -64), C_RED),
+    (17.00, 18.25, 'spin', 'world', _fixed(T.CENTRIFUGE[0] - 22, T.CENTRIFUGE[1] + 2), (-78, 46), C_TEAL),
+    (20.70, 23.80, 'rbc_ch', 'channel', lambda t: M.channel_point('rbc', t), (-10, -52), C_RED),
+    (21.00, 22.40, 'plt_ch', 'channel', lambda t: M.channel_point('plt', t), (-4, 40), C_GOLD),
+    (21.30, 23.80, 'plasma_ch', 'channel', lambda t: M.channel_point('plasma', t), (-16, 62), C_PLASMA),
+    (22.70, 23.80, 'plt_out', 'channel', lambda t: M.channel_port_point(), (-110, 20), C_GOLD),
+    (26.80, 27.95, 'bag', 'world', lambda t: (T.BAG[0] + T.BAG_W / 2, T.BAG[1] - 6), (6, -60), C_GOLD),
+    (28.30, 29.70, 'ret', 'world', _fixed(T.NEEDLE[0] + 6, T.NEEDLE[1] - 4), (-30, -64), C_TEAL),
 ]
-CPS = 70.0
+CPS = 100.0
 LINE2 = 2
 
 
