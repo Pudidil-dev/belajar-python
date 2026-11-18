@@ -111,15 +111,6 @@ def _spot(buf, v, t, sk, X, Y, sx, sy, i, first):
             hl = ((X - (sx - 6)) ** 2 + (Y - (sy + 6)) ** 2) < (2.0 + 4.0 * k) ** 2
             buf[near & hl] = SKIN[4]
             buf[near & (r > S.R_IN * 0.8) & (r < S.R_IN) & V.CHECK] = SKIN[1]
-        pd = S.pool_d(t, i) if t < T.POP or i != S.MAIN else 0.0
-        if pd > 0.2:
-            rp = S.R_IN * np.sqrt(max(0.0, 1 - (min(pd, d * 0.95) / max(d, 0.01)) ** (1 / 1.5))) if d > 0.3 else \
-                S.R_IN - pd
-            rp = min(rp, S.R_IN - 1.2)
-            ringm = near & (r >= rp) & (r < S.R_IN)
-            buf[ringm] = BLOOD[1]
-            buf[ringm & (X < sx) & (Y > sy) & (r < rp + 1.2)] = BLOOD[3]
-            buf[ringm & (r > S.R_IN - 0.9)] = BLOOD[0]
     # the cupping mark, once the main cup is off
     if main_off:
         k = S.mark_k(t)

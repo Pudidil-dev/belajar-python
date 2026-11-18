@@ -12,7 +12,7 @@ import numpy as np
 from . import view as V
 from . import state as S
 from . import timeline as T
-from .palette import GLASS, WHITE, STEEL, OUTLINE, SKIN
+from .palette import GLASS, WHITE, STEEL, OUTLINE, SKIN, BLOOD
 
 
 def _sil(v, x0, y0, zl, grow=1.0):
@@ -47,18 +47,38 @@ def _valve(buf, parts):
     buf[V.edge(vc)] = STEEL[0]
 
 
-def draw_cup(buf, v, t, x0, y0, zl=0.0, grow=1.0, clip=None):
-    """A whole clear cup."""
+def _blood(buf, v, t, x0, y0, zl, level, glass):
+    """The blood collected in a cup, seen through the glass: its flat surface (an ellipse at the blood's level) and,
+    in an angled view, the band of blood behind the front wall below it. Returns the mask it covers."""
+    bx, by = v.to(x0, y0, zl)
+    sx_, sy_ = v.to(x0, y0, zl + level)
+    a = (S.R_IN - 0.3) * v.s
+    b = a * v.se
+    q2 = 1.0 - ((V.XC - bx) / max(a, 0.5)) ** 2
+    q = np.sqrt(np.clip(q2, 0.0, None))
+    body = V.full((q2 > 0) & (V.YC >= sy_ - b * q) & (V.YC <= by + b * q)) & glass
+    surf = V.full(V.ell(sx_, sy_, a, b)) & glass
+    buf[body] = BLOOD[0]                                      # behind the front wall, in shadow
+    buf[surf] = BLOOD[1]                                      # the surface
+    buf[V.edge(surf) & V.full(V.YC < sy_)] = BLOOD[2]         # its far edge catches the light
+    hl = V.full(V.ell(sx_ - a * 0.4, sy_ - b * 0.4, a * 0.2, max(b * 0.2, 0.8))) & surf
+    buf[hl & V.CHECK] = BLOOD[3]
+    return body
+
+
+def draw_cup(buf, v, t, x0, y0, zl=0.0, grow=1.0, clip=None, level=0.0):
+    """A whole clear cup, with the blood collected in it (level: height of its surface above the rim, mm)."""
     glass, stem_parts, (bx, by, rx, ry), (tx, ty) = _sil(v, x0, y0, zl, grow)
     if clip is not None:
         glass = glass & clip
     if not glass.any():
         return
+    blood = _blood(buf, v, t, x0, y0, zl, level, glass) if level > 0.05 else np.zeros((V.H, V.W), bool)
     sheen = V.full(((V.XC.astype(int) + 2 * V.YC.astype(int)) % 4) == 0)
     buf[glass & sheen] = GLASS[3]
     if v.se < 0.97:                                           # the far half of the rim, seen through the glass
         rim = V.full(V.edge(V.ell(bx, by, rx, ry)))
-        buf[rim & glass & V.full(V.YC < by)] = GLASS[1]
+        buf[rim & glass & V.full(V.YC < by) & ~blood] = GLASS[1]
         buf[rim & glass & V.full(V.YC >= by)] = GLASS[3]
         if v.ce > 0.15:
             top = V.full(V.edge(V.ell(tx, ty, rx, ry))) & V.full(V.YC >= ty)
@@ -134,4 +154,6 @@ def draw_all(buf, v, t):
             px, py = v.to(sx, sy, 0)
             sh = V.full(V.ell(px + 2, py + 2, S.R_OUT * v.s * 0.9, S.R_OUT * v.s * 0.9 * v.se))
             buf[sh & V.CHECK] = SKIN[1]
-        draw_cup(buf, v, t, sx, sy, zl + (drop if v.se < 0.9 else 0.0), grow=1.0 + (0.012 * drop if v.se > 0.9 else 0))
+        level = S.pool_d(T.POP - 1e-3, i) if (i == S.MAIN and t >= T.POP) else S.pool_d(t, i)
+        draw_cup(buf, v, t, sx, sy, zl + (drop if v.se < 0.9 else 0.0), grow=1.0 + (0.012 * drop if v.se > 0.9 else 0),
+                 level=level)

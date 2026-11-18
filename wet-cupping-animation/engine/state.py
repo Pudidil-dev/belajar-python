@@ -18,6 +18,8 @@ STEM_R, STEM_Z0, STEM_Z1 = 3.0, 34.6, 41.5    # the valve stem
 VCAP_R, VCAP_Z1 = 4.6, 43.6                   # the valve cap
 DEPTH = 22.0                                  # how deep the cross-section goes
 LAMBDA = 7.0                                  # how fast the upward pull fades with depth
+CUP_VOL = math.pi * R_IN ** 2 * (WALL_H + 2.0 / 3.0 * (CAP_H - 1.6))   # inside of a cup (mm^3, ~35 ml)
+FILL = 0.30                                   # the blood collected fills 30% of the cup
 
 
 def tapped(t, i):
@@ -72,11 +74,31 @@ def dome_h(t, i):
     return max(h, 0.0)
 
 
-def pool_d(t, i):
-    """Depth (mm) of the blood collected at the rim inside cup i."""
+def blood_frac(t, i):
+    """How much of cup i the collected blood fills (a fraction of the cup's volume)."""
     if i == MAIN:
-        return 4.6 * T.smooth(T.u_of(t, (T.LEAK[0] + 0.6, T.COLLECT[1])))
-    return 4.0 * T.smooth(T.u_of(t, (12.0, 17.0)))
+        return FILL * T.smooth(T.u_of(t, (T.LEAK[0] + 0.6, T.COLLECT[1])))
+    return FILL * T.smooth(T.u_of(t, (12.0, 17.0)))
+
+
+def level_for(vol, d):
+    """Height (mm, above the rim) of the surface of vol mm^3 of blood around a dome of height d.
+
+    The dome is d * (1 - r^2/R^2)^1.5 inside a cup of inner radius R. On a flat floor the blood would stand v high
+    (v = vol / (pi R^2)). Below the dome's top it fills a ring: v = 0.6 L (L/d)^(2/3). Once it covers the dome:
+    L = v + 0.4 d (the dome takes 0.4 pi R^2 d of the room). So when the skin sinks, the level drops with it."""
+    v = vol / (math.pi * R_IN ** 2)
+    if v <= 0.0:
+        return 0.0
+    if d < 1e-6 or v >= 0.6 * d:
+        return v + 0.4 * max(d, 0.0)
+    return (v * d ** (2.0 / 3.0) / 0.6) ** 0.6
+
+
+def pool_d(t, i):
+    """Height (mm, above the rim) of the surface of the blood collected in cup i. It rises past the top of the dome,
+    and drops a little when the air goes back in and the skin sinks."""
+    return level_for(blood_frac(t, i) * CUP_VOL, dome_h(t, i))
 
 
 def clot(t):

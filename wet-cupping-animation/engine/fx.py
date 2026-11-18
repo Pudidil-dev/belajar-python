@@ -51,11 +51,13 @@ def air_side(buf, v, t):
     if abs(v.ycut - sy) > 1.0:
         return
     zl = S.lift(t)
+    lev = S.pool_d(t, S.MAIN) if t < T.POP else S.pool_d(T.POP - 1e-3, S.MAIN)   # the air is above the blood
     ta = T.anim(t)
     n = int(round(len(SIDE_AIR) * S.air(t)))
     for k, (fx, fz, ph) in enumerate(SIDE_AIR[:n]):
         x = sx + fx * (S.R_IN - 1.5) + 0.6 * math.sin(ta * 1.1 + ph)
         h = float(S.dome_at(t, np.array(x), sy))
+        h = lev if t >= T.POP else max(h, lev)
         z_hi = S.WALL_H + S.CAP_H * math.sqrt(max(0.0, 1 - ((x - sx) / S.R_IN) ** 2)) - 2.0
         z = zl + h + 1.0 + fz * max(0.5, z_hi - h - 1.0) + 0.5 * math.cos(ta * 0.9 + ph)
         if t >= T.PSSSH and k >= int(round(len(SIDE_AIR) * S.air(T.PSSSH - 0.01))):

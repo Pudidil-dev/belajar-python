@@ -11,11 +11,12 @@ capillary through them, beads on the skin, runs down the dome and collects at th
 """
 import math
 import numpy as np
+from . import gfx
 from . import view as V
 from . import state as S
 from . import timeline as T
 from .back import half_width, wiped
-from .palette import EPI, DERMIS, FAT, MUSCLE, BLOOD, CLOT, VESSEL, MARK, OUTLINE, NAVY, PLASMA
+from .palette import EPI, DERMIS, FAT, MUSCLE, BLOOD, VESSEL, MARK, OUTLINE, NAVY, PLASMA
 
 PAP = 2.4                      # papilla spacing (mm)
 PLEX = -4.2                    # the small vessel along the bottom of the dermis
@@ -218,15 +219,9 @@ def paint_blood(buf, v, t):
     near = np.abs(X - sx) < S.R_IN
     h = np.broadcast_to(S.dome_at(t, v.X, v.ycut), (V.H, V.W))
     k_clot = S.clot(t)
-    pool_cols = (BLOOD[1], BLOOD[0], BLOOD[2]) if k_clot < 0.5 else (CLOT[1], CLOT[0], CLOT[2])
+    bay = gfx.BAYER[:V.H, :V.W]
     if t < T.POP:
         d = S.pool_d(t, S.MAIN)
-        if d > 0.05:
-            pool = near & (Z > h) & (Z < d)
-            buf[pool] = pool_cols[0]
-            buf[pool & (Z < 0.6)] = pool_cols[1]
-            wav = 0.12 * np.sin(X * 2.0 + T.anim(t) * 6.0)
-            buf[pool & (Z > d - 0.35 / max(v.s / 5, 1) + wav - 0.1)] = pool_cols[2]
         # the runs: once beads have rolled, a thin red film stays on the dome
         if t >= T.COLLECT[0] + 0.2:
             film = near & (Z > h) & (Z < h + max(0.25, 1.2 / v.s)) & (np.abs(X - sx) > 2.5) & \
@@ -243,6 +238,14 @@ def paint_blood(buf, v, t):
                 rb *= 1 - 0.4 * roll
             zp = float(S.dome_at(t, np.array(xp), v.ycut)) + rb * 0.75
             _bead(buf, v, xp, zp, rb)
+        # the collected blood, painted last: below its surface it covers the dome, the runs and the beads
+        if d > 0.05:
+            px1 = 1.0 / v.s                                   # one canvas pixel, in mm
+            pool = near & (Z > h) & (Z < d)
+            _pool_shade(buf, pool, Z < 0.35 * d, bay, k_clot)
+            buf[pool & (Z < h + max(0.25, 1.2 * px1))] = BLOOD[0]       # where it lies on the skin
+            wav = 0.12 * (1 - k_clot) * np.sin(X * 2.0 + T.anim(t) * 6.0)   # the surface stills as it thickens
+            buf[pool & (Z > d - 0.35 / max(v.s / 5, 1) + wav - 0.1)] = BLOOD[2]
     else:
         # the clot goes up with the cup; a little blood stays on the skin until the gauze wipes it
         lz = S.lift(t)
@@ -250,14 +253,22 @@ def paint_blood(buf, v, t):
         hp = np.broadcast_to(S.dome_at(T.POP - 1e-3, v.X, v.ycut), (V.H, V.W))
         Zc = Z - lz
         clotm = near & (Zc > hp) & (Zc < d)
-        buf[clotm] = CLOT[1]
-        buf[clotm & (Zc < 0.6)] = CLOT[0]
-        buf[clotm & (Zc > d - 0.45)] = CLOT[2]
+        _pool_shade(buf, clotm, Zc < 0.35 * d, bay, 1.0)
+        buf[clotm & (Zc < hp + max(0.25, 1.2 / v.s))] = BLOOD[0]
+        buf[clotm & (Zc > d - 0.45)] = BLOOD[2]
         for dx, _, rr in ((-5.0, 0, 0.7), (0.0, 0, 0.8), (5.0, 0, 0.7)):
             if wiped(t, sx + dx, sy):
                 continue
             zp = float(S.dome_at(t, np.array(sx + dx), v.ycut)) + rr * 0.6
             _bead(buf, v, sx + dx, zp, rr)
+
+
+def _pool_shade(buf, pool, lower, bay, k):
+    """The collected blood: plain red, darker toward the bottom; as it thickens (k 0..1) an ordered dither darkens
+    it a step. It stays a clear red throughout (no dark, "dirty" look)."""
+    buf[pool] = BLOOD[1]
+    buf[pool & (bay < 0.5 * k)] = BLOOD[0]
+    buf[pool & lower & (bay < 0.5 + 0.5 * k)] = BLOOD[0]
 
 
 def _bead(buf, v, x, z, r):
@@ -271,13 +282,18 @@ def _bead(buf, v, x, z, r):
 
 # ---------------------------------------------------------------- the micro-shot: cells in the collected blood
 _rng = np.random.default_rng(12)
-POOL_CELLS = [(_rng.uniform(-19.0, 19.0), _rng.uniform(0.2, 4.4), _rng.uniform(0, 6.28), _rng.uniform(0.6, 1.4))
-              for _ in range(260)]
+POOL_CELLS = [(_rng.uniform(-19.0, 19.0), _rng.uniform(0.0, 1.0), _rng.uniform(0, 6.28), _rng.uniform(0.6, 1.4))
+              for _ in range(800)]                       # (x offset, height as a fraction of the level, phase, speed)
+
+
+MICRO_S = (14.0, 26.0)        # camera scales (px/mm) over which the close-up look comes in
 
 
 def paint_pool_cells(buf, v, t):
-    """Red blood cells floating and tumbling in the collected blood (visible in the close-up)."""
-    if v.ZC is None or v.s < 20 or t >= T.POP:
+    """Red blood cells floating and tumbling in the collected blood (visible in the close-up). The cells appear from
+    MICRO_S[0] on; the plasma around them comes in through an ordered dither over MICRO_S, so zooming in or out never
+    switches the whole pool's colour in one frame."""
+    if v.ZC is None or v.s < MICRO_S[0] or t >= T.POP:
         return
     sx, sy = S.SPOTS[S.MAIN]
     d = S.pool_d(t, S.MAIN)
@@ -286,11 +302,16 @@ def paint_pool_cells(buf, v, t):
     Z = np.broadcast_to(v.ZC, (V.H, V.W))
     h = np.broadcast_to(S.dome_at(t, v.X, v.ycut), (V.H, V.W))
     pool = (np.abs(X - sx) < S.R_IN) & (Z > h) & (Z < d)
-    buf[pool] = PLASMA[0]
-    buf[pool & V.CHECK & (Z > d * 0.5)] = PLASMA[1]
+    k = T.clamp01((v.s - MICRO_S[0]) / (MICRO_S[1] - MICRO_S[0]))
+    plasma = pool & (gfx.BAYER[:V.H, :V.W] < k)
+    buf[plasma] = PLASMA[0]
+    buf[plasma & V.CHECK & (Z > d * 0.5)] = PLASMA[1]
     for (ox, oz, ph, sp) in POOL_CELLS:
         x = sx + ox + 0.25 * math.sin(ta * 0.9 * sp + ph)
-        z = oz + 0.18 * math.cos(ta * 0.7 * sp + ph * 1.3)
+        z = 0.2 + oz * (d - 0.35) + 0.18 * math.cos(ta * 0.7 * sp + ph * 1.3)
+        px, py = v.to(x, v.ycut, z)
+        if not (-20 < px < V.W + 20 and -20 < py < V.H + 20):
+            continue                                          # off screen
         hz = float(S.dome_at(t, np.array(x), v.ycut))
         if abs(x - sx) >= S.R_IN - 0.25 or z <= hz + 0.2 or z >= d - 0.15:
             continue

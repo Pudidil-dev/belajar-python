@@ -6,9 +6,9 @@ It shows the mechanics only. It makes no claim that cupping removes toxins or cu
 
 top view → the lancet taps four spots → clear cups drop on → the hand pump: PUMP, PUMP, WHOOSH, the skin rises → the
 camera tips down into a side cutaway → the skin domes up into the low-pressure cup → zoom into the capillaries and
-their red blood cells → a little blood leaves through a tiny opening → it collects at the rim inside the cup → a
-micro close-up of red blood cells in the collected blood → PSSSH, air back in → POP, the cup lifts straight up with
-the blood inside → the round reddish-purple mark → gauze wipes the left-over blood, the mark stays → zoom out and slide
+their red blood cells → blood leaves through the tiny openings → it collects in the cup until the cup is about a
+third full → a micro close-up of red blood cells in the collected blood → PSSSH, air back in → POP, the cup lifts
+straight up with the blood inside → the round reddish-purple mark → gauze wipes the left-over blood, the mark stays → zoom out and slide
 down the spine to the next, clean spots → loop.
 
 ![storyboard](docs/storyboard.png)
@@ -23,7 +23,7 @@ down the spine to the next, clean spots → loop.
   - a reddish-purple cupping mark.
   
   The art has bold silhouettes, stepped 1-px outlines, flat colours, at most a checker dither, and no gradients or 3D
-  models. There is no gore: the blood is a clean, friendly red, and only a little of it is shown.
+  models. There is no gore: the blood is a clean, friendly red with no splashes, and it stays inside the cup.
 - **Labels.** LANCET, VACUUM PUMP, LOW PRESSURE, EPIDERMIS, DERMIS, CAPILLARY, RED BLOOD CELLS, SKIN OPENING, AIR IN,
   CUPPING MARK.
   - They use a 5×7 pixel font at 1×: white with a dark outline, and no box.
@@ -161,11 +161,11 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | 7–9 | **Side cutaway.** The cup on the skin, cut in half: epidermis, dermis with its small vessels, fat and muscle. Inside the cup only a few air dots are left (low pressure), and the skin keeps rising into a dome. The pull fades with depth: the skin and dermis stretch most, the muscle hardly moves, and nothing is pulled out of the skin. The other cups are pumped meanwhile. | LOW PRESSURE · EPIDERMIS · DERMIS | a soft, low swell |
 | 9–11.6 | Zoom into the top of the dermis: a capillary loop rises into every papilla, and red blood cells move through the loops and along a small vessel below. The vessels widen a little and tiny spots of blood (petechiae) appear in the upper dermis. | CAPILLARY · RED BLOOD CELLS | a zoom whoosh, soft bubbly blips as the cells hop along |
 | 11.6–13 | The camera slides to one of the tiny openings: a little blood leaves a cut capillary through it and beads on the skin. | SKIN OPENING | soft plips as the beads form |
-| 13–15.5 | **Blood collects** (time-lapse ▶▶). The camera pulls back to the whole cup: beads grow, roll down the dome and collect in a pool at the rim inside the cup. The camera follows them into the cup. | | a soft whoosh, fast ticks, drips, BLOOP… BLOOP |
-| 15.5–18 | **Micro close-up** of the collected blood: red blood cells floating in plasma, beside the skin and the cup wall. The blood starts to thicken as it clots. Then the camera pulls back out to the whole cup. | RED BLOOD CELLS | a third BLOOP, a soft swirl, a whoosh back out |
-| 18–21 | **Removal.** A gloved hand opens the valve: PSSSH, air rushes back in and the dome sinks. The hand grips the cup and POP, the seal breaks. The cup lifts straight up and stays level, with the collected blood inside, and the camera follows it. | AIR IN | the valve, PSSSH, POP, a rising whoosh |
+| 13–15.5 | **Blood collects** (time-lapse ▶▶). The camera pulls back to the whole cup: beads grow and roll down the dome, and the blood rises inside the cup until it covers the dome and the cup is about a third full (30% of its volume). The camera follows it into the cup. | | a soft whoosh, fast ticks, drips, BLOOP… BLOOP |
+| 15.5–18 | **Micro close-up** of the collected blood: red blood cells floating in plasma, beside the skin and the cup wall. The cells emerge as the camera dives in and blend back into the red as it pulls out. The blood starts to thicken as it clots: a step darker, still plainly red. Then the camera pulls back out to the whole cup. | RED BLOOD CELLS | a third BLOOP, a soft swirl, a whoosh back out |
+| 18–21 | **Removal.** A gloved hand opens the valve: PSSSH, air rushes back in, the dome sinks and the blood level drops a little with it. The hand grips the cup and POP, the seal breaks. The cup lifts straight up and stays level, with the collected blood inside (about 30% of the cup), and the camera follows it. | AIR IN | the valve, PSSSH, POP, a rising whoosh |
 | 21–24 | The camera tips back up to an angled top view while the cut closes. Where the cup was, a round reddish-purple mark with a few left-over drops of blood. A gloved hand wipes them away with gauze in two strokes; the mark stays. | CUPPING MARK | a whoosh and a bell, SWIPE, SWIPE, a little sparkle when the skin is clean. The music's hook comes back. |
-| 24–26 | Zoom out: three cups still on, one mark. The camera slides down the spine to the next, clean set of four marked spots, framed exactly like the opening, and the lancet comes in again. Then the film loops. | | a zoom-out whoosh, a slide whoosh, the lancet coming in; the C7 turnaround and a tom fill lead back to the top |
+| 24–26 | Zoom out: three cups still on, each about a third full of blood, and one mark. The camera slides down the spine to the next, clean set of four marked spots, framed exactly like the opening, and the lancet comes in again. Then the film loops. | | a zoom-out whoosh, a slide whoosh, the lancet coming in; the C7 turnaround and a tom fill lead back to the top |
 
 ## The science (as drawn)
 
@@ -177,9 +177,13 @@ On Windows, use `py render.py` if `python` is not on PATH.
   dome, the fat moves less and the muscle hardly at all. Vessels stay inside the skin; they widen a little under the
   suction.
 - **The openings.** The lancet makes three tiny, shallow openings per spot, through the epidermis into the upper dermis,
-  where they cut a few capillaries. Under the low pressure a little blood comes out through them, beads on the skin,
-  runs down the dome and collects at the rim inside the cup. It is ordinary blood (red cells in plasma) that starts to
-  clot in the cup. It is not "toxins" or "dirty blood", and the film never says it is.
+  where they cut a few capillaries. Under the low pressure blood comes out through them, beads on the skin, runs down
+  the dome and collects in the cup. It is ordinary blood (red cells in plasma) that starts to clot in the cup. It is not
+  "toxins" or "dirty blood", and the film never says it is: it stays a normal red as it thickens.
+- **How much blood.** In this film the blood fills 30% of each cup's volume, about 10.5 ml of the 35 ml cup. How much
+  is collected in practice varies; the film makes no claim about it. The domed skin takes up room inside the cup, so
+  while the skin is pulled up the blood's surface stands at about 37% of the cup's height. When the air goes back in
+  and the skin sinks, the surface drops to about 31%, which is what the lifted cup holds.
 - **The mark.** The suction also breaks some tiny capillaries in the upper dermis. The small spots of blood they leave
   under the skin (petechiae) make the round reddish-purple mark, which stays after the skin is wiped clean and
   usually fades within about a week.
@@ -235,6 +239,11 @@ Sources checked (through web-search summaries in this session; the pages themsel
   - **The cups** are drawn exactly for any angle: the rim and wall ellipses, a band between them, an ellipsoid top and
     a steel valve. When the cut passes through the main cup, it switches to a cut-in-half profile with hatched glass
     walls.
+  - **The blood** is a volume: 30% of the cup. Its surface height follows from that volume and the dome under it (in
+    closed form), so it covers the dome while the skin is pulled up and drops when the air goes back in. Seen at an
+    angle, each cup shows the blood's surface as an ellipse and, below it, the band of blood behind the front wall. In
+    the close-up, the plasma around the cells comes in through an ordered dither as the camera zooms, so the pool never
+    changes colour in one frame.
   - **The loop** is built into the world. A second, identical set of spots sits 240 mm further down the spine, and the
     vertebrae's spacing (24 mm) divides that distance. So the last frame, framed on the second set, looks like the
     first.
@@ -281,12 +290,13 @@ Sources checked (through web-search summaries in this session; the pages themsel
   - `palette.py`, `gfx.py`, `pixfont.py`: the palette, the pixel toolkit (upscaling, dither), the bitmap font.
   - `view.py`: the 2.5D camera (top view, side view and any angle between, with the cut plane) and the pixel shape
     masks.
-  - `state.py`: where everything is at time t (the spots, cup heights, dome heights, pool depth, air left in the cup).
+  - `state.py`: where everything is at time t (the spots, cup heights, dome heights, how much blood each cup holds and
+    how high it stands, air left in the cup).
   - `back.py`: the back from above (spine, vertebrae, shoulder blades), the marker rings, openings, mark and left-over
     blood.
   - `tissue.py`: the cross-section (layers, vessels, capillary loops, petechiae, openings) and the blood (cells, beads,
     pool, clot).
-  - `cups.py`: the clear cups at any angle, and the cut-in-half profile.
+  - `cups.py`: the clear cups at any angle with the blood inside them, and the cut-in-half profile.
   - `tools.py`: the lancet pen, the hand pump and hose, the gauze, and the hand on the valve.
   - `fx.py`: the air dots, the tap sparks and the clean sparkle.
   - `captions.py`: the small labels that follow the objects, and the fast-forward mark.
