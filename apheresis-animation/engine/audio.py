@@ -7,7 +7,8 @@ Effects follow the one continuous camera: a soft pulse and a gentle flow on the 
 every zoom in and a falling one for every zoom out, sparkle tones in the stream, one tik for citrate holding
 calcium, the pump clicks (one per roller), the spin-up whirr and its steady tone, ticks as the layers separate, a
 plip for each drop that lands in the bag, the phase-switch clicks and the pump clicking backwards on RETURN, a soft
-"done" chime, the seal clicking shut, a shimmer as the bag lifts, an impact for the banner and a ting for each star.
+"done" chime, the seal clicking shut, a shimmer as the bag lifts, an impact for the shockwave and a ting for each
+big sparkle.
 Mastered to -14 LUFS with a -1 dBTP ceiling.
 """
 import math
@@ -135,7 +136,7 @@ def music():
                 drum_b.put(S.snare(0.7), t0, 0.24, -0.1)
             drum_b.put(S.hat(k % 4 == 3, 0.6), t0, 0.15 if k % 2 else 0.1, 0.3)
     # ---- the fanfare (original): F hit, Bb, C, a big F with a sparkle run, then a last "ta-da"
-    b0 = T.BANNER
+    b0 = T.BURST
     for t0, dur, chord in ((b0, 0.42, (77, 81, 84)), (b0 + 0.5, 0.22, (74, 77, 82)), (b0 + 0.75, 0.22, (76, 79, 84)),
                            (b0 + 1.0, 1.35, (77, 81, 84, 89)), (b0 + 2.5, 0.16, (79, 84, 88)),
                            (b0 + 2.7, 1.25, (77, 81, 84, 89))):
@@ -150,7 +151,7 @@ def music():
     for t0, g in ((b0, 0.75), (b0 + 1.0, 0.7), (b0 + 2.7, 0.75)):
         drum_b.put(S.kick(), t0, g)
         drum_b.put(S.crash(1.6), t0, 0.12, 0.2)
-    for k in range(4):                                         # a tom fill into the banner
+    for k in range(4):                                         # a tom fill into the shockwave
         drum_b.put(S.tom(50 - 3 * k), b0 - 0.5 + k * 0.125, 0.3)
     drum_b.put(S.crash(1.4), T.SEPARATE[0], 0.07, 0.2)
     echo = np.stack([S.echo(lead_b.x[0], 0.375, 0.3), S.echo(lead_b.x[1], 0.375, 0.3)])[:, :NL]
@@ -308,13 +309,13 @@ def sfx(info=True):
     bus.put(flow(T.RETURN[1] - T.RETURN[0] - 0.4, 71, 520), T.RETURN[0] + 0.3, 0.32, -0.2)
     for k, f_ in enumerate((1046.5, 1568.0)):
         bus.put(chime_note(f_, 0.5 if k else 0.3), T.DONE + k * 0.14, 0.14, -0.1 + 0.2 * k)
-    # ---- the finale: the seal clicks shut, the bag lifts, the banner lands, five stars
+    # ---- the finale: the seal clicks shut, the bag lifts, the shockwave, five big sparkles
     bus.put(click(5, 1800), T.SEAL, 1.0)
     bus.put(S.thump(240, 120, 0.08, 0.6, 4), T.SEAL, 0.3)
     bus.put(shimmer(True, T.LIFT[1] - T.LIFT[0] + 0.2, 500, 2600, 77), T.LIFT[0], 0.26)
-    bus.put(S.thump(120, 46, 0.4, 0.5, 9), T.BANNER, 0.55)
+    bus.put(S.thump(120, 46, 0.4, 0.5, 9), T.BURST, 0.55)
     for k, m in enumerate((84, 86, 89, 91, 93)):
-        bus.put(chime_note(S.mtof(m + 12), 0.35), T.BANNER + 0.35 + 0.14 * k, 0.2, -0.4 + 0.2 * k)
+        bus.put(chime_note(S.mtof(m + 12), 0.35), T.BURST + 0.35 + 0.14 * k, 0.2, -0.4 + 0.2 * k)
     return bus.x
 
 

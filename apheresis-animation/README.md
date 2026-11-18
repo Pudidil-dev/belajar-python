@@ -11,7 +11,7 @@ tubing and zooms in and out:
 - it follows the platelets up to their bag and pulls out wide while the rest of the blood goes back to the donor.
 
 The film ends on the result of the donation: the sealed platelet bag lifts off its hook and is shown like a
-**rare item** in a game.
+**rare item** in a game, with effects only and no text.
 
 The machine is a generic bedside apheresis console with no brand or logo. Its shape follows the common layout of
 real consoles: a wide, low cabinet with the pumps on a sloped front deck, the centrifuge under a round lid on top,
@@ -45,8 +45,9 @@ kamera tanpa potongan dan tanpa transisi**: kamera bergeser, zoom in dan zoom ou
 9. **46–49 dtk.** Kamera mundur lebar: layar berganti ke KEMBALI dan sisa darah (sel merah + plasma) kembali ke
    donor lewat selang yang sama. Lalu layar menunjukkan DONE.
 10. **49–56 dtk.** **Hasil donor:** kamera mendekat ke kantong trombosit. Selangnya disegel, kantong terangkat dari
-    gantungannya, lalu muncul seperti item langka di game: sinar berputar, kilauan, garis cahaya, banner "ITEM
-    LANGKA!" dengan lima bintang, dan nama itemnya, DONASI TROMBOSIT. Video selesai di sini (tidak berulang).
+    gantungannya, lalu tampil seperti item langka di game, hanya dengan efek visual tanpa tulisan: layar meredup,
+    sinar emas berputar, gelombang kejut dan semburan emas saat fanfare, lima kilauan besar, garis cahaya dan kilap
+    pada kantong. Video selesai di sini (tidak berulang).
 
 **Yang direvisi di versi ini:**
 - **Tanpa transisi:** lensa pembesar dihapus. Kamera benar-benar bergerak masuk dan keluar, dan detail halus (sel,
@@ -54,6 +55,7 @@ kamera tanpa potongan dan tanpa transisi**: kamera bergeser, zoom in dan zoom ou
 - **Antikoagulan:** sekarang bergabung dekat sisi jarum sebelum pompa, seperti di mesin sungguhan.
 - **Tidak berulang:** tidak lagi kembali ke awal. Video ditutup dengan hasil donor, yaitu kantong trombosit sebagai
   item langka.
+- **Penutup bersih:** tanpa caption atau banner, hanya efek visual.
 
 Tidak ada narasi dan tidak ada kotak caption, hanya label yang menempel pada bendanya. Default bahasa Inggris,
 `--lang id` untuk Bahasa Indonesia, `--clean` tanpa label sama sekali.
@@ -95,7 +97,7 @@ cd apheresis-animation
 Other versions (each writes its own file):
 
 ```bash
-python render.py --lang id      # labels and the rare-item banner in Bahasa Indonesia -> out/apheresis_ID.mp4
+python render.py --lang id      # labels in Bahasa Indonesia -> out/apheresis_ID.mp4
 python render.py --clean        # no labels -> out/apheresis_clean.mp4
 python render.py --assets       # key-frame sprites + cell sprite sheet -> assets/sprites/, audio stems -> assets/audio/
 ```
@@ -131,7 +133,7 @@ python render.py --scale 8                      # 2160x3840 (4K vertical) instea
 | 44–46 | The bag fills | Drops of platelet product fall in, each with a ripple, and the level rises. | a plip for each drop, a reward tone |
 | 46–49 | Wide: the return | The camera pulls out to the donor and the machine. The screen flips to RETURN, the pump turns the other way and the rest of the blood goes back along the same tube. Then the screen shows DONE. | the phase click, the pump clicking backwards, a soft "done" chime |
 | 49–52 | Push in on the bag | The camera pushes in on the platelet bag. The line is sealed with a click, and the bag lifts off its hook. | the seal click, a build-up, a shimmer as it lifts |
-| 52–56 | The rare item | The clinic dims and golden rays turn behind the bag. It glows, sparkles and bobs, and a shine sweeps across it. A RARE ITEM! banner drops in, five stars pop in one by one, and the name types in underneath: PLATELET DONATION / READY TO HELP A PATIENT. The film ends here. | an impact, an original fanfare (F, Bb, C, a big F, ta-da), a ting for each star |
+| 52–56 | The rare item (effects only, no text) | The clinic dims and golden rays turn behind the bag. On the fanfare hit the rays flare, a white and a gold shockwave ring push outward, and a burst of gold specks flies out. Five big sparkles flash around the bag one by one. The bag glows with a colour-cycling outline, bobs, and a shine sweeps across it. The film ends here. | an impact, an original fanfare (F, Bb, C, a big F, ta-da), a ting for each big sparkle |
 
 ## Labels (default; `--clean` removes them)
 
@@ -150,7 +152,8 @@ it on screen. The first line is white; the second is in the colour of the subjec
 | 33.6–38.8 | RED CELLS / HEAVIEST: OUTSIDE · PLATELETS / IN THE MIDDLE · PLASMA / LIGHTEST: INSIDE · PLATELETS / LEAVE HERE | SEL DARAH MERAH / PALING BERAT: LUAR · TROMBOSIT / DI TENGAH · PLASMA / PALING RINGAN: DALAM · TROMBOSIT / KELUAR DI SINI | the three layers and the platelet port |
 | 44.3–45.9 | PLATELETS / COLLECTED | TROMBOSIT / TERKUMPUL | the bag |
 | 46.8–48.9 | RETURN: RED CELLS + PLASMA / GO BACK TO THE DONOR | KEMBALI: SEL MERAH + PLASMA / MASUK LAGI KE DONOR | the needle site |
-| 52.0–56 | RARE ITEM! · PLATELET DONATION / READY TO HELP A PATIENT | ITEM LANGKA! · DONASI TROMBOSIT / SIAP MEMBANTU PASIEN | the banner and the name plate |
+
+The ending has no text at all: the rare-item moment is told with effects only.
 
 The machine screen also shows the phase: DRAW (arrow toward the machine), RETURN (arrow toward the donor) and, at
 the end, DONE with a check mark.
@@ -223,11 +226,13 @@ consoles (the reference photo in the request was one of them):
     inside. It squeezes flat under a pump roller.
   - The arm is built from tapered limbs, with a relaxed hand, a thumb, finger lines and a nail, plus two strips of
     tape.
-- The finale is a game-style reward:
+- The finale is a game-style reward in effects only, with no caption:
   - the clinic dims;
   - golden rays turn behind the bag, with twinkling sparkles;
-  - the bag has a glowing outline that cycles colours, a shine sweep and a gentle bob;
-  - the banner drops in with a bounce, and the stars pop.
+  - on the fanfare hit the rays flare, a white and a gold shockwave ring push outward, and a burst of gold specks
+    flies out;
+  - five big sparkles flash around the bag in time with the five tings;
+  - the bag has a glowing outline that cycles colours, a shine sweep and a gentle bob.
 - Palette:
   - dark navy #0D1B2A background;
   - off-white machine #EEF1F4;
@@ -265,7 +270,7 @@ The arrangement follows the journey:
 - ticks as the layers separate, a rising tone as the platelets leave;
 - a plip for each drop that lands in the bag, a reward tone;
 - the phase click, the pump clicking backwards, the return flow, a soft "done" chime;
-- the seal click, a shimmer as the bag lifts, an impact for the banner, a ting for each star;
+- the seal click, a shimmer as the bag lifts, an impact for the shockwave, a ting for each big sparkle;
 - tiny pops when a label appears (left out with `--clean`).
 
 All of it is synthesized from code and mastered to −14 LUFS with a −1 dBTP ceiling. The last chord fades out at the
@@ -286,7 +291,7 @@ very end.
 | `engine/scene.py` | Draws the clinic and the nested worlds at the camera's zoom, resolves them with the zoom-tied dither, the labels, and the rare-item finale. |
 | `engine/world.py` | The clinic: room, chair and donor silhouette, the arm and hand, the per-pixel tubing, and the machine: cabinet, deck, both pump heads, clamps, Y fitting, drip chamber, centrifuge lid, touchscreen, IV poles, bags. |
 | `engine/micro.py` | The finer worlds: biconcave red cells, platelets, white cells, the stream inside the tube, citrate and calcium, the separation channel. |
-| `engine/labels.py` | The explanation labels and the finale texts (English and Indonesian). |
+| `engine/labels.py` | The explanation labels (English and Indonesian). |
 | `engine/audio.py`, `engine/synth.py` | Music, fanfare and sound effects. |
 | `engine/pen.py`, `engine/gfx.py`, `engine/view.py`, `engine/palette.py`, `engine/pixfont.py` | Pixel helpers, camera (with a separate vertical scale for the tilt), palette, bitmap font. |
 
@@ -303,8 +308,8 @@ These checks ran on the code and on half-size previews:
 - **No jumps:** the largest change between two frames was measured on the preview. After the tilt over the
   centrifuge became its own 1.3 s camera move and the pull-outs were eased, no frame changes more than a normal fast
   camera move.
-- **Muted, phone-size check** (360×640 frames): the story reads without sound, and the labels and the finale banner
-  are readable at that size.
+- **Muted, phone-size check** (360×640 frames): the story reads without sound, the labels are readable at that
+  size, and the ending reads as a reward without any text.
 - **Determinism:** the same frames rendered twice are identical.
 - **Audio** (measured, not listened to): 56.000 s, 48 kHz stereo, −14.0 LUFS, true peak −1.15 dBTP; the last chord
   fades out, so the file ends in silence.

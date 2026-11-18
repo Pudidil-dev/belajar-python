@@ -51,7 +51,7 @@ TO_FINALE = (49.0, 50.8)
 FINALE = (50.8, 56.0)              # the donation is done: the platelet bag, sealed, as a rare item
 SEAL = 50.95
 LIFT = (51.2, 52.0)
-BANNER = 52.0
+BURST = 52.0                       # the fanfare hit: a shockwave and a burst of gold around the bag
 REWARD = 45.4                      # the bag is full enough: a small reward tone
 DONE = 49.0
 

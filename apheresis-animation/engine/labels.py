@@ -22,7 +22,6 @@ TEXT = {
         'bag': 'PLATELETS\nCOLLECTED', 'inbag': 'IN THE BAG:\nPLATELETS IN PLASMA',
         'ret_mix': 'GOING BACK:\nRED CELLS + PLASMA', 'ret_arm': 'BACK TO\nTHE DONOR',
         'collected': 'PLATELETS COLLECTED', 'returned': 'BLOOD RETURNED',
-        'rare': 'RARE ITEM!', 'item': 'PLATELET DONATION', 'item_sub': 'READY TO HELP A PATIENT',
     },
     'id': {
         'draw': 'AMBIL\nDARAH KE MESIN',
@@ -37,7 +36,6 @@ TEXT = {
         'bag': 'TROMBOSIT\nTERKUMPUL', 'inbag': 'ISI KANTONG:\nTROMBOSIT + PLASMA',
         'ret_mix': 'DIKEMBALIKAN:\nSEL MERAH + PLASMA', 'ret_arm': 'KEMBALI\nKE DONOR',
         'collected': 'TROMBOSIT TERKUMPUL', 'returned': 'DARAH DIKEMBALIKAN',
-        'rare': 'ITEM LANGKA!', 'item': 'DONASI TROMBOSIT', 'item_sub': 'SIAP MEMBANTU PASIEN',
     },
 }
 C_RED, C_GOLD, C_PLASMA, C_TEAL, C_MINT, C_ION = P.RED[5], P.GOLD[3], P.PLASMA[3], P.TEAL[3], P.MINT[3], P.ION[2]

@@ -9,7 +9,7 @@ As the camera closes in, the finer world resolves inside the coarser one through
 zoom, so the detail appears because the camera got closer, not because the picture changed.
 
 The film ends on the result of the donation: the sealed platelet bag lifts off its hook and is shown like a rare item
-in a game (light rays, sparkles, a glowing outline, a banner with stars, the item's name)."""
+in a game, in effects only (light rays, a shockwave and a burst of gold, sparkles, a glowing outline, a shine)."""
 import math
 import numpy as np
 from . import gfx, palette as P, pixfont
@@ -177,15 +177,27 @@ def _star(frame, cx, cy, s, col, hi):
                         frame[y, x] = hi if (j <= 2 and i in (3, 4)) else col
 
 
+def _sparkle(frame, x, y, size, col=None):
+    """A four-point pixel sparkle with short diagonal glints."""
+    x, y = int(round(x)), int(round(y))
+    for d in range(-size, size + 1):
+        for xx, yy in ((x + d, y), (x, y + d)):
+            if 0 <= xx < W and 0 <= yy < H:
+                frame[yy, xx] = P.WHITE if abs(d) <= max(1, size // 3) else (col or P.GOLD[3])
+    g = max(1, size // 3)
+    for d in range(1, g + 1):
+        for xx, yy in ((x + d, y + d), (x - d, y - d), (x + d, y - d), (x - d, y + d)):
+            if 0 <= xx < W and 0 <= yy < H:
+                frame[yy, xx] = P.GOLD[2]
+
+
 def finale(frame, t, view, lang='en'):
-    """The donation's result as a rare item: the bag lifts, rays turn behind it, sparkles, a banner, the name."""
+    """The donation's result as a rare item, in effects only (no text): the bag lifts, the clinic dims, rays turn
+    behind it, a shockwave and a burst of gold on the fanfare, sparkles, a glowing outline and a shine."""
     if t < T.LIFT[0]:
         if T.SEAL <= t < T.SEAL + 0.12:                                # a little glint as the seal clicks shut
             x, y = view.px(*T.path_point('plt', 0.955))
-            for dx, dy in ((0, 0), (2, 0), (-2, 0), (0, 2), (0, -2), (3, 0), (-3, 0), (0, 3), (0, -3)):
-                xx, yy = int(x + dx), int(y + dy)
-                if 0 <= xx < W and 0 <= yy < H:
-                    frame[yy, xx] = P.WHITE
+            _sparkle(frame, x, y, 3)
         return
     u = (t - T.LIFT[0]) / (T.LIFT[1] - T.LIFT[0])
     hx, hy = view.px(*T.BAG)
@@ -200,16 +212,41 @@ def finale(frame, t, view, lang='en'):
     if dim > 0:
         f = frame.astype(np.float32)
         frame[...] = (f + (np.asarray(P.NAVY[0], np.float32) - f) * dim).astype(np.uint8)
+    hit = max(0.0, 1 - (t - T.BURST) / 0.6) if t >= T.BURST else 0.0   # the fanfare hit: everything flares
     g = T.smooth((t - T.LIFT[0] - 0.25) / 0.5)                          # light rays turning behind the bag
+    dx, dy = _II - bx, _JJ - by
+    rr = np.hypot(dx, dy)
     if g > 0:
-        dx, dy = _II - bx, _JJ - by
-        rr = np.hypot(dx, dy)
-        ang = np.arctan2(dy, dx) + 0.35 * (t - T.LIFT[0])
+        ang = np.arctan2(dy, dx) + 0.35 * (t - T.LIFT[0]) + 0.6 * T.smooth((t - T.BURST) / 0.8)
         ray = ((ang * 14 / (2 * math.pi)) % 1.0) < 0.5
         reach = 300.0 * g
         fade = 1 - rr / max(reach, 1)
-        frame[ray & (rr < reach) & (_BAYER < fade * 0.42)] = P.GOLD[1]
-        frame[(rr < 46 * g) & (_BAYER < 0.5 * (1 - rr / (46 * g + 1e-6)))] = P.GOLD[2]
+        frame[ray & (rr < reach) & (_BAYER < fade * (0.42 + 0.3 * hit))] = P.GOLD[1]
+        frame[(rr < (46 + 30 * hit) * g) & (_BAYER < 0.5 * (1 - rr / ((46 + 30 * hit) * g + 1e-6)))] = P.GOLD[2]
+    if t >= T.BURST:                                                   # shockwaves and a burst of gold
+        for delay, width, col in ((0.0, 3.0, P.WHITE), (0.12, 2.0, P.GOLD[3])):
+            v = (t - T.BURST - delay) / 0.7
+            if 0 <= v < 1:
+                r0 = 24 + 280 * (1 - (1 - v) ** 3)
+                ring = (np.abs(rr - r0) < width) & (_BAYER < 1 - v)
+                frame[ring] = col
+        rng = np.random.default_rng(21)
+        age = t - T.BURST
+        for k in range(28):
+            a = rng.uniform(0, 2 * math.pi)
+            sp = rng.uniform(150, 280)
+            life = rng.uniform(0.7, 1.1)
+            if age >= life:
+                continue
+            d = sp * (1 - math.exp(-age * 2.6)) / 2.6
+            px_, py_ = int(bx + d * math.cos(a)), int(by + d * math.sin(a) + 40 * age * age)
+            if (_BAYER[min(max(py_, 0), H - 1), min(max(px_, 0), W - 1)] > 1 - age / life):
+                continue
+            col = (P.GOLD[3], P.WHITE, P.GOLD[2])[k % 3]
+            for oy in (0, 1):
+                for ox in (0, 1):
+                    if 0 <= px_ + ox < W and 0 <= py_ + oy < H:
+                        frame[py_ + oy, px_ + ox] = col
     rng = np.random.default_rng(3)                                      # twinkling sparkles
     for k in range(18):
         a = rng.uniform(0, 2 * math.pi)
@@ -219,16 +256,13 @@ def finale(frame, t, view, lang='en'):
         if t - T.LIFT[0] < 0.3 or life > 0.6:
             continue
         sz = int(round(3 * math.sin(math.pi * life / 0.6)))
-        sx, sy = int(bx + rad * math.cos(a)), int(by + rad * math.sin(a) * 1.1)
-        for d in range(-sz, sz + 1):
-            for xx, yy in ((sx + d, sy), (sx, sy + d)):
-                if 0 <= xx < W and 0 <= yy < H:
-                    frame[yy, xx] = P.WHITE if d == 0 else P.GOLD[3]
+        if sz > 0:
+            _sparkle(frame, bx + rad * math.cos(a), by + rad * math.sin(a) * 1.1, sz)
     spr, m = _bag_sprite(t, bx, by, zb)                                 # the bag, with a glowing outline
-    halo = _dilate(m, 3) & ~_dilate(m, 1)
-    frame[halo & (_BAYER < 0.5)] = P.GOLD[2]
+    halo = _dilate(m, 3 + int(2 * hit)) & ~_dilate(m, 1)
+    frame[halo & (_BAYER < 0.5 + 0.4 * hit)] = P.GOLD[2]
     ring = _dilate(m, 1) & ~m
-    frame[ring] = (P.WHITE, P.GOLD[3], P.GOLD[2])[int(t * 15) % 3]
+    frame[ring] = P.WHITE if hit > 0.7 else (P.WHITE, P.GOLD[3], P.GOLD[2])[int(t * 15) % 3]
     frame[m] = spr[m]
     ph = ((t - T.LIFT[0]) % 1.4) / 1.4                                  # a shine sweeping across it
     if ph < 0.4:
@@ -236,28 +270,15 @@ def finale(frame, t, view, lang='en'):
         if len(ii):
             span = (ii.max() - ii.min()) + (jj.max() - jj.min())
             pos = ii.min() + jj.min() + span * ph / 0.4
-            band = m & (np.abs((_II + _JJ) - pos) < 2.5)
-            frame[band] = P.WHITE
-    if t < T.BANNER:
-        return
-    v = (t - T.BANNER) / 0.45                                           # the banner drops in with a bounce
-    y0 = -70 + (36 + 70) * _ease_back(v)
-    _plate(frame, 22, y0, W - 22, y0 + 62, P.GOLD[2], P.GOLD[1])
-    _text(frame, LB.TEXT[lang]['rare'], W / 2, y0 + 9, P.GOLD[3], scale=2)
-    for k in range(5):                                                  # five stars pop in, one by one
-        ts = T.BANNER + 0.35 + 0.14 * k
-        if t >= ts:
-            big = 2 if t < ts + 0.08 else 1
-            _star(frame, W / 2 + (k - 2) * 22, y0 + 44, big, P.GOLD[3], P.WHITE)
-    if t >= T.BANNER + 1.1:                                             # the item's name types in under the bag
-        n = int((t - T.BANNER - 1.1) * 40) + 1
-        name, sub = LB.TEXT[lang]['item'], LB.TEXT[lang]['item_sub']
-        w = max(pixfont.text_size(name)[0], pixfont.text_size(sub)[0])
-        y1 = 352
-        _plate(frame, W / 2 - w / 2 - 9, y1, W / 2 + w / 2 + 9, y1 + 34, P.GOLD[2])
-        _text(frame, name[:n], W / 2, y1 + 8, P.WHITE)
-        if n > len(name):
-            _text(frame, sub[:n - len(name)], W / 2, y1 + 19, P.GOLD[3])
+            frame[m & (np.abs((_II + _JJ) - pos) < 2.5)] = P.WHITE
+    for k in range(5):                                                  # five big sparkles, one per star ting
+        ts = T.BURST + 0.35 + 0.14 * k
+        v = (t - ts) / 0.4
+        if 0 <= v < 1:
+            a = math.radians(-150 + 30 * k)
+            size = int(round(8 * math.sin(math.pi * v)))
+            if size > 0:
+                _sparkle(frame, bx + 104 * math.cos(a), by + 112 * math.sin(a), size)
 
 
 # ------------------------------------------------------------------ the frame
