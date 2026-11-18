@@ -14,9 +14,12 @@ TOTAL = 26.0
 
 # ---- 1. top-view hook
 LANCET_IN = (-0.5, 0.35)   # the lancet is already coming in at t = 0 (the loop needs the motion to continue)
-TAPS = (0.5, 0.85, 1.2, 1.55)   # "tik" on the four marked spots
+TAPS = (0.375, 0.75, 1.125, 1.5)   # "tik" on the four marked spots: every three 16ths, in rests of the hook melody
+HOP = (0.02, 0.07)         # the camera hops toward the next spot from just after a tap to just before the next one
+PULL = (1.58, 1.98)        # then pulls back to frame all four cups
 LANCET_OUT = (1.65, 2.05)
-CUPS = (1.95, 2.3, 2.65, 3.0)   # four cups drop onto the spots
+CUP_LAND = (2.125, 2.375, 2.625, 2.875)        # the cups land one after another, between the melody's notes
+CUPS = tuple(c - 0.12 for c in CUP_LAND)       # (the middle of each cup's fall)
 PUMP_IN = (3.0, 3.45)
 HOSE_CLICK = 3.5           # the hose clicks onto the main cup's valve
 # ---- 2. the vacuum pump

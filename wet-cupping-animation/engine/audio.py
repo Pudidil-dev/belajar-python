@@ -455,8 +455,8 @@ def seq(s):
 
 
 LEAD = {
-    0: seq('A5 -  C6 -  F6 .  C6 -  E6 -  D6 C6 G5 -  C6 -'),    # the hook, between the lancet's "tik"s
-    1: seq('D6 -  F6 -  A6 .  F6 -  D6 -  C6 Bb5 .  .  A5 -'),   # the cups drop in; the hose clicks on (3.5)
+    0: seq('A5 -  C6 .  F6 -  .  C6 E6 .  D6 C6 .  G5 C6 -'),    # the hook; the lancet's "tik"s fill its four rests
+    1: seq('D6 .  F6 .  A6 .  F6 .  D6 -  C6 Bb5 .  .  A5 -'),   # a cup lands after each note; the hose clicks (3.5)
     2: seq('.  .  A5 .  .  .  C6 .  .  .  .  .  .  E6 G6 -'),    # a step up after each squeeze (off the squeezes)
     3: seq('F6 -  D6 -  Bb5 - F5 -  G5 -  C6 -  E6 -  G6 -'),    # the camera tips over into the cutaway
     4: seq('F5 -  -  -  A5 -  -  -  E5 -  -  -  C6 -  -  -'),    # low pressure: the skin rises (soft)
@@ -485,6 +485,7 @@ CHORD = {'F': (41, (0, 4, 7)), 'C': (48, (0, 4, 7)), 'Dm': (38, (0, 3, 7)), 'Bb'
 BARS = [('F', 'C'), ('Dm', 'Bb'), ('F', 'C'), ('Bb', 'C'), ('Dm', 'Am'), ('Bb', 'F'), ('Gm', 'C'), ('F', 'Dm'),
         ('Bb', 'C'), ('F', 'C'), ('Dm', 'Bb'), ('F', 'C'), ('Bb', 'C7')]
 N_BARS = len(BARS)
+TAP_STEPS = tuple(int(round(t0 / STEP)) for t0 in T.TAPS)    # the 16ths of bar 0 the lancet taps on (3, 6, 9, 12)
 assert N_BARS * T.BAR == T.TOTAL
 
 
@@ -496,6 +497,8 @@ def _bass(b, half, root):
     base = 8 * half
     if b in (B_LOW, B_MICRO):
         return [(base, 3.6, root, 0.26), (base + 4, 1.6, root + 7, 0.2), (base + 6, 1.6, root + 12, 0.2)]
+    if b == 1 and half == 0:                # short notes: the cups land between them
+        return [(base + 2 * k, 0.9, root + iv, 0.28) for k, iv in enumerate((0, 12, 7, 12))]
     if b == B_PUMP:                         # answers each squeeze on the off-beat; quiet under the whoosh
         if half == 0:
             return [(2, 0.9, root, 0.32), (6, 0.9, root + 12, 0.24)]
@@ -544,6 +547,8 @@ def music():
                                 -0.5)
             elif not (b == B_POP and half == 0) and b != B_PUMP:      # the pump bar: room for the effects
                 for k in range(4):
+                    if (b == 0 and base + 2 * k in TAP_STEPS) or (b == 1 and half == 0):
+                        continue                                       # room for the "tik"s and the cups
                     arp_bus.put(chip_arp(tones[k], STEP * 1.6, 0.25), bar_t(b, base + 2 * k), 0.035, -0.45)
     for b in SOFT_BARS:
         for half in (0, 1):
@@ -573,6 +578,8 @@ def music():
                 drum_bus.put(Sn, t0 + k * STEP, g, 0.08)
             continue
         kicks, snares = [0, 8, 10], [4, 12]
+        if b in (0, 1):
+            snares = [4]                                     # beat 4 belongs to the last "tik" / the hose click
         for k in kicks:
             drum_bus.put(K, t0 + k * STEP, 0.4)
         for k in snares:
@@ -582,6 +589,8 @@ def music():
             st = k if busy else 2 * k
             if b == B_TURN and st >= 12:
                 continue
+            if (b == 0 and st in TAP_STEPS) or (b == 1 and st == 12):
+                continue                                     # out of the way of the "tik"s and the hose click
             drum_bus.put(Hc, t0 + st * STEP, 0.09 if st % 4 == 2 else 0.045, 0.3)
         if b in (1, B_LEAK):
             drum_bus.put(Ho, t0 + 14 * STEP, 0.06, 0.3)
@@ -739,8 +748,8 @@ def sfx_forward():
     for i, t0 in enumerate(T.CUPS):
         land = t0 + 0.12
         bus.put(glide(1300, 800, 0.22, 0.0, 0.25), t0 - 0.12, 0.008, -0.2 + 0.15 * i)
-        bus.put(thump(160, 80, 0.18, 0.4, 30 + i), land, 0.09, -0.2 + 0.15 * i)
-        bus.put(glass_ping((2093, 2349, 2637, 3136)[i], 0.3, 34 + i), land + 0.004, 0.05, -0.2 + 0.15 * i)
+        bus.put(thump(160, 80, 0.18, 0.4, 30 + i), land, 0.13, -0.2 + 0.15 * i)
+        bus.put(glass_ping((2093, 2349, 2637, 3136)[i], 0.3, 34 + i), land + 0.004, 0.07, -0.2 + 0.15 * i)
         bus.put(blip(mtof((77, 81, 84, 89)[i]), mtof((89, 93, 96, 101)[i]), 0.06, 0.5), land + 0.02, 0.025)
     # the pump slides in and its hose clicks onto the valve
     bus.put(whoosh(T.PUMP_IN[1] - T.PUMP_IN[0], 500, 1300, 40, 0.8, 0.6), T.PUMP_IN[0], 0.04, 0.3)

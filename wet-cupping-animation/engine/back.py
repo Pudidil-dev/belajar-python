@@ -10,7 +10,7 @@ import numpy as np
 from . import view as V
 from . import state as S
 from . import timeline as T
-from .palette import SKIN, BLOOD, MARK, MARKER, TABLE, GAUZE
+from .palette import SKIN, BLOOD, MARK, MARKER, TABLE, GAUZE, WHITE
 
 
 FAR = 270.0        # the far end of the back (toward the head): a straight edge, past the top of every shot
@@ -123,7 +123,10 @@ def _spot(buf, v, t, sk, X, Y, sx, sy, i, first):
             buf[pet] = MARK[0]
     # the marker ring on the chosen spot and the tiny openings
     if not main_off:
-        buf[near & (r > 2.3) & (r < 3.3)] = MARKER
+        if first and 0 <= t - T.TAPS[i] < 0.1:
+            buf[near & (r > 2.6) & (r < 4.2)] = WHITE          # it flashes when the lancet taps it
+        else:
+            buf[near & (r > 2.3) & (r < 3.3)] = MARKER
     if first and S.tapped(t, i):
         for dx in S.PUNCT:
             buf[near & ((X - sx - dx) ** 2 + (Y - sy) ** 2 < 0.55 ** 2)] = BLOOD[0]

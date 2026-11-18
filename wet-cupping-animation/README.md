@@ -32,19 +32,22 @@ down the spine to the next, clean spots → loop.
   - Each types itself in quickly and disappears when its moment is over.
   - A small ▶▶ mark in the top-right corner shows when time is sped up.
 - **Camera.** One continuous camera, with no cuts and no fades:
-  - it holds the top view for the lancet and the cups, then leans in on the pump;
+  - it starts close and hops from spot to spot with the lancet, pulls back as the four cups land one after another,
+    then leans in on the pump;
   - it tips down to a side view while the near half of the back is sliced away (the x-ray-style cutaway);
   - it zooms into the capillaries, slides to an opening, pulls back, follows the blood into the cup and dives into it;
   - it follows the cup up, then tips back up to an angled view of the mark;
   - finally it zooms out and slides down the spine.
   
-  It scrolls in whole pixels and every move is eased.
+  It scrolls in whole pixels and every move is eased. Impacts get a small screen shake, 8-bit style: each tap, each
+  cup landing, each pump and the pop.
 - **Loop.** The end frames a second, clean set of four marked spots exactly like the opening, and the lancet comes in
   again. The back's pattern repeats every 240 mm along the spine, so this set looks just like the first. The first
   set's mark and three cups are still on the back: they leave the picture by scrolling out of frame and never vanish
   on screen.
-  - The last frame matches the first on 99.8% of its pixels (mean difference 0.2/255), and the last two frames still
-    differ, so the picture never freezes. There is no fade, no freeze and no jump.
+  - The lancet is already moving across the loop point, so the last frame differs from the first only as much as
+    any two neighbouring frames do (0.36/255 on average, 99.6% of pixels identical): no visible seam, no freeze, no
+    fade and no jump.
   - The music's last bar (a C7 turnaround with a tom fill) resolves into the first, and every echo and reverb tail
     wraps onto the start, so the sound loops seamlessly too.
   - `python render.py --loops 3` also writes the loop three times back to back (78 s), to check the join.
@@ -154,8 +157,8 @@ On Windows, use `py render.py` if `python` is not on PATH.
 
 | Time | Picture | Labels | Sound |
 |---|---|---|---|
-| 0–2 | **The hook, from above.** A patient lies face down; four spots on the back are marked with small rings. A gloved hand brings in a lancet pen and taps each spot. Each tap leaves three tiny openings and a little spark. | LANCET | TIK on every tap (a click and a high blip), the lancet whooshing in and out |
-| 2–4 | Four clear cups drop onto the spots one by one, with a small bounce. The hand pump slides in and its clear hose clicks onto the valve of the main cup (upper right). | VACUUM PUMP | a glass "tunk" and a rising blip per cup, the hose CLICK |
+| 0–2 | **The hook, from above.** A patient lies face down; four spots on the back are marked with small rings. The lancet pen, in a gloved hand, is already in the first frame. The camera starts close and hops from spot to spot with it. Every 0.375 s it taps a spot: the ring flashes white, an 8-bit impact star bursts out, the screen shakes a little, and three tiny openings appear. | LANCET | TIK on every tap (a click and a high blip), each one in a rest of the hook melody; the lancet whooshing in and out |
+| 2–4 | The camera pulls back and four clear cups land on the spots one after another, every 0.25 s between the melody's notes, each with a small bounce, a ring of dust and a screen shake. The hand pump slides in and its clear hose clicks onto the valve of the main cup (upper right). | VACUUM PUMP | a glass "tunk" and a rising blip per cup, the hose CLICK on beat 4 |
 | 4–5.7 | **The pump.** Three squeezes: air dots leave the cup through the hose, the gauge needle swings over, and with each squeeze the skin inside the cup rises a step. The WHOOSH as the suction settles; the hose comes off and the pump leaves. | | PUMP, PUMP, PUMP, then WHOOSH. The music plays stop-time here: the band rests on the squeezes and answers between them. |
 | 5.7–7 | The camera tips from top-down to side-on while the near half of the back is sliced away at the main cup, revealing the cross-section. | | a whoosh, a scan sweep, a glass ping when the slice is done |
 | 7–9 | **Side cutaway.** The cup on the skin, cut in half: epidermis, dermis with its small vessels, fat and muscle. Inside the cup only a few air dots are left (low pressure), and the skin keeps rising into a dome. The pull fades with depth: the skin and dermis stretch most, the muscle hardly moves, and nothing is pulled out of the skin. The other cups are pumped meanwhile. | LOW PRESSURE · EPIDERMIS · DERMIS | a soft, low swell |
@@ -250,19 +253,26 @@ Sources checked (through web-search summaries in this session; the pages themsel
 - **Sound** (`engine/audio.py`). Everything is synthesized, with no samples.
   - **Chip voices:** band-limited pulse waves, an NES-style triangle bass, LFSR noise drums, echo and FM bells.
   - **Music:** 120 BPM in F major, 13 bars. Bar by bar:
-    - a square-wave hook (A5 C6 F6 C6 | E6 D6 C6 G5) opens the loop;
-    - the cups drop in on a rising line;
+    - a square-wave hook (A5 C6 F6 C6 | E6 D6 C6 G5) opens the loop, with four rests that the lancet's TIKs fill;
+    - the cups land between the short notes of a rising line;
     - the pump bar is a stop-time break that answers each squeeze with a step up;
     - soft bars for the low pressure and the micro close-up, and bouncy staccato for the cells;
     - the melody rests for the psssh and the pop;
     - the hook comes back over the wipe;
     - a C7 turnaround with a tom fill leads back into the top.
-  - **Space for the key moments.** The music drops out under the three PUMPs and the WHOOSH and leaves the stage to
-    the PSSSH and the POP. It dips under the TIKs, BLOOPs and SWIPEs. Measured per frequency band against the music
-    as you hear it, every effect is louder than the music in its own loudest band:
+  - **Space for the key moments.** The score leaves room for the effects:
+    - the hook melody rests on each TIK, the bass and arpeggio step aside for the cup landings, and beat 4 belongs to
+      the hose CLICK;
+    - the music drops out under the three PUMPs and the WHOOSH and leaves the stage to the PSSSH and the POP;
+    - it dips under the BLOOPs and SWIPEs.
+    
+    Measured per frequency band against the music as you hear it, every effect is louder than the music where it is
+    loudest:
     - the pumps, the whoosh, the psssh and the pop by about 19 dB or more;
+    - the cup landings by about 25 dB;
     - the bloops by 15–21 dB;
-    - the short, high tiks and swipes by 3–15 dB (the first tik, on the hook's top note, is the closest call).
+    - the tiks by 10–19 dB;
+    - the swipes by 4–9 dB.
   - **Effects:** TIK, glass "tunk", CLICK, PUMP, WHOOSH, soft drips and plips, BLOOP, PSSSH, POP, SWIPE, the sparkle
     when the skin is clean, and camera whooshes. All of them run on the picture's clock.
   - **Loudness:** the mix is −14 LUFS with true peak below −1 dBTP.

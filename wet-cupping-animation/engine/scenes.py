@@ -1,6 +1,7 @@
 """What is on screen at time t: one 2.5D camera over the back, and everything drawn in order.
 
-The camera never cuts. It holds the top view while the lancet taps and the cups go on, leans in on the pump, tips
+The camera never cuts. It starts close and hops from spot to spot with the lancet, pulls back as the cups drop on the
+beat, leans in on the pump, tips
 down to a side view while the near part of the back is sliced away, zooms into the capillaries and an opening, pulls
 back while blood collects, dives into the collected blood, follows the cup up, tips back up to an angled view of the
 mark, then pulls out and slides down the spine to the next clean set of spots, framed exactly like the opening.
@@ -24,7 +25,46 @@ FOLW = (X0 + 13.0, Y0, 3.0, 9.0, 0.0)
 MICRO = (X0 + 16.6, Y0, 2.6, 52.0, 0.0)
 ANG = (X0, Y0 + 3.0, 0.0, 3.0, 58.0)
 WIDE = (0.0, 12.0, 0.0, 1.05, 90.0)
-K2 = (0.0, 110.0 - T.P, 0.0, 2.0, 90.0)
+TAP_S = 2.6                                   # closer than the cups' framing while the lancet taps
+# screen shake on impacts: (time, amplitude in canvas pixels, duration)
+SHAKES = [(t0, 2.0, 0.12) for t0 in T.TAPS] + [(c, 2.0, 0.15) for c in T.CUP_LAND] + \
+    [(p, 1.0, 0.10) for p in T.PUMPS] + [(T.POP, 2.0, 0.14)]
+_SHAKE = ((1, 0), (-1, 1), (1, -1), (-1, 0), (0, 1), (1, 1), (0, -1))
+
+
+TAP_FOLLOW = 0.42                             # how far toward the tapped spot the camera goes (0 = stay in the middle)
+
+
+def _tap_frame(i):
+    """Where the camera looks while the lancet taps spot i: part of the way from the middle of the spots toward it."""
+    sx, sy = S.SPOTS[i]
+    return TAP_FOLLOW * sx, 110.0 + TAP_FOLLOW * (sy - 110.0)
+
+
+def _tap_cam(tau, dy=0.0):
+    """The camera during the taps (tau: time in the loop; dy moves it to the second set of spots for the loop's end).
+    It holds on a spot while the lancet presses, then hops toward the next one, eased, before the next tap."""
+    x, y = _tap_frame(0)
+    for k in range(1, len(T.TAPS)):
+        u = T.u_of(tau, (T.TAPS[k - 1] + T.HOP[0], T.TAPS[k] - T.HOP[1]))
+        if u <= 0:
+            break
+        (x0, y0), (x1, y1) = _tap_frame(k - 1), _tap_frame(k)
+        e_ = T.smooth(u)
+        x, y = T.lerp(x0, x1, e_), T.lerp(y0, y1, e_)
+    return (x, y + dy, 0.0, TAP_S, 90.0)
+
+
+def shake(t):
+    """Canvas-pixel offset of the screen shake at time t (a new offset every 1/30 s, dying away)."""
+    dx = dy = 0.0
+    for t0, amp, dur in SHAKES:
+        u = (t - t0) / dur
+        if 0 <= u < 1:
+            ox, oy = _SHAKE[int((t - t0) * 30) % len(_SHAKE)]
+            dx += ox * amp * (1 - u)
+            dy += oy * amp * (1 - u)
+    return int(round(dx)), int(round(dy))
 
 
 def _vessel_cam(t):
@@ -42,8 +82,10 @@ def _mix(a, b, k):
 
 
 def camera(t):
+    if t < T.PULL[0]:
+        return _tap_cam(t)
     if t < 3.9:
-        return K0
+        return _mix(_tap_cam(t), K0, T.ease_in_out(T.u_of(t, T.PULL), 2.0))
     if t < T.TILT_DOWN[0]:
         return _mix(K0, PUMPK, T.ease_in_out(T.u_of(t, (3.9, 4.5)), 2.0))
     if t < 7.0:
@@ -75,7 +117,7 @@ def camera(t):
         return c[:2] + (T.lerp(a[2], b[2], T.ease_out(u, 2.5)),) + c[3:4] + (T.lerp(a[4], b[4], T.ease_in_out(u, 1.6)),)
     if t < T.TO_NEXT[0]:
         return _mix(ANG, WIDE, T.ease_in_out(T.u_of(t, T.ZOOM_OUT), 2.0))
-    return _mix(WIDE, K2, T.ease_in_out(T.u_of(t, T.TO_NEXT), 2.0))
+    return _mix(WIDE, _tap_cam(t - T.TOTAL, -T.P), T.ease_in_out(T.u_of(t, T.TO_NEXT), 2.0))
 
 
 def cut_plane(t, cam):
@@ -97,7 +139,15 @@ def frame(t):
     cam = camera(t)
     ycut = cut_plane(t, cam)
     cx, cy, cz, s, e = cam
-    cx, cy = round(cx * s) / s, cy                     # whole-pixel scrolling across
+    cx = round(cx * s) / s                             # whole-pixel scrolling across
+    kx, ky = shake(t)
+    if kx or ky:
+        se_, ce_ = math.sin(math.radians(e)), math.cos(math.radians(e))
+        cx += kx / s
+        if se_ > 0.5:
+            cy += ky / (s * se_)
+        else:
+            cz += ky / (s * ce_)
     v = V.View(cx, cy, cz, s, e, ycut)
     buf = np.empty((H, W, 3), np.uint8)
     buf[:] = NAVY[3]
@@ -111,6 +161,7 @@ def frame(t):
     fx.air_side(buf, v, t)
     fx.air_top(buf, v, t)
     cups.draw_all(buf, v, t)
+    fx.dust(buf, v, t)
     tools.draw_pump(buf, v, t)
     tools.draw_lancet(buf, v, t)
     tools.draw_gauze(buf, v, t)

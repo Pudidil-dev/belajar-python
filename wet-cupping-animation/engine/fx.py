@@ -9,7 +9,7 @@ from . import view as V
 from . import state as S
 from . import timeline as T
 from .tools import lancet_state, hose_points
-from .palette import AIR, WHITE, GLASS
+from .palette import AIR, WHITE, GLASS, SKIN
 
 _rng = np.random.default_rng(4)
 TOP_AIR = [(_rng.uniform(0, 2 * math.pi), math.sqrt(_rng.uniform(0.02, 1.0)) * (S.R_IN - 2.0), _rng.uniform(0, 6.28))
@@ -68,18 +68,30 @@ def air_side(buf, v, t):
         V.dot(buf, px, py, AIR, 2 if v.s > 6 else 1)
 
 
+def _burst(buf, px, py, u):
+    """An 8-bit impact star: eight short rays fly out from just outside the tapped ring and thin away (the diagonals
+    go first)."""
+    r0, r1 = 9.0 + 6.0 * u, 13.0 + 10.0 * u
+    size = 2 if u < 0.5 else 1
+    for k in range(8):
+        if k % 2 and u > 0.5:
+            continue
+        a = k * math.pi / 4
+        r = r0
+        while r < r1:
+            V.dot(buf, px + math.cos(a) * r, py - math.sin(a) * r, WHITE, size)
+            r += 1.0
+
+
 def sparks(buf, v, t):
-    """A tiny white spark where the lancet touches; a sparkle on the clean skin."""
+    """An impact star where the lancet taps; a sparkle on the clean skin."""
     for tau, spots in ((t, S.SPOTS), (t - T.TOTAL, S.SPOTS2)):
         for i, t0 in enumerate(T.TAPS):
-            u = (tau - t0) / 0.12
+            u = (tau - t0) / 0.16
             if 0 <= u < 1:
                 sx, sy = spots[i]
                 px, py = v.to(sx, sy, 0)
-                n = 2 if u < 0.5 else 1
-                for k in range(1, n + 1):
-                    for dx, dy in ((k + 1, 0), (-k - 1, 0), (0, k + 1), (0, -k - 1)):
-                        V.dot(buf, px + dx, py + dy, WHITE)
+                _burst(buf, px, py, u)
     u = (t - T.CLEAN) / 0.5
     if 0 <= u < 1 and v.se > 0.5:
         sx, sy = S.SPOTS[S.MAIN]
@@ -92,3 +104,19 @@ def sparks(buf, v, t):
                     for ex, ey in ((k, 0), (-k, 0), (0, k), (0, -k)):
                         V.dot(buf, px + ex, py + ey, WHITE if n > 1 else GLASS[3])
                 V.dot(buf, px, py, WHITE)
+
+
+def dust(buf, v, t):
+    """A ring of dust puffs where a cup lands (top view)."""
+    if v.se < 0.9:
+        return
+    for i, c in enumerate(T.CUP_LAND):
+        u = (t - c) / 0.24
+        if not (0 <= u < 1):
+            continue
+        sx, sy = S.SPOTS[i]
+        r = S.R_OUT + 1.0 + 6.0 * T.ease_out(u, 2.0)
+        for k in range(12):
+            a = 2 * math.pi * (k + 0.5 * (i % 2)) / 12
+            px, py = v.to(sx + r * math.cos(a), sy + r * math.sin(a), 0)
+            V.dot(buf, px, py, SKIN[4] if u < 0.6 else SKIN[3], 2 if u < 0.5 else 1)
