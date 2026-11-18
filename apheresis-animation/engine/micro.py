@@ -116,19 +116,25 @@ def wbc(pen, x, y, r):
 # ------------------------------------------------------------------ stream (inside the tube)
 _rng = np.random.default_rng(5)
 TUBE_R = 70.0
-_N_RBC, _N_PLT, _N_WBC = 84, 46, 3
-S_RBC = np.c_[_rng.uniform(-60, 760, _N_RBC), _rng.uniform(-60, 60, _N_RBC), _rng.uniform(0, 6.3, _N_RBC),
+WRAP = 340.0                       # the cells repeat every WRAP units around the camera, so the stream never thins
+CAM_V = 58.0                       # the camera drifts with the flow (units per second)
+_N_RBC, _N_PLT, _N_WBC = 40, 22, 2
+S_RBC = np.c_[_rng.uniform(0, WRAP, _N_RBC), _rng.uniform(-60, 60, _N_RBC), _rng.uniform(0, 6.3, _N_RBC),
               _rng.uniform(0.0, 1.4, _N_RBC)]
-S_PLT = np.c_[_rng.uniform(-60, 760, _N_PLT), _rng.uniform(-63, 63, _N_PLT), _rng.uniform(0, 6.3, _N_PLT)]
-S_WBC = np.c_[np.array([120.0, 380.0, 610.0]), np.array([-20.0, 28.0, -36.0])]
+S_PLT = np.c_[_rng.uniform(0, WRAP, _N_PLT), _rng.uniform(-63, 63, _N_PLT), _rng.uniform(0, 6.3, _N_PLT)]
+S_WBC = np.c_[np.array([-28.0, 150.0]), np.array([-22.0, 30.0])]
 
 
 def _v(y):
     return 22.0 + 64.0 * (1 - (y / TUBE_R) ** 2)               # faster in the middle of the tube
 
 
+def _cam_x(t):
+    return 40.0 + CAM_V * (t - T.STREAM[1])
+
+
 def stream_camera(t):
-    return View(40.0 + 52.0 * (t - T.STREAM[1]), 0.0, 1.7)
+    return View(_cam_x(t), 0.0, 1.7)
 
 
 def stream_pos(kind, i, t):
@@ -139,7 +145,10 @@ def stream_pos(kind, i, t):
         x, y = S_PLT[i, 0], S_PLT[i, 1]
     else:
         x, y = S_WBC[i, 0], S_WBC[i, 1]
-    return x + _v(y) * e, y + 2.0 * math.sin(e * 2.0 + i)
+    x = x + _v(y) * e
+    cx = _cam_x(t)
+    x = cx + ((x - cx + WRAP / 2) % WRAP) - WRAP / 2
+    return x, y + 2.0 * math.sin(e * 2.0 + i)
 
 
 def stream(pen, t):
@@ -160,7 +169,7 @@ def stream(pen, t):
         wbc(pen, x, y, 15)
     for i in range(_N_RBC):
         x, y = stream_pos('rbc', i, t)
-        rbc(pen, x, y, 11, tilt=0.15 + 1.2 * abs(math.sin(e * 0.9 + S_RBC[i, 2])), psi=S_RBC[i, 3] + e * 0.6)
+        rbc(pen, x, y, 11, tilt=0.15 + 1.2 * abs(math.sin(e * 0.5 + S_RBC[i, 2])), psi=S_RBC[i, 3] + e * 0.4)
     for i in range(_N_PLT):
         x, y = stream_pos('plt', i, t)
         platelet(pen, x, y, 4.0, S_PLT[i, 2] + e * 1.5)
@@ -255,7 +264,7 @@ PORT_ANG = 0.62                                     # where the platelet port le
 
 def channel_camera(t):
     u = T.smoother((t - T.DIVERT[0]) / (T.DIVERT[1] - T.DIVERT[0]))
-    return View(0.0 + 16.0 * u, 70.0 - 4.0 * u, 2.6)
+    return View(0.0 + 40.0 * u, 70.0 - 8.0 * u, 2.6)
 
 
 def _band_r(r0, band, p, k):
@@ -340,3 +349,9 @@ def channel_point(kind):
     r = {'rbc': 130.0, 'plt': 108.0, 'plasma': 90.0}[kind]
     a = {'rbc': -0.42, 'plt': -0.18, 'plasma': -0.55}[kind]
     return RC[0] + r * math.sin(a), RC[1] - r * math.cos(a)
+
+
+def channel_port_point():
+    """World point on the platelet port, a little way along it (for its label)."""
+    r0 = (BAND['plt'][0] + BAND['plt'][1]) / 2
+    return RC[0] + r0 * math.sin(PORT_ANG) + 30 * 0.55, RC[1] - r0 * math.cos(PORT_ANG) - 30 * 0.85

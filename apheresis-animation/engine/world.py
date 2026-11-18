@@ -14,7 +14,7 @@ import numpy as np
 from . import gfx, palette as P, pixfont
 from . import timeline as T
 from .pen import Pen
-from .view import put
+from .view import put, poly_sel
 
 W, H = gfx.W, gfx.H
 R_OUT, R_IN = 2.7, 1.8
@@ -68,46 +68,75 @@ def _poly(pen, pts, col, line=None):
         pen.outline(bx, m, line)
 
 
-def _capsule(pen, a, b, r, cols, outline):
-    """A limb segment with flat shading: lit top, base, shaded underside."""
-    x0, y0 = min(a[0], b[0]) - r, min(a[1], b[1]) - r
-    x1, y1 = max(a[0], b[0]) + r, max(a[1], b[1]) + r
-    bx = pen.box(x0, y0, x1, y1, 1)
+def _limb(pen, a, b, ra, rb, cols, outline, bulge=0.0):
+    """A tapered limb segment with flat shading: lit top, base, shaded underside (cols: shade, base, lit)."""
+    r = max(ra, rb) + bulge
+    bx = pen.box(min(a[0], b[0]) - r, min(a[1], b[1]) - r, max(a[0], b[0]) + r, max(a[1], b[1]) + r, 1)
     if bx is None:
         return None, None
     U, V = pen.grid(bx)
     ax, ay = b[0] - a[0], b[1] - a[1]
-    L2 = ax * ax + ay * ay
-    h = np.clip(((U - a[0]) * ax + (V - a[1]) * ay) / L2, 0, 1)
+    h = np.clip(((U - a[0]) * ax + (V - a[1]) * ay) / (ax * ax + ay * ay), 0, 1)
+    rr = ra + (rb - ra) * h + bulge * np.sin(np.pi * np.clip(h * 1.6, 0, 1))
     dx, dy = U - (a[0] + ax * h), V - (a[1] + ay * h)
-    d = np.sqrt(dx * dx + dy * dy)
-    m = d <= r
+    m = dx * dx + dy * dy <= rr * rr
     put(pen.buf, bx, m, cols[1])
-    put(pen.buf, bx, m & (dy < -r * 0.45), cols[2])
-    put(pen.buf, bx, m & (dy > r * 0.5), cols[0])
+    put(pen.buf, bx, m & (dy < -rr * 0.42), cols[2])
+    put(pen.buf, bx, m & (dy > rr * 0.5), cols[0])
     pen.outline(bx, m, outline)
     return bx, m
 
 
+def _shape(pen, pts, cols, outline, lit=1.6, shade=1.9, open_left=None):
+    """A filled outline with flat shading: a lit band along its top edge and a shaded band along its bottom edge.
+    open_left: no outline left of this x (where the shape joins another one)."""
+    bx, m = pen.poly(pts)
+    if bx is None:
+        return None, None
+    put(pen.buf, bx, m, cols[1])
+    put(pen.buf, bx, m & ~poly_sel(pen.view, pts, bx, 0.0, lit), cols[2])
+    put(pen.buf, bx, m & ~poly_sel(pen.view, pts, bx, 0.0, -shade), cols[0])
+    e = m & ~(np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1))
+    if open_left is not None:
+        U, V = pen.grid(bx)
+        e &= U >= open_left
+    put(pen.buf, bx, e, outline)
+    return bx, m
+
+
+# a relaxed right hand resting palm-down on the armrest, seen from the thumb side, fingers pointing to the machine
+HAND = [(-87.5, 119.5), (-80, 118.8), (-73, 117.5), (-67, 118.0), (-62, 119.1), (-58.4, 120.9), (-56.3, 123.5),
+        (-55.9, 126.0), (-56.9, 127.7), (-60, 128.1), (-68, 128.3), (-78, 128.1), (-87.5, 128.0)]
+
+
 def arm(pen, t):
-    """The donor's arm resting on the armrest: sleeve, upper arm, forearm, relaxed hand, the taped needle."""
+    """The donor's arm resting on the armrest: sleeve, upper arm, elbow, forearm, wrist and a relaxed hand."""
     skin = (P.SKIN[2], P.SKIN[3], P.SKIN[4])
-    _capsule(pen, (-196, 88), (-160, 108), 9.5, (P.CHAIR[1], P.CHAIR[2], P.CHAIR[3]), P.CHAIR[0])   # sleeve
-    _capsule(pen, (-162, 108), (-134, 121), 7.0, skin, P.SKIN[0])
-    _capsule(pen, (-136, 121), (-76, 124), 6.2, skin, P.SKIN[0])
-    bx, m, U, V = pen.disc(-68, 124, 7.6)                                              # relaxed hand
+    buf = pen.buf
+    _limb(pen, (-198, 89), (-161, 108), 9.6, 9.0, (P.CHAIR[1], P.CHAIR[2], P.CHAIR[3]), P.CHAIR[0])   # sleeve
+    _limb(pen, (-163, 108.5), (-137, 120.6), 7.4, 6.5, skin, P.SKIN[1])                             # upper arm
+    _limb(pen, (-138, 121.3), (-84, 123.7), 6.3, 4.3, skin, P.SKIN[1], bulge=0.7)                   # forearm
+    _shape(pen, HAND, skin, P.SKIN[1], open_left=-86.0)                                            # hand
+    for line in (((-72, 121.2), (-64, 121.6), (-59.6, 123.2), (-58.1, 125.6)),                      # finger lines
+                 ((-71, 124.6), (-63.5, 125.0), (-60.2, 126.4))):
+        for (xa, ya), (xb, yb) in zip(line[:-1], line[1:]):
+            _segment(pen, (xa, ya), (xb, yb), 0.32, P.SKIN[1])
+    _disc(pen, -57.5, 122.6, 1.05, P.SKIN[4], None, None, P.SKIN[2])                              # fingernail
+    _limb(pen, (-84.5, 123.0), (-70.0, 122.6), 2.2, 1.9, skin, P.SKIN[1])                           # thumb
+    _disc(pen, -70.2, 122.3, 0.8, P.SKIN[4])
+    bx, m, U, V = pen.disc(-137.5, 116.5, 2.2)                                                     # elbow crease
     if bx is not None:
-        put(pen.buf, bx, m, P.SKIN[3])
-        put(pen.buf, bx, m & (V - 124 > 3.5), P.SKIN[2])
-        put(pen.buf, bx, m & (V - 124 < -4.5), P.SKIN[4])
-        pen.outline(bx, m, P.SKIN[0])
-        for k in range(3):
-            pen.dot(-64 + 2.3 * k, 126.5, P.SKIN[1])
-    # the needle site: a strip of white tape, the clear hub, the tube leaving to the right
-    _poly(pen, [(-126, 116.5), (-109, 116.5), (-109, 123.5), (-126, 123.5)], P.MACH[5], P.MACH[2])
-    for k in range(3):
-        pen.dot(-122 + 5 * k, 120, P.MACH[3])
-    _poly(pen, [(-110, 118.6), (-103.5, 119.2), (-103.5, 122.8), (-110, 123.4)], P.TUBE[3], P.TUBE[1])
+        put(buf, bx, m & (np.abs((U + 137.5) * 0.9 + (V - 116.5) * 0.4) < 0.35), P.SKIN[1])
+
+
+def arm_overlay(pen, t):
+    """The tape over the needle site, the clear needle hub and a second strip of tape holding the tube."""
+    _poly(pen, [(-127, 115.6), (-109, 114.9), (-108.6, 123.8), (-126.6, 124.3)], P.MACH[5], P.MACH[2])
+    for k in range(4):
+        pen.dot(-123.5 + 4.5 * k, 119.8, P.MACH[3])
+    _poly(pen, [(-110, 118.4), (-103.4, 119.0), (-103.4, 123.0), (-110, 123.6)], P.TUBE[3], P.TUBE[1])
+    _poly(pen, [(-93.5, 113.0), (-87.5, 112.2), (-86.6, 121.0), (-92.6, 121.8)], P.MACH[5], P.MACH[2])
+    pen.dot(-90.0, 116.8, P.MACH[3])
 
 
 # ------------------------------------------------------------------ tubing
@@ -116,16 +145,29 @@ def _flow_table(name):
 
 
 _FLOW = {name: _flow_table(name) for name in T.PATHS}
+CELL = 4.2                          # spacing of the cells drawn flowing inside a tube
 
 
 def _period(name):
-    """Dash length of the flow texture, nudged so a whole number of dashes passes per loop (seamless at 32 s)."""
+    """Cell spacing nudged so that a whole number of cells passes per loop (seamless at the loop point)."""
     tab = _FLOW[name]
     total = abs(tab[int(T.TOTAL * 60)] - tab[0])
-    return total / max(1, round(total / 7.0)) if total > 1e-6 else 7.0
+    return total / max(1, round(total / CELL)) if total > 1e-6 else CELL
 
 
 _PERIOD = {name: _period(name) for name in T.PATHS}
+LIGHT = np.array([-0.53, -0.85])    # toward the light: upper left, mostly above
+
+
+def _frames(name):
+    pts, s = T.PATHS[name]
+    d = np.gradient(pts, axis=0)
+    d /= np.hypot(d[:, 0], d[:, 1])[:, None] + 1e-9
+    n = np.c_[-d[:, 1], d[:, 0]]
+    return n, np.clip((n @ LIGHT) / 0.3, -1, 1)              # +1: the +n side faces the light
+
+
+_FRAMES = {name: _frames(name) for name in T.PATHS}
 
 
 def flow_shift(name, t):
@@ -136,47 +178,95 @@ def flow_shift(name, t):
 
 
 def _content(name, t):
-    """(base, dash, light) colours of what is inside a tube right now."""
+    """(base, shade, gloss, particle, particle core, style) of what is inside a tube right now."""
     if name in ('ac', 'acpump', 'ac2'):
-        return P.TUBE[3], P.MINT[3], P.WHITE
+        return P.TUBE[3], P.TUBE[2], P.WHITE, P.MINT[2], P.MINT[3], 'fleck'
     if name == 'plt':
-        return P.PLASMA[3], P.GOLD[3], P.WHITE
+        return P.PLASMA[3], P.PLASMA[2], P.WHITE, P.GOLD[2], P.GOLD[3], 'fleck'
     if T.returning(t):                                           # going back: red cells and plasma, no platelets
-        return P.RED[2], P.RED[1], P.RED[3]
-    return P.RED[3], P.RED[2], P.RED[4]
+        return P.RED[2], P.RED[1], P.RED[3], P.RED[1], P.RED[3], 'cell'
+    return P.RED[3], P.RED[2], P.RED[4], P.RED[2], P.RED[4], 'cell'
+
+
+def _hash(i):
+    x = np.sin(i * 12.9898 + 4.1) * 43758.5453
+    return x - np.floor(x)
 
 
 def tube(pen, name, t, squeeze=None):
+    """A clear plastic tube and what flows inside, drawn per pixel from the nearest point of its path: a lit and a
+    shaded side, a glossy band, cells (or flecks) moving with the flow, squeezed flat under a pump roller."""
     pts, s = T.PATHS[name]
+    nrm, lit = _FRAMES[name]
+    z = pen.z
     x0, y0, x1, y1 = pen.view.world_rect()
-    vis = (pts[:, 0] > x0 - 6) & (pts[:, 0] < x1 + 6) & (pts[:, 1] > y0 - 6) & (pts[:, 1] < y1 + 6)
+    pad = R_OUT + 1.0
+    vis = (pts[:, 0] > x0 - pad) & (pts[:, 0] < x1 + pad) & (pts[:, 1] > y0 - pad) & (pts[:, 1] < y1 + pad)
     idx = np.nonzero(vis)[0]
     if len(idx) == 0:
         return
-    step = max(1, int(round(0.9 / (0.6 * pen.z)))) if pen.z < 1.6 else 1
-    idx = idx[::step]
-    base, dash, light = _content(name, t)
-    shift = flow_shift(name, t)
+    idx = idx[::max(1, int(0.8 / (0.6 * z)))]
     sq = squeeze(pts[idx]) if squeeze is not None else np.zeros(len(idx))
-    for k, i in enumerate(idx):                                  # transparent wall
+    q = pts[idx]
+    bx = pen.box(q[:, 0].min() - pad, q[:, 1].min() - pad, q[:, 0].max() + pad, q[:, 1].max() + pad, 1)
+    if bx is None:
+        return
+    U, V = pen.grid(bx)
+    hh, ww = U.shape
+    best = np.full((hh, ww), np.inf)
+    S, LAT, LIT, K = np.zeros((hh, ww)), np.zeros((hh, ww)), np.zeros((hh, ww)), np.zeros((hh, ww))
+    view, rpx = pen.view, pad * z + 1
+    for k, i in enumerate(idx):
         x, y = pts[i]
-        bx, m, U, V = pen.disc(x, y, R_OUT * (1 - 0.35 * sq[k]), 0)
-        if bx is not None:
-            put(pen.buf, bx, m, P.TUBE[1])
-    for k, i in enumerate(idx):                                  # what flows inside
-        x, y = pts[i]
-        r = R_IN * (1 - 0.92 * sq[k])
-        if r < 0.25:
+        ci, cj = view.px(x, y)
+        a0, a1 = max(int(ci - rpx) - bx[0], 0), min(int(ci + rpx) + 2 - bx[0], ww)
+        b0, b1 = max(int(cj - rpx) - bx[1], 0), min(int(cj + rpx) + 2 - bx[1], hh)
+        if a1 <= a0 or b1 <= b0:
             continue
-        f = ((s[i] - shift) / _PERIOD[name]) % 1.0
-        col = dash if f < 0.32 else (light if f < 0.40 else base)
-        bx, m, U, V = pen.disc(x, y, r, 0)
-        if bx is not None:
-            put(pen.buf, bx, m, col)
-    if pen.z >= 1.2:                                             # a glint along the top of the tube
-        for k, i in enumerate(idx[::2]):
-            x, y = pts[i]
-            pen.dot(x, y - R_IN * 0.75, P.TUBE[3])
+        u, v = U[b0:b1, a0:a1] - x, V[b0:b1, a0:a1] - y
+        d2 = u * u + v * v
+        win = best[b0:b1, a0:a1]
+        upd = d2 < win
+        if not upd.any():
+            continue
+        win[upd] = d2[upd]
+        S[b0:b1, a0:a1][upd] = s[i]
+        LAT[b0:b1, a0:a1][upd] = (u * nrm[i, 0] + v * nrm[i, 1])[upd]
+        LIT[b0:b1, a0:a1][upd] = lit[i]
+        K[b0:b1, a0:a1][upd] = sq[k]
+    d = np.sqrt(best)
+    r_out, r_in = R_OUT * (1 - 0.35 * K), R_IN * (1 - 0.92 * K)
+    wall = d < r_out
+    if not wall.any():
+        return
+    lumen = d < r_in
+    side = LAT * LIT                                             # > 0: toward the lit side
+    buf = pen.buf
+    base, shade, gloss, part, core, style = _content(name, t)
+    put(buf, bx, wall, P.TUBE[1])
+    put(buf, bx, wall & (side > 0), P.TUBE[2])
+    put(buf, bx, lumen, base)
+    if z >= 0.9:
+        put(buf, bx, lumen & (side < -0.42 * r_in), shade)
+    if z >= 1.4:
+        L = _PERIOD[name]
+        shift = flow_shift(name, t)
+        for row in (0, 1):
+            u = (S - shift) / L + 0.5 * row
+            cid = np.floor(u)
+            off = (_hash(cid + 37 * row) - 0.5) * 1.1 * R_IN
+            hl, hw = (1.15, 0.85) if style == 'cell' else (0.55, 0.5)
+            e = ((u - cid - 0.5) * L / hl) ** 2 + ((LAT - off) / hw) ** 2
+            m = lumen & (e < 1.0)
+            if style != 'cell':
+                m &= _hash(cid * 3.1 + row) < 0.55
+            put(buf, bx, m, part)
+            if z >= 2.4 and style == 'cell':
+                put(buf, bx, m & (e < 0.22), core)
+        put(buf, bx, lumen & (side > 0.38 * r_in) & (side < 0.72 * r_in), gloss)
+    pen.outline(bx, wall, P.TUBE[0])
+    if z >= 1.0:
+        put(buf, bx, wall & ~lumen & (side > 0) & (d < r_out - 0.45), P.TUBE[3])
 
 
 # ------------------------------------------------------------------ the machine
@@ -431,9 +521,11 @@ def fittings(pen, t):
         _rrect(pen, x - 5.5, yy - 1.2, x + 5.5, yy + 1.2, 0.5, P.NAVY[0])
 
 
-def bag(pen, c, w, h, edge, fill, level, t, hook, gold=False):
-    """A hanging plastic bag; the contents keep level, with a small wave."""
+def bag(pen, c, w, h, edge, fill, level, t, hook, gold=False, port=None):
+    """A hanging plastic bag; the contents keep level, with a small wave. The platelet bag has a label sticker, and
+    drops fall in from its inlet while the platelets flow."""
     x, y = c
+    buf = pen.buf
     _poly(pen, [(hook[0] - 0.8, hook[1]), (hook[0] + 0.8, hook[1]), (hook[0] + 0.8, y - h / 2 - 4),
                 (hook[0] - 0.8, y - h / 2 - 4)], P.MACH[2])
     pts = [(x - w / 2 + 3, y - h / 2), (x + w / 2 - 3, y - h / 2), (x + w / 2, y - h / 2 + 6), (x + w / 2 + 1, y + h / 2 - 6),
@@ -442,23 +534,54 @@ def bag(pen, c, w, h, edge, fill, level, t, hook, gold=False):
     if bx is None:
         return
     U, V = pen.grid(bx)
-    put(pen.buf, bx, m, P.NAVY[2])
-    surf = y + h / 2 - 3 - (h - 6) * level + 0.8 * np.sin((U - x) * 0.5 + t * 4)
+    put(buf, bx, m, P.NAVY[2])
+    surf0 = y + h / 2 - 3 - (h - 6) * level
+    surf = surf0 + 0.8 * np.sin((U - x) * 0.5 + t * 4)
     liq = m & (V >= surf)
-    put(pen.buf, bx, liq, fill)
+    put(buf, bx, liq, fill)
     if gold:
-        put(pen.buf, bx, liq & (((U + V * 0.5 + t * 6) // 3) % 5 == 0), P.GOLD[3])
-        put(pen.buf, bx, liq & (V < surf + 1.2), P.WHITE)
-    put(pen.buf, bx, m & (np.abs(U - (x - w / 2 + 4)) < 0.8) & (V > y - h / 2 + 6) & (V < y + h / 2 - 8), P.TUBE[3])
+        put(buf, bx, liq & (((U + V * 0.5 + t * 6) // 3) % 5 == 0), P.GOLD[3])
+        put(buf, bx, liq & (V < surf + 1.2), P.WHITE)
+    put(buf, bx, m & (np.abs(U - (x - w / 2 + 4)) < 0.8) & (V > y - h / 2 + 6) & (V < y + h / 2 - 8), P.TUBE[3])
     pen.outline(bx, m, edge)
     _poly(pen, [(x - 2, y - h / 2 - 4), (x + 2, y - h / 2 - 4), (x + 2, y - h / 2), (x - 2, y - h / 2)], P.TUBE[2])
+    if not gold:
+        return
+    sx0, sy0, sx1, sy1 = x - w / 2 + 4, y + h / 2 - 16, x + w / 2 - 3, y + h / 2 - 6         # label sticker
+    _poly(pen, [(sx0, sy0), (sx1, sy0), (sx1, sy1), (sx0, sy1)], P.MACH[5], P.MACH[2])
+    if pen.z >= 2.2:
+        i, j = pen.view.px(sx0 + 1.5, sy0 + 1.6)
+        gfx.fill(buf, pixfont.text_mask('PLT', int(i), int(j), font='3x5'), P.NAVY[0])
+        for k in range(6):
+            bxx = sx1 - 9 + 1.4 * k
+            _poly(pen, [(bxx, sy0 + 2), (bxx + (0.5 if k % 2 else 0.9), sy0 + 2), (bxx + (0.5 if k % 2 else 0.9), sy1 - 2),
+                        (bxx, sy1 - 2)], P.NAVY[0])
+    if port is None or T.returning(t):
+        return
+    px_, top = port[0], y - h / 2 + 2                                    # drops falling in, ripples where they land
+    _poly(pen, [(px_ - 0.9, top - 1), (px_ + 0.9, top - 1), (px_ + 0.9, top + 2.5), (px_ - 0.9, top + 2.5)], P.TUBE[2])
+    g, per = 420.0, 0.22
+    fall = math.sqrt(max(2 * (surf0 - top - 2.5) / g, 1e-6))
+    for k in range(5):
+        tn = (math.floor(t / per) - k) * per
+        age = t - tn
+        if age < fall:
+            _disc(pen, px_, top + 2.5 + 0.5 * g * age * age, 1.1, P.GOLD[3], P.WHITE, P.GOLD[2])
+        elif age < fall + 0.3:
+            v = (age - fall) / 0.3
+            rb = pen.box(px_ - 7, surf0 - 3, px_ + 7, surf0 + 3, 1)
+            if rb is not None:
+                RU, RV = pen.grid(rb)
+                rx, ry = 1.5 + 5.0 * v, 0.6 + 1.0 * v
+                e = ((RU - px_) / rx) ** 2 + ((RV - surf0 - 0.8) / ry) ** 2
+                put(buf, rb, (e <= 1.0) & (e >= 0.45) & (v < 0.9), P.WHITE)
 
 
 def machine(pen, t):
     poles(pen, t)
     bag(pen, T.AC_BAG, T.AC_W, T.AC_H, P.TUBE[3], P.MINT[3], 0.82, t, hook=(T.AC_BAG[0], T.POLE_TOP + 5))
     bag(pen, T.BAG, T.BAG_W, T.BAG_H, P.TUBE[3], P.PLASMA[3], T.bag_level(t), t, hook=(T.BAG[0], T.POLE_TOP + 5),
-        gold=True)
+        gold=True, port=T.path_point('plt', 1.0))
     screen(pen, t)
     cabinet(pen, t)
     centrifuge(pen, t)
@@ -475,3 +598,4 @@ def draw(pen, t):
     pump_head(pen, t, T.AC_PUMP, 'acpump', T.ac_pump_angle(t), P.BLUE)
     pump_head(pen, t, T.PUMP, 'pump', T.pump_angle(t), (P.RED[1], P.RED[2], P.RED[3], P.RED[4]))
     fittings(pen, t)
+    arm_overlay(pen, t)

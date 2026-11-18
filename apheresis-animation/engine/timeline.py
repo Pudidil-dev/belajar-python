@@ -1,4 +1,4 @@
-"""The clock, the clinic layout and the choreography (120 BPM, one bar = 2 s, 16 bars = 32 s, looping).
+"""The clock, the clinic layout and the choreography (120 BPM, one bar = 2 s, 24 bars = 48 s, looping).
 
 World space (canvas px at zoom 1, y down): the reclining donor on the left, the apheresis machine on the right, the
 tubing between them. The machine works in two phases through one needle: DRAW (blood goes from the arm to the
@@ -10,30 +10,33 @@ import numpy as np
 BPM = 120
 BEAT = 60.0 / BPM
 BAR = 4 * BEAT
-TOTAL = 32.0
+TOTAL = 48.0
 FPS = 30
 
 # ---------------------------------------------------------------- events (seconds)
-TRACK = (0.6, 3.0)                 # follow the blood along the tube
-STREAM = (3.0, 3.35, 5.65, 6.0)    # cut into the tube, the stream, cut back out at the pump
-PUMP_HOLD = (6.0, 8.2)
-TO_JUNCTION = (8.2, 9.5)
-MOLECULE = (9.5, 9.65, 10.55, 10.7)
-BIND = 10.1                        # citrate clicks onto a calcium ion: tik
-TO_SPIN = (10.7, 11.8)
-SPIN_UP = (11.8, 13.2)
-INTO_CHANNEL = (13.2, 14.7)
-SEPARATE = (14.7, 15.0, 21.0, 21.3)   # cut in, separation scene, cut out
-SEP_PROGRESS = (15.8, 19.0)
-DIVERT = (19.0, 21.0)              # the platelet band takes its own exit
-TO_BAG = (21.3, 23.0)
-BAG_FILL = (21.9, 25.0)
-RETURN = (25.0, 29.0)              # the single needle switches to RETURN, then back to DRAW
-REVEAL = (29.0, 30.5)
-WIDE_AT = 29.85                     # the pull-out lands on the wide shot here and holds it until BACK
-BACK = (30.5, 32.0)
-REWARD = 24.5
-SUCCESS = 29.5
+# Close-ups open and close through a round magnifier lens (start, fully open, closing, closed), never a hard flash.
+TRACK = (1.0, 4.4)                 # hold on the arm, then follow the blood along the tube
+STREAM = (4.4, 5.4, 9.6, 10.6)     # lens into the tube, the stream, lens back out onto the blood pump
+PUMP_HOLD = (10.6, 14.4)
+TO_JUNCTION = (14.4, 15.6)         # glide to the anticoagulant pump and the Y fitting, then hold
+MOLECULE = (16.6, 17.6, 20.0, 21.0)
+BIND = 18.6                        # citrate closes on a calcium ion: tik
+TO_SPIN = (21.0, 22.2)             # follow the blood into the centrifuge
+SPIN_UP = (22.2, 24.2)             # pull out to the whole machine while the rotor spins up
+INTO_CHANNEL = (24.2, 25.4)        # slow push into the lid
+SEPARATE = (25.4, 26.4, 33.4, 34.4)   # lens into the channel, separation, lens out
+SEP_PROGRESS = (27.2, 30.4)
+DIVERT = (30.4, 33.4)              # the platelet band takes its own exit
+TO_BAG = (34.4, 36.4)
+BAG_FILL = (34.8, 40.0)
+BAG_CALLOUT = (37.4, 40.0)         # magnifier bubble on what is in the bag
+RETURN = (40.0, 45.0)              # the single needle switches to RETURN, then back to DRAW
+RETURN_CALLOUT = (41.0, 42.6)      # magnifier bubble on what goes back
+REVEAL = (45.0, 46.6)
+WIDE_AT = 45.8                     # the pull-out lands on the wide shot here and holds it until BACK
+BACK = (46.6, 48.0)
+REWARD = 39.4
+SUCCESS = 45.6
 
 
 def clamp01(x):
@@ -112,8 +115,8 @@ def _arc(c, r, a0, a1, n=40):
 
 # the donor line: needle -> along the arm -> a soft sag to the machine -> up through the drip chamber and the clamps ->
 # into the blood pump at the bottom of its raceway
-_DRAW_IN = [NEEDLE, (-88, 118), (-70, 116), (-48, 119), (-28, 137), (-10, 164), (12, 188), (38, 200), (64, 204),
-            (82, 203), (90, 199.5), (FILTER[0], FILTER[2] + 1.0)]
+_DRAW_IN = [NEEDLE, (-95, 118.2), (-86, 116.4), (-76, 114.9), (-66, 115.2), (-57, 117.2), (-48, 122.0), (-36, 133),
+            (-22, 149), (-8, 166), (12, 188), (38, 200), (64, 204), (82, 203), (90, 199.5), (FILTER[0], FILTER[2] + 1.0)]
 _DRAW_UP = [(FILTER[0], FILTER[2] + 1.0), (FILTER[0], 141.0)]
 _DRAW_TURN = [(FILTER[0], 141.0), (93.0, 137.5), (100.0, 134.8), (112.0, 134.1), (PUMP[0], PUMP[1] + PUMP_R)]
 # blood pump raceway: bottom -> right -> top (counter-clockwise on screen); out at the top, left to the junction
@@ -201,7 +204,7 @@ def _angle(tab, t):
 
 
 def pump_angle(t):
-    return _angle(_PUMP_TAB, t)
+    return _angle(_PUMP_TAB, t) + math.pi / 2         # a roller passes the raceway inlet on every 1/8 note
 
 
 def ac_pump_angle(t):
@@ -251,15 +254,27 @@ def flows(t):
 
 
 # ---------------------------------------------------------------- cameras
-OPEN = (-110.0, 118.0, 3.4)        # the arm close-up (first and last frame)
+OPEN = (-98.0, 118.0, 3.1)         # the arm close-up (first and last frame)
 WIDE = (-44.0, 84.0, 0.62)         # the whole setup: donor, tubing, machine
 PUMP_CAM = (PUMP[0] - 2.0, PUMP[1] + 3.0, 6.2)
-JUNCTION_CAM = (JUNCTION[0] - 2.0, JUNCTION[1] - 2.0, 3.3)
+JUNCTION_CAM = (JUNCTION[0] - 2.0, JUNCTION[1] + 2.0, 3.3)
 LID_CAM = (CENTRIFUGE[0], CENTRIFUGE[1] + 4.0, 3.2)
 SPIN_CAM = (CENTRIFUGE[0], CENTRIFUGE[1] + 16.0, 1.45)
 CHANNEL_CAM = (CENTRIFUGE[0], CENTRIFUGE[1] - 0.72 * BAY_R * LID_K, 7.0)
-BAG_CAM = (BAG[0] - 20.0, BAG[1] + 12.0, 2.2)
-FRONT_CAM = (112.0, 92.0, 2.5)     # the screen and the blood pump in one frame
+BAG_CAM = (BAG[0] - 14.0, BAG[1] + 6.0, 3.0)
+FRONT_CAM = (112.0, 96.0, 2.5)     # the screen and the blood pump in one frame
+
+# where each magnifier lens opens and closes (world points)
+LENS_FOCUS = {
+    ('stream', 'in'): None,                                   # the dive point on the tube (filled in below)
+    ('stream', 'out'): (PUMP[0], PUMP[1] + PUMP_R),           # the blood entering the pump
+    ('molecule', 'in'): JUNCTION,
+    ('molecule', 'out'): JUNCTION,
+    ('channel', 'in'): CHANNEL_CAM[:2],
+    ('channel', 'out'): None,                                 # the platelet outlet (filled in below)
+}
+LENS_FOCUS[('stream', 'in')] = path_point('draw1', F_DIVE)
+LENS_FOCUS[('channel', 'out')] = path_point('plt', 0.04)
 
 
 def _lerp_cam(a, b, u):
@@ -268,8 +283,18 @@ def _lerp_cam(a, b, u):
     return a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w, z
 
 
+def _push(c, k, u):
+    """Slow push on the same centre: zoom times k at u = 1 (sine in-out)."""
+    return c[0], c[1], c[2] * math.exp(math.log(k) * (0.5 - 0.5 * math.cos(math.pi * clamp01(u))))
+
+
+def _long_tail(u):
+    u = clamp01(u)
+    return 1 - (1 - u) ** 3
+
+
 def world_camera(t):
-    """Camera over the clinic (world space). The micro views use their own cameras."""
+    """Camera over the clinic (world space). The close-ups use their own cameras."""
     t = t % TOTAL
     if t < TRACK[0]:
         return OPEN[0] + 1.5 * t, OPEN[1], OPEN[2]
@@ -277,47 +302,55 @@ def world_camera(t):
         u = smoother((t - TRACK[0]) / (TRACK[1] - TRACK[0]))
         x, y = path_point('draw1', 0.03 + (F_DIVE - 0.03) * u)
         z = OPEN[2] + (3.0 - OPEN[2]) * u
-        k = smooth(min(1.0, (t - TRACK[0]) / 0.6))             # ease from the opening hold onto the tube
+        k = smooth(min(1.0, (t - TRACK[0]) / 0.8))             # ease from the opening hold onto the tube
         sx, sy = OPEN[0] + 1.5 * TRACK[0], OPEN[1]
-        cx, cy = sx + (x - sx) * k, sy + (y - sy) * k
-        if t >= STREAM[0]:                                     # dive into the tube
-            z = 3.0 * math.exp(math.log(4.5) * smooth((t - STREAM[0]) / (STREAM[1] - STREAM[0])))
-        return cx, cy, z
+        c = (sx + (x - sx) * k, sy + (y - sy) * k, z)
+        if t >= STREAM[0]:                                     # slow push into the tube while the lens opens
+            return _push(c, 1.2, (t - STREAM[0]) / (STREAM[1] - STREAM[0]))
+        return c
+    if t < STREAM[3]:                                          # the lens closes onto the pump; settle back
+        v = _long_tail((t - STREAM[2]) / (STREAM[3] - STREAM[2]))
+        return PUMP_CAM[0], PUMP_CAM[1], PUMP_CAM[2] * (1.1 - 0.1 * v)
     if t < PUMP_HOLD[1]:
         return PUMP_CAM
+    if t < MOLECULE[0]:
+        return _lerp_cam(PUMP_CAM, JUNCTION_CAM, smoother((t - TO_JUNCTION[0]) / (TO_JUNCTION[1] - TO_JUNCTION[0])))
     if t < MOLECULE[1]:
-        c = _lerp_cam(PUMP_CAM, JUNCTION_CAM, smoother((t - TO_JUNCTION[0]) / (TO_JUNCTION[1] - TO_JUNCTION[0])))
-        if t >= MOLECULE[0]:
-            v = smooth((t - MOLECULE[0]) / (MOLECULE[1] - MOLECULE[0]))
-            return JUNCTION_CAM[0], JUNCTION_CAM[1], JUNCTION_CAM[2] * math.exp(math.log(3.0) * v)
-        return c
+        return _push(JUNCTION_CAM, 1.2, (t - MOLECULE[0]) / (MOLECULE[1] - MOLECULE[0]))
+    if t < MOLECULE[3]:
+        v = _long_tail((t - MOLECULE[2]) / (MOLECULE[3] - MOLECULE[2]))
+        return JUNCTION_CAM[0], JUNCTION_CAM[1], JUNCTION_CAM[2] * (1.2 - 0.2 * v)
     if t < TO_SPIN[1]:
-        return _lerp_cam(JUNCTION_CAM, LID_CAM, smoother((t - MOLECULE[2]) / (TO_SPIN[1] - MOLECULE[2])))
+        return _lerp_cam(JUNCTION_CAM, LID_CAM, smoother((t - TO_SPIN[0]) / (TO_SPIN[1] - TO_SPIN[0])))
     if t < SPIN_UP[1]:
-        return _lerp_cam(LID_CAM, SPIN_CAM, smoother((t - SPIN_UP[0]) / (SPIN_UP[1] - SPIN_UP[0])))
+        return _lerp_cam(LID_CAM, SPIN_CAM, _long_tail((t - SPIN_UP[0]) / (SPIN_UP[1] - SPIN_UP[0])))
+    if t < SEPARATE[0]:
+        return _lerp_cam(SPIN_CAM, CHANNEL_CAM, smoother((t - INTO_CHANNEL[0]) / (INTO_CHANNEL[1] - INTO_CHANNEL[0])))
     if t < SEPARATE[1]:
-        return _lerp_cam(SPIN_CAM, CHANNEL_CAM, smoother((t - INTO_CHANNEL[0]) / (SEPARATE[1] - INTO_CHANNEL[0])))
-    if t < TO_BAG[0]:
-        x, y = path_point('plt', 0.04)
-        return x, y, 4.0
+        return _push(CHANNEL_CAM, 1.12, (t - SEPARATE[0]) / (SEPARATE[1] - SEPARATE[0]))
+    x0, y0 = path_point('plt', 0.04)
+    if t < SEPARATE[3]:
+        v = _long_tail((t - SEPARATE[2]) / (SEPARATE[3] - SEPARATE[2]))
+        return x0, y0, 4.4 - 0.4 * v
     if t < TO_BAG[1]:
         u = smoother((t - TO_BAG[0]) / (TO_BAG[1] - TO_BAG[0]))
-        x, y = path_point('plt', 0.04 + 0.88 * u)
-        return x, y, 4.0 - 0.8 * u
+        x, y = path_point('plt', 0.04 + 0.84 * u)
+        c = (x, y, 4.0 - 0.9 * u)
+        return _lerp_cam(c, BAG_CAM, smoother((t - (TO_BAG[1] - 0.7)) / 0.7)) if t > TO_BAG[1] - 0.7 else c
     if t < RETURN[0]:
-        x, y = path_point('plt', 0.92)
-        return _lerp_cam((x, y, 3.2), BAG_CAM, smoother((t - TO_BAG[1]) / (RETURN[0] - TO_BAG[1])))
+        return BAG_CAM[0] - 0.4 * (t - TO_BAG[1]), BAG_CAM[1], BAG_CAM[2]
     if t < RETURN[1]:
-        u = (t - RETURN[0]) / (RETURN[1] - RETURN[0])
-        if u < 0.22:                                    # the screen flips to RETURN, the blood pump turns back
-            return _lerp_cam(BAG_CAM, FRONT_CAM, smoother(u / 0.22))
-        if u < 0.42:
+        tt = t - RETURN[0]
+        bag_end = (BAG_CAM[0] - 0.4 * (RETURN[0] - TO_BAG[1]), BAG_CAM[1], BAG_CAM[2])
+        if tt < 1.0:                                    # the screen flips to RETURN; glide to the pump
+            return _lerp_cam(bag_end, FRONT_CAM, smoother(tt / 1.0))
+        if tt < 2.4:
             return FRONT_CAM
         x0, y0 = path_point('draw1', 1.0)
-        if u < 0.5:                                     # settle onto the donor line at the pump
-            return _lerp_cam(FRONT_CAM, (x0, y0, 2.4), smoother((u - 0.42) / 0.08))
-        if u < 0.9:                                     # follow the blood back along the same line to the arm
-            v = smoother((u - 0.5) / 0.4)
+        if tt < 2.8:                                    # settle onto the donor line at the pump
+            return _lerp_cam(FRONT_CAM, (x0, y0, 2.4), smoother((tt - 2.4) / 0.4))
+        if tt < 4.4:                                    # follow the blood back along the same line to the arm
+            v = smoother((tt - 2.8) / 1.6)
             x, y = path_point('draw1', 1.0 - v)
             return x, y, 2.4 + 1.0 * v - 0.5 * math.sin(math.pi * v)
         x, y = path_point('draw1', 0.0)
@@ -328,27 +361,24 @@ def world_camera(t):
     return _lerp_cam(WIDE, OPEN, smoother((t - BACK[0]) / (BACK[1] - BACK[0] - 0.1)))   # lands 3 frames early
 
 
+_LENSES = (('stream', STREAM), ('molecule', MOLECULE), ('channel', SEPARATE))
+
+
 def view_kind(t):
-    """Which artwork is on screen: 'world', 'stream', 'molecule', 'channel' (or a cut between two of them)."""
+    """Which artwork fills the screen: 'world', 'stream', 'molecule' or 'channel'."""
     t = t % TOTAL
-    if STREAM[1] <= t < STREAM[2]:
-        return 'stream'
-    if MOLECULE[1] <= t < MOLECULE[2]:
-        return 'molecule'
-    if SEPARATE[1] <= t < SEPARATE[2]:
-        return 'channel'
+    for kind, ev in _LENSES:
+        if ev[1] <= t < ev[2]:
+            return kind
     return 'world'
 
 
-def cut(t):
-    """(from, to, progress) during a stepped pixel cut, else None."""
+def lens(t):
+    """(close-up kind, 'in' / 'out', progress 0..1, focus world point) while a magnifier lens opens or closes."""
     t = t % TOTAL
-    for a, b, k_from, k_to in ((STREAM[0] + 0.2, STREAM[1], 'world', 'stream'),
-                               (STREAM[2], STREAM[3] - 0.2, 'stream', 'world'),
-                               (MOLECULE[0] + 0.05, MOLECULE[1], 'world', 'molecule'),
-                               (MOLECULE[2], MOLECULE[3] - 0.05, 'molecule', 'world'),
-                               (SEPARATE[0] + 0.15, SEPARATE[1], 'world', 'channel'),
-                               (SEPARATE[2], SEPARATE[3] - 0.15, 'channel', 'world')):
-        if a <= t < b:
-            return k_from, k_to, (t - a) / (b - a)
+    for kind, ev in _LENSES:
+        if ev[0] <= t < ev[1]:
+            return kind, 'in', (t - ev[0]) / (ev[1] - ev[0]), LENS_FOCUS[(kind, 'in')]
+        if ev[2] <= t < ev[3]:
+            return kind, 'out', (t - ev[2]) / (ev[3] - ev[2]), LENS_FOCUS[(kind, 'out')]
     return None

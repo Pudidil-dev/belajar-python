@@ -1,12 +1,13 @@
 # How an Apheresis Machine Takes Platelets and Returns Your Blood
 
-A 32-second looping vertical medical-science short in 2D 8-bit retro medical-tech pixel art, with an original
+A 48-second looping vertical medical-science short in 2D 8-bit retro medical-tech pixel art, with an original
 120 BPM chiptune and synced sound effects.
 
 The film follows one calm donor's blood through one machine. It leaves the arm and goes through the blood pump. It
 gets anticoagulant and is spun apart. The platelets go into a golden bag, and the rest of the blood goes back into
-the same arm. The hero shot is the separation inside the spinning channel. The last frame flows straight back into
-the first.
+the same arm. The hero shot is the separation inside the spinning channel. The film then shows both outputs
+clearly: what is in the bag (platelets in plasma) and what goes back to the donor (red cells and plasma). The last
+frame flows straight back into the first.
 
 The machine is a generic bedside apheresis console with no brand or logo. Its shape follows the common layout of
 real consoles: a wide, low cabinet with the pumps on a sloped front deck, the centrifuge under a round lid on top,
@@ -18,37 +19,47 @@ Labels in Bahasa Indonesia (`--lang id`): [docs/storyboard_id.png](docs/storyboa
 
 ## Ringkasan (Bahasa Indonesia)
 
-Video 32 detik, vertikal 1080×1920, pixel art 8-bit bergaya alat medis retro, berulang (loop) tanpa sambungan:
+Video 48 detik, vertikal 1080×1920, pixel art 8-bit bergaya alat medis retro, berulang (loop) tanpa sambungan:
 
-1. **0–3 dtk.** Close-up lengan donor. Jarum sudah terpasang dan diplester, dan darah sudah mengalir di selang.
-   Kamera ikut bergerak sepanjang selang menuju mesin (label AMBIL).
-2. **3–6 dtk.** Kamera masuk ke dalam selang. Sel darah merah (cakram bikonkaf merah tua), trombosit emas kecil,
-   beberapa sel darah putih dan plasma kuning pucat masih bercampur.
-3. **6–9 dtk.** Pompa darah (rotor merah) di panel depan mesin, dalam tampilan potong. Dua roller menekan dan
-   melepas selang bergantian sehingga darah terdorong maju ("klik-klik").
-4. **9–11 dtk.** Pompa antikoagulan (rotor biru) mengalirkan antikoagulan, dan selangnya bergabung di sambungan Y di
-   bawah tutup sentrifus. Close-up singkat: sitrat menangkap ion kalsium ("tik"), jadi darah tidak membeku di selang.
-5. **11–15 dtk.** Darah naik ke sentrifus di bawah tutup bundar di atas mesin. Kamera mundur memperlihatkan seluruh
-   mesin saat rotor mulai berputar, lalu masuk lagi ke saluran pemisah.
-6. **15–21 dtk.** Inti film. Darah yang tercampur memilah diri menurut massa jenis: sel darah merah ke dinding luar,
-   plasma tetap di bagian dalam, dan pita trombosit emas terbentuk di antaranya lalu menuju lubang keluarnya sendiri.
-7. **21–25 dtk.** Aliran trombosit emas naik ke kantong yang tergantung. Kantong terisi produk kuning keemasan pucat
-   (label TROMBOSIT).
-8. **25–29 dtk.** Layar berganti ke KEMBALI dan pompa darah berputar ke arah sebaliknya. Sisa darah (sel darah
-   merah dan plasma) kembali lewat jalur yang sama ke lengan yang sama. Satu jarum: mengambil dan mengembalikan
-   bergantian, tidak pernah bersamaan.
-9. **29–30,5 dtk.** Kamera mundur memperlihatkan seluruh sistem: donor yang tenang, selang, mesin dan kantong emas
-   (label TROMBOSIT TERKUMPUL).
-10. **30,5–32 dtk.** Kamera meluncur kembali ke close-up lengan. Frame terakhir menyambung ke frame pertama.
+1. **0–4,4 dtk.** Close-up lengan donor dengan tangan yang rileks. Jarum sudah tertutup plester, dan selang bening
+   berisi darah yang mengalir bertumpu di atas tangan. Kamera mengikuti selang menuju mesin (label AMBIL / DARAH KE
+   MESIN).
+2. **4,4–10,6 dtk.** Sebuah lensa pembesar bulat terbuka di atas selang. Di dalamnya sel darah merah, trombosit, sel
+   darah putih dan plasma masih tercampur. Lensa lalu menutup ke darah yang masuk ke pompa.
+3. **10,6–14,4 dtk.** Pompa darah (rotor merah) dalam tampilan potong. Dua roller menekan selang bergantian dan
+   mendorong darah ("klik-klik").
+4. **14,4–21 dtk.** Pompa antikoagulan (rotor biru), dan selangnya bergabung di sambungan Y. Lensa terbuka: sitrat
+   mengikat ion kalsium ("tik"), jadi darah tidak membeku.
+5. **21–26,4 dtk.** Darah masuk ke sentrifus di bawah tutup bundar. Kamera mundur memperlihatkan seluruh mesin saat
+   rotor mulai berputar, lalu lensa terbuka ke saluran pemisah.
+6. **26,4–34,4 dtk.** Inti film. Sel darah merah (paling berat) ke dinding luar, plasma (paling ringan) di dalam,
+   dan pita trombosit emas di tengah. Pita trombosit keluar lewat lubangnya sendiri.
+7. **34,4–40 dtk.** **Keluaran 1:** aliran trombosit naik ke kantong. Tetesan jatuh ke dalam kantong dan isinya
+   naik. Gelembung pembesar memperlihatkan isinya: trombosit dalam plasma.
+8. **40–45 dtk.** **Keluaran 2:** layar berganti ke KEMBALI dan pompa berputar balik. Gelembung pembesar
+   memperlihatkan yang dikembalikan: sel darah merah + plasma. Kamera mengikuti darah kembali ke lengan.
+9. **45–48 dtk.** Kamera mundur memperlihatkan seluruh sistem dengan kedua keluaran (TROMBOSIT TERKUMPUL, DARAH
+   DIKEMBALIKAN), lalu meluncur kembali ke close-up lengan.
+
+**Yang direvisi di versi ini:**
+- **Lengan dan tangan:** bentuknya lebih alami. Lengan atas, siku dan lengan bawah dibuat meruncing ke pergelangan,
+  dan tangannya rileks dengan ibu jari, garis jari dan kuku.
+- **Selang:** sekarang berupa tabung bening yang halus, dengan sisi terang dan sisi gelap, kilap, dan sel darah yang
+  mengalir di dalamnya. Tidak lagi seperti rantai manik-manik.
+- **Transisi antar adegan:** lensa pembesar bulat yang membuka dan menutup dengan tenang (sekitar 1 detik), tanpa
+  potongan blok yang berkedip. Gerak kamera juga lebih pelan.
+- **Penjelasan:** label menempel pada bendanya dan kini berisi nama plus satu baris penjelasan singkat, misalnya
+  "POMPA DARAH / ROLLER MENDORONG DARAH". Keluaran darah (isi kantong, dan yang dikembalikan ke donor) ditampilkan
+  dengan gelembung pembesar.
+- **Durasi:** 48 detik (sebelumnya 32), supaya setiap langkah sempat terbaca.
 
 **Bentuk mesin:** konsol apheresis generik tanpa merek atau logo, mengikuti bentuk mesin sungguhan. Badannya lebar dan
 rendah, berwarna putih keabu-abuan dengan panel diagonal abu-abu. Dua pompa (rotor biru dan merah) ada di panel depan
 yang miring, bersama klem hitam dan drip chamber di ceruk depan. Sentrifus ada di bawah tutup bundar di atas mesin,
 layar sentuh berdiri di atas tiang dengan tombol stop merah, dan ada dua tiang infus berkait merah dan biru.
 
-Tidak ada narasi dan tidak ada subtitle, hanya label kecil yang menempel pada bendanya. Default bahasa Inggris,
-`--lang id` untuk Bahasa Indonesia, `--clean` tanpa label sama sekali. **Video akhir tidak dirender di sini; kamu
-render sendiri dengan perintah di bawah.**
+Tidak ada narasi dan tidak ada kotak caption, hanya label yang menempel pada bendanya. Default bahasa Inggris,
+`--lang id` untuk Bahasa Indonesia, `--clean` tanpa label sama sekali.
 
 ## Render it yourself (copy-paste)
 
@@ -67,12 +78,12 @@ python render.py
 | Step | Command (run inside `belajar-python/apheresis-animation`) | Result |
 |---|---|---|
 | Install | `pip install -r requirements.txt` | numpy, Pillow, imageio-ffmpeg |
-| Preview | `python render.py --preview` | `out/preview.mp4`: half size (540×960) with sound, about 30 s to make |
+| Preview | `python render.py --preview` | `out/preview.mp4`: half size (540×960) with sound, under a minute to make |
 | Render | `python render.py` | `out/apheresis.mp4`: the final film |
 
 **Output path:** `belajar-python/apheresis-animation/out/apheresis.mp4`. It is a vertical 9:16 H.264 MP4, 1080×1920,
-30 fps, exactly 32.000 s (960 frames), with synchronized AAC 48 kHz stereo audio. On a 4-core machine it takes
-about a minute; slower machines take a few minutes.
+30 fps, exactly 48.000 s (1440 frames), with synchronized AAC 48 kHz stereo audio. On a 4-core machine it takes
+about one to two minutes; slower machines take a few minutes.
 
 Already have the repository? Use these commands instead of the clone:
 
@@ -98,44 +109,45 @@ On Windows, write `py` instead of `python` if `python` is not found. On some Lin
 More options:
 
 ```bash
-python render.py --stills 0,6.6,13.4,30.3       # full-size PNG frames -> out/stills/
-python render.py --sheet 0:32:1 --cols 8        # contact sheet -> out/sheet.png
-python render.py --from 15 --to 21 --out out/slice.mp4   # just a slice (with its part of the soundtrack)
+python render.py --stills 0,12.4,31,38.8        # full-size PNG frames -> out/stills/
+python render.py --sheet 0:48:2 --cols 8        # contact sheet -> out/sheet.png
+python render.py --from 26 --to 34 --out out/slice.mp4   # just a slice (with its part of the soundtrack)
 python render.py --audio-only                   # soundtrack only -> out/music.wav, out/sfx.wav, out/mix.wav
 python render.py --scale 8                      # 2160x3840 (4K vertical) instead of 1080x1920
 ```
 
-## Scene by scene (120 BPM, one bar = 2 s, 16 bars, looping)
+## Scene by scene (120 BPM, one bar = 2 s, 24 bars, looping)
 
 | Time (s) | Scene | What you see | Sound |
 |---|---|---|---|
-| 0–3 | 1 The arm | Close-up of the donor's forearm on the armrest. The needle is already taped in, and red blood is already moving in the clear tube. After a short hold the camera slides along the tube toward the machine. | a soft double pulse, a flow whoosh, the calm first bar |
-| 3–6 | 2 Inside the tube | A stepped pixel cut dives into the tube. Deep-red biconcave red cells tumble past (some tilted, some edge-on) with small gold platelets and a few pale white cells, all in pale-yellow plasma, still mixed. They flow fastest in the middle of the tube. A stepped cut back out lands on the pump. | a quick whoosh with falling blips at each cut, little sparkle tones |
-| 6–9 | 3 Peristaltic pump | The blood pump on the front deck, in cutaway: a black housing, a red rotor with a white bar and a roller at each end, and the tube running round the raceway. Each roller pinches the tube against the raceway and pushes a pocket of blood forward, and the tube springs open again behind it. The camera then follows the blood out. | a click for every roller (on the eighth notes), a soft motor hum, an arpeggio locked to the clicks |
-| 9–11 | 4 Anticoagulant | The anticoagulant pump (blue rotor) turns slowly, and its mint line joins the blood line at a Y fitting just below the centrifuge lid. A quick zoom shows a citrate molecule closing onto a calcium ion (two-frame gold flash), then the camera goes back out to the flow. | one **tik** at 10.1 s; the music ducks around it |
-| 11–15 | 5 Into the centrifuge | The blood runs up into the centrifuge under the round lid on top of the machine. The camera pulls out to show the whole machine as the rotor spins up under the lid: its spokes blur into rings and motion streaks. Then it pushes back in to the separation channel. | a rising whirr, then a steady spin tone; a spinning 16th-note arpeggio |
-| 15–21 | 6 Separation (hero) | A curved section of the spinning channel; the camera holds still and drifts slightly with the platelet band. The mixed blood sorts itself. Red cells drift to the outer wall and pack into a deep-red layer, plasma stays on the inner side, and a gold platelet band forms between them, with the few white cells right next to it. The band then slides toward its own exit port. | a crash at 15 s, small rising ticks 16.5–19 s, a rising tone as the platelets leave |
-| 21–25 | 7 Platelet bag | A stepped cut back out to the lid. The gold platelet stream runs up its line, past the screen, into the bag hanging on the right pole, which fills slowly with a pale-gold product. | soft filling bubbles, then a bright little reward tone at 24.5 s |
-| 25–29 | 8 Return | The screen flips to RETURN, and the blood pump turns the other way while the anticoagulant pump rests. The remaining blood (red cells and plasma) goes back the way it came: out of the centrifuge, back through the blood pump and the drip chamber, along the same tube into the same arm. | a phase-switch click, a whoosh, a soft flow |
-| 29–30.5 | 9 Reveal | The screen flips back to DRAW, and the camera pulls out to the whole setup. You see the calm donor (a silhouette under a blanket), the tubing, the machine with its screen and poles, the mint anticoagulant bag and the golden platelet bag. The wide shot holds. | the phase click, a crash, a three-note success chime at 29.5 s |
-| 30.5–32 | 10 Back to the arm | The camera glides back into the opening close-up, and blood flows toward the machine again. The last frame flows into the first, with no fade and no freeze. | a rising swoosh and a drum fill back into bar 1 |
+| 0–4.4 | 1 The arm | Close-up of the donor's arm on the armrest, with a relaxed hand. The needle is already in place under tape, and the clear tube rests on the hand with red blood already moving in it. After two quiet seconds the camera follows the tube toward the machine. | a soft double pulse, a gentle flow, the calm first bar |
+| 4.4–10.6 | 2 Inside the tube | A round magnifier lens opens on the tube (about 1 s). Inside, deep-red biconcave red cells tumble past with small gold platelets and a white cell, all in pale-yellow plasma, still mixed and fastest in the middle. The lens then closes onto the blood entering the pump. | a soft rising bloop in, little sparkle tones, a falling bloop out |
+| 10.6–14.4 | 3 Blood pump | The blood pump on the front deck, in cutaway: a black housing, a red rotor with a white bar and a roller at each end, and the tube running round the raceway. Each roller pinches the tube and pushes a pocket of blood forward, and the tube springs open again behind it. | a click for every roller (on the eighth notes), a soft motor hum, an arpeggio locked to the clicks |
+| 14.4–21 | 4 Anticoagulant | The camera glides to the anticoagulant pump (blue rotor) and the Y fitting where its mint line joins the blood. A lens opens on the fitting: a citrate molecule closes onto a calcium ion (two-frame gold flash), then the lens closes again. | one **tik** at 18.6 s over a soft held chord |
+| 21–26.4 | 5 Into the centrifuge | The blood runs into the centrifuge under the round lid. The camera pulls out to the whole machine as the rotor spins up, then pushes back in, and a lens opens on the separation channel. | a rising whirr, then a steady spin tone |
+| 26.4–34.4 | 6 Separation (hero) | A curved section of the spinning channel. The mixed blood sorts itself: red cells drift to the outer wall, plasma stays inside, and a gold platelet band forms between them with the white cells close by. The camera drifts to the port where the platelet band leaves, and the lens closes onto the platelet outlet. | a spinning 16th-note arpeggio, small rising ticks, a rising tone as the platelets leave |
+| 34.4–40 | 7 Output 1: the bag | The gold platelet line runs up into the bag on the right pole. Drops fall in, each with a ripple, and the level rises. A magnifier bubble beside the bag shows what is inside: platelets in plasma. | a plip for each drop, a soft pop for the bubble, a reward tone at 39.4 s |
+| 40–45 | 8 Output 2: back to the donor | The screen flips to RETURN, and the blood pump turns the other way while the anticoagulant pump rests. A bubble shows what goes back: red cells and plasma. The camera follows that blood along the same tube into the same arm. | a phase-switch click, the pump clicking backwards, a soft flow |
+| 45–48 | 9 Both outputs, then the loop | The screen flips back to DRAW and the camera pulls out to the whole setup, labelled PLATELETS COLLECTED and BLOOD RETURNED. Then it glides back into the opening close-up. The last frame flows into the first. | the phase click, a crash, a three-note success chime, a fill back into bar 1 |
 
 ## Labels (default; `--clean` removes them)
 
-There is no narration, no subtitle and no caption box. Each label is one or two words on a small dark plate, pinned
-to the thing it names by a dotted leader line. It types in quickly and follows that thing on screen through camera
-moves.
+There is no narration and no caption box. Each label is a name and, where it helps, one short line about what the
+thing does. It sits on a small dark plate joined to the thing by a dotted leader line, types in quickly and follows
+it on screen. The first line is white; the second is in the colour of the subject.
 
 | Time (s) | English | Indonesian (`--lang id`) | Pinned to |
 |---|---|---|---|
-| 0.7–2.8 | DRAW | AMBIL | the tube ahead of the camera |
-| 3.7–5.5 | RBC · PLATELETS · PLASMA | SEL DARAH MERAH · TROMBOSIT · PLASMA | one red cell and one platelet (moving with the flow), the plasma near the wall |
-| 8.55–9.55 | ANTICOAGULANT | ANTIKOAGULAN | the anticoagulant line between its pump and the Y fitting |
-| 9.75–10.5 | CITRATE · CALCIUM | SITRAT · KALSIUM | the citrate molecule and the calcium ion it catches |
-| 16.8–20.9 | RBC · PLATELETS · PLASMA | SEL DARAH MERAH · TROMBOSIT · PLASMA | the outer red layer, the gold band, the pale inner layer |
-| 23.0–25.0 | PLATELETS | TROMBOSIT | the collection bag |
-| 26.9–28.95 | RETURN | KEMBALI | the line as the blood flows back (the screen already says RETURN before that) |
-| 29.7–30.7 | PLATELETS COLLECTED | TROMBOSIT TERKUMPUL | the bag in the wide shot |
+| 2.0–4.3 | DRAW / BLOOD TO THE MACHINE | AMBIL / DARAH KE MESIN | the tube |
+| 6.0–9.3 | RED CELL · PLATELETS · WHITE CELL · PLASMA / ALL STILL MIXED | SEL DARAH MERAH · TROMBOSIT · SEL DARAH PUTIH · PLASMA / MASIH TERCAMPUR | one cell of each kind, moving with the flow |
+| 11.2–14.2 | BLOOD PUMP / ROLLERS PUSH THE BLOOD | POMPA DARAH / ROLLER MENDORONG DARAH | the pump rotor |
+| 15.0–16.55 | ANTICOAGULANT / STOPS CLOTTING | ANTIKOAGULAN / CEGAH PEMBEKUAN | the anticoagulant line |
+| 17.8–19.95 | CITRATE · CALCIUM, then CALCIUM HELD / SO NO CLOT FORMS | SITRAT · KALSIUM, then KALSIUM DIIKAT / JADI TIDAK MEMBEKU | the molecule and the ion |
+| 22.6–24.4 | CENTRIFUGE / SPINS VERY FAST | SENTRIFUS / BERPUTAR SANGAT CEPAT | the lid |
+| 28.0–33.2 | RED CELLS / HEAVIEST: OUTSIDE · PLATELETS / IN THE MIDDLE · PLASMA / LIGHTEST: INSIDE · PLATELETS / LEAVE HERE | SEL DARAH MERAH / PALING BERAT: LUAR · TROMBOSIT / DI TENGAH · PLASMA / PALING RINGAN: DALAM · TROMBOSIT / KELUAR DI SINI | the three layers and the platelet port |
+| 36.6–39.95 | PLATELETS / COLLECTED · IN THE BAG: / PLATELETS IN PLASMA | TROMBOSIT / TERKUMPUL · ISI KANTONG: / TROMBOSIT + PLASMA | the bag and its bubble |
+| 41.4–44.95 | GOING BACK: / RED CELLS + PLASMA · BACK TO / THE DONOR | DIKEMBALIKAN: / SEL MERAH + PLASMA · KEMBALI / KE DONOR | the return bubble and the arm |
+| 45.7–46.8 | PLATELETS COLLECTED · BLOOD RETURNED | TROMBOSIT TERKUMPUL · DARAH DIKEMBALIKAN | the bag and the arm in the wide shot |
 
 The machine screen also shows the phase as a word, an arrow and a gold yield bar: DRAW (arrow toward the machine)
 or RETURN (arrow toward the donor).
@@ -165,7 +177,7 @@ or RETURN (arrow toward the donor).
   thin middle, so an edge-on cell looks like a rounded bar.
 - **Simplified on purpose.**
   - Time is compressed. A real platelet donation repeats many draw/return cycles and takes well over an hour; the
-    film shows one cycle in 32 seconds.
+    film shows one cycle in 48 seconds.
   - In real machines the anticoagulant usually joins the draw line close to the needle, before the blood pump, so
     the blood is anticoagulated from the very start. The film puts the junction after the pump (the order of the
     brief), so the pump and the anticoagulant each get their own scene.
@@ -173,8 +185,8 @@ or RETURN (arrow toward the donor).
     single-needle machines do. Others collect blood in a reservoir and send it back with a separate return pump.
   - The citrate molecule is a small icon that closes like a claw. Cells, molecules and the channel are not to scale,
     and the colours are stylized (real platelet concentrate is a pale straw colour).
-- **The donor** is shown only as an arm close-up and a calm silhouette under a blanket, with no drawn face
-  (huashu-art-motion character rule). Nothing graphic is shown: the needle is already in place under tape.
+- **The donor** is shown only as an arm with a relaxed hand and a calm silhouette under a blanket, with no drawn
+  face (huashu-art-motion character rule). Nothing graphic is shown: the needle is already in place under tape.
 
 ## The machine
 
@@ -192,14 +204,19 @@ consoles (the reference photo in the request was one of them):
 
 ## Format and style
 
-- 270×480 working canvas, upscaled exactly 4× (nearest neighbour) to 1080×1920; 30 fps; 32.000 s; H.264 (yuv420p,
+- 270×480 working canvas, upscaled exactly 4× (nearest neighbour) to 1080×1920; 30 fps; 48.000 s; H.264 (yuv420p,
   CRF 16) + AAC 256 kb/s 48 kHz stereo.
 - 2D 8-bit retro medical-tech style:
   - chunky pixel sprites with 1-px outlines and flat pixel-cluster shading (no gradients, no glow);
   - every shape is drawn per canvas pixel at the current zoom, so the art stays crisp at every scale;
   - separate artwork for the clinic, the blood stream inside the tube, the citrate–calcium close-up and the spinning
     separation channel;
-  - stepped pixel cuts (rings of 12-px blocks in four steps) between those artworks, no cross-fades.
+  - between those artworks, a round magnifier lens opens over the spot being explained and grows to fill the screen
+    (about 1 s, eased), then shrinks back onto the next spot; no flashes, no block cuts, no cross-fades;
+  - the tubing is drawn per pixel as one smooth clear tube: a lit and a shaded side, a glossy band, an outline, and
+    cells (or gold and mint flecks) moving inside at the speed of the flow; under a pump roller it squeezes flat;
+  - the arm is built from tapered limbs (upper arm, elbow, forearm narrowing to the wrist) with a relaxed hand, a
+    thumb, finger lines and a nail, and two strips of tape.
 - Palette:
   - dark navy #0D1B2A background;
   - off-white machine #EEF1F4;
@@ -212,7 +229,8 @@ consoles (the reference photo in the request was one of them):
 
 ## Sound
 
-The music is an original 16-bar chiptune in F major at 120 BPM (chords F Dm Bb C | F Dm Bb C | Dm Bb F C | Dm Bb C C):
+The music is an original 24-bar chiptune in F major at 120 BPM (chords F Dm Bb C | F Dm Bb C | Dm Bb F C |
+F Dm Bb C | Bb C Am Dm | Bb C F C):
 - a square-wave lead with a short echo;
 - a bouncy triangle octave bass;
 - light arcade drums.
@@ -220,21 +238,21 @@ The music is an original 16-bar chiptune in F major at 120 BPM (chords F Dm Bb C
 The arrangement follows the picture:
 - The first bar is calm: a half-time kick under the soft pulse.
 - In the pump bars the melody rests and an eighth-note arpeggio locks to the pump clicks.
-- The music ducks around the anticoagulant tik.
+- In the citrate bar the beat thins to a soft held chord, and the music ducks around the tik.
 - The separation bars add a spinning 16th-note arpeggio, and the bag bars add little bell answers.
 - A short snare fill in the last bar leads back into bar 1, so the loop restarts on the downbeat.
 
 **Sound effects:**
-- a soft pulse and a flow whoosh on the opening;
-- tube flow whooshes while the camera travels;
-- quick whooshes with falling blips on each stepped cut, sparkle tones in the stream;
+- a soft pulse and a gentle flow on the opening;
+- a soft rising "bloop" when a magnifier lens opens and a falling one when it closes (no whooshes);
+- sparkle tones in the stream;
 - one click per roller, with a soft pump hum;
 - one tik when citrate catches calcium;
 - the rising spin-up whirr and the steady spin tone;
 - small ticks as the layers separate, a rising tone as the platelets leave;
-- bag-fill bubbles and the reward tone;
-- phase-switch clicks, the return whoosh and flow;
-- the success chime on the reveal, the swoosh back into the loop;
+- a plip for each drop that lands in the bag, a soft pop for each bubble, the reward tone;
+- phase-switch clicks, the pump clicking backwards, the return flow;
+- the success chime on the wide shot;
 - tiny pops when a label appears (left out with `--clean`).
 
 All of it is synthesized from code on a circular bus, so the end flows into the start. It is mastered to −14 LUFS
@@ -252,30 +270,30 @@ with a −1 dBTP ceiling.
 | `assets/audio/` | Not in git: `python render.py --assets` writes the music, effects and mix stems here. |
 | `out/` | Renders go here (not in git). |
 | `engine/timeline.py` | The clock, the machine layout and the choreography: events on the beat grid, tube paths, flows, both pump rotors, the centrifuge rotor, separation progress, bag level, DRAW/RETURN phase, every camera move. |
-| `engine/world.py` | The clinic: room, chair and donor silhouette, arm, tubing with moving blood, and the machine: cabinet, deck, both pump heads, clamps, drip chamber, centrifuge lid, touchscreen, IV poles, bags. |
+| `engine/world.py` | The clinic: room, chair and donor silhouette, the arm and hand, the per-pixel tubing with cells flowing inside, and the machine: cabinet, deck, both pump heads, clamps, drip chamber, centrifuge lid, touchscreen, IV poles, bags (with drops falling in). |
 | `engine/micro.py` | The close-ups: biconcave red cells, platelets, white cells, the stream inside the tube, citrate and calcium, the separation channel. |
-| `engine/scene.py` | Which view is on screen, the stepped pixel cuts, the labels. |
-| `engine/labels.py` | The tiny context labels (English and Indonesian, anchors, placement). |
+| `engine/scene.py` | Which view is on screen, the magnifier lens between views, the two 'what comes out' bubbles, the labels. |
+| `engine/labels.py` | The explanation labels: name plus one short line, English and Indonesian, anchors, placement. |
 | `engine/audio.py`, `engine/synth.py` | Music and sound effects. |
 | `engine/pen.py`, `engine/gfx.py`, `engine/view.py`, `engine/palette.py`, `engine/pixfont.py` | Pixel helpers, camera, palette, bitmap font. |
 
 ## Checks run on this project
 
-The final film was not rendered here (as asked). These checks ran on the code and on half-size previews:
+These checks ran on the code and on half-size previews:
 
-- **Shot list lint** (`storyboard_lint.py`): green, 9 shots, 32 s.
-- **Film gate** (`film_gate.py --no-template`) on a half-size preview: **pass**. Fast-motion frames 52.7%, no empty
-  frames, no blue-purple. One yellow note: about 9 push-ins per minute. The brief asks for three dives (into the tube,
-  into the citrate close-up, into the channel) plus the zoom in and out around the spin-up. Each push-in is followed
-  by a pull back or a stepped cut back out, so the camera never just keeps pushing.
-- **Muted, phone-size check** (360×640 frames): the story reads without sound or labels (red tube → mixed cells →
-  red pump → mint line joins → red/gold/pale layers under the lid → gold bag → wide shot). The machine parts read at
-  that size: both rotors, the clamps, the drip chamber, the lid, the screen and the poles. The labels are readable
-  and stay clear of the frame edges.
-- **Loop seam:** the frame at 32.0 s is pixel-identical to frame 0. The step from the last frame to the first
-  changes 0.49% of the pixels, the same as a normal frame step (0.51–0.64%). The camera lands on the opening framing
-  three frames early, and the flow texture in each tube moves a whole number of dashes per loop.
-- **Determinism:** the same frames rendered in a fresh clone are identical.
-- **Audio** (measured, not listened to): 32.000 s, 48 kHz stereo, −14.0 LUFS, true peak −1.15 dBTP. The pump clicks,
-  the tik, the reward tone and the success chime sit within about 3 dB of the music around them. The flows and
-  bubbles sit lower as texture. The loop point has no click.
+- **Shot list lint** (`storyboard_lint.py`): 12 shots, 48 s, no red. One yellow: the first shot has a label. It
+  appears only after two seconds of picture, and it names what the whole film is about (DRAW: blood to the
+  machine).
+- **Film gate** (`film_gate.py --no-template`) on a half-size preview: **pass**. Fast-motion frames 38.2%, no empty
+  frames, no blue-purple, no cross-fades. One yellow note: about 9 push-ins per minute (down from 11 before the
+  pushes under the lenses were softened). Those are the three magnifier lenses opening; each is followed by the
+  lens closing and a pull back, so the camera never just keeps pushing.
+- **Muted, phone-size check** (360×640 frames): the story reads without sound (arm → magnifier into the tube →
+  pump → mint line joins → layers in the channel → bag with its bubble → return bubble → wide shot), and the
+  two-line labels are readable at that size and stay clear of the frame edges.
+- **Loop seam:** the frame at 48.0 s is pixel-identical to frame 0. The step from the last frame to the first
+  changes 0.32% of the pixels, the same as a normal frame step (0.31–0.42%). The camera lands on the opening framing
+  three frames early, and the cells in each tube move a whole number of spacings per loop.
+- **Determinism:** the same frames rendered twice are identical.
+- **Audio** (measured, not listened to): 48.000 s, 48 kHz stereo, −14.0 LUFS, true peak −1.15 dBTP. The loop point
+  has no click.

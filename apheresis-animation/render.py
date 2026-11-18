@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Render "How an Apheresis Machine Takes Platelets and Returns Your Blood": a 32-second looping 8-bit pixel-art medical-tech short.
+"""Render "How an Apheresis Machine Takes Platelets and Returns Your Blood": a 48-second looping 8-bit pixel-art medical-tech short.
 
     python render.py                      # the film -> out/apheresis.mp4 (1080x1920, 30 fps, stereo)
     python render.py --preview            # quick half-size check -> out/preview.mp4 (540x960)
-    python render.py --stills 0,6.6,13.4,30.3   # full-size PNG frames -> out/stills/
-    python render.py --sheet 0:32:1       # one contact sheet (canvas size) -> out/sheet.png
+    python render.py --stills 0,12.4,31,38.8    # full-size PNG frames -> out/stills/
+    python render.py --sheet 0:48:2       # one contact sheet (canvas size) -> out/sheet.png
     python render.py --from 4 --to 10 --out out/slice.mp4   # just a slice
     python render.py --audio-only         # only the soundtrack -> out/music.wav, out/sfx.wav, out/mix.wav
     python render.py --lang id            # the short explanation in Bahasa Indonesia -> out/apheresis_ID.mp4
@@ -114,12 +114,12 @@ def render_stills(a):
 
 def render_sheet(a):
     from PIL import Image, ImageDraw
-    from engine import scene
+    from engine import scene, timeline as T
     if ':' in a.sheet:
         s0, s1, step = map(float, a.sheet.split(':'))
         ts, v = [], s0
         while v <= s1 + 1e-9:
-            ts.append(round(min(v, 31.99), 4))
+            ts.append(round(min(v, T.TOTAL - 0.01), 4))
             v += step
     else:
         ts = [float(x) for x in a.sheet.split(',')]
@@ -149,9 +149,9 @@ def export_assets(a):
     sp = ROOT / 'assets' / 'sprites'
     sp.mkdir(parents=True, exist_ok=True)
     big = lambda im: Image.fromarray(im).resize((im.shape[1] * 4, im.shape[0] * 4), Image.NEAREST)
-    for name, t in (('arm_draw', 0.0), ('blood_stream', 4.4), ('pump', 6.6), ('citrate_calcium', 10.15),
-                    ('machine', 13.4), ('separation', 20.3), ('platelet_bag', 24.6), ('return', 26.4),
-                    ('wide_reveal', 30.2)):
+    for name, t in (('arm_draw', 0.0), ('blood_stream', 7.5), ('pump', 12.4), ('citrate_calcium', 19.0),
+                    ('machine', 23.8), ('separation', 31.0), ('platelet_bag', 38.8), ('return', 41.8),
+                    ('wide_reveal', 46.2)):
         big(scene.render_canvas(t, False, a.lang)).save(sp / f'{name}.png')
 
     def tile(draw, w=64, h=64, z=3.0, bg=P.PLASMA[2]):
