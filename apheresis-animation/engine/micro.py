@@ -115,63 +115,85 @@ def wbc(pen, x, y, r):
 
 # ------------------------------------------------------------------ stream (inside the tube)
 _rng = np.random.default_rng(5)
-TUBE_R = 70.0
+TUBE_R = T.TUBE_R
 WRAP = 340.0                       # the cells repeat every WRAP units around the camera, so the stream never thins
-CAM_V = 58.0                       # the camera drifts with the flow (units per second)
-_N_RBC, _N_PLT, _N_WBC = 40, 22, 2
+_N_RBC, _N_PLT, _N_WBC, _N_CIT = 40, 22, 2, 26
 S_RBC = np.c_[_rng.uniform(0, WRAP, _N_RBC), _rng.uniform(-60, 60, _N_RBC), _rng.uniform(0, 6.3, _N_RBC),
               _rng.uniform(0.0, 1.4, _N_RBC)]
 S_PLT = np.c_[_rng.uniform(0, WRAP, _N_PLT), _rng.uniform(-63, 63, _N_PLT), _rng.uniform(0, 6.3, _N_PLT)]
 S_WBC = np.c_[np.array([-28.0, 150.0]), np.array([-22.0, 30.0])]
+S_CIT = np.c_[_rng.uniform(0, WRAP, _N_CIT), _rng.uniform(-64, 64, _N_CIT)]      # citrate from the anticoagulant
 
 
 def _v(y):
-    return 22.0 + 64.0 * (1 - (y / TUBE_R) ** 2)               # faster in the middle of the tube
+    return T.flow_speed(y)
 
 
-def _cam_x(t):
-    return 40.0 + CAM_V * (t - T.STREAM[1])
+def _clear_parcel():
+    """Move any cell that would pass through the plasma parcel the camera dives into to another lane."""
+    qx0, qy = T.X_Q0, T.Y_Q
+    for arr, rad in ((S_RBC, 11.0), (S_PLT, 4.0), (S_WBC, 15.0)):
+        for i in range(len(arr)):
+            for t in np.linspace(12.0, 20.5, 60):
+                e = t - T.IN_TUBE[0]
+                d = (arr[i, 0] + _v(arr[i, 1]) * e) - (qx0 + _v(qy) * e)
+                d = (d + WRAP / 2) % WRAP - WRAP / 2
+                if abs(d) < rad + 14 and abs(arr[i, 1] - qy) < rad + 14:
+                    arr[i, 1] = (36.0 + (i * 7) % 24) * (1 if i % 2 else -1)
+                    break
+
+
+_clear_parcel()
 
 
 def stream_camera(t):
-    return View(_cam_x(t), 0.0, 1.7)
+    return View(T.stream_cam_u(t), 0.0, T.STREAM_Z)
 
 
-def stream_pos(kind, i, t):
-    e = t - T.STREAM[1]
+def stream_pos(kind, i, t, cx=None):
+    """Position of a particle in the stream (stream units), repeated every WRAP around the camera centre cx."""
+    e = t - T.IN_TUBE[0]
     if kind == 'rbc':
         x, y = S_RBC[i, 0], S_RBC[i, 1]
     elif kind == 'plt':
         x, y = S_PLT[i, 0], S_PLT[i, 1]
+    elif kind == 'cit':
+        x, y = S_CIT[i, 0], S_CIT[i, 1]
     else:
         x, y = S_WBC[i, 0], S_WBC[i, 1]
     x = x + _v(y) * e
-    cx = _cam_x(t)
+    if cx is None:
+        cx = T.stream_cam_u(t)
     x = cx + ((x - cx + WRAP / 2) % WRAP) - WRAP / 2
     return x, y + 2.0 * math.sin(e * 2.0 + i)
 
 
 def stream(pen, t):
+    """Inside the tube: plasma, red cells, platelets, a white cell and specks of citrate, all flowing together."""
     buf = pen.buf
-    e = t - T.STREAM[1]
-    buf[...] = P.NAVY[1]
+    e = t - T.IN_TUBE[0]
+    cx = pen.view.cx
+    buf[...] = P.PLASMA[2]
     bx = (0, 0, W, H)
     U, V = pen.grid(bx)
-    inside = np.abs(V) < TUBE_R
-    put(buf, bx, inside, P.PLASMA[2])
-    put(buf, bx, inside & ((np.floor((U - _v(V) * e) / 9) + np.floor(V / 7)) % 11 == 0), P.PLASMA[3])
-    wall = (np.abs(V) >= TUBE_R) & (np.abs(V) < TUBE_R + 9)
-    put(buf, bx, wall, P.TUBE[2])
-    put(buf, bx, wall & (np.abs(np.abs(V) - TUBE_R - 2) < 0.6), P.TUBE[3])
-    put(buf, bx, wall & (np.abs(np.abs(V) - TUBE_R - 8.5) < 0.6), P.TUBE[1])
+    if pen.z < 3.0:                                                  # a faint flow texture at the reading scale
+        put(buf, bx, np.broadcast_to((np.floor((U - _v(V) * e) / 9) + np.floor(V / 7)) % 11 == 0, buf.shape[:2]),
+            P.PLASMA[3])
+    for i in range(_N_CIT):
+        x, y = stream_pos('cit', i, t, cx)
+        if pen.z * 1.6 >= 0.6:
+            bx2, m, CU, CV = pen.disc(x, y, 1.6)
+            if bx2 is not None:
+                put(buf, bx2, m, P.MINT[2])
+                pen.outline(bx2, m, P.MINT[1])
     for i in range(_N_WBC):
-        x, y = stream_pos('wbc', i, t)
+        x, y = stream_pos('wbc', i, t, cx)
         wbc(pen, x, y, 15)
     for i in range(_N_RBC):
-        x, y = stream_pos('rbc', i, t)
+        x, y = stream_pos('rbc', i, t, cx)
         rbc(pen, x, y, 11, tilt=0.15 + 1.2 * abs(math.sin(e * 0.5 + S_RBC[i, 2])), psi=S_RBC[i, 3] + e * 0.4)
     for i in range(_N_PLT):
-        x, y = stream_pos('plt', i, t)
+        x, y = stream_pos('plt', i, t, cx)
         platelet(pen, x, y, 4.0, S_PLT[i, 2] + e * 1.5)
 
 
@@ -181,13 +203,13 @@ TARGET = 2
 
 
 def citrate_pos(t):
-    """Citrate drifts in and clicks onto the target calcium ion at T.BIND."""
+    """Citrate drifts in and closes on the target calcium ion at T.BIND."""
     tx, ty = IONS[TARGET]
     end = (tx - 17.0, ty + 2.0)
     if t >= T.BIND:
         d = t - T.BIND
         return end[0] + 6 * d, end[1] - 4 * d
-    u = T.smooth((t - T.MOLECULE[1] + 0.25) / (T.BIND - T.MOLECULE[1] + 0.25))
+    u = T.smooth((t - T.IN_MOL[0] + 0.6) / (T.BIND - T.IN_MOL[0] + 0.6))
     return -70 + (end[0] + 70) * u, -50 + (end[1] + 50) * u + 5 * math.sin(t * 5) * (1 - u)
 
 
@@ -201,12 +223,12 @@ def ion_pos(i, t):
 
 def molecule(pen, t):
     buf = pen.buf
-    buf[...] = P.PLASMA[3]
+    buf[...] = P.PLASMA[2]                                            # the same plasma as the stream around it
     bx = (0, 0, W, H)
     U, V = pen.grid(bx)
-    ring = np.sqrt(U * U + (V * 0.6) ** 2)
-    put(buf, bx, ring > 150, P.NAVY[1])                              # a round "lens" on the scene
-    put(buf, bx, (ring > 146) & (ring <= 150), P.TUBE[2])
+    dots = (np.floor(U / 9) * 7 + np.floor(V / 9) * 13) % 17 == 0                  # sparse water specks
+    put(buf, bx, np.broadcast_to(dots & (np.abs(U % 9 - 4.5) < 0.7) & (np.abs(V % 9 - 4.5) < 0.7), buf.shape[:2]),
+        P.PLASMA[3])
     for i in range(len(IONS)):
         x, y = ion_pos(i, t)
         ib, im, IU, IV = pen.disc(x, y, 9)
@@ -247,7 +269,7 @@ def molecule(pen, t):
 
 
 def molecule_camera(t):
-    return View(-6.0, 8.0, 2.2)
+    return View(T.MOL_C[0], T.MOL_C[1], T.MOL_Z)
 
 
 # ------------------------------------------------------------------ channel (the separation, seen from the rotor)
@@ -263,8 +285,7 @@ PORT_ANG = 0.62                                     # where the platelet port le
 
 
 def channel_camera(t):
-    u = T.smoother((t - T.DIVERT[0]) / (T.DIVERT[1] - T.DIVERT[0]))
-    return View(0.0 + 40.0 * u, 70.0 - 8.0 * u, 2.6)
+    return View(*T.channel_cam(t), T.CH_Z)
 
 
 def _band_r(r0, band, p, k):
@@ -276,7 +297,7 @@ def _band_r(r0, band, p, k):
 def channel_particle(kind, i, t):
     """(x, y) of a particle in the channel at t."""
     p = T.separation(t)
-    e = t - T.SEPARATE[1]
+    e = t - T.SEPARATE[0]
     if kind == 'rbc':
         a0, r0 = C_RBC[i, 0], C_RBC[i, 1]
         band = BAND['rbc']
@@ -344,14 +365,14 @@ def channel(pen, t):
         platelet(pen, x, y, 2.0, C_PLT[i, 2] + t)
 
 
-def channel_point(kind):
-    """World point of a band (for the labels), on the left half of the channel."""
+def channel_point(kind, t=None):
+    """A point on a band (for its label), a little left of the channel camera so it stays in view."""
     r = {'rbc': 130.0, 'plt': 108.0, 'plasma': 90.0}[kind]
-    a = {'rbc': -0.42, 'plt': -0.18, 'plasma': -0.55}[kind]
-    return RC[0] + r * math.sin(a), RC[1] - r * math.cos(a)
+    cx = (T.channel_cam(t)[0] if t is not None else 0.0) - {'rbc': 14.0, 'plt': 6.0, 'plasma': 12.0}[kind]
+    return RC[0] + cx, RC[1] - math.sqrt(max(r * r - cx * cx, 1.0))
 
 
 def channel_port_point():
-    """World point on the platelet port, a little way along it (for its label)."""
+    """World point on the platelet port, just past where it leaves the channel (for its label)."""
     r0 = (BAND['plt'][0] + BAND['plt'][1]) / 2
-    return RC[0] + r0 * math.sin(PORT_ANG) + 30 * 0.55, RC[1] - r0 * math.cos(PORT_ANG) - 30 * 0.85
+    return RC[0] + r0 * math.sin(PORT_ANG) + 8 * 0.55, RC[1] - r0 * math.cos(PORT_ANG) - 8 * 0.85

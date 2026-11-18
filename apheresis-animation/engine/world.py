@@ -248,7 +248,7 @@ def tube(pen, name, t, squeeze=None):
     put(buf, bx, lumen, base)
     if z >= 0.9:
         put(buf, bx, lumen & (side < -0.42 * r_in), shade)
-    if z >= 1.4:
+    if 1.4 <= z < 7.0:
         L = _PERIOD[name]
         shift = flow_shift(name, t)
         for row in (0, 1):
@@ -263,6 +263,7 @@ def tube(pen, name, t, squeeze=None):
             put(buf, bx, m, part)
             if z >= 2.4 and style == 'cell':
                 put(buf, bx, m & (e < 0.22), core)
+    if z >= 1.4:
         put(buf, bx, lumen & (side > 0.38 * r_in) & (side < 0.72 * r_in), gloss)
     pen.outline(bx, wall, P.TUBE[0])
     if z >= 1.0:
@@ -344,6 +345,16 @@ def screen(pen, t):
     if not (0.5 < pen.z < 7.5):
         return
     ret = T.returning(t)
+    if T.done(t):                                                # the donation is complete
+        col = P.MINT[2]
+        if pen.z >= 1.4:
+            w, h = pixfont.text_size('DONE')
+            i, j = pen.view.px(cx, sy0 + 3)
+            gfx.fill(pen.buf, pixfont.text_mask('DONE', int(i - w / 2), int(j)), P.MINT[3])
+        ay = sy0 + 16
+        _segment(pen, (cx - 8, ay), (cx - 3, ay + 5), 1.4, col)
+        _segment(pen, (cx - 3, ay + 5), (cx + 8, ay - 5), 1.4, col)
+        return
     col = P.GOLD[2] if ret else P.TEAL[2]
     if pen.z >= 1.4:
         text = 'RETURN' if ret else 'DRAW'
@@ -402,8 +413,9 @@ def cabinet(pen, t):
 def centrifuge(pen, t):
     """The centrifuge under its round lid, seen from slightly above (an ellipse) through smoked glass."""
     cx, cy = T.CENTRIFUGE
-    K, R = T.LID_K, T.BAY_R
+    K, R = T.lid_k(t), T.BAY_R
     s = R / 36.0
+    c_in, c_out = 80.0 * T.B_C, 140.0 * T.B_C                       # the channel walls (same as the close-up)
     bx = pen.box(cx - R - 4, cy - (R + 4) * K - 1, cx + R + 4, cy + (R + 4) * K + 3, 1)
     if bx is None:
         return
@@ -424,28 +436,22 @@ def centrifuge(pen, t):
     ang = np.arctan2(dy, dx) - T.spin_angle(t)
     sp = T.spin_speed(t)
     if sp < 1.6:                                                 # spokes (blur into rings when fast)
-        put(buf, bx, rot & (rr > 7 * s) & (np.abs(((ang * 3 / math.pi) % 2) - 1) < 0.12) & (rr < 17 * s), P.MACH[0])
+        put(buf, bx, rot & (rr > 7 * s) & (np.abs(((ang * 3 / math.pi) % 2) - 1) < 0.12) & (rr < c_in - 1), P.MACH[0])
     else:
-        put(buf, bx, rot & (rr > 7 * s) & (rr < 17 * s) & (((rr / s).astype(int) % 4) == 0), P.MACH[0])
+        put(buf, bx, rot & (rr > 7 * s) & (rr < c_in - 1) & (((rr / s).astype(int) % 4) == 0), P.MACH[0])
     # the ring-shaped separation channel: mixed blood, sorting into red / gold / pale yellow as it spins
-    tt = t % T.TOTAL
-    sep = T.separation(t) if tt >= T.SEPARATE[1] else 0.0
-    if T.TO_SPIN[0] - 0.2 <= tt < T.SPIN_UP[0] + 0.4:
-        filled = (ang % (2 * math.pi)) < 2 * math.pi * T.clamp01((tt - (T.TO_SPIN[0] - 0.2)) / 1.4)
-    else:
-        filled = np.ones_like(rr, bool)
-    ch = rot & (rr > 18 * s) & (rr < 27 * s)
-    put(buf, bx, ch, P.NAVY[2])
+    sep = T.separation(t)
+    ch = rot & (rr > c_in) & (rr < c_out)
     if sep < 0.5:
-        put(buf, bx, ch & filled, P.RED[3])
-        put(buf, bx, ch & filled & ((np.floor(ang * 5) % 2) == 0) & (sp < 1.6), P.RED[2])
+        put(buf, bx, ch, P.RED[3])
+        put(buf, bx, ch & ((np.floor(ang * 5) % 2) == 0) & (sp < 1.6), P.RED[2])
     else:
-        put(buf, bx, ch & (rr >= 23.5 * s), P.RED[3])
-        put(buf, bx, ch & (rr >= 21.5 * s) & (rr < 23.5 * s), P.GOLD[2])
-        put(buf, bx, ch & (rr < 21.5 * s), P.PLASMA[2])
+        put(buf, bx, ch, P.PLASMA[2])
+        put(buf, bx, ch & (rr >= 120.0 * T.B_C), P.RED[3])
+        put(buf, bx, ch & (rr >= 104.0 * T.B_C) & (rr < 112.0 * T.B_C), P.GOLD[2])
     pen.outline(bx, ch, P.MACH[0])
     if sp >= 1.6:                                                # motion streaks on the rotor
-        put(buf, bx, rot & (rr > 27.5 * s) & (np.abs(((ang * 8 / math.pi) % 2) - 1) < 0.18), P.MACH[3])
+        put(buf, bx, rot & (rr > c_out + 0.5) & (np.abs(((ang * 8 / math.pi) % 2) - 1) < 0.18), P.MACH[3])
     hub = rr < 5 * s
     put(buf, bx, hub, P.MACH[3])
     pen.outline(bx, hub, P.MACH[0])
@@ -509,7 +515,7 @@ def fittings(pen, t):
         knob(pen, x, T.CREASE_Y - 8, 3.6)
     _disc(pen, T.PUMP[0] - 14, T.CREASE_Y - 7, 3.8, P.MACH[3], P.MACH[4], P.MACH[2], P.MACH[1])   # air detector
     _disc(pen, T.PUMP[0] - 14, T.CREASE_Y - 7, 1.6, P.MACH[5], None, None, P.MACH[2])
-    _disc(pen, T.JUNCTION[0], T.JUNCTION[1], 2.3, P.TEAL[3], P.WHITE, P.TEAL[2], P.TEAL[1])     # Y fitting
+    _disc(pen, T.AC_Y[0], T.AC_Y[1] - 1.0, 2.6, P.TEAL[3], P.WHITE, P.TEAL[2], P.TEAL[1])       # Y fitting
     x, y0, y1 = T.FILTER                                         # drip chamber on the donor line
     _rrect(pen, x - 3.6, y0, x + 3.6, y1, 1.6, P.TUBE[3], P.TUBE[1])
     blood = P.RED[2] if T.returning(t) else P.RED[3]
@@ -580,8 +586,9 @@ def bag(pen, c, w, h, edge, fill, level, t, hook, gold=False, port=None):
 def machine(pen, t):
     poles(pen, t)
     bag(pen, T.AC_BAG, T.AC_W, T.AC_H, P.TUBE[3], P.MINT[3], 0.82, t, hook=(T.AC_BAG[0], T.POLE_TOP + 5))
-    bag(pen, T.BAG, T.BAG_W, T.BAG_H, P.TUBE[3], P.PLASMA[3], T.bag_level(t), t, hook=(T.BAG[0], T.POLE_TOP + 5),
-        gold=True, port=T.path_point('plt', 1.0))
+    if t < T.LIFT[0]:
+        bag(pen, T.BAG, T.BAG_W, T.BAG_H, P.TUBE[3], P.PLASMA[3], T.bag_level(t), t, hook=(T.BAG[0], T.POLE_TOP + 5),
+            gold=True, port=T.path_point('plt', 1.0))
     screen(pen, t)
     cabinet(pen, t)
     centrifuge(pen, t)
@@ -593,9 +600,12 @@ def draw(pen, t):
     room(pen, t)
     chair_and_donor(pen, t)
     machine(pen, t)
-    for name in ('ac', 'ac2', 'plt', 'draw3', 'draw2', 'draw1'):
+    for name in ('ac', 'ac2', 'plt', 'draw2', 'draw1'):
         tube(pen, name, t)
     pump_head(pen, t, T.AC_PUMP, 'acpump', T.ac_pump_angle(t), P.BLUE)
     pump_head(pen, t, T.PUMP, 'pump', T.pump_angle(t), (P.RED[1], P.RED[2], P.RED[3], P.RED[4]))
     fittings(pen, t)
     arm_overlay(pen, t)
+    if t >= T.SEAL:                                              # the platelet line is sealed off the bag
+        x, y = T.path_point('plt', 0.955)
+        _rrect(pen, x - 3.4, y - 1.6, x + 3.4, y + 1.6, 0.8, P.WHITE, P.MACH[2])

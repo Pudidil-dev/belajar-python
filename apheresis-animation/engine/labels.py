@@ -12,6 +12,7 @@ TEXT = {
     'en': {
         'draw': 'DRAW\nBLOOD TO THE MACHINE',
         'rbc': 'RED CELL', 'plt': 'PLATELETS', 'wbc': 'WHITE CELL', 'plasma': 'PLASMA\nALL STILL MIXED',
+        'cit': 'CITRATE\nFROM THE ANTICOAGULANT', 'ret': 'RETURN: RED CELLS + PLASMA\nGO BACK TO THE DONOR',
         'pump': 'BLOOD PUMP\nROLLERS PUSH THE BLOOD',
         'ac': 'ANTICOAGULANT\nSTOPS CLOTTING',
         'citrate': 'CITRATE', 'calcium': 'CALCIUM', 'bound': 'CALCIUM HELD\nSO NO CLOT FORMS',
@@ -21,10 +22,12 @@ TEXT = {
         'bag': 'PLATELETS\nCOLLECTED', 'inbag': 'IN THE BAG:\nPLATELETS IN PLASMA',
         'ret_mix': 'GOING BACK:\nRED CELLS + PLASMA', 'ret_arm': 'BACK TO\nTHE DONOR',
         'collected': 'PLATELETS COLLECTED', 'returned': 'BLOOD RETURNED',
+        'rare': 'RARE ITEM!', 'item': 'PLATELET DONATION', 'item_sub': 'READY TO HELP A PATIENT',
     },
     'id': {
         'draw': 'AMBIL\nDARAH KE MESIN',
         'rbc': 'SEL DARAH MERAH', 'plt': 'TROMBOSIT', 'wbc': 'SEL DARAH PUTIH', 'plasma': 'PLASMA\nMASIH TERCAMPUR',
+        'cit': 'SITRAT\nDARI ANTIKOAGULAN', 'ret': 'KEMBALI: SEL MERAH + PLASMA\nMASUK LAGI KE DONOR',
         'pump': 'POMPA DARAH\nROLLER MENDORONG DARAH',
         'ac': 'ANTIKOAGULAN\nCEGAH PEMBEKUAN',
         'citrate': 'SITRAT', 'calcium': 'KALSIUM', 'bound': 'KALSIUM DIIKAT\nJADI TIDAK MEMBEKU',
@@ -34,6 +37,7 @@ TEXT = {
         'bag': 'TROMBOSIT\nTERKUMPUL', 'inbag': 'ISI KANTONG:\nTROMBOSIT + PLASMA',
         'ret_mix': 'DIKEMBALIKAN:\nSEL MERAH + PLASMA', 'ret_arm': 'KEMBALI\nKE DONOR',
         'collected': 'TROMBOSIT TERKUMPUL', 'returned': 'DARAH DIKEMBALIKAN',
+        'rare': 'ITEM LANGKA!', 'item': 'DONASI TROMBOSIT', 'item_sub': 'SIAP MEMBANTU PASIEN',
     },
 }
 C_RED, C_GOLD, C_PLASMA, C_TEAL, C_MINT, C_ION = P.RED[5], P.GOLD[3], P.PLASMA[3], P.TEAL[3], P.MINT[3], P.ION[2]
@@ -56,9 +60,9 @@ def _visible(kind, n, t0, t1, x0=36, x1=W - 70):
     return best
 
 
-_RBC_I = _visible('rbc', M._N_RBC, 6.0, 9.3)
-_PLT_I = _visible('plt', M._N_PLT, 6.4, 9.3)
-_WBC_I = _visible('wbc', M._N_WBC, 6.8, 9.3, 30, W - 30)
+_RBC_I = _visible('rbc', M._N_RBC, 9.9, 12.8)
+_PLT_I = _visible('plt', M._N_PLT, 10.2, 12.8)
+_CIT_I = _visible('cit', M._N_CIT, 11.2, 12.8)
 
 
 def _path(name, f):
@@ -76,39 +80,25 @@ def _fixed(x, y):
     return lambda t: (x, y)
 
 
-def _bubble(name):
-    """The top of a 'what comes out' bubble, on the canvas."""
-    def f(t):
-        from . import scene
-        from .view import View
-        g = scene.callout_geometry(name, t, View(*T.world_camera(t)))
-        return (g[0], g[1] - g[2] - 2) if g is not None else (-999.0, -999.0)
-    return f
-
-
 # (start, end, key, space, anchor(t) -> point in that space, plate offset px, accent)
 LABELS = [
-    (2.00, 4.30, 'draw', 'world', _cam_point(14, -2), (12, -40), C_TEAL),
-    (6.00, 9.30, 'rbc', 'stream', lambda t: M.stream_pos('rbc', _RBC_I, t), (10, -34), C_RED),
-    (6.40, 9.30, 'plt', 'stream', lambda t: M.stream_pos('plt', _PLT_I, t), (10, 30), C_GOLD),
-    (6.80, 9.30, 'wbc', 'stream', lambda t: M.stream_pos('wbc', _WBC_I, t), (14, -30), P.WBC[1]),
-    (7.20, 9.30, 'plasma', 'stream', lambda t: (M.stream_camera(t).cx - 30, 52.0), (-20, 40), C_PLASMA),
-    (11.20, 14.20, 'pump', 'world', _fixed(T.PUMP[0] - 4, T.PUMP[1] - 6), (-74, -64), C_RED),
-    (15.00, 16.55, 'ac', 'world', _path('ac2', 0.45), (4, 14), C_MINT),
-    (17.80, 18.60, 'citrate', 'molecule', lambda t: M.citrate_pos(t), (-40, 34), C_MINT),
-    (17.90, 18.60, 'calcium', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (14, -40), C_ION),
-    (18.80, 19.95, 'bound', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (-60, -60), C_MINT),
-    (22.60, 24.40, 'spin', 'world', _fixed(T.CENTRIFUGE[0] - 22, T.CENTRIFUGE[1] + 2), (-78, 46), C_TEAL),
-    (28.00, 33.20, 'rbc_ch', 'channel', lambda t: M.channel_point('rbc'), (-10, -52), C_RED),
-    (28.60, 30.60, 'plt_ch', 'channel', lambda t: M.channel_point('plt'), (-4, 40), C_GOLD),
-    (29.20, 33.20, 'plasma_ch', 'channel', lambda t: M.channel_point('plasma'), (-16, 62), C_PLASMA),
-    (30.80, 33.20, 'plt_out', 'channel', lambda t: M.channel_port_point(), (-96, -10), C_GOLD),
-    (36.60, 39.95, 'bag', 'world', lambda t: (T.BAG[0] + T.BAG_W / 2, T.BAG[1] - 6), (6, -60), C_GOLD),
-    (37.90, 39.95, 'inbag', 'screen', _bubble('bag'), (-30, -26), C_GOLD),
-    (41.40, 42.55, 'ret_mix', 'screen', _bubble('return'), (-20, -26), C_RED),
-    (43.40, 44.95, 'ret_arm', 'world', _fixed(T.NEEDLE[0] - 2, T.NEEDLE[1] - 4), (14, -46), C_TEAL),
-    (45.70, 46.80, 'collected', 'world', lambda t: (T.BAG[0] - T.BAG_W / 2, T.BAG[1]), (-120, -36), C_GOLD),
-    (45.80, 46.80, 'returned', 'world', _fixed(T.NEEDLE[0], T.NEEDLE[1] - 2), (-10, -50), C_TEAL),
+    (2.20, 4.80, 'draw', 'world', _cam_point(14, -2), (12, -40), C_TEAL),
+    (5.40, 6.90, 'ac', 'world', _path('ac2', 0.55), (10, -18), C_MINT),
+    (9.90, 12.80, 'rbc', 'stream', lambda t: M.stream_pos('rbc', _RBC_I, t), (10, -34), C_RED),
+    (10.20, 12.80, 'plt', 'stream', lambda t: M.stream_pos('plt', _PLT_I, t), (10, 30), C_GOLD),
+    (10.60, 12.80, 'plasma', 'stream', lambda t: (M.stream_camera(t).cx - 30, 52.0), (-20, 40), C_PLASMA),
+    (11.20, 12.80, 'cit', 'stream', lambda t: M.stream_pos('cit', _CIT_I, t), (10, -92), C_MINT),
+    (15.30, 16.20, 'citrate', 'molecule', lambda t: M.citrate_pos(t), (-40, 34), C_MINT),
+    (15.40, 16.20, 'calcium', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (14, -40), C_ION),
+    (16.40, 17.90, 'bound', 'molecule', lambda t: M.ion_pos(M.TARGET, t), (-60, -60), C_MINT),
+    (23.00, 25.80, 'pump', 'world', _fixed(T.PUMP[0] - 4, T.PUMP[1] - 6), (-74, -64), C_RED),
+    (28.20, 29.90, 'spin', 'world', _fixed(T.CENTRIFUGE[0] - 22, T.CENTRIFUGE[1] + 2), (-78, 46), C_TEAL),
+    (33.60, 38.80, 'rbc_ch', 'channel', lambda t: M.channel_point('rbc', t), (-10, -52), C_RED),
+    (34.20, 36.60, 'plt_ch', 'channel', lambda t: M.channel_point('plt', t), (-4, 40), C_GOLD),
+    (34.80, 38.80, 'plasma_ch', 'channel', lambda t: M.channel_point('plasma', t), (-16, 62), C_PLASMA),
+    (37.00, 38.80, 'plt_out', 'channel', lambda t: M.channel_port_point(), (-110, 20), C_GOLD),
+    (44.30, 45.90, 'bag', 'world', lambda t: (T.BAG[0] + T.BAG_W / 2, T.BAG[1] - 6), (6, -60), C_GOLD),
+    (46.80, 48.90, 'ret', 'world', _fixed(T.NEEDLE[0] + 6, T.NEEDLE[1] - 4), (-30, -64), C_TEAL),
 ]
 CPS = 70.0
 LINE2 = 2

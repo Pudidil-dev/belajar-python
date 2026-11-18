@@ -17,40 +17,44 @@ W, H = gfx.W, gfx.H
 
 
 class View:
-    __slots__ = ('cx', 'cy', 'z', 'ox', 'oy')
+    """World -> canvas camera. zy (vertical scale) defaults to z; a different zy squashes or stretches the view
+    vertically (used when the camera tilts down into the centrifuge)."""
+    __slots__ = ('cx', 'cy', 'z', 'zy', 'ox', 'oy')
 
-    def __init__(self, cx, cy, z):
+    def __init__(self, cx, cy, z, zy=None):
         self.cx, self.cy, self.z = float(cx), float(cy), float(z)
+        self.zy = float(zy) if zy is not None else self.z
         self.ox = W / 2 - self.cx * self.z         # canvas x of world x = 0
-        self.oy = H / 2 - self.cy * self.z
+        self.oy = H / 2 - self.cy * self.zy
 
     def apply(self):
         gfx.set_dither_origin(self.ox, self.oy)
 
     # ---- transforms
     def px(self, x, y):
-        return x * self.z + self.ox, y * self.z + self.oy
+        return x * self.z + self.ox, y * self.zy + self.oy
 
     def wx(self, i):
         return (i + 0.5 - self.ox) / self.z
 
     def wy(self, j):
-        return (j + 0.5 - self.oy) / self.z
+        return (j + 0.5 - self.oy) / self.zy
 
     def world_rect(self):
         return self.wx(-0.5), self.wy(-0.5), self.wx(W - 0.5), self.wy(H - 0.5)
 
     def visible(self, x0, y0, x1, y1, pad=0.0):
         a, b, c, d = self.world_rect()
-        p = pad / self.z
+        p = pad / min(self.z, self.zy)
         return not (x1 < a - p or x0 > c + p or y1 < b - p or y0 > d + p)
 
     def box(self, x0, y0, x1, y1, pad=2):
         """Canvas box (i0, j0, i1, j1) covering the world rectangle, clipped; None when off screen."""
-        i0 = int(math.floor(x0 * self.z + self.ox)) - pad
-        j0 = int(math.floor(y0 * self.z + self.oy)) - pad
-        i1 = int(math.ceil(x1 * self.z + self.ox)) + pad
-        j1 = int(math.ceil(y1 * self.z + self.oy)) + pad
+        lim = 1e7
+        i0 = int(math.floor(max(min(x0 * self.z + self.ox, lim), -lim))) - pad
+        j0 = int(math.floor(max(min(y0 * self.zy + self.oy, lim), -lim))) - pad
+        i1 = int(math.ceil(max(min(x1 * self.z + self.ox, lim), -lim))) + pad
+        j1 = int(math.ceil(max(min(y1 * self.zy + self.oy, lim), -lim))) + pad
         i0, j0, i1, j1 = max(i0, 0), max(j0, 0), min(i1, W), min(j1, H)
         if i1 <= i0 or j1 <= j0:
             return None
@@ -59,7 +63,7 @@ class View:
     def grid(self, bx):
         i0, j0, i1, j1 = bx
         X = ((np.arange(i0, i1) + 0.5 - self.ox) / self.z)[None, :]
-        Y = ((np.arange(j0, j1) + 0.5 - self.oy) / self.z)[:, None]
+        Y = ((np.arange(j0, j1) + 0.5 - self.oy) / self.zy)[:, None]
         return X, Y
 
     def full(self):
@@ -170,7 +174,7 @@ def poly_sel(view, pts, bx, ox=0.0, oy=0.0):
     i0, j0, i1, j1 = bx
     P = np.asarray(pts, float)
     xs = (P[:, 0] + ox) * view.z + view.ox - i0
-    ys = (P[:, 1] + oy) * view.z + view.oy - j0
+    ys = (P[:, 1] + oy) * view.zy + view.oy - j0
     im = Image.new('1', (i1 - i0, j1 - j0), 0)
     lim = 4 * max(W, H)
     pts_c = [(float(np.clip(x, -lim, lim)), float(np.clip(y, -lim, lim))) for x, y in zip(xs, ys)]
