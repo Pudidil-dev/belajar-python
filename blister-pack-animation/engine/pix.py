@@ -178,6 +178,13 @@ def capsule(buf, c, x, y, ang, L=T.CAP_L, r=T.CAP_R, cap=RED, body=CAPW, outline
         v[pm & (b < -0.72)] = ramp_[0]
     seam = m & full(w, np.abs(s - 0.35) < 0.55 / w.s) & full(w, np.abs(n) < r * 0.92)
     v[seam] = cap[1]
+    if w.s >= 6.0:                                            # close up: a long shine along each half, a rim light
+        for lo, hi in ((-h * 0.85, -0.6), (0.9, h * 0.85)):
+            sh = m & full(w, (s > lo) & (s < hi) & (np.abs(n - r * 0.5) < r * 0.13))
+            v[sh] = WHITE
+        rim = m & full(w, (b < -0.55) & (np.abs(n) > r * 0.78) & (n < 0))
+        v[rim & is_cap] = cap[2]
+        v[rim & ~is_cap] = body[2]
     if w.s >= 2.6:                                            # a glint on the cap
         gx, gy = x + (-h * 0.55) * ca - (r * 0.45) * sa, y + (-h * 0.55) * sa + (r * 0.45) * ca
         gm = m & full(w, (w.X - gx) ** 2 + (w.Y - gy) ** 2 <= (0.55 / w.s * 1.6) ** 2)

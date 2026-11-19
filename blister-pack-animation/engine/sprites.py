@@ -1,6 +1,6 @@
-"""Export the sprites as PNGs: the capsule, a formed card and a sealed card, the hopper full of capsules, the heated
-sealing roller, the hand and thumb with the hero's card, and full-frame tiles of the key moments; plus one labelled
-sheet.
+"""Export the sprites as PNGs: the capsule (and its close-up), a sealed card foil side up, the hero's card with the
+pocket pushed up and then burst, the boss's hand, the sealing roller with its foil, and full-frame tiles of the key
+moments; plus one labelled sheet.
 
 The art itself is code: every object is drawn per frame at the camera's own scale. These PNGs are an export of that
 code for reference and reuse (transparent where nothing is drawn). To change a sprite, edit the code and export again:
@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 from . import gfx
 from . import world as Wd
 from . import timeline as T
-from . import pix, web, feeder, machine, hand, scenes
+from . import pix, line, stations, hand, scenes
 from .palette import HUD
 
 _KEYS = ((255, 0, 255), (0, 255, 0))
@@ -39,27 +39,34 @@ def _iso(draw, cam):
 
 
 def _hand(b, c):
-    web.draw_hand_card(b, c, 19.9)
-    hand.draw_thumb(b, c, 19.9)
+    hand.draw(b, c, 2.0, -24.0, 0.0, thumb_only=True)
+    line.card(b, c, 0.0, 0.0, 0.0, hero_tag=True, bump=1.0, shadow=False)
+    hand.draw(b, c, 2.0, -24.0, 0.0)
+
+
+def _roller(b, c):
+    stations.seal_over(b, c, 12.0)
 
 
 SPRITES = [
     ('capsule', 'the capsule (the hero)', lambda b, c: pix.capsule(b, c, 0.0, 0.0, 0.0), Wd.Cam(0, 0, 8.0)),
-    ('card-formed', 'a card, pockets formed', lambda b, c: web.card(b, c, -50.0, 0.0, 0.0,
-                                                                   [(T.POCKET_D, None, False)] * 5, None),
-     Wd.Cam(0, -3, 2.5)),
-    ('card-sealed', 'a sealed card', lambda b, c: web.card(b, c, -50.0, 0.0, 0.0, web._full_card(), 0.0),
-     Wd.Cam(0, -3, 2.5)),
-    ('hopper', 'the hopper, full', lambda b, c: feeder.draw_hopper(b, c, 6.5), Wd.Cam(-110.0, 198.0, 2.4)),
-    ('sealing-roller', 'the heated sealing roller', lambda b, c: machine.sealing_front(b, c, 12.6),
-     Wd.Cam(T.XS - 8.0, 132.0, 2.4)),
-    ('hand-thumb', 'the thumb on the card', _hand, Wd.Cam(T.XP + 12.0, 190.0, 2.4)),
+    ('capsule-close', 'the capsule, close up', lambda b, c: pix.capsule(b, c, 0.0, 0.0, -26.0), Wd.Cam(0, 0, 13.0)),
+    ('card-sealed', 'a sealed card, foil up', lambda b, c: line.card(b, c, 0.0, 0.0, 0.0, shadow=False),
+     Wd.Cam(0, 0, 3.4)),
+    ('card-pressed', "the hero's card, pushed up", lambda b, c: line.card(b, c, 0.0, 0.0, 0.0, hero_tag=True, bump=1.0,
+                                                                         shadow=False), Wd.Cam(0, 0, 3.4)),
+    ('card-burst', "the hero's card, burst", lambda b, c: line.card(b, c, 0.0, 0.0, 0.0, hero_tag=True, torn=1.0,
+                                                                    shadow=False), Wd.Cam(0, 0, 3.4)),
+    ('card-reject', 'a rejected card', lambda b, c: line.card(b, c, 0.0, 0.0, 0.0, reject=True, shadow=False),
+     Wd.Cam(0, 0, 3.4)),
+    ('hand', 'the final boss: the hand and the card', _hand, Wd.Cam(18.0, -40.0, 2.4)),
+    ('sealing-roller', 'the foil and the sealing roller', _roller, Wd.Cam(0.0, T.Y_SEAL + 22.0, 2.6)),
 ]
 TILES = [
-    ('tile-hook', 'the hook', 0.4), ('tile-question', 'how did I get in here?', 1.3),
-    ('tile-rewind', 'the rewind', 3.0), ('tile-pockets', 'LV.1 pockets', 5.6), ('tile-lineup', 'LV.2 line up', 7.4),
-    ('tile-drop', 'LV.3 drop', 9.3), ('tile-scan', 'LV.4 scan', 10.9), ('tile-seal', 'LV.5 seal', 12.7),
-    ('tile-shield', 'the shield', 13.55), ('tile-cut', 'LV.6 cut', 14.7), ('tile-boss', 'final boss', 16.6),
+    ('tile-pop', 'the hook: POP', 0.06), ('tile-question', 'how did I get in here?', 1.0),
+    ('tile-rewind', 'the rewind', 1.75), ('tile-mold', 'STAGE 1 MOLD', 3.3), ('tile-fill', 'STAGE 2 FILL', 5.6),
+    ('tile-perfect', 'PERFECT!', 6.8), ('tile-scan', 'STAGE 3 SCAN', 9.45), ('tile-seal', 'STAGE 4 SEAL', 12.05),
+    ('tile-cut', 'STAGE 5 CUT', 13.6), ('tile-warning', 'WARNING', 15.6), ('tile-boss', 'final boss', 16.3),
     ('tile-press', 'the press', 19.6),
 ]
 

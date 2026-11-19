@@ -1,9 +1,9 @@
-"""A limited 8-bit palette for a pharma factory at work.
+"""A limited 8-bit palette for a clean, bright blister line seen from above.
 
-A dark pharma-green factory wall; a white and stainless blister machine; the hero's red-and-white capsule; yellow game
-text; orange for heat and only for heat; light blue for air and water and only for those; aluminium greys for the foil;
-skin tones for the hand at the end. The UI adds a green for PASS and a crimson for REJECT. No hue sits in the
-blue-violet range (225-300 degrees).
+A deep teal factory floor far below; a dark steel machine bed with mint-green machine paint; clear film with white
+glints; the hero's red-and-white capsule; silver foil; yellow game text; orange for heat and only for heat; light blue
+for air and only for air; skin tones for the hand. The UI adds a green for PASS and a crimson for REJECT. No hue sits
+in the blue-violet range (225-300 degrees).
 """
 
 
@@ -15,24 +15,22 @@ def ramp(*cols):
     return [hx(c) for c in cols]
 
 
-OUTLINE = hx('#0b1a17')
+OUTLINE = hx('#0a1416')
 WHITE = hx('#ffffff')
-WALL = ramp('#0f2420', '#163029', '#1d3b34', '#285043', '#356653')          # pharma-green wall, dark .. light
-FLOOR = ramp('#121c1a', '#1c2a27', '#283a35', '#384f48')                   # epoxy floor
-STEEL = ramp('#262e32', '#46535a', '#74838b', '#a9b6bd', '#d7e0e4')         # stainless parts, dark .. light
-BODY = ramp('#7f8c94', '#b9c3c9', '#e1e8eb', '#f6f9fa')                    # the machine's white panels
+FLOOR = ramp('#0b2a2c', '#0f3a3c', '#14494b', '#1b5c5d')                   # the factory floor far below
+BED = ramp('#1a2124', '#232c30', '#2e393e', '#3c494f', '#53626a')           # the machine bed under the film
+PAINT = ramp('#0f5a45', '#17805f', '#25a879', '#5fd3a2', '#b4f2d6')        # mint machine paint (frames, gantries)
+STEEL = ramp('#262e32', '#46535a', '#74838b', '#a9b6bd', '#d7e0e4')
+GLASS = ramp('#2f5f63', '#5f989b', '#a6d6d6', '#e3faf8')                   # clear PVC film
+FOIL = ramp('#4e5a60', '#7e8b92', '#aab6bc', '#d3dce0', '#f2f6f8')
 RED = ramp('#76101f', '#b3182c', '#e2343c', '#ff7a66')                      # the capsule's red cap
 CAPW = ramp('#8d989f', '#cdd5da', '#eef2f4', '#ffffff')                     # the capsule's white body
-YELLOW = ramp('#9e7404', '#e0b010', '#ffd736', '#fff3a0')                   # game text, the player tag, stars
+YELLOW = ramp('#9e7404', '#e0b010', '#ffd736', '#fff3a0')                   # game text, the player tag, hazard stripes
 HEAT = ramp('#7a3206', '#c8580c', '#ff8a1f', '#ffc06a')                     # heat only
-AIR = ramp('#246f93', '#4aa9d8', '#8fd8f6', '#d6f4ff')                      # air and water only (hue ~199)
-GLASS = ramp('#2c4d49', '#6d9a95', '#b6dcd7', '#e8fbf8')                    # clear PVC film and acrylic
-FOIL = ramp('#4e5a60', '#7e8b92', '#aeb9bf', '#dbe3e7')                     # aluminium lidding foil
-SKIN = ramp('#6b3524', '#a8603d', '#dc966b', '#f4c39b')                     # the hand
+AIR = ramp('#246f93', '#4aa9d8', '#8fd8f6', '#d6f4ff')                      # air only (hue ~199)
+SKIN = ramp('#6b3524', '#a8603d', '#dc966b', '#f4c39b', '#ffe0c6')          # the hand
 PASS = ramp('#14602c', '#2fbf5c', '#9cf5b4')                                # UI: tick, PASS
 REJ = ramp('#6e0b25', '#e0284f', '#ff8ca2')                                 # UI: cross, REJECT
-HUD = ramp('#061210', '#0e221e', '#183a33')                                 # dark UI panels, the monitor
-SCREEN = ramp('#06140f', '#0c2a1f', '#8dffad')                              # monitor: dark .. lit
+HUD = ramp('#061210', '#0e221e', '#183a33', '#2b5a50')                      # dark UI panels, the text box
 SPARK = ramp('#ffab00', '#ffe066', '#fff8cc')
-CARTON = ramp('#5a3c22', '#8a6440', '#b48a5c', '#d8b585')                   # boxes on the racks
-LAMP = ramp('#3fcf6a', '#ffb020', '#ff3b3b')                                # the stack light: green, amber, red
+LASER = ramp('#a3002a', '#ff2a4d', '#ffb3c1')                               # the scanner's laser

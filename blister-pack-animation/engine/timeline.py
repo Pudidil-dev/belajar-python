@@ -1,16 +1,15 @@
 """The film's clock (120 BPM, 20 s = 10 bars) and the whole story laid out on it, in one place.
 
-Story time S. The frames at t in [0, 2) and [4, 20) show story time S = t. The hook, S in [0, 2), is the moment right
-after the end: the thumb has just pushed the capsule out, so the last frame (the thumb pressing) runs straight into the
-first (the pop). During the rewind, t in [2, 4), the film plays the story backward at speed, from S = 2 back through the
-loop point (0 = 20) to S = 4, so the whole line is previewed in reverse before the levels start.
+Story time S = film time t. The hook (S in [0, 2)) is the moment right after the end: the thumb has just pushed the
+capsule through the foil, so the last frame (the foil bulging under the thumb) runs straight into the first (the pop).
 
-The machine is one long side view in millimetres: the film web runs left to right at height WEB_Y. The web's position
-W(S) (how far it has moved) is a set of smooth keyframes chosen so that the hero's pocket reaches every station on the
-beat. The stations' x positions are derived from those keyframes, so they stay consistent with the motion.
+The blister line runs from the top of the screen to the bottom (a top-down, 3/4 RPG view). The clear film web moves
+at a constant V mm/s, so one row of pockets passes any point every 16th note: the forming puffs, the pills dropping,
+the scanner ticks and the punch all fall on the beat grid by construction. A web point with coordinate v (mm, along
+the web, larger = further ahead) is at world y = -(v + web(S)). Each station sits where the hero's pocket passes it
+at the right moment, so the stations' positions are derived from the story times below.
 """
 import math
-import numpy as np
 
 BPM = 120
 BEAT = 60.0 / BPM          # 0.5 s
@@ -18,71 +17,56 @@ BAR = 4 * BEAT             # 2.0 s
 STEP = BEAT / 4            # one 16th = 0.125 s
 TOTAL = 20.0
 
-# ---------------------------------------------------------------- the beats
+# ---------------------------------------------------------------- the hook
 POP = 0.0                  # the foil bursts (the first frame)
-HOOK_TEXT = (0.22, 0.55)   # "HOW DID I" / "GET IN HERE?"
-FREEZE = (0.3, 0.8)        # the capsule slows to a near freeze in mid-air
-REW_CUE = 1.6              # the rewind icon blinks in
-REWIND = (2.0, 4.0)
-LV = (4.0, 6.0, 8.0, 10.0, 12.0, 14.0)      # LV.1 .. LV.6
-LV_NAMES = ('LV.1 POCKETS', 'LV.2 LINE UP', 'LV.3 DROP', 'LV.4 SCAN', 'LV.5 SEAL', 'LV.6 CUT')
+FREEZE = (0.2, 0.6)        # the capsule slows to a near stop in mid-air
+DIALOG = (0.25, 1.97)      # the RPG text box
+LINE1 = 0.34               # "HOW DID I GET HERE?" types from here (30 letters a second)
+LINE2 = 1.14               # "...REWIND!"
+REW = (1.62, 2.0)          # the tape glitch back in time
+
+# ---------------------------------------------------------------- the shots (hard cuts on the beat)
+SHOTS = (('hook', 0.0), ('mold', 2.0), ('fill', 4.0), ('scan', 8.0), ('seal', 11.0), ('cut', 13.0))
+STAGES = (('STAGE 1', 'MOLD', 2.0), ('STAGE 2', 'FILL', 4.0), ('STAGE 3', 'SCAN', 8.0), ('STAGE 4', 'SEAL', 11.0),
+          ('STAGE 5', 'CUT', 13.0))
+PACKED = 14.32            # the hero's card lands on the stack
+WARN = (15.0, 16.0)        # the boss is coming
 FINAL = 16.0
 
-# LV.1: the film softens between hot plates, the mould clamps, air puffs the hero's card into shape, pocket by pocket
-CLAMP = 4.5
-PUFFS = (4.75, 5.0, 5.25, 5.5, 5.75)        # pockets k = 0..4 of the hero's card (the hero's pocket, k = 3, at 5.5)
-OPEN = 5.85
-# LV.4: a line-scan camera: the web runs under it one pocket per 16th, the card ahead (one empty pocket) first
-SCAN_REJ = (10.375, 10.5, 10.625, 10.75, 10.875)    # the last one is the empty pocket
-SCAN_HERO = (11.0, 11.125, 11.25, 11.375, 11.5)
-VERDICT_REJ = 10.875
-VERDICT_PASS = 11.625
-SCAN_ON = (10.3, 11.6)
-# LV.5: the shield
-BLOCKS = (13.5, 13.75)
-# LV.6: the punch
-THUNK_REJ = 14.5
-THUNK_HERO = 15.0
-BLAST = 14.57              # the air jet blows the rejected card into the bin
-BIN_LAND = 14.85
-STACK_LAND = 15.18
-# the final boss: a hand takes the hero's card off the stack, a thumb comes up under the hero's pocket and presses
-HAND_IN = (16.0, 16.5)
-GRAB = 16.5
-LIFT = (16.6, 17.4)
-THUMB_IN = (17.55, 18.55)
-PRESS = (18.6, 20.0)
-
 # ---------------------------------------------------------------- the parts (mm)
-WEB_Y = 100.0              # the top of the film
-PITCH = 20.0               # pocket pitch along the web
-NPOCK = 5                  # pockets per card (one row seen from the side)
-CARD = PITCH * NPOCK       # 100 mm
-POCKET_HALF = 8.2          # half the pocket's inside length
-POCKET_D = 6.6             # pocket depth below the film
-CAP_L = 14.0               # capsule length
-CAP_R = 2.9                # capsule radius
-HERO_K = 3                 # the hero's pocket (web coordinate u = 70), in card 0
-MISS_K = 5                 # the pocket that passes by empty, in card 1 (the card ahead)
-HERO_CARD = 0
-REJECT_CARD = 1
-V1 = 80.0                  # web speed while the feeder drops (one pocket per 8th note) and under the sealing roller
-V2 = 160.0                 # web speed under the inspection camera: one pocket per 16th note
-LANE_SLOTS = 7
-STACK_PITCH = 7.6
-STACK_Y0 = 12.0            # the stack tray's top
+V = 120.0                  # web speed: 15 mm per 16th note
+ROW = 15.0                 # row pitch along the web
+ROWS = 4
+COLS = (-11.0, 11.0)       # the two columns of pockets
+CARD_L = ROWS * ROW        # 60 mm along the web
+CARD_W = 50.0
+WEB_HALF = 30.0
+POCKET = (9.0, 3.9)        # half-size of a pocket (across, along the web)
+POCKET_D = 4.6             # depth
+CAP_L = 15.0               # capsule length
+CAP_R = 2.75               # capsule radius
+HERO = (0, 1, 1)           # card, row, column of the hero's pocket
+MISS = (1, 2, 0)           # the pocket the feeder misses (in the card ahead)
+REJECT_CARD = MISS[0]
+
+# when the hero's pocket passes each station
+T_FORM = 3.25
+T_LAND = 6.75
+T_SCAN = 10.0
+T_SEAL = 12.0
+T_CUT = 14.0
+STOP = (14.0, 14.3)        # the line winds down after the hero's card is cut
+FALL = 0.22                # a pill's fall from the funnel into its pocket
+
+# ---------------------------------------------------------------- the final boss
+HAND_IN = (16.0, 16.65)
+GRAB = 16.75
+LIFT = (16.85, 17.85)
+PRESS = (18.1, 20.0)
+Z_HELD = 150.0             # how high the card is held (the camera looks down from Z_CAM)
+Z_CAM = 320.0
 
 
-def pocket_u(k):
-    """Web coordinate of pocket k's centre (u = 0 is the hero's card's left end)."""
-    return 10.0 + PITCH * k
-
-
-def card_of(k):
-    return int(math.floor(k / NPOCK))
-
-
-# ---------------------------------------------------------------- easing
 def clamp01(u):
     return max(0.0, min(1.0, u))
 
@@ -119,203 +103,142 @@ def lerp(a, b, k):
     return a + (b - a) * k
 
 
-def anim(t, fps=15.0):
-    """Sprite time on twos: steps 15 times a second, like an 8-bit game."""
-    return math.floor(t * fps) / fps
-
-
 def pulse(t, t0, dur):
-    """1 at t0, fading to 0 over dur (0 outside)."""
     u = (t - t0) / dur
     return 0.0 if u < 0 or u >= 1 else 1.0 - u
 
 
-# ---------------------------------------------------------------- the web's motion
-def _keys():
-    w9 = -70.0                                   # 9.25 s: the hero's pocket (u = 70) is under the gate (x = 0)
-    w69 = w9 - V1 * (9.25 - 6.9)                 # constant speed while the feeder drops
-    wf = w69 - 0.5 * V1 * 0.9                    # the forming dwell, then a 0.9 s run-up
-    w101 = w9 + V1 * (10.1 - 9.25)
-    wa = w101 + 0.5 * (V1 + V2) * 0.2            # up to scanning speed
-    wb = wa + V2 * 1.3                           # both cards run under the camera
-    wc = wb + 0.5 * (V1 + V2) * 0.55             # back down to sealing speed
-    wd = wc + V1 * 1.25                          # the hero's card rolls under the sealing roller
-    we = wd + 0.5 * V1 * 0.2                     # stop: the card ahead in the punch
-    wg = we + CARD                               # index: the hero's card in the punch
-    keys = [(4.0, wf, 0.0), (6.0, wf, 0.0), (6.9, w69, V1), (10.1, w101, V1), (10.3, wa, V2), (11.6, wb, V2),
-            (12.15, wc, V1), (13.4, wd, V1), (13.6, we, 0.0), (14.6, we, 0.0), (14.85, wg, 0.0), (TOTAL, wg, 0.0)]
-    return keys, wa, wc, we
-
-
-WKEYS, _WA, _WC, _WE = _keys()
-W_F = WKEYS[0][1]
-W_END = WKEYS[-1][1]
-XD = 0.0                                         # the feeder's gate: pills drop here
-XF = W_F + CARD / 2                              # the forming mould's centre (the hero's card sits in it)
-XI = _WA + V2 * (SCAN_REJ[0] - 10.3) + (10.0 + PITCH * 9)   # the line-scan camera: pocket 9 passes it at SCAN_REJ[0]
-XS = _WC + CARD                                  # the sealing roller's contact line
-XP = _WE + CARD * REJECT_CARD + CARD / 2         # the punch (the card ahead stops in it)
-
-
+# ---------------------------------------------------------------- the web
 def web(S):
-    """How far the web has moved (mm) at story time S. The hook (S < 2) is the end state."""
-    if S < WKEYS[0][0]:
-        return W_END
-    for (t0, w0, v0), (t1, w1, v1) in zip(WKEYS, WKEYS[1:]):
-        if S <= t1:
-            h = t1 - t0
-            u = (S - t0) / h
-            return ((2 * u ** 3 - 3 * u ** 2 + 1) * w0 + (u ** 3 - 2 * u ** 2 + u) * h * v0
-                    + (-2 * u ** 3 + 3 * u ** 2) * w1 + (u ** 3 - u ** 2) * h * v1)
-    return W_END
+    """How far the web has moved (mm). Constant speed, then a wind-down once the hero's card is cut."""
+    if S < STOP[0]:
+        return V * S
+    if S < STOP[1]:
+        u = (S - STOP[0]) / (STOP[1] - STOP[0])
+        return V * STOP[0] + V * (STOP[1] - STOP[0]) * (u - 0.5 * u * u)
+    return V * STOP[0] + 0.5 * V * (STOP[1] - STOP[0])
 
 
-_SG = np.arange(4.0, TOTAL + 1e-9, 0.0005)
-_WG = np.maximum.accumulate(np.array([web(s) for s in _SG]))
+def pocket_v(card, row):
+    return CARD_L * card + ROW * (row + 0.5)
 
 
-def when_web(w):
-    """The first story time at which the web has moved w (None if before the story, inf if never)."""
-    if w <= _WG[0]:
-        return None
-    i = int(np.searchsorted(_WG, w))
-    if i >= len(_SG):
-        return math.inf
-    return float(_SG[i])
+def card_v(card):
+    """Web coordinate of a card's centre."""
+    return CARD_L * card + CARD_L / 2
 
 
-# ---------------------------------------------------------------- the feeder: which pocket gets which pill, when
-def land_time(k):
-    """When a pill lands in pocket k (it passes under the gate then): None = filled before the story."""
-    return when_web(XD - pocket_u(k))
+def y_of(v, S):
+    return -(v + web(S))
 
 
-K_TOP = int(math.floor((XD - W_F - 10.0) / PITCH))       # the first pocket the story fills
-K_LAST = int(math.floor((XD - W_END - 10.0) / PITCH)) + 1  # the last one
-QUEUE = []                                               # (k, landing time, kind) in order: 'pill', 'gap', 'hero'
-for _k in range(K_TOP, K_LAST - 1, -1):
-    _t = land_time(_k)
-    if _t is None or _t == math.inf:
-        continue
-    QUEUE.append((_k, _t, 'gap' if _k == MISS_K else 'hero' if _k == HERO_K else 'pill'))
-FALL = 0.2                                               # tip-off to landing
-SHIFT = 0.12                                             # the queue closes up after each release
-_REL = np.array([q[1] - FALL for q in QUEUE])
-HERO_J = [q[2] for q in QUEUE].index('hero')
-GAP_J = [q[2] for q in QUEUE].index('gap')
-HERO_LAND = QUEUE[HERO_J][1]
-MISS_TIME = QUEUE[GAP_J][1]
+def cross(v, y_line):
+    """When web point v reaches the station line y_line (while the line still runs)."""
+    return (-y_line - v) / V
 
 
-def released(S):
-    """Smoothed count of releases so far: slot positions move by one over SHIFT seconds after each release."""
-    u = np.clip((S - _REL) / SHIFT, 0.0, 1.0)
-    return float(np.sum(u * u * (3 - 2 * u)))
+_HV = pocket_v(HERO[0], HERO[1])
+Y_FORM = y_of(_HV, T_FORM)          # the forming nozzles
+Y_DROP = y_of(_HV, T_LAND)          # the feeder's drop line
+Y_SCAN = y_of(_HV, T_SCAN)          # the scanner's laser line
+Y_SEAL = y_of(_HV, T_SEAL)          # the heated sealing roller
+Y_PRESS = y_of(card_v(HERO[0]), T_CUT)   # the punch (centred on a card when it strikes)
 
 
-def slot(j, S):
-    """Lane slot of queue item j (0 = at the gate); negative once it has been released."""
-    return j - released(S)
+def formed(v, S):
+    """How far the pocket at web coordinate v has been blown into shape (0..1, overshooting a little)."""
+    t0 = cross(v, Y_FORM)
+    if S < t0:
+        return 0.0
+    u = (S - t0) / 0.14
+    return 1.0 if u >= 1 else back_out(u, 2.0)
 
 
-def pill_in(k, S):
-    """Is there a pill resting in pocket k (on the web) at story time S?"""
-    if k == MISS_K:
+def land_time(card, row):
+    return cross(pocket_v(card, row), Y_DROP)
+
+
+def has_pill(card, row, col, S):
+    if (card, row, col) == MISS:
         return False
-    t = land_time(k)
-    return t is None or S >= t
+    return S >= land_time(card, row)
 
 
-# ---------------------------------------------------------------- the forming, the seal, the cuts
-def formed(k, S):
-    """How far pocket k has been blown into shape (0 flat .. 1, with a little overshoot)."""
-    c = card_of(k)
-    if c > HERO_CARD or S < 2.0:
-        return 1.0
-    if c == HERO_CARD:
-        t0 = PUFFS[k - NPOCK * HERO_CARD]
-        if S < t0:
-            return 0.0
-        u = (S - t0) / 0.16
-        return 1.0 if u >= 1 else back_out(u, 2.2)
-    return 1.0 if pocket_u(k) + web(S) >= XF + CARD / 2 + POCKET_HALF else 0.0
+def scan_time(card, row):
+    return cross(pocket_v(card, row), Y_SCAN)
 
 
-def sealed_from(S):
-    """Web coordinate u from which the web is sealed (everything with u + W >= XS)."""
-    return XS - web(S)
+def strike_time(card):
+    return cross(card_v(card), Y_PRESS)
 
 
-def cut_time(c):
-    """When card c is punched out (None: before the story)."""
-    if c == REJECT_CARD:
-        return THUNK_REJ
-    if c == HERO_CARD:
-        return THUNK_HERO
-    t = when_web(XP - (CARD * c + CARD / 2))
-    return t
+def is_cut(card, S):
+    t = strike_time(card)
+    return t <= STOP[0] + 1e-6 and S >= t
 
 
-STACKED = sorted([c for c in range(REJECT_CARD + 1, 40) if cut_time(c) is not None], key=lambda c: cut_time(c))
+def die_down(S):
+    """How far the punch's die is down (0..1): it strikes once per card, on the beat."""
+    if S > STOP[0] + 0.3:
+        return 0.0
+    c = math.floor((-Y_PRESS - web(S) - CARD_L / 2) / CARD_L + 0.5)
+    k = 0.0
+    for cc in (c - 1, c, c + 1):
+        t = strike_time(cc)
+        if t > STOP[0] + 1e-6:
+            continue
+        u = S - t
+        if -0.05 <= u < 0:
+            k = max(k, (u + 0.05) / 0.05)
+        elif 0 <= u < 0.05:
+            k = 1.0
+        elif 0.05 <= u < 0.2:
+            k = max(k, 1 - (u - 0.05) / 0.15)
+    return k
+
+
+# the stack at the end of the line: a few cards already there, then the cards cut on screen land on it
+STACK_BASE = 4
+HOP = 0.32                 # a cut card's hop from the die onto the stack
 
 
 def stack_cards(S):
-    """The cards on the stack at story time S, bottom first (the hero's card while it is there)."""
+    """Cards on the stack (bottom first) at story time S: base cards (None), then the cut cards that have landed."""
     if S < 2.0:
         S = TOTAL
-    out = [c for c in STACKED if cut_time(c) <= S]
-    if THUNK_HERO <= S < GRAB:
-        out.append(HERO_CARD)
+    out = [None] * STACK_BASE
+    for c in (2, 0):
+        if S >= strike_time(c) + HOP:
+            out.append(c)
+    if S >= GRAB:
+        out = [c for c in out if c != HERO[0]]
     return out
 
 
-def stack_top(n):
-    """Film level of the n-th card from the bottom of the stack."""
-    return STACK_Y0 + POCKET_D + 0.8 + n * STACK_PITCH
-
-
-# ---------------------------------------------------------------- the hand at the end
 def press(S):
-    """How far the thumb has pushed the hero's dome in (0..1); 1 at the end and through the hook."""
+    """How far the thumb has pushed the hero's pocket up under the foil (0..1); 1 at the end and through the hook."""
     if S < 2.0:
         return 1.0
-    return ease_in(u_of(S, PRESS), 1.6)
+    return ease_in(u_of(S, PRESS), 1.7)
 
 
-# ---------------------------------------------------------------- the hook: a freeze-frame flight
 def tau(S):
-    """Time as the frozen world feels it during the hook: normal at first, then slowed to a near freeze."""
-    if S < FREEZE[0]:
-        return S
+    """Time as the frozen hook feels it: normal at first, then slowed to a near stop."""
     a, b = FREEZE
+    if S < a:
+        return S
     u = clamp01((S - a) / (b - a))
-    return a + (b - a) * (u - 0.5 * u * u * 0.94) + max(0.0, S - b) * 0.06
+    return a + (b - a) * (u - 0.5 * u * u * 0.95) + max(0.0, S - b) * 0.045
 
 
-def flight(S):
-    """(dx, dy, spin_deg) of the popped capsule from its pocket, S in [0, 2): it shoots up, then hangs in mid-air."""
-    tt = tau(S)
-    v0, g = 190.0, 400.0
-    return -30.0 * tt, v0 * tt - 0.5 * g * tt * tt, -700.0 * tt
+def shot(S):
+    name = SHOTS[0][0]
+    for n, t0 in SHOTS:
+        if S >= t0:
+            name = n
+    return name
 
 
 def env_time(S):
-    """The clock for background motion (pipes, gauges, fans): story time, slowed with the freeze in the hook."""
-    return S if S >= REWIND[0] else TOTAL + tau(S)
-
-
-# ---------------------------------------------------------------- the rewind
-def rewind_source(t):
-    """Story time shown at film time t during the rewind: from 2 back through the loop point to 4, slow-fast-slow."""
-    u = clamp01((t - REWIND[0]) / (REWIND[1] - REWIND[0]))
-    eps = 1e-3                                   # stay inside the hook and the story (S never in [2, 4))
-    back = (REWIND[0] + TOTAL - REWIND[1] - 2 * eps) * ease_in_out(u, 2.5)
-    S = REWIND[0] - eps - back
-    return S + TOTAL if S < 0 else S
-
-
-def story(t):
-    """Story time for film time t."""
-    if REWIND[0] <= t < REWIND[1]:
-        return rewind_source(t)
-    return t
+    """The clock for idle motion (glints, blinking lights): story time, slowed with the freeze in the hook."""
+    return S if S >= 2.0 else TOTAL + tau(S)

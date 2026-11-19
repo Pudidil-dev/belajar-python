@@ -1,123 +1,24 @@
-"""The game layer: the hook question, a level banner per station (it slides in and out; there is no fixed HUD), the
-player tag over the hero capsule and over its pocket, pop-up words, small typed labels next to the parts they name,
-and the inspection monitor's top view of the card being checked.
+"""The game layer: an RPG text box for the hook, a big title card per stage, the player tag over the hero capsule,
+pop-up words, and the scanner's ticks and crosses.
 
-Text is the 5x7 pixel font with a 1-px dark outline. Everything important stays inside the middle of the frame (the
-top and bottom of a phone screen are covered by app buttons).
+Text is the 5x7 pixel font, scaled 2x to 4x, with a 1-px dark outline and a drop shadow. Everything important stays
+in the middle band of the frame (a phone app covers the top and bottom edges).
 """
 import math
 import numpy as np
-from . import gfx, pixfont
+from . import gfx, pixfont, pix
+from . import world as Wd
 from . import timeline as T
-from . import machine as M
-from .palette import OUTLINE, WHITE, YELLOW, REJ, PASS, HUD, SCREEN, GLASS, RED, CAPW, FOIL, HEAT, AIR
+from . import view as Vw
+from .palette import OUTLINE, WHITE, YELLOW, REJ, PASS, HUD
 
 W, H = gfx.W, gfx.H
-CPS = 40.0
 
 
-def _txt(buf, s, x, y, col, scale=1, anchor='mm', shadow=HUD[0], font='5x7', outline=OUTLINE):
-    pixfont.draw_text(buf, s, x, y, col, font=font, anchor=anchor, scale=scale, shadow=shadow, outline=outline)
+def _txt(buf, s, x, y, col, scale=2, anchor='mm', shadow=HUD[0]):
+    pixfont.draw_text(buf, s, x, y, col, anchor=anchor, scale=scale, shadow=shadow)
 
 
-def _line(buf, x0, y0, x1, y1, col):
-    n = int(max(abs(x1 - x0), abs(y1 - y0)))
-    for i in range(n + 1):
-        x = int(round(x0 + (x1 - x0) * i / max(n, 1)))
-        y = int(round(y0 + (y1 - y0) * i / max(n, 1)))
-        if 0 <= x < W and 0 <= y < H:
-            buf[y, x] = col
-
-
-# ---------------------------------------------------------------- the hook question
-def hook_text(buf, S):
-    if not (0.0 <= S < 2.0):
-        return
-    for word, t0, y, col in (('HOW DID I', T.HOOK_TEXT[0], 66, WHITE), ('GET IN HERE?', T.HOOK_TEXT[1], 90, YELLOW[2])):
-        if S < t0:
-            continue
-        sc = 3 if S - t0 < 0.07 else 2
-        _txt(buf, word, W // 2, y, col, scale=sc)
-
-
-# ---------------------------------------------------------------- level banners
-def banners(buf, S):
-    for i, t0 in enumerate(T.LV):
-        a, b = t0 + 0.05, t0 + 1.55
-        if not (a <= S < b):
-            continue
-        k_in = T.back_out(T.u_of(S, (a, a + 0.24)), 1.4)
-        k_out = T.ease_in(T.u_of(S, (b - 0.2, b)), 2.0)
-        x = W // 2 + int(round((1 - k_in) * 190 - k_out * 220))
-        name = T.LV_NAMES[i]
-        lv, rest = name[:4], name[4:]
-        wl = pixfont.text_size(lv, scale=2)[0]
-        wr = pixfont.text_size(rest, scale=2)[0]
-        x0 = x - (wl + wr) // 2
-        _txt(buf, lv, x0, 58, YELLOW[2], scale=2, anchor='lm')
-        _txt(buf, rest, x0 + wl, 58, WHITE, scale=2, anchor='lm')
-        # six pips under the banner: progress through the levels
-        for j in range(6):
-            cx = x - 25 + j * 10
-            col = YELLOW[2] if j <= i else HUD[2]
-            buf[72:76, max(cx - 2, 0):max(cx + 2, 0)] = col
-    a, b = T.FINAL + 0.02, T.FINAL + 1.6
-    if a <= S < b:
-        u = S - a
-        sc = 3 if u < 0.08 else 2
-        jx = int(round(2 * math.sin(u * 60))) if u < 0.4 else 0
-        out = T.ease_in(T.u_of(S, (b - 0.2, b)), 2.0)
-        if not (b - S < 0.25 and int(S * 20) % 2):
-            _txt(buf, 'FINAL BOSS', W // 2 + jx - int(out * 220), 58, REJ[1], scale=sc)
-
-
-# ---------------------------------------------------------------- tags and pops
-def tag(buf, c, x, y, text, S, col=YELLOW[2]):
-    """A player-style tag: a word and a down marker, bobbing over a world point."""
-    tx, ty = c.to(x, y)
-    bob = 1 if int(T.env_time(S) * 4) % 2 else 0
-    ty = ty - 6 - bob
-    if not (-20 < tx < W + 20 and -20 < ty < H + 20):
-        return
-    tx = min(max(tx, 20), W - 20)
-    _txt(buf, '~', tx, ty, col, anchor='mb')
-    _txt(buf, text, tx, ty - 7, col, anchor='mb')
-
-
-def pop(buf, c, text, x, y, S, t0, t1, col, scale=1, rise=6):
-    if not (t0 <= S < t1):
-        return
-    tx, ty = c.to(x, y)
-    ty -= int(rise * T.ease_out(T.u_of(S, (t0, t0 + 0.25)), 2.0))
-    if t1 - S < 0.12 and int(S * 20) % 2:
-        return
-    sc = scale + 1 if S - t0 < 0.07 else scale
-    w = pixfont.text_size(text, scale=sc)[0]
-    tx = min(max(tx, w // 2 + 4), W - w // 2 - 4)
-    _txt(buf, text, tx, ty, col, scale=sc)
-
-
-def label(buf, c, text, anchor, S, t0, t1, off=(10, -14), col=WHITE):
-    """A typed label with a thin leader line to the part it names."""
-    if not (t0 <= S < t1):
-        return
-    ax, ay = c.to(*anchor)
-    w, h = pixfont.text_size(text)
-    x = int(round(min(max(ax + off[0] - (w / 2 if off[0] == 0 else (w if off[0] < 0 else 0)), 4), W - 4 - w)))
-    y = int(round(min(max(ay + off[1] - h / 2, 4), H - 4 - h)))
-    if 0 <= ax < W and 0 <= ay < H:
-        cx = min(max(ax, x - 2), x + w + 1)
-        cy = min(max(ay, y - 2), y + h + 1)
-        if math.hypot(cx - ax, cy - ay) > 4:
-            _line(buf, ax, ay, cx, cy, YELLOW[1])
-            buf[int(ay), int(ax)] = WHITE
-    n = int((S - t0) * CPS) + 1
-    shown = text[:n]
-    if shown.strip():
-        pixfont.draw_text(buf, shown, x, y, col)
-
-
-# ---------------------------------------------------------------- the inspection monitor (top view)
 def _box(buf, x0, y0, x1, y1, col):
     x0, y0, x1, y1 = (int(round(v)) for v in (x0, y0, x1, y1))
     x0, x1 = max(x0, 0), min(x1, W)
@@ -126,186 +27,211 @@ def _box(buf, x0, y0, x1, y1, col):
         buf[y0:y1, x0:x1] = col
 
 
-def _tick(buf, x, y, col):
-    for dx, dy in ((-2, 0), (-1, 1), (0, 2), (1, 1), (2, 0), (3, -1), (4, -2)):
-        for oy in (0, 1):
-            xx, yy = int(x + dx), int(y + dy + oy)
-            if 0 <= xx < W and 0 <= yy < H:
-                buf[yy, xx] = col
+# ---------------------------------------------------------------- the RPG text box (the hook)
+BOX = (10, 302, 260, 384)
+LINES1 = ('HOW DID I', 'GET HERE?')
+LINES2 = ('...REWIND!',)
+CPS = 30.0                                           # letters typed per second
 
 
-def _cross(buf, x, y, col):
-    for d in range(-3, 4):
-        for xx, yy in ((x + d, y + d), (x + d, y - d), (x + d + 1, y + d), (x + d + 1, y - d)):
-            xx, yy = int(xx), int(yy)
-            if 0 <= xx < W and 0 <= yy < H:
-                buf[yy, xx] = col
-
-
-def monitor(buf, c, S):
-    """The line-scan monitor: a live top view of the web running under the camera's scan line. Each pocket gets a
-    tick (or a cross, if it is empty: the backlight shines straight through) as it crosses the line."""
-    mx0, mx1, my0, my1 = M.MONITOR
-    ax, ay = c.to(mx0 + 3, my1 - 3)
-    bx, by = c.to(mx1 - 3, my0 + 3)
-    if bx < 0 or ax > W or by < 0 or ay > H:
+def dialogue(buf, S):
+    a, b = T.DIALOG
+    if not (a <= S < b):
         return
-    sw, sh = bx - ax, by - ay
-    for yy in range(int(max(ay, 0)), int(min(by, H)), 2):
-        buf[yy, int(max(ax, 0)):int(min(bx, W))] = SCREEN[1] if yy % 4 == 0 else SCREEN[0]
-    on = T.SCAN_ON[0] - 0.15 <= S < T.SCAN_ON[1] + 0.5
-    if not on:
-        if c.s > 1.6:
-            _txt(buf, 'READY', (ax + bx) / 2, (ay + by) / 2, SCREEN[2], anchor='mm', shadow=None, outline=None)
-        return
-    k = sw / 150.0                                   # screen px per mm of web
-    cx = (ax + bx) / 2
-    Wv = T.web(S)
-    row_y = (ay + sh * 0.3, ay + sh * 0.55)
-    ph = sh * 0.17
-    pw = T.POCKET_HALF * 2 * k * 0.92
-    for ci in (T.REJECT_CARD + 1, T.REJECT_CARD, T.HERO_CARD, T.HERO_CARD - 1):
-        x0 = cx + (T.CARD * ci + Wv - T.XI) * k
-        x1 = x0 + T.CARD * k
-        if x1 < ax or x0 > bx:
+    k = T.back_out(T.u_of(S, (a, a + 0.12)), 1.4)
+    x0, y0, x1, y1 = BOX
+    yo = int(round((1 - k) * 100))
+    y0, y1 = y0 + yo, y1 + yo
+    _box(buf, x0 - 2, y0 - 2, x1 + 2, y1 + 2, OUTLINE)
+    _box(buf, x0, y0, x1, y1, WHITE)
+    _box(buf, x0 + 3, y0 + 3, x1 - 3, y1 - 3, HUD[1])
+    _box(buf, x0 + 4, y0 + 4, x1 - 4, y0 + 6, HUD[3])
+    # the speaker's name tab: who is talking is the capsule itself (a little icon of it, no name)
+    _box(buf, x0 + 8, y0 - 22, x0 + 62, y0 + 1, OUTLINE)
+    _box(buf, x0 + 10, y0 - 20, x0 + 60, y0 + 1, WHITE)
+    _box(buf, x0 + 12, y0 - 18, x0 + 58, y0 + 1, HUD[1])
+    s_ = 1.8
+    ix, iy = x0 + 35, y0 - 9
+    pix.capsule(buf, Wd.Cam(-(ix - W / 2) / s_, (iy - H / 2) / s_, s_), 0.0, 0.0, -14.0)
+    if S < T.LINE2:
+        lines, t0 = LINES1, T.LINE1
+    else:
+        lines, t0 = LINES2, T.LINE2
+    n = int((S - t0) * CPS) + 1 if S >= t0 else 0
+    shown = []
+    for ln in lines:
+        shown.append(ln[:max(0, n)])
+        n -= len(ln)
+    for i, s_ in enumerate(shown):
+        if s_:
+            pixfont.draw_text(buf, s_, x0 + 14, y0 + 14 + 30 * i, WHITE, scale=3, outline=None, shadow=HUD[0])
+    done = n > 0
+    if done and int(S * 4) % 2 == 0:                     # the blinking "more" arrow
+        _txt(buf, '~', x1 - 18, y1 - 14, YELLOW[2], scale=2, shadow=None)
+
+
+def typed_chars(S):
+    """How many characters of the text box have been typed by story time S (for the typing blips)."""
+    if S < T.LINE1:
+        return 0
+    if S < T.LINE2:
+        return min(int((S - T.LINE1) * CPS) + 1, len(''.join(LINES1)))
+    return 100 + min(int((S - T.LINE2) * CPS) + 1, len(''.join(LINES2)))
+
+
+def title_up(S):
+    """Is a stage title on screen (the player tag keeps out of its way)?"""
+    return any(t0 + 0.04 <= S < t0 + 0.95 for _l, _n, t0 in T.STAGES)
+
+
+# ---------------------------------------------------------------- stage titles
+def stage_title(buf, S):
+    for i, (lab, name, t0) in enumerate(T.STAGES):
+        a, b = t0 + 0.04, t0 + 0.95                       # gone before the stage's big moment
+        if not (a <= S < b):
             continue
-        _box(buf, max(x0 + 1, ax), row_y[0] - ph * 0.9, min(x1 - 1, bx), row_y[1] + ph * 0.9, FOIL[1])
-        for i in range(T.NPOCK):
-            kk = ci * T.NPOCK + i
-            px = cx + (T.pocket_u(kk) + Wv - T.XI) * k
-            if px - pw / 2 < ax or px + pw / 2 > bx:
-                continue
-            for r, ry in enumerate(row_y):
-                empty = (kk == T.MISS_K and r == 1)
-                _box(buf, px - pw / 2, ry - ph / 2, px + pw / 2, ry + ph / 2, GLASS[3] if empty else GLASS[1])
-                if empty:
-                    if int(S * 10) % 2 == 0:
-                        _box(buf, px - pw / 2 + 1, ry - ph / 2 + 1, px + pw / 2 - 1, ry + ph / 2 - 1, WHITE)
-                    continue
-                _box(buf, px - pw * 0.42, ry - ph * 0.28, px, ry + ph * 0.28, RED[2])
-                _box(buf, px, ry - ph * 0.28, px + pw * 0.42, ry + ph * 0.28, CAPW[2])
-                if kk == T.HERO_K and r == 1 and c.s > 1.8:
-                    buf[int(ry - ph / 2) - 3:int(ry - ph / 2) - 1, int(px - 1):int(px + 1)] = YELLOW[2]
-            t_k = T.when_web(T.XI - T.pocket_u(kk))
-            if t_k is not None and t_k <= S and abs(t_k - T.SCAN_ON[0] - 0.6) < 0.7:
-                ty = row_y[1] + ph * 1.25
-                if kk == T.MISS_K:
-                    _cross(buf, px, ty, REJ[1])
-                else:
-                    _tick(buf, px, ty, PASS[1])
-    # the scan line
-    if T.SCAN_ON[0] <= S < T.SCAN_ON[1]:
-        _box(buf, cx, ay + 2, cx + 1, by - 2, SCREEN[2])
-    # the verdicts
-    if T.VERDICT_REJ <= S < T.VERDICT_REJ + 0.6:
-        if int(S * 12) % 2 == 0:
-            _box(buf, ax + 2, by - sh * 0.22, bx - 2, by - 2, REJ[0])
-            _txt(buf, 'REJECT', cx, by - sh * 0.11, REJ[2], anchor='mm', shadow=None)
-    if S >= T.VERDICT_PASS:
-        _box(buf, ax + 2, by - sh * 0.22, bx - 2, by - 2, PASS[0])
-        _txt(buf, 'PASS', cx, by - sh * 0.11, PASS[2], anchor='mm', shadow=None)
+        u = S - a
+        k = T.back_out(T.u_of(S, (a, a + 0.2)), 2.2)
+        out = T.ease_in(T.u_of(S, (b - 0.18, b)), 2.0)
+        dy = int(round((1 - k) * -60 - out * 90))
+        sc = 5 if u < 0.06 else 4
+        _txt(buf, lab, W // 2, 52 + dy, YELLOW[2], scale=2)
+        _txt(buf, name, W // 2, 84 + dy, WHITE, scale=sc)
+    a, b = T.FINAL + 0.02, T.FINAL + 1.5
+    if a <= S < b:
+        u = S - a
+        jx = int(round(3 * math.sin(u * 70))) if u < 0.5 else 0
+        out = T.ease_in(T.u_of(S, (b - 0.2, b)), 2.0)
+        if not (b - S < 0.22 and int(S * 20) % 2):
+            _txt(buf, 'FINAL', W // 2 + jx, 52 - int(out * 90), REJ[2], scale=2)
+            _txt(buf, 'BOSS', W // 2 + jx, 84 - int(out * 90), REJ[1], scale=5 if u < 0.07 else 4)
 
 
-# ---------------------------------------------------------------- the seal, seen from above
-SEAL_WIN = (T.XS - 0.0, 12.45, 13.3)
+# ---------------------------------------------------------------- the player tag, pop-ups
+def tag(buf, sx, sy, text, S, col=YELLOW[2], scale=2):
+    bob = 1 if int(T.env_time(S) * 4) % 2 else 0
+    sy = sy - 4 - bob
+    if not (-30 < sx < W + 30 and -30 < sy < H + 30):
+        return
+    tw = pixfont.text_size(text, scale=scale)[0]
+    sx = min(max(sx, tw / 2 + 4), W - tw / 2 - 4)
+    _txt(buf, '~', sx, sy, col, scale=scale, anchor='mb')
+    _txt(buf, text, sx, sy - 8 * scale, col, scale=scale, anchor='mb')
 
 
-def seal_window(buf, S):
-    """A round window: the foil seen from above while the hot roller presses the diamond pattern into it."""
-    t0, t1 = SEAL_WIN[1], SEAL_WIN[2]
+def pop(buf, text, sx, sy, S, t0, t1, col, scale=3, rise=10):
     if not (t0 <= S < t1):
         return
-    k = T.back_out(T.u_of(S, (t0, t0 + 0.2)), 1.6) * (1 - T.ease_in(T.u_of(S, (t1 - 0.15, t1)), 2.0))
-    R = 44.0 * k
-    if R < 3:
+    sy = sy - int(rise * T.ease_out(T.u_of(S, (t0, t0 + 0.25)), 2.0))
+    if t1 - S < 0.12 and int(S * 20) % 2:
         return
-    cx, cy = 198.0, 150.0
-    XC = (np.arange(W) + 0.5)[None, :]
-    YC = (np.arange(H) + 0.5)[:, None]
-    d2 = (XC - cx) ** 2 + (YC - cy) ** 2
-    buf[d2 <= (R + 2) ** 2] = OUTLINE
-    buf[d2 <= (R + 1) ** 2] = HEAT[1]
-    inside = d2 <= R * R
-    if k < 0.8:
-        buf[inside] = HUD[1]
-        return
-    sc = 1.7                                          # inset px per mm
-    shift = T.web(S) * sc
-    xs = XC - cx + shift
-    roller = cx + 2.0
-    buf[inside] = FOIL[2]
-    sealed = inside & (XC > roller + 4)
-    # pockets under the foil (their domes are not pressed): smooth rounded patches with a glint
-    pitch = T.PITCH * sc
-    pu = ((XC - cx + shift) % pitch) - pitch / 2
-    hw, hh = T.POCKET_HALF * sc * 0.88, 6.5
-    pocket = np.zeros(inside.shape, bool)
-    for ry in (cy - 13.0, cy + 13.0):
-        dxp = np.maximum(np.abs(pu) - (hw - hh), 0.0)
-        pocket |= (dxp ** 2 + (YC - ry) ** 2) <= hh * hh
-    pocket &= inside
-    knurl = sealed & ~pocket & ((((xs + YC) % 8) < 1.0) | (((xs - YC) % 8) < 1.0))
-    buf[knurl] = FOIL[0]
-    buf[sealed & ~pocket & ((((xs + YC) % 8) < 1.0) & (((xs - YC) % 8) < 1.0))] = FOIL[3]
-    buf[pocket] = FOIL[3]
-    ring_ = np.zeros_like(pocket)
-    ring_[1:] |= pocket[:-1] & ~pocket[1:]
-    ring_[:-1] |= pocket[1:] & ~pocket[:-1]
-    ring_[:, 1:] |= pocket[:, :-1] & ~pocket[:, 1:]
-    ring_[:, :-1] |= pocket[:, 1:] & ~pocket[:, :-1]
-    buf[ring_ & inside] = FOIL[1]
-    for ry in (cy - 13.0, cy + 13.0):
-        buf[pocket & (np.abs(YC - ry + 3) < 1.0) & (pu < -2) & (pu > -hw + 4)] = WHITE
-    # before the roller there is no foil yet: clear pockets, the capsules visible inside
-    open_ = inside & (XC < roller - 4)
-    buf[open_] = GLASS[0]
-    op = open_ & pocket
-    buf[op] = GLASS[1]
-    buf[ring_ & open_] = GLASS[2]
-    for ry in (cy - 13.0, cy + 13.0):
-        capm = op & (np.abs(YC - ry) < 4.0) & (np.abs(pu) < hw - 3.0)
-        buf[capm & (pu < 0)] = RED[2]
-        buf[capm & (pu >= 0)] = CAPW[2]
-        buf[capm & (np.abs(YC - ry + 2.5) < 0.8) & (pu < -2)] = RED[3]
-        buf[capm & (np.abs(YC - ry + 2.5) < 0.8) & (pu > 2)] = WHITE
-    # the hot roller, seen from above: a bar across the window
-    bar = inside & (np.abs(XC - roller) < 4)
-    buf[bar] = HEAT[1]
-    buf[bar & (np.abs(XC - roller) < 1.5)] = HEAT[3]
-    buf[inside & (np.abs(XC - roller - 4.5) < 0.6)] = OUTLINE
-    _txt(buf, 'TOP VIEW', cx, cy + R + 8, WHITE, anchor='mt', shadow=None)
+    sc = scale + 1 if S - t0 < 0.06 else scale
+    tw = pixfont.text_size(text, scale=sc)[0]
+    sx = min(max(sx, tw / 2 + 4), W - tw / 2 - 4)
+    _txt(buf, text, sx, sy, col, scale=sc)
 
 
-# ---------------------------------------------------------------- all of it
-def draw(buf, c, S, hero):
-    monitor(buf, c, S)
-    seal_window(buf, S)
-    Wv = T.web(S)
-    # labels next to the parts
-    label(buf, c, 'HEAT 110^C', ((M.HEAT_X[0] + M.HEAT_X[1]) / 2, 117.0), S, 4.15, 5.7, off=(-6, -22))
-    label(buf, c, 'AIR', (M.VALVE[0] + 8.0, M.VALVE[1]), S, 4.8, 5.85, off=(14, -6))
-    label(buf, c, 'BACKLIGHT', (T.XI - 40.0, 90.0), S, 10.45, 11.9, off=(0, 26))
-    label(buf, c, 'FOIL', (M.FOIL_REEL[0] - 20.0, M.FOIL_REEL[1] + 10.0), S, 12.2, 13.25, off=(-8, -16))
-    label(buf, c, 'HEAT SEAL', (M.SEAL_C[0] + 12.0, M.SEAL_C[1] + 10.0), S, 12.35, 13.3, off=(10, -18))
-    # the player tags
-    hx, hy = hero['pos']
-    if hero['show']:
-        tag(buf, c, hx, hy + T.CAP_R + 2.0, 'YOU', S)
-    pu = T.pocket_u(T.HERO_K) + Wv
-    if 5.55 <= S < 6.25 or 8.45 <= S < T.HERO_LAND - 0.04:
-        tag(buf, c, pu, T.WEB_Y + 2.0, 'YOUR POCKET', S, col=YELLOW[3])
-    # pops
-    mu = T.pocket_u(T.MISS_K) + Wv
-    pop(buf, c, 'MISS!', mu, T.WEB_Y - 12.0, S, T.MISS_TIME, T.MISS_TIME + 0.55, REJ[1])
-    px_, py_ = hero['pocket']
-    pop(buf, c, 'PERFECT FIT!', px_, py_ + 16.0, S, T.HERO_LAND, T.HERO_LAND + 0.75, YELLOW[2], scale=2)
-    pop(buf, c, 'PASS!', px_, py_ + 14.0, S, T.VERDICT_PASS, T.VERDICT_PASS + 0.55, PASS[2], scale=2)
-    for i, tb in enumerate(T.BLOCKS):
-        pop(buf, c, 'BLOCKED!', px_ + (-10 if i == 0 else 10), py_ + 20.0 + 6 * i, S, tb, tb + 0.4, AIR[3])
-    pop(buf, c, 'REJECT!', (M.BIN[0] + M.BIN[1]) / 2, M.BIN[3] + 14.0, S, T.BIN_LAND - 0.1, T.BIN_LAND + 0.6, REJ[1],
-        scale=2)
-    if hero.get('thumb') is not None and 17.9 <= S < 18.9:
-        tx, ty = hero['thumb']
-        label(buf, c, 'THUMB', (tx + 8.0, ty - 8.0), S, 17.9, 18.9, off=(14, 8))
-    banners(buf, S)
-    hook_text(buf, S)
+# ---------------------------------------------------------------- the scanner's marks
+_TICK = ['.........', '........#', '.......##', '#.....##.', '##...##..', '.##.##...', '..###....', '...#.....']
+_CROSS = ['#.....#', '##...##', '.##.##.', '..###..', '.##.##.', '##...##', '#.....#']
+
+
+def _mark(buf, sx, sy, shape, col, scale):
+    m = np.array([[ch == '#' for ch in r] for r in shape], bool)
+    m = np.kron(m, np.ones((scale, scale), bool)).astype(bool)
+    h, w = m.shape
+    x0, y0 = int(round(sx - w / 2)), int(round(sy - h / 2))
+    big = np.zeros((h + 2, w + 2), bool)
+    for dy in (0, 1, 2):
+        for dx in (0, 1, 2):
+            big[dy:dy + h, dx:dx + w] |= m
+    for mm, cc, off in ((big, OUTLINE, -1), (m, col, 0)):
+        hh, ww = mm.shape
+        ys, xs = y0 + off, x0 + off
+        a0, b0 = max(ys, 0), max(xs, 0)
+        a1, b1 = min(ys + hh, H), min(xs + ww, W)
+        if a1 > a0 and b1 > b0:
+            sub = buf[a0:a1, b0:b1]
+            sub[mm[a0 - ys:a1 - ys, b0 - xs:b1 - xs]] = cc
+
+
+def scan_marks(buf, c, S):
+    """A tick (or a cross, for the empty pocket) pops up over each pocket as it crosses the laser, and fades."""
+    for card in range(-3, 6):
+        for row in range(T.ROWS):
+            t = T.scan_time(card, row)
+            if not (t <= S < t + 0.55):
+                continue
+            u = (S - t) / 0.55
+            for col in range(2):
+                bad = (card, row, col) == T.MISS
+                x = T.COLS[col]
+                y = T.y_of(T.pocket_v(card, row), S)
+                sx, sy = Vw.to(c, x, y, 8.0 + 10.0 * u)
+                if u > 0.8 and int(S * 30) % 2:
+                    continue
+                sc = 3 if u < 0.1 else 2
+                if bad:
+                    _mark(buf, sx, sy, _CROSS, REJ[1], sc + 1)
+                else:
+                    _mark(buf, sx, sy, _TICK, PASS[1], sc)
+
+
+# ---------------------------------------------------------------- the boss warning, the foil bar
+def warning(buf, S):
+    """An arcade boss warning: the screen pulses red on each beat and a hazard band with WARNING blinks across it."""
+    a, b = T.WARN
+    if not (a <= S < b):
+        return buf
+    u = S - a
+    k = 0.28 * T.pulse(S, a, 0.3) + 0.28 * T.pulse(S, a + 0.5, 0.3) + 0.08
+    f = buf.astype(np.float32)
+    buf = (f + (np.asarray(REJ[0], np.float32) - f) * k).astype(np.uint8)
+    grow = T.back_out(T.u_of(S, (a, a + 0.15)), 1.6)
+    half = int(round(26 * grow))
+    if T.u_of(S, (b - 0.12, b)) > 0:
+        half = int(round(26 * (1 - T.u_of(S, (b - 0.12, b)))))
+    if half <= 0:
+        return buf
+    y0, y1 = 228 - half, 228 + half
+    _box(buf, 0, y0 - 2, W, y1 + 2, OUTLINE)
+    _box(buf, 0, y0, W, y1, REJ[0])
+    xs = np.arange(W)
+    off = int(u * 60)
+    for yy, d in ((y0 + 2, 1), (y1 - 6, -1)):            # chevrons scrolling in opposite directions
+        for r in range(4):
+            row = buf[yy + r] if 0 <= yy + r < H else None
+            if row is None:
+                continue
+            m = ((xs + d * off + (r if d > 0 else 3 - r)) % 12) < 4
+            row[m] = YELLOW[2]
+    if int(u * 8) % 4 != 3 and half > 14:
+        _txt(buf, 'WARNING', W // 2, 228, WHITE, scale=4, shadow=OUTLINE)
+    return buf
+
+
+def foil_bar(buf, S, press):
+    """The pill's last shield: the foil, draining as the thumb pushes (an RPG health bar)."""
+    if not (T.PRESS[0] - 0.1 <= S < T.TOTAL):
+        return
+    a = T.back_out(T.u_of(S, (T.PRESS[0] - 0.1, T.PRESS[0] + 0.1)), 1.8) if S >= 2.0 else 1.0
+    hp = 1.0 - press if S >= 2.0 else 0.0
+    x0, y0 = 70, 44 - int(round((1 - a) * 40))
+    nseg, sw = 10, 14
+    _txt(buf, 'FOIL', x0 - 6, y0 + 6, WHITE, scale=2, anchor='rm')
+    _box(buf, x0 - 2, y0 - 2, x0 + nseg * sw + 2, y0 + 14, OUTLINE)
+    _box(buf, x0 - 1, y0 - 1, x0 + nseg * sw + 1, y0 + 13, WHITE)
+    _box(buf, x0, y0, x0 + nseg * sw, y0 + 12, HUD[0])
+    full = hp * nseg
+    low = hp < 0.3
+    blink = low and int(S * 10) % 2 == 0
+    for i in range(nseg):
+        f = T.clamp01(full - i)
+        if f <= 0:
+            continue
+        col = REJ[1] if low else (PASS[1] if hp > 0.6 else YELLOW[2])
+        if blink:
+            col = WHITE
+        w_ = int(round((sw - 2) * f))
+        _box(buf, x0 + i * sw + 1, y0 + 1, x0 + i * sw + 1 + w_, y0 + 11, col)
+        _box(buf, x0 + i * sw + 1, y0 + 1, x0 + i * sw + 1 + w_, y0 + 3, WHITE if not blink else col)
