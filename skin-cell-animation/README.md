@@ -1,21 +1,20 @@
 # The Life Cycle of a Skin Cell
 
 A 35-second looping, vertical short in 8-bit pixel art about how your skin replaces itself, with a calm, catchy
-chiptune soundtrack and sound effects tied to every event on screen. The structure follows the client's scenario: a
-flake of dead skin lifts off into flowing water (the hook); the camera dives back into the skin to where it came
-from, down to the bottom layer, where a basal cell is about to divide. That division is the highlight: the camera
-zooms into the basal cell and watches it, in slow motion, become two cells, one above the other. The bottom one stays
-in the basal layer; the top one is the cell we follow. It pops up on the beat and is pushed up through every layer,
-changes, dies and becomes a flat tile. The bonds holding the top tiles break, and the camera settles back on the
-opening shot, where our cell is now the flake about to lift off, so the last frame runs straight into the first. No
-game elements and no narration: clean captions in English name the things on screen.
+chiptune soundtrack and sound effects tied to every event on screen. It follows one skin cell's life from the
+client's scenario (born at the bottom, pushed up, dies, flakes off), reordered so that the cell division runs from the
+very first frame. The film opens inside a basal cell that is already dividing and follows the division step by step
+for 20 seconds, until it is two cells, one above the other. The camera comes back out as the top one, the cell we
+follow, pops up. A fast-forward carries it up through the layers to the top, where it is a dead, flat tile, and it
+lifts off in a flake into the water. The camera dives back down to the cell that stayed at the bottom, which is
+about to divide again, and goes into it: the last frame runs straight into the first. No game elements and no
+narration: clean captions in English name the things on screen.
 
-dead skin flake lifts off into the water → the camera dives back into the skin to a basal cell about to divide →
-**the camera zooms into it: the copied DNA packs into chromosomes → the spindle catches them → they line up → each
-splits and one copy goes each way → the cell pinches into two cells, one above the other → back out** → the top cell
-pops up (NEW CELL, DAY 1) → it is pushed up on every beat, grows spines and keratin, then dark granules → its nucleus
-disappears (DAY 14) → it flattens into a dead tile full of keratin, held by lipid "glue" → the bonds break and the
-tiles above it peel away → it is the top of the skin (DAY 28), ready to lift off → the loop starts again.
+inside a basal cell, already dividing: **the copied DNA packs into chromosomes → the spindle catches them → they line
+up → each splits and one copy goes each way → the cell pinches into two cells, one above the other** → back out: the
+top cell pops up (NEW CELL, DAY 1) → fast-forward up the layers: spines and keratin, granules, the nucleus goes
+(DAY 14), a flat dead tile → it lifts off in a flake (DEAD SKIN CELL, DAY 28) → the camera dives back to the cell
+that stayed (BASAL CELL, DIVIDES AGAIN) and into it → the loop starts again.
 
 ![storyboard](docs/storyboard.png)
 
@@ -35,22 +34,24 @@ tiles above it peel away → it is the top of the skin (DAY 28), ready to lift o
     round it.
 - **The cell we follow** has no face and no tag: it is just a little warmer than its neighbours, with a light rim,
   and the camera keeps it in view.
-- **Inside the dividing cell** (5–16.25 s). The dive runs straight into the basal cell and through its membrane in
-  a short white flash. Inside, the cell fills the frame. It sits on the basement membrane, with the dermis below,
+- **Inside the dividing cell** (0–20 s). The film opens inside it; the camera got there at the end of the loop,
+  diving into the basal cell and through its membrane in a short white flash. Inside, the cell fills the frame. It sits on the basement membrane, with the dermis below,
   held down by hemidesmosomes. Its neighbours are just beyond the membrane on both sides, held on by desmosomes, and
   the cell born before it is above. It has a big nucleus with clumped chromatin, free ribosomes and orange
   mitochondria. The four chromosomes each have their own colour (maroon, gold, teal, green), and both copies of a
   chromosome share it. The spindle is drawn in cream, with a pair of centrioles at each pole, and a pink ring pinches
   the cell in two. The camera follows the division and pulls back as the cell stretches, then comes back out of the
-  two new cells as the top one pops up.
-- **Motion.** The tissue is a slow conveyor that advances in one push per beat: each push sends a jelly-like
-  squash-and-stretch up through the cells, divisions pop below, and the cell we follow rises in time with the music.
-  Membranes wobble gently all the time.
+  two new cells as the top one pops up. It breathes with the music: a slow drift, a small zoom pulse on every beat
+  and a bigger one on each step, and the cytoplasm's specks stream slowly.
+- **The fast-forward** (21–30 s). The tissue is a conveyor that pushes the new cell up on every 8th note, 12 cell
+  heights in under 9 seconds; the camera rides up with it while it changes, and the tiles above it peel away.
+- **Motion.** Each push of the conveyor sends a jelly-like squash-and-stretch up through the cells, divisions pop
+  below, and the cell we follow rises in time with the music. Membranes wobble gently all the time.
 - **Captions.** White pixel text with a thin line to the object it names, typed on and gone a couple of seconds
   later; never more than one at a time, and always clear of a phone app's buttons and caption area.
-- **Loop.** The last frame is the opening shot with our tile at the top of the skin, ready to lift off; the first
-  frame is the same shot, and the flake lifts off from the next frame. Every idle motion (water, bubbles, wobble,
-  the capillary) repeats exactly once per loop, and the soundtrack wraps round too. `python render.py --loops 3`
+- **Loop.** The camera crosses into the basal cell 0.3 s before the end, so the last frames are the first moments
+  inside it and the first frame carries straight on. Every idle motion (water, bubbles, wobble, the capillary)
+  repeats exactly once per loop, and the soundtrack wraps round too. `python render.py --loops 3`
   writes the loop three times back to back (105 s).
 
 ## Render it yourself
@@ -152,19 +153,15 @@ On Windows, use `py render.py` if `python` is not on PATH.
 
 | Time | Picture | Captions | Sound |
 |---|---|---|---|
-| 0–2.6 | **The hook.** Water flows over the skin; a flake of dead cells (three wide, two deep) peels off, curls and drifts away, leaving a hole. The camera drifts after it. | DEAD SKIN CELL · DAY 28 | a whoosh and a crackle on the downbeat, the flake fluttering off to the right, the water's hush, the hook phrase over F |
-| 2.6–5.0 | **The dive.** The camera stops and dives back into the skin where the flake came from, down through every layer to a basal cell about to divide. | BASAL CELL · ABOUT TO DIVIDE | a falling bloop and bubbles; the music goes muffled, as if underwater |
-| 5.0–6.25 | **Zoom in.** The dive runs straight into the basal cell, through its membrane. | | a rising rush; a deep bloop and a soft kick through the membrane |
-| 6.25–8.0 | **Packing up.** Inside, the copied DNA packs into four X-shaped chromosomes, each its own colour; the two centrosomes move to the top and the bottom. | CHROMOSOMES · DNA COPIED AND PACKED | the music opens up: a music-box bell over Bb; a quick twist as each chromosome appears; two tones parting |
-| 8.0–10.8 | **Caught and lined up.** The nuclear envelope breaks up; fibres from both poles catch each chromosome and line them up across the middle. | SPINDLE · CATCHES EACH ONE · LINED UP | a crackle as the envelope breaks; a pluck for each fibre that catches (top pole an octave above the bottom); a soft chord on the downbeat of bar 4 as they line up |
-| 10.8–12.8 | **Pulled apart.** Each X splits; one copy is pulled up, the other down, and the cell stretches. | PULLED APART · ONE COPY EACH WAY | a snap, then two tones moving apart |
-| 12.8–15.0 | **Two cells.** A nucleus forms round each set of copies and a ring pinches the cell into two cells, one above the other; the bottom one's anchors glint. | TWO NEW CELLS · ONE STAYS, ONE GOES UP | two bloops on the downbeat of bar 5 (top, then bottom); a rubbery creak as the ring tightens; a plip as they come apart |
-| 15.0–18.0 | **Out, and up.** Back out through the membrane to the slice; on beat 3 the top cell, ours, pops up into the layer above. | NEW CELL · DAY 1 | a falling bloop and rush, a rubbery stretch that snaps into a juicy pop on beat 3; then a soft pop on every push and a rising tick each time it climbs a cell height |
-| 18.0–23.4 | **The climb.** The cells born below push ours up on every beat. It grows spines and keratin filaments, then dark granules. | GRANULES · KERATOHYALIN | the pops and the rising scale; a crackle as granules form |
-| 23.4–25.4 | **The change.** Its nucleus shrinks, darkens and breaks up; lipid sacs empty into the gaps. | NUCLEUS GONE · DAY 14 | a falling bloop |
-| 25.4–28.9 | **Dead.** It flattens into a thin tile full of keratin; lipid fills the gaps between the tiles like mortar. | DEAD CELL · FULL OF KERATIN · LIPID GLUE | a squish; a sticky blob |
-| 28.9–32.0 | **Shedding.** The little bonds between the top tiles switch off one by one, and the tiles above ours peel away into the water. | BONDS BREAK | tiny bell tinks as bonds break; soft flicks as tiles peel; the hook phrase returns |
-| 32.0–35.0 | **Ready.** The camera settles on the opening shot: our tile is now the top of the skin, ready to lift off. | DEAD SKIN CELL · DAY 28 | the water's hush swells into the whoosh at the top of the loop |
+| 0–4.0 | **Already dividing.** Inside a basal cell, the copied DNA packs into four X-shaped chromosomes, each its own colour, one per beat; the two centrosomes move to the top and the bottom. | CHROMOSOMES · DNA COPIED AND PACKED | a music-box bell over Bb; a quick twist as each chromosome appears (they rise up the chord: the tune of bar 0); two tones parting |
+| 4.0–8.0 | **Caught.** The nuclear envelope breaks up on the downbeat; on every 8th note a spindle fibre catches a chromosome, from the top or the bottom. | SPINDLE · CATCHES EACH ONE | a crackle as the envelope breaks; a pluck for each fibre that catches (top pole an octave above the bottom): the tune of bar 2 |
+| 8.0–12.5 | **Lined up.** The chromosomes gather and line up across the middle. | LINED UP | a soft chord on the downbeat of bar 4 as they line up |
+| 12.5–15.0 | **Pulled apart.** On the downbeat each X splits; one copy is pulled up, the other down, and the cell stretches. | PULLED APART · ONE COPY EACH WAY | a snap, then two tones moving apart |
+| 15.0–20.0 | **Two cells.** A nucleus forms round each set of copies and a ring pinches the cell into two cells, one above the other; the bottom one's anchors glint. | TWO NEW CELLS · ONE STAYS, ONE GOES UP | two bloops on the downbeat of bar 6 (top, then bottom); a rubbery creak as the ring tightens; a plip as they come apart; a tom run |
+| 20.0–21.25 | **Out.** Back out through the membrane to the slice; on beat 3 the top cell, ours, pops up into the layer above. | NEW CELL · DAY 1 | a falling bloop and rush, a rubbery stretch that snaps into a juicy pop on beat 3 |
+| 21.25–30.0 | **Fast-forward.** Pushed up on every 8th note, it grows spines and keratin, then dark granules, loses its nucleus and flattens into a dead tile; the tiles above it peel away into the water. | NUCLEUS GONE · DAY 14 | a driving beat; a soft pop on every push, a rising tick for every cell height (a scale), a crackle, a falling bloop as the nucleus goes, a squish, tinks and flicks at the top |
+| 30.0–32.2 | **Flake.** At the top, it lifts off with its neighbours in a flake on the downbeat and drifts away; the camera follows. | DEAD SKIN CELL · DAY 28 | the water's hush swells into a whoosh and a crackle, the flake fluttering off to the right, the hook phrase |
+| 32.2–35.0 | **Again.** The camera dives back down to the cell that stayed in the basal layer and zooms into it, through its membrane. | BASAL CELL · DIVIDES AGAIN | a falling bloop and bubbles, the music muffled; a rising rush and a bloop through the membrane, into the first frame |
 
 ## The science (as drawn)
 
@@ -196,7 +193,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 - **Simplified on purpose.**
   - Cells are drawn in tidy columns that move like a conveyor, in one push per beat; real cells are not that
     orderly.
-  - About four weeks are squeezed into about 19 seconds of the story (plus the division, played in slow motion).
+  - The division is played slowly (about 20 seconds) and the four weeks of the climb fast (under 9 seconds).
   - The dividing cell has four chromosomes; a human cell has 46. The colours are only there to follow each one.
   - The copying of the DNA happens before the division and is not shown; the caption only says it has happened.
   - The two new cells are drawn as big as the cell they came from (the tissue model needs that); real daughter
@@ -235,31 +232,36 @@ Sources checked during this session (through web-search summaries; the pages the
   camera's own scale (3.9 to 5.3 canvas px per unit).
 - **One conveyor, one clock** (`engine/timeline.py`). The epidermis is columns of cells; a cell's look depends only
   on its height p (0 at birth, 12 at shedding). Each column holds the same cells at the same heights, only out of
-  step with its neighbours (that is what lays the dead cells like bricks). The conveyor stands still in the hook and
-  the dive, then advances in one push per beat. The story runs on its own clock, which crawls through the basal
-  cell's division while we watch it from inside: 1.25 s of story take 11.25 s of film (4 extra bars). So the film
-  has two times: story time drives the conveyor, the division on the tissue scale, the captions and the shedding,
-  while film time drives the camera, the music and every idle motion. By the end the conveyor has moved exactly 12
-  cells and come to rest, so the last frame is the first frame.
+  step with its neighbours (that is what lays the dead cells like bricks), so after the conveyor has moved exactly 12
+  cells the slice looks the same as before it moved. The film runs on one clock: the conveyor creeps through the
+  division (P = SPLIT × the division's progress), then pushes on every 8th note until it has moved 12 cells, then
+  holds while the flake lifts and the camera dives back, and from there it is drawn as 0 again. The division's
+  progress is one number that drives both the inside view and the tissue's own drawing of the division, so the
+  zoom in and the zoom out match.
 - **Cells** (`engine/tissue.py`). Every cell is drawn from its height: shape and size, colour ramp, organelles,
   keratin filaments to its desmosomes, granules, nucleus (resting, condensing, breaking up, gone), lipid, the dead
   tile's woven keratin and its bonds. Details are fixed in the cell's own frame, so they move with it; its membrane
   wobbles and each push sends a squash-and-stretch up the tissue.
 - **Inside the dividing cell** (`engine/inside.py`). Its own drawing in design pixels (26 per tissue unit, the
-  scale the zoom reaches), driven by the same division progress as the tissue's own drawing of it, so going in and
-  coming out match. The camera pushes onto the chromosomes, pulls back to see both poles, stays close while the
-  copies are pulled apart and pulls back as the cell pinches in two. Every event with a sound (a chromosome packing
-  up, the envelope breaking, a fibre catching, the line-up, the split, the new nuclei) lands on the 16th-note grid.
+  scale the zoom reaches), driven by the same division progress as the tissue's own drawing of it. It starts 0.31 s
+  before the loop point, so the first frame is already inside. The camera pushes onto the chromosomes, pulls back to
+  see both poles, leans in on the line-up, stays close while the copies are pulled apart and pulls back as the cell
+  pinches in two; on top of that it drifts slowly and pulses on the beats (the captions use the camera without the
+  pulses, so the text stays still). Every event with a sound is on the beat grid: the chromosomes appear on the
+  beats of bar 0, the spindle catches one on every 8th of bar 2, and the line-up, the split and the new nuclei land
+  on downbeats. Its grain (the ordered dither) is fixed to the cell, not to the screen, and kept soft in the large
+  flat areas, so it moves with the picture.
 - **Captions** (`engine/scenes.py`): a dot on the object, a thin line, the text typed on.
 - **Sound** (`engine/audio.py`). Everything is synthesized, with no samples.
   - **Chip voices:** band-limited pulse waves, an NES-style triangle bass, LFSR noise drums, echo and FM bells.
-  - **Music:** 96 BPM in F major, 14 bars: a hook phrase over F, a falling answer for the dive, a stretch that pops
-    on the beat, I-vi-IV-V while the cell climbs (the arpeggio climbs too), and the hook phrase again at the top.
-    Inside the dividing cell, 4 bars of Bb–Gm–F–C: the tune moves to a soft music-box bell over a pad, a light
-    pulse and a music-box arpeggio; it lands on the line-up and climbs as the cell pinches in two, and a tom run
-    leads out of the cell into the pop. The music is muffled while the camera is inside the skin (deepest in the
-    dive, which runs into the zoom, and on the way back out), opens up inside the cell, and opens fully at the
-    surface.
+  - **Music:** 96 BPM, 14 bars. Bars 0–7 are inside the dividing cell (Bb–Gm–F–C–Dm–Bb–F–C): a soft music-box
+    bell over a pad, a light pulse and a music-box arpeggio. The chromosomes' own notes are the tune of bar 0 and
+    the spindle's plucks the tune of bar 2; the bell holds on the line-up, steps down as the copies part and climbs
+    as the cell pinches in two, and a tom run leads out. Bar 8 comes out of the cell with a stretch that pops on
+    beat 3. Bars 9–11 drive the fast-forward (I–vi/IV–V, 16th hats, a climbing arpeggio). Bar 12 is the hook
+    phrase as the flake lifts off, and bar 13 falls away for the dive. The music is muffled while the camera is
+    inside the skin (deepest on the dive and on the way into and out of the cell, a little on the climb), opens up
+    inside the cell, and opens fully at the surface.
   - **Effects stay on top.** Each effect was measured against the music at that moment, band by band, and the quiet
     ones were raised until they clear it.
   - **Loudness:** the mix is −14 LUFS with true peak below −1 dBTP.
@@ -279,12 +281,12 @@ Sources checked during this session (through web-search summaries; the pages the
   - `palette.py`, `gfx.py`, `pixfont.py`, `world.py`: the palette, the pixel toolkit, the bitmap font, the camera.
   - `tissue.py`: the water, the dermis and capillary, the melanocytes, the basal cells and their divisions, every
     cell and dead tile.
-  - `scenes.py`: the camera path (and the zoom into the basal cell and back), the shedding tiles, the hook's flake,
-    the captions and frame assembly.
+  - `scenes.py`: the camera path (and the zoom into the basal cell and back), the shedding tiles, the flake, the
+    captions and frame assembly.
   - `inside.py`: the dividing basal cell from inside: nucleus, chromosomes, spindle, the ring, the two new cells,
     its surroundings, its camera and captions.
   - `audio.py`: synthesizer, score, effects, master.
 - `assets/audio/`: the original soundtrack.
-- `镜头表.md`: the shot list (style lock, palette, 12 beats).
+- `镜头表.md`: the shot list (style lock, palette, 9 beats).
 - `docs/交付说明.md`: delivery notes and the quality-gate results.
 - `docs/storyboard.png`: one frame from each beat.

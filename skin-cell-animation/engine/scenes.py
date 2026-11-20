@@ -1,18 +1,12 @@
-"""What is on screen at time t: one continuous camera over a slice of skin, and a look inside the basal cell as it
-divides.
+"""What is on screen at time t: the basal cell dividing (seen from inside), then the new cell's whole life on a
+slice of skin, in one camera move that loops.
 
-Film time (the times below): 0-2.6 s the hook: the flake of dead skin (the cell we follow, and two neighbours) lifts
-off into the flowing water and the camera drifts after it. 2.6-5 s it stops and dives back down into the skin to
-where the flake came from, all the way to the basal layer, where a basal cell is about to divide in two (the top
-one will be ours). 5-16.25 s that division plays in slow motion while the camera zooms into the basal cell, through its
-membrane (engine/inside.py takes over 6.25-15 s and shows the division from inside), and back out of the two new
-cells as they pop apart on beat 3. 16.25-32 s the camera rides up with ours while the conveyor pushes it up on every
-beat: it turns spiny, then granular, loses its nucleus, flattens into a dead tile, and its rivets switch off as the
-tiles above it peel away. 32-35 s the camera settles back on the opening shot, where our tile is now the top of the
-skin, ready to lift off: the next frame is the first frame.
-
-Story time (timeline.story) is film time with the division slowed down; the conveyor, the captions' anchors and the
-shedding run on story time, the camera and every idle motion on film time.
+0-20 s inside the basal cell, already dividing (engine/inside.py; it began 0.31 s before the loop point). 20-21.25 s
+the camera comes back out of the two new cells; on beat 3 the top one, ours, pops up. 21.25-30 s fast-forward: the
+conveyor pushes it up on every 8th note, through the spinous and granular layers, until it is a dead tile at the top
+(the tiles above it peel away on the way). 30-32.2 s it lifts off with its neighbours in a flake, carried off by the
+water, and the camera follows. 32.2-33.44 s the camera dives back down to the basal cell that stayed; 33.44-34.69 s
+it zooms into it, through its membrane, and the next frame is the first frame.
 
 Clean captions name the things on screen (white text, a thin line to the object, no boxes, no game marks).
 """
@@ -31,32 +25,35 @@ SAFE_R = 230                                         # captions stay left of thi
 
 
 def hero_xy(t):
-    """World centre of the cell we follow (and its height p)."""
-    if t < 3.6:                                       # in the hook it is the middle tile of the flake
-        dx, dy, _ = T.flake_pose(t)
+    """World centre of the cell we follow (and its height p) at film time t."""
+    th = t % T.TOTAL - T.HOOK[0]
+    if 0.0 <= th < 3.6:                               # lifting off, it is the middle tile of the flake
+        dx, dy, _ = T.flake_pose(th)
         x, y, p = TS.cell_xy(0, -T.N, 0.0)
         return x + dx, y + dy, p
     return TS.cell_xy(0, 0, T.P(t))
 
 
-def flake_centre(t):
-    dx, dy, tilt = T.flake_pose(t)
+def flake_centre(th):
+    """The flake's centre, th seconds after it lifts."""
+    dx, dy, tilt = T.flake_pose(th)
     x, y, _ = TS.cell_xy(0, -T.N, 0.0)
     return x + dx, y + dy
 
 
 # ---------------------------------------------------------------- the camera
 def _keys():
-    k = [(0.0,) + CAM_OPEN]
-    for tt in (1.2, 2.3):
-        fx, fy = flake_centre(tt)
-        k.append((tt, 0.6 * fx, CAM_OPEN[1] + 0.4 * (fy - TS.cell_xy(0, -T.N, 0.0)[1]), 4.2))
-    k += [(3.0, 26.0, 116.0, 3.9), (4.2, 6.0, 64.0, 4.2), (4.9, 0.0, 28.0, 4.8), (6.25, 0.0, 24.0, 5.3),
-          (7.6, 0.0, 32.0, 5.0)]
-    for tt, s in ((9.0, 4.7), (10.5, 4.6), (12.0, 4.6), (13.5, 4.8), (15.0, 5.0), (16.5, 5.0), (18.0, 4.7)):
+    """The tissue camera's keys (film time), from the pop to the zoom into the next division."""
+    k = [(T.POP, 0.0, 24.0, 5.3)]
+    for tt, s in ((22.1, 5.1), (23.0, 4.9), (23.9, 4.8), (24.8, 4.7), (25.7, 4.7), (26.6, 4.7), (27.5, 4.6),
+                  (28.4, 4.5)):
         x, y, p = TS.cell_xy(0, 0, T.P(tt))
         k.append((tt, 0.0, y + 2.0, s))
-    k += [(20.0, 0.0, 112.0, 4.2), (22.0, 0.0, 118.0, 4.25), (25.0,) + CAM_OPEN]
+    k += [(29.3, 0.0, 117.0, 4.3), (T.HOOK[0],) + CAM_OPEN]
+    for dt in (1.0, 1.7):                                # follow the flake for a moment
+        fx, fy = flake_centre(dt)
+        k.append((T.HOOK[0] + dt, 0.6 * fx, CAM_OPEN[1] + 0.4 * (fy - TS.cell_xy(0, -T.N, 0.0)[1]), 4.2))
+    k += [(T.DIVE[0], 22.0, 112.0, 3.9), (32.9, 5.0, 60.0, 4.2), (T.ZOOM_IN[0], 0.0, 30.0, 4.75)]
     return k
 
 
@@ -84,26 +81,25 @@ S_OUT = 26.0 * 0.66                                 # coming out: the two new ce
 
 
 def camera(t):
-    """The film's camera: the story's camera, and around the slow-motion division a zoom into the basal cell (at the
-    end of the dive) and back out of the two new cells (as they pop apart)."""
+    """The film's camera: the keyed tissue camera, a zoom into the basal cell (at the end of the dive) and one back
+    out of the two new cells (as they pop apart). In between, engine/inside.py has its own camera."""
     t = t % T.TOTAL
-    if T.SLOW[0] <= t < T.SLOW[1]:
-        hy = TS.mother_y(0) + 6.5 * T.smooth(T.div_k(t))    # the middle of the dividing cell
-        if t < T.ZOOM_OUT[0]:
-            bx, by, bs = camera_story(T.SLOW_STORY[0])
-            s_end = S_IN
-            k = T.ease_in(T.u_of(t, T.ZOOM_IN), 2.2)
-        else:
-            bx, by, bs = camera_story(T.SLOW_STORY[1])
-            s_end = S_OUT
-            k = 1.0 - T.ease_out(T.u_of(t, T.ZOOM_OUT), 2.2)
-        g = T.smooth(min(1.0, k * 1.6))
-        return T.lerp(bx, 0.0, g), T.lerp(by, hy, g), bs * (s_end / bs) ** k
-    return camera_story(T.story(t))
+    if T.ZOOM_IN[0] <= t < T.ZOOM_IN[1]:
+        bx, by, bs = camera_keys(T.ZOOM_IN[0])
+        hy, s_end = TS.mother_y(0), S_IN
+        k = T.ease_in(T.u_of(t, T.ZOOM_IN), 2.2)
+    elif T.ZOOM_OUT[0] <= t < T.ZOOM_OUT[1]:
+        bx, by, bs = camera_keys(T.ZOOM_OUT[1])
+        hy, s_end = TS.mother_y(0) + 6.5 * T.smooth(T.div_k(t)), S_OUT   # the middle of the dividing cell
+        k = 1.0 - T.ease_out(T.u_of(t, T.ZOOM_OUT), 2.2)
+    else:
+        return camera_keys(t)
+    g = T.smooth(min(1.0, k * 1.6))
+    return T.lerp(bx, 0.0, g), T.lerp(by, hy, g), bs * (s_end / bs) ** k
 
 
-def camera_story(t):
-    t = t % T.STORY
+def camera_keys(t):
+    t = min(max(t % T.TOTAL, _KT[0]), _KT[-1])
     i = int(np.clip(np.searchsorted(_KT, t, side='right') - 1, 0, len(_KT) - 2))
     h = _KT[i + 1] - _KT[i]
     u = (t - _KT[i]) / h
@@ -131,7 +127,7 @@ def _shed_events():
     return ev
 
 
-SHED = [(col, m, T.film(tx)) for col, m, tx in _shed_events()]
+SHED = _shed_events()
 SHED_LIFE = 1.6
 
 
@@ -148,51 +144,26 @@ def _anchor_hero(t):
     return x, y
 
 
-def _anchor_granule(t):
-    x, y, p = hero_xy(t)
-    hw, hh, _ = TS.dims(p)
-    return x - 0.35 * hw, y - 0.2 * hh
-
-
 def _anchor_mother(t):
     return 0.0, TS.mother_y(0)
 
 
-def _anchor_lipid(t):
-    x, y, p = hero_xy(t)
-    hw, hh, _ = TS.dims(p)
-    return x - 0.55 * hw, y + hh + 0.5
-
-
-def _anchor_rivet(t):
-    P = T.P(t)
-    col = 1
-    b = T.base(col) + P
-    m = math.ceil(b - T.N)
-    x, y, p = TS.cell_xy(col, m, P)
-    return TS.rivet_world(x, y, p, 3)
-
-
 def _anchor_flake(t):
-    if t >= 20.0:
+    th = t % T.TOTAL - T.HOOK[0]
+    if th < 0:                                        # still in the skin: our tile at the top
         x, y, p = TS.cell_xy(0, 0, T.P(t))
         return x, y
-    return flake_centre(t)
+    return flake_centre(th)
 
 
-# (text, second line, anchor, start, end, side): side is where the text sits relative to the object
-_STORY_CAPTIONS = [
-    ('DEAD SKIN CELL', 'DAY 28', _anchor_flake, 22.4, 27.4, (-1, -1)),
-    ('NEW CELL', 'DAY 1', _anchor_hero, 6.35, 8.1, (1, -1)),
-    ('GRANULES', 'KERATOHYALIN', _anchor_granule, 11.4, 13.2, (-1, -1)),
-    ('NUCLEUS GONE', 'DAY 14', _anchor_hero, 13.4, 15.2, (1, -1)),
-    ('DEAD CELL', 'FULL OF KERATIN', _anchor_hero, 15.5, 17.3, (-1, -1)),
-    ('LIPID GLUE', None, _anchor_lipid, 17.45, 18.95, (-1, -1)),
-    ('BONDS BREAK', None, _anchor_rivet, 19.2, 21.3, (1, -1)),
+# (text, second line, anchor, start, end, side): side is where the text sits relative to the object (the captions
+# inside the dividing cell are engine/inside.py's)
+CAPTIONS = [
+    ('NEW CELL', 'DAY 1', _anchor_hero, 21.35, 23.1, (1, -1)),
+    ('NUCLEUS GONE', 'DAY 14', _anchor_hero, 24.75, 26.45, (1, -1)),
+    ('DEAD SKIN CELL', 'DAY 28', _anchor_flake, 28.9, 31.9, (-1, -1)),
+    ('BASAL CELL', 'DIVIDES AGAIN', _anchor_mother, 33.0, 34.6, (-1, -1)),
 ]
-# (text, second line, anchor (takes story time), film start, film end, side)
-CAPTIONS = [(a, b, f, T.film(t0), T.film(t0) + (t1 - t0), sd) for a, b, f, t0, t1, sd in _STORY_CAPTIONS]
-CAPTIONS.append(('BASAL CELL', 'ABOUT TO DIVIDE', _anchor_mother, 4.15, 5.75, (-1, -1)))   # (film time)
 
 
 def _line(buf, x0, y0, x1, y1, col):
@@ -239,26 +210,27 @@ def draw_captions(buf, c, t):
         for tt in (t, t + T.TOTAL):
             if t0 <= tt < t1:
                 at = tt if tt < T.TOTAL else tt - T.TOTAL
-                ax, ay = anchor(T.story(at))
+                ax, ay = anchor(at)
                 caption(buf, c, text, sub, ax, ay, tt - t0, t1 - t0, side)
 
 
 # ---------------------------------------------------------------- the frame
 def story_frame(t):
     t = t % T.TOTAL
-    if T.INSIDE[0] <= t < T.INSIDE[1]:
+    if T.is_inside(t):
         from . import inside
-        return inside.frame(t - T.INSIDE[0])
-    ts = T.story(t)
+        return inside.frame(T.inside_u(t))
+    ts = t
     cx, cy, s = camera(t)
     c = Wd.Cam(round(cx * s) / s, round(cy * s) / s, s)
-    P = T.P(ts)
+    P = T.P(t)
     buf = np.empty((H, W, 3), np.uint8)
     TS.draw_water(buf, c, t)
     gone = set()
-    if t > 1e-6:                                       # at t = 0 the flake is still part of the skin (as at 25 s)
-        for col, ahead in T.FLAKE:
-            gone.add((col, -ahead))                    # then it has left the skin
+    th = t - T.HOOK[0]
+    if th > 1e-6 or t < T.POP + 1.0:                   # the flake has left the skin (as it lifts, the tiles at the
+        for col, ahead in T.FLAKE:                     # top are drawn at P = 0: from then on, until the conveyor
+            gone.add((col, -ahead))                    # has carried their places past the top, they are gone)
     surf = TS.surface_y(c, P, gone)
     TS.draw_dermis(buf, c, t)
     TS.draw_body(buf, c, P, surf)
@@ -270,7 +242,7 @@ def story_frame(t):
         TS.draw_melanocytes(buf, c)
     for col in range(c0, c1 + 1):
         if y_lo < TS.mother_y(col) + 20:
-            TS.draw_mother(buf, c, col, P, hero=(col == 0 and 4.0 < ts < 6.3), t=t, ts=ts)
+            TS.draw_mother(buf, c, col, P, hero=(col == 0 and (t >= T.DIVE[0] or t < T.POP + 0.05)), t=t, ts=ts)
     for col in range(c0, c1 + 1):
         b = T.base(col) + P
         for m in range(math.ceil(b - T.N), math.floor(b - T.SPLIT) + 1):
@@ -281,8 +253,8 @@ def story_frame(t):
                 continue
             TS.draw_cell(buf, c, x, y, p, hero=(col == 0 and m % T.N == 0), cid=(col, m % T.N), t=t, ts=ts)
     # the pop when a cell splits off (ours gets a ring of light)
-    if T.DIVIDE[1] <= ts < T.DIVIDE[1] + 0.35:
-        TS.pop_ring(buf, c, 0.0, TS.mother_y(0) + 6.5, ts - T.DIVIDE[1])
+    if T.POP <= t < T.POP + 0.35:
+        TS.pop_ring(buf, c, 0.0, TS.mother_y(0) + 6.5, t - T.POP)
     # tiles peeling away during the climb
     for col, m, tx_ in SHED:
         for age in (t - tx_, t + T.TOTAL - tx_):
@@ -291,10 +263,10 @@ def story_frame(t):
                 dx, dy, tilt = shed_pose(age, col)
                 TS.draw_cell(buf, c, x + dx, y + dy, T.N, ang=tilt, cid=(col, m % T.N), t=t, ts=ts,
                              fade=1.0 - T.clamp01((age - 0.8) / (SHED_LIFE - 0.8)))
-    # the hook's flake lifting off (the cell we follow is its middle tile)
-    if 1e-6 < t < 4.5:
-        dx, dy, tilt = T.flake_pose(t)
-        curl = T.flake_curl(t)
+    # the flake lifting off (the cell we follow is its middle tile)
+    if 1e-6 < th < 4.5:
+        dx, dy, tilt = T.flake_pose(th)
+        curl = T.flake_curl(th)
         fx0, fy0, _ = TS.cell_xy(0, -T.N, 0.0)
         for col, ahead in sorted(T.FLAKE, key=lambda k: -k[1]):
             x, y, p = TS.cell_xy(col, -ahead, 0.0)

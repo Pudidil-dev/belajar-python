@@ -1,4 +1,4 @@
-"""Inside the basal cell while it divides (8.75 s of the slow-motion division): how one skin cell becomes two.
+"""Inside the basal cell while it divides (the first 20 s of the film): how one skin cell becomes two.
 
 The camera has zoomed into the basal cell at the bottom of the epidermis. It sits on the basement membrane (the dermis
 below), held down by hemidesmosomes, with a neighbour on each side and the cell born before it above. Then:
@@ -16,9 +16,10 @@ below), held down by hemidesmosomes, with a neighbour on each side and the cell 
    basal cell still), the top one is the cell we follow, about to be pushed up.
 
 Drawn on the 270x480 canvas in design pixels (26 per tissue unit, so the basal cell matches the tissue's at the cut),
-seen through a camera that follows the division and pulls back as the cell stretches. Every event that has a sound
-(a chromosome packing up, the envelope breaking, a fibre catching, the line-up, the split, the new nuclei) happens on
-the 16th-note grid.
+seen through a camera that follows the division and pulls back as the cell stretches. It starts 0.31 s before the
+loop point (the camera crosses the membrane there), so the film's first frame is already inside a dividing cell. Every
+event that has a sound (a chromosome packing up, the envelope breaking, a fibre catching, the line-up, the split, the
+new nuclei) is on the beat grid; the line-up, the split and the new nuclei land on downbeats.
 """
 import math
 import numpy as np
@@ -30,7 +31,7 @@ from .palette import (OUTLINE, WHITE, SPIN, BASAL, GAP, NUC, NUC_IN, CHROMO, SPI
                       SPARK, HERO, WARM, DERMIS, COLLAGEN)
 
 W, H = gfx.W, gfx.H
-DUR = T.INSIDE[1] - T.INSIDE[0]
+DUR = T.INSIDE_DUR
 _B4 = gfx._B4
 _BZ = ((_B4[np.arange(H)[:, None] % 4, np.arange(W)[None, :] % 4] + 0.5) / 16.0).astype(np.float32)
 _CK = ((np.arange(H)[:, None] + np.arange(W)[None, :]) % 2) == 0
@@ -44,6 +45,17 @@ CYTO = [warm(c_, 0.28) for c_ in BASAL]          # our basal cell, warm as on th
 NEIGH = [tuple(c_) for c_ in BASAL]              # the neighbouring basal cells
 ABOVE = [warm(c_, 0.08) for c_ in SPIN]          # the cells above them (spinous)
 
+
+def mid(a, b):
+    """Halfway between two colours: the grain in large flat areas is kept soft (a fine texture, not a pattern that
+    reads as something drawn on the screen)."""
+    return tuple(int(round((x + y) / 2)) for x, y in zip(a, b))
+
+
+GRAIN = {'cyto': (mid(CYTO[2], CYTO[3]), mid(CYTO[2], CYTO[1])), 'neigh': (mid(NEIGH[2], NEIGH[3]), mid(NEIGH[2], NEIGH[1])),
+         'above': (mid(ABOVE[2], ABOVE[3]), mid(ABOVE[2], ABOVE[1])), 'gap': mid(GAP[1], GAP[0]),
+         'derm': (mid(DERMIS[2], DERMIS[3]), mid(DERMIS[2], DERMIS[1]))}
+
 UNIT = 26.0                                      # design px per tissue unit (the zoom-in's scale)
 CX, Y0 = 135.0, 300.0                            # the basal cell's centre
 HW, HH, RR = 4.6 * UNIT, 6.4 * UNIT, 88.0        # its half width and height (as on the tissue scale), corner radius
@@ -52,13 +64,15 @@ Y_BM = Y0 + HH + 4.0                             # the basement membrane
 GAPW = 6.0                                       # the gap to the neighbours
 NUC_R = (78.0, 90.0)
 
-# the events (seconds into the look inside; the film time is T.INSIDE[0] + u, and each is on a 16th)
-T_COND = tuple(0.3125 + 0.15625 * i for i in range(4))     # each chromosome packs up
-T_ENV = 1.71875                                           # the nuclear envelope breaks up
-T_ATT = tuple(1.875 + 0.15625 * j for j in range(8))      # fibre j catches chromosome j // 2 (from the top, then below)
-T_LINED = 3.75                                            # all lined up (the downbeat of bar 4)
-T_SPLIT = 4.6875                                          # the copies part
-T_NUCS = 6.25                                             # two new nuclei (the downbeat of bar 5)
+# the events, in seconds into the look inside (u); U0 is the film's first frame, so U0 + x is film time x
+U0 = T.TOTAL - T.INSIDE[0]
+T_COND = (0.0,) + tuple(U0 + 0.625 * i for i in range(1, 4))   # each chromosome packs up: as we enter, then beats 2-4
+T_ENV = U0 + 5.0                                          # the nuclear envelope breaks up (the downbeat of bar 2)
+T_ATT = tuple(U0 + 5.3125 + 0.3125 * j for j in range(8))  # fibre j catches chromosome j // 2 (top, then below), 8ths
+T_LINED = U0 + 10.0                                       # all lined up (the downbeat of bar 4)
+T_SPLIT = U0 + 12.5                                       # the copies part (the downbeat of bar 5)
+T_NUCS = U0 + 15.0                                        # two new nuclei (the downbeat of bar 6)
+T_GLINT = U0 + 18.6                                       # the bottom cell's anchors glint
 
 CH_P0 = ((-36.0, -30.0), (30.0, -40.0), (-24.0, 34.0), (38.0, 26.0))   # where each packs up, in the nucleus
 CH_A0 = (25.0, -40.0, 70.0, -15.0)
@@ -117,10 +131,12 @@ def poles(u):
 
 # ---------------------------------------------------------------- the camera
 # (u, x offset, y offset from the cell's middle, zoom): it settles in from the zoom, pushes onto the chromosomes as
-# they pack up, pulls back to see both poles, leans in on the line-up and stays close while the copies are pulled
-# apart, then pulls back as the cell pinches in two, ending where the tissue camera picks up (0.66 = scenes.S_OUT).
-CAM_KEYS = ((0.0, 0.0, 0.0, 1.10), (1.3, 0.0, -8.0, 1.24), (2.6, 0.0, 0.0, 1.00), (3.9, 0.0, 0.0, 1.12),
-            (5.9, 0.0, 0.0, 1.16), (7.4, 0.0, 0.0, 0.74), (DUR, 0.0, 0.0, 0.66))
+# they pack up, pulls back to see both poles as the spindle catches them, leans in on the line-up and stays close
+# while the copies are pulled apart, then pulls back as the cell pinches in two, ending where the tissue camera picks
+# up (0.66 = scenes.S_OUT).
+CAM_KEYS = ((0.0, 0.0, 0.0, 1.10), (U0 + 2.2, 0.0, -8.0, 1.24), (U0 + 5.2, 0.0, 0.0, 1.00), (U0 + 7.8, 0.0, 0.0, 1.02),
+            (U0 + 10.0, 0.0, 0.0, 1.14), (U0 + 12.5, 0.0, 0.0, 1.16), (U0 + 14.6, 0.0, 0.0, 1.18),
+            (U0 + 17.6, 0.0, 0.0, 0.76), (DUR, 0.0, 0.0, 0.66))
 
 
 def _slopes(ts, ys):
@@ -140,15 +156,40 @@ _CV = np.array([k[1:] for k in CAM_KEYS])
 _CM = np.stack([_slopes(_CT, _CV[:, j]) for j in range(3)], 1)
 
 
-def cam(u):
-    """(centre x, centre y, zoom) of the camera inside the cell at u."""
+def _bumps():
+    """(u, size) of the camera's little pulses: a soft one on every beat, bigger ones on the events (all on the beat
+    grid, so the picture pulses with the music)."""
+    ev = [(U0 + 0.625 * k, 0.010) for k in range(32)]
+    ev += [(t, 0.03) for t in T_COND] + [(T_ENV, 0.045)] + [(t, 0.022) for t in T_ATT]
+    ev += [(T_LINED, 0.05), (T_SPLIT, 0.055), (T_NUCS, 0.04), (T_NUCS + T.STEP, 0.03)]
+    return ev
+
+
+BUMPS = _bumps()
+
+
+def cam(u, pulse=True):
+    """(centre x, centre y, zoom) of the camera inside the cell at u: the keyed path, a slow drift (faded in and out,
+    so the cuts in and out match) and, unless pulse is False (the captions use that, so the text stays still), a
+    small zoom pulse on the beats and the events."""
     u = min(max(u, 0.0), DUR)
     i = int(np.clip(np.searchsorted(_CT, u, side='right') - 1, 0, len(_CT) - 2))
     h = _CT[i + 1] - _CT[i]
     k = (u - _CT[i]) / h
     h00, h10, h01, h11 = 2 * k ** 3 - 3 * k ** 2 + 1, k ** 3 - 2 * k ** 2 + k, -2 * k ** 3 + 3 * k ** 2, k ** 3 - k ** 2
     v = h00 * _CV[i] + h10 * h * _CM[i] + h01 * _CV[i + 1] + h11 * h * _CM[i + 1]
-    return CX + float(v[0]), Y0 - elong(u) / 2 + float(v[1]), float(v[2])
+    env = T.smooth(u / 1.0) * T.smooth((DUR - u) / 1.2)
+    dx = 6.0 * math.sin(2 * math.pi * u / 7.0) * env
+    dy = 5.0 * math.sin(2 * math.pi * u / 5.3 + 1.0) * env
+    z = float(v[2])
+    if pulse:
+        b = 0.0
+        for ue, a in BUMPS:
+            d = u - ue
+            if 0.0 <= d < 0.7:
+                b += a * (1.0 - math.exp(-d / 0.025)) * math.exp(-d / 0.13)
+        z *= 1.0 + b * env
+    return CX + float(v[0]) + dx, Y0 - elong(u) / 2 + float(v[1]) + dy, z
 
 
 def grids(u):
@@ -199,7 +240,7 @@ def surroundings(buf, X, Y, u):
     basement membrane and the dermis under it."""
     E = elong(u)
     buf[:] = GAP[1]
-    buf[_BZ < 0.2] = GAP[0]
+    buf[_BZ < 0.2] = GRAIN['gap']
     xl = CX - HW - GAPW + 1.5 * np.sin(Y / 31.0 + 0.6 * u)
     xr = CX + HW + GAPW + 1.5 * np.sin(Y / 29.0 + 1.7 - 0.5 * u)
     for side, xx, top in ((-1, xl, Y0 - HH - 0.15 * E - 30.0), (1, xr, Y0 - HH - 0.15 * E + 22.0)):
@@ -207,14 +248,14 @@ def surroundings(buf, X, Y, u):
         basal = region & (Y > top) & (Y < Y0 + HH)
         above = region & (Y < top - GAPW)
         buf[basal] = NEIGH[2]
-        buf[basal & (_BZ < 0.12)] = NEIGH[3]
-        buf[basal & (_BZ > 0.9)] = NEIGH[1]
+        buf[basal & (_BZ < 0.12)] = GRAIN['neigh'][0]
+        buf[basal & (_BZ > 0.9)] = GRAIN['neigh'][1]
         buf[above] = ABOVE[2]
-        buf[above & (_BZ < 0.12)] = ABOVE[3]
+        buf[above & (_BZ < 0.12)] = GRAIN['above'][0]
         # their insides: a darker rim along the membranes, speckles fixed in the tissue (they move with it)
         near = np.abs(X - xx) < 10.0
-        buf[basal & near & (_BZ < 0.5)] = NEIGH[1]
-        buf[above & near & (_BZ < 0.5)] = ABOVE[1]
+        buf[basal & near & (_BZ < 0.5)] = GRAIN['neigh'][1]
+        buf[above & near & (_BZ < 0.5)] = GRAIN['above'][1]
         speck = (np.mod(np.floor(X / 3.0) * 7919.0 + np.floor((Y + 0.15 * E) / 3.0) * 104729.0, 61.0) < 1.0)
         buf[basal & speck] = NEIGH[0]
         buf[above & speck] = ABOVE[0]
@@ -230,8 +271,8 @@ def surroundings(buf, X, Y, u):
     ay = Y0 - E - HH - GAPW - 150.0
     am = rrect_sd(X - CX, Y - ay, HW - 2.0, 150.0, 70.0) <= 0
     buf[am] = ABOVE[2]
-    buf[am & (_BZ < 0.12)] = ABOVE[3]
-    buf[am & (_BZ > 0.9)] = ABOVE[1]
+    buf[am & (_BZ < 0.12)] = GRAIN['above'][0]
+    buf[am & (_BZ > 0.9)] = GRAIN['above'][1]
     an = am & (np.hypot((X - CX - 6.0) / 62.0, (Y - ay - 8.0) / 54.0) <= 1.0)
     buf[an] = NUC[2]
     buf[an & (np.sin(X * 0.23 + 1.0) * np.sin(Y * 0.2 + np.sin(X * 0.1)) > 0.5)] = NUC[1]
@@ -241,8 +282,8 @@ def surroundings(buf, X, Y, u):
     ybm = Y_BM + 3.0 * np.sin(X / 37.0 + 0.4)
     derm = Y > ybm + 1.2
     buf[derm] = DERMIS[2]
-    buf[derm & (_BZ < 0.14)] = DERMIS[3]
-    buf[derm & (_BZ > 0.9)] = DERMIS[1]
+    buf[derm & (_BZ < 0.14)] = GRAIN['derm'][0]
+    buf[derm & (_BZ > 0.9)] = GRAIN['derm'][1]
     for k in range(5):
         cy_ = Y_BM + 22.0 + 17.0 * k
         wave = cy_ + 4.0 * np.sin(X / (21.0 + 3 * k) + k * 1.7 + 0.3 * u)
@@ -260,17 +301,18 @@ def cell_body(buf, X, Y, u, sd):
     yt = Y0 - E
     inside = sd <= 0.0
     buf[inside] = CYTO[2]
-    buf[inside & (_BZ < 0.08)] = CYTO[3]
-    buf[inside & (_BZ > 0.92)] = CYTO[1]
+    buf[inside & (_BZ < 0.08)] = GRAIN['cyto'][0]
+    buf[inside & (_BZ > 0.92)] = GRAIN['cyto'][1]
     # a rounded volume: lit at the top left, darker toward the bottom right
     sd2 = cell_sd(X + 3.0, Y + 3.0, u)
     rim = inside & (sd > -9.0)
-    buf[rim & (sd2 > sd) & (_BZ < 0.6)] = CYTO[1]
-    buf[rim & (sd2 < sd) & (_BZ < 0.6)] = CYTO[3]
+    buf[rim & (sd2 > sd) & (_BZ < 0.6)] = GRAIN['cyto'][1]
+    buf[rim & (sd2 < sd) & (_BZ < 0.6)] = GRAIN['cyto'][0]
     rng = np.random.default_rng(7)
     for half, cy_ in ((0, Y0), (1, yt)):
-        for i in range(170):                                 # free ribosomes
-            fx, fy = CX + rng.uniform(-HW + 12, HW - 12), cy_ + rng.uniform(-HH + 12, HH - 12)
+        for i in range(170):                                 # free ribosomes, drifting in the streaming cytoplasm
+            fx = CX + rng.uniform(-HW + 12, HW - 12) + 5.0 * math.sin(0.55 * u + i * 0.7)
+            fy = cy_ + rng.uniform(-HH + 12, HH - 12) + 4.0 * math.cos(0.45 * u + i * 1.3)
             buf[inside & (np.abs(X - fx) < 0.9) & (np.abs(Y - fy) < 0.9)] = RIBO[1] if i % 3 else CYTO[0]
     # keratin (its own kind in basal cells) from the anchors into the cell, faint
     for x0 in (-95.0, -48.0, 0.0, 48.0, 95.0):
@@ -301,7 +343,7 @@ def cell_body(buf, X, Y, u, sd):
                     br = (np.abs(Y - yy - k) < 0.6) & (side * (X - xin) > 1.0) & (side * (X - xout) < -1.0)
                     buf[br & (_BZ < show)] = KERATIN[1]
     # hemidesmosomes holding the bottom cell to the basement membrane (they glow once the cell has split)
-    glow = T.smooth((u - 7.5) / 0.3) * (0.5 + 0.5 * math.sin(u * 12.0))
+    glow = T.smooth((u - T_GLINT) / 0.3) * (0.5 + 0.5 * math.sin(u * 12.0))
     for x0 in (-95.0, -63.0, -32.0, 0.0, 32.0, 63.0, 95.0):
         hx, hy = CX + x0, Y0 + HH - 4.5
         pl = (np.abs(X - hx) < 4.5) & (np.abs(Y - hy) < 1.6)
@@ -332,6 +374,10 @@ def condensed(i, u):
     return T.ease_out(T.u_of(u, (T_COND[i], T_COND[i] + 0.55)), 2.0)
 
 
+SPINDLE_FADE = (T_NUCS - 0.2, T_NUCS + 0.8)
+CHROMO_FADE = (T_NUCS - 0.1, T_NUCS + 0.9)
+
+
 def nucleus(buf, X, Y, u):
     """The resting nucleus: its chromatin packs away into the chromosomes, its envelope breaks into pieces that fade."""
     a = 1.0 - T.smooth((u - T_ENV) / 0.6)
@@ -347,7 +393,7 @@ def nucleus(buf, X, Y, u):
     packed = sum(condensed(i, u) for i in range(4)) / 4.0
     chrom = (np.sin(X * 0.21 + np.sin(Y * 0.13) * 2.0) * np.sin(Y * 0.19 + 1.3) + 0.5 * np.sin((X + Y) * 0.31)) > 0.62
     buf[inside & chrom & (_BZ >= packed)] = NUC[3]
-    nl_a = 1.0 - T.smooth(u / 1.2)
+    nl_a = 1.0 - T.smooth((u - U0) / 2.0)
     if nl_a > 0:
         nrr = np.hypot((X - CX - 30.0) / 15.0, (Y - Y0 - 40.0) / 11.0) * (1 + 0.12 * np.sin(3 * np.arctan2(Y - Y0 - 40.0, X - CX - 30.0)))
         buf[(nrr <= 1.0) & fade & (_BZ < nl_a)] = NUC[2]
@@ -371,14 +417,14 @@ def centrosomes(u):
     the other travels round the nucleus to the bottom."""
     pt, pb = poles(u)
     start = (CX + 30.0, Y0 - NUC_R[1] - 16.0)
-    k_top = T.ease_in_out(T.u_of(u, (0.45, 1.6)), 2.0)
+    k_top = T.ease_in_out(T.u_of(u, (U0 + 1.5, U0 + 4.5)), 2.0)
     top = (T.lerp(start[0], CX, k_top), T.lerp(start[1], pt, k_top))
-    k = T.ease_in_out(T.u_of(u, (0.45, 1.6)), 2.0)
+    k = T.ease_in_out(T.u_of(u, (U0 + 1.5, U0 + 4.5)), 2.0)
     th = math.radians(T.lerp(-70.0, 90.0, k))
     around = (CX + (NUC_R[0] + 22.0) * math.cos(th), Y0 + (NUC_R[1] + 22.0) * math.sin(th))
-    settle = T.smooth(T.u_of(u, (1.4, 1.8)))
+    settle = T.smooth(T.u_of(u, (U0 + 4.3, U0 + 4.8)))
     bot = (T.lerp(around[0], CX, settle), T.lerp(around[1], pb, settle))
-    if u < 0.45:
+    if u < U0 + 1.5:
         top, bot = (start[0] - 3.0, start[1]), (start[0] + 3.0, start[1] + 2.0)
     return top, bot
 
@@ -388,9 +434,9 @@ def chromosome_state(i, u):
     E = elong(u)
     plate = Y0 - E / 2
     x0, y0 = CX + CH_P0[i][0] + 3.0 * math.sin(u * 1.7 + i), Y0 + CH_P0[i][1] + 2.0 * math.cos(u * 1.3 + i)
-    m = T.ease_in_out(T.u_of(u, (T_ATT[2 * i], T_ATT[2 * i] + 0.9)), 2.0)
+    m = T.ease_in_out(T.u_of(u, (T_ATT[2 * i], T_ATT[2 * i] + 1.4)), 2.0)
     x = T.lerp(x0, CX + CH_X[i], m)
-    y = T.lerp(y0, plate, m) + 1.5 * math.sin(9.0 * u + i) * T.smooth(T.u_of(u, (T_LINED - 0.3, T_LINED)))
+    y = T.lerp(y0, plate, m) + 1.5 * math.sin(9.0 * u + i) * T.smooth(T.u_of(u, (T_LINED - 1.0, T_LINED)))
     ang = T.lerp(CH_A0[i], 0.0, m)
     return x, y, ang
 
@@ -399,7 +445,7 @@ def copies(i, u):
     """After the split: the two copies' centromeres (top, bottom) and how far into the pull they are."""
     E = elong(u)
     x, y, _ = chromosome_state(i, T_SPLIT)
-    m = T.ease_in_out(T.u_of(u, (T_SPLIT, T_SPLIT + 1.25)), 2.0)
+    m = T.ease_in_out(T.u_of(u, (T_SPLIT, T_SPLIT + 2.0)), 2.0)
     tx = CX + 0.55 * CH_X[i]
     top = (T.lerp(x, tx, m), T.lerp(y - 2.2, Y0 - E - 22.0, m))
     bot = (T.lerp(x, tx, m), T.lerp(y + 2.2, Y0 + 22.0, m))
@@ -428,7 +474,7 @@ def rot(v, ang):
 def chromosomes(buf, X, Y, u):
     """The four chromosomes: packing up as X shapes, moving to the middle, splitting, the copies pulled apart, then
     unpacking into the two new nuclei."""
-    fade = 1.0 - T.smooth((u - 6.0) / 0.8)
+    fade = 1.0 - T.smooth(T.u_of(u, CHROMO_FADE))
     if fade <= 0.0:
         return
     for i in range(4):
@@ -453,17 +499,17 @@ def chromosomes(buf, X, Y, u):
 
 def spindle(buf, X, Y, u):
     """The poles (centrosomes), their rays, and the fibres that catch the chromosomes and pull the copies apart."""
-    a = 1.0 - T.smooth((u - 6.0) / 0.7)
+    a = 1.0 - T.smooth(T.u_of(u, SPINDLE_FADE))
     if a <= 0.0:
         return
     fade = _BZ < a
     (tx, ty), (bx, by) = centrosomes(u)
     lines = np.zeros(X.shape, bool)
     # rays around each pole
-    ray = 30.0 * T.smooth(T.u_of(u, (0.8, 1.4)))
+    ray = 30.0 * T.smooth(T.u_of(u, (U0 + 1.2, U0 + 2.2)))
     if ray > 1.0:
         for (px, py), out in (((tx, ty), -90.0), ((bx, by), 90.0)):
-            if u < 1.6:                                      # still on their way: rays point away from the nucleus
+            if u < U0 + 4.5:                                 # still on their way: rays point away from the nucleus
                 out = math.degrees(math.atan2(py - Y0, px - CX))
             for d in (-75.0, -50.0, -25.0, 0.0, 25.0, 50.0, 75.0):
                 ar = math.radians(out + d)
@@ -504,11 +550,11 @@ def spindle(buf, X, Y, u):
 def new_nuclei(buf, X, Y, u):
     """Telophase: an envelope closes round each set of copies, which unpack into chromatin; each nucleus settles in the
     middle of its new cell."""
-    f = T.smooth((u - 5.95) / 0.9)
+    f = T.smooth((u - (T_NUCS - 0.25)) / 1.0)
     if f <= 0.0:
         return
     E = elong(u)
-    settle = T.smooth((u - 6.6) / 1.0)
+    settle = T.smooth((u - (T_NUCS + 0.6)) / 1.4)
     for cy_ in (T.lerp(Y0 - E - 22.0, Y0 - E, settle), T.lerp(Y0 + 22.0, Y0, settle)):
         rx, ry = 30.0 + 40.0 * f, 34.0 + 46.0 * f
         th = np.arctan2((Y - cy_) / ry, (X - CX) / rx)
@@ -578,11 +624,11 @@ def caption(buf, text, sub, ox, oy, age, life, side):
 
 
 CAPTIONS = (
-    ('CHROMOSOMES', 'DNA COPIED AND PACKED', 0.2, 1.75, (1, -1)),
-    ('SPINDLE', 'CATCHES EACH ONE', 1.85, 3.4, (1, -1)),
-    ('LINED UP', None, 3.5, 4.6, (-1, -1)),
-    ('PULLED APART', 'ONE COPY EACH WAY', 4.7, 6.45, (1, -1)),
-    ('TWO NEW CELLS', 'ONE STAYS, ONE GOES UP', 6.55, 8.65, (1, -1)),
+    ('CHROMOSOMES', 'DNA COPIED AND PACKED', U0 + 1.25, U0 + 4.0, (1, -1)),
+    ('SPINDLE', 'CATCHES EACH ONE', U0 + 5.4, U0 + 8.7, (1, -1)),
+    ('LINED UP', None, U0 + 10.1, U0 + 12.3, (-1, -1)),
+    ('PULLED APART', 'ONE COPY EACH WAY', U0 + 12.6, U0 + 15.0, (1, -1)),
+    ('TWO NEW CELLS', 'ONE STAYS, ONE GOES UP', U0 + 15.5, U0 + 19.7, (1, -1)),
 )
 
 
@@ -598,9 +644,20 @@ def anchors(u):
 
 
 # ---------------------------------------------------------------- the frame
+def world_dither(X, Y):
+    """Anchor the ordered dither and the checker to the cell (design pixels) for this frame, so the dither moves with
+    the picture instead of sitting still on the screen while the camera drifts and pulses."""
+    global _BZ, _CK
+    xi = np.floor(X).astype(np.int64)
+    yi = np.floor(Y).astype(np.int64)
+    _BZ = ((_B4[yi % 4, xi % 4] + 0.5) / 16.0).astype(np.float32)
+    _CK = ((xi + yi) % 2) == 0
+
+
 def frame(u):
-    """The inside of the dividing basal cell at u seconds into the look inside (0 .. 8.75)."""
+    """The inside of the dividing basal cell at u seconds into the look inside (0 .. DUR)."""
     X, Y, c = grids(u)
+    world_dither(X, Y)
     buf = np.empty((H, W, 3), np.uint8)
     surroundings(buf, X, Y, u)
     sd = cell_sd(X, Y, u)
@@ -615,9 +672,10 @@ def frame(u):
     buf[(sd > -1.1) & (sd <= 0.0)] = HERO
     buf[(sd > 0.0) & (sd <= 1.2)] = OUTLINE
     an = anchors(u)
+    c_text = cam(u, pulse=False)
     for k, (text, sub, t0, t1, side) in enumerate(CAPTIONS):
         if t0 <= u < t1:
-            ox, oy = to_canvas(an[k][0], an[k][1], c)
+            ox, oy = to_canvas(an[k][0], an[k][1], c_text)
             caption(buf, text, sub, ox, oy, u - t0, t1 - t0, side)
     if u < 0.1:                                            # in through the membrane
         buf = gfx.whiten(buf, 0.45 * (1 - u / 0.1))

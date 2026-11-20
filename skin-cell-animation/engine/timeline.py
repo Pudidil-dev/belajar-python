@@ -6,13 +6,16 @@ the spinous layer, [4.5, 6.5] the granular layer, [6.5, 12] the dead, flat cells
 p = 12 it is shed. Every column holds the same cells at the same heights, only out of step with its neighbours, so
 the slice looks the same after the conveyor has moved exactly N = 12 cells: that is the loop.
 
-P(t) is how far the conveyor has moved. It stands still during the hook and the dive, then advances in pushes, one
-per beat (each push fast, then settling), so divisions, ticks and the cell's rise all land on the beat; after 25 s of
-story it has moved exactly 12 cells and has come to rest, so the last frame is the first frame. The film is 35 s:
-the basal cell's division is watched from inside, in slow motion (film 5-16.25 s, 4 extra bars); story(t) and
-film(s) convert.
-The cell we follow is the one born in column 0 at P = 0: its height is p = P(t) (t in story time). About 28 days
-pass on its way up (2.33 days per cell height).
+The film, in order (all times are film times; the division wraps round the loop point):
+  33.44-34.69  the camera zooms into a basal cell at rest (P = 0)
+  34.69-20.00  inside it, the cell divides (engine/inside.py), from the first frame on: the progress k goes 0 -> 0.97
+  20.00-21.25  back out of the two new cells; on beat 3 of bar 8 the top one, ours, pops up (k = 1, P = SPLIT)
+  21.25-30.00  fast-forward: the conveyor pushes it up on every 8th note, 12 cell heights (about 28 days)
+  30.00-32.20  at the top, it lifts off in a flake with its neighbours; the camera follows
+  32.20-33.44  the camera dives back down to the basal cell that stayed, which is about to divide again
+P(t) is how far the conveyor has moved: SPLIT * k during the division, then pushes, then 12, which looks exactly like
+0 (so it is drawn as 0 from the moment the flake lifts). The cell we follow is the one born in column 0 at P = 0: its
+height is p = P(t).
 """
 import math
 import numpy as np
@@ -21,55 +24,51 @@ BPM = 96
 BEAT = 60.0 / BPM          # 0.625 s
 BAR = 4 * BEAT             # 2.5 s
 STEP = BEAT / 4            # one 16th
-STORY = 25.0               # the cell's life, from the hook back to the hook
-TOTAL = 35.0               # the film: 14 bars (the story, with its cell division watched from inside in slow motion)
+TOTAL = 35.0               # the film: 14 bars
 
-# The basal cell's division in slow motion (film time): the camera zooms into the basal cell at the end of the dive,
-# watches it divide from the inside, and comes back out as the two new cells pop apart. Story time crawls through it:
-# the cell rests (story 5.0-5.5), then divides (5.5-6.25, the span the tissue's own division takes), while 11.25 s of
-# film pass. The extra 10 s are 4 bars.
-SLOW = (5.0, 16.25)
-ZOOM_IN = (5.0, 6.25)
-INSIDE = (6.25, 15.0)
-ZOOM_OUT = (15.0, 16.25)
-SLOW_STORY = (5.0, 6.25)
-EXTRA = (SLOW[1] - SLOW[0]) - (SLOW_STORY[1] - SLOW_STORY[0])
-_REST_END = 5.5            # story time the division starts (DIVIDE[0])
-# how far the division has got (0 resting .. 1 two cells; the tissue draws it as P = SPLIT * k) at film times
-DIV_KEYS = ((5.0, 0.0), (6.25, 0.0), (7.85, 0.12), (9.45, 0.25), (10.85, 0.38), (12.25, 0.62), (13.65, 0.85),
-            (15.0, 0.97), (16.25, 1.0))
+ZOOM_IN = (33.4375, 34.6875)    # into the basal cell (ends on the last 8th of bar 13: through the membrane)
+INSIDE = (34.6875, 20.0)        # the division from inside (wraps round the loop point)
+ZOOM_OUT = (20.0, 21.25)        # back out of the two new cells
+POP = 21.25                     # the top cell pops up (beat 3 of bar 8): the first push
+HOOK = (30.0, 32.2)             # the flake lifts off on the downbeat of bar 12; the camera follows it
+DIVE = (32.2, 33.4375)          # and dives back down to the basal layer
+INSIDE_DUR = INSIDE[1] + TOTAL - INSIDE[0]
+# how far the division has got (0 resting .. 1 two cells; the tissue draws it as P = SPLIT * k), at film times
+# (before the loop point counted as negative)
+DIV_KEYS = ((ZOOM_IN[0] - TOTAL, 0.0), (INSIDE[0] - TOTAL, 0.0), (5.0, 0.12), (7.5, 0.25), (10.0, 0.33),
+            (12.5, 0.38), (15.0, 0.62), (17.5, 0.85), (20.0, 0.97), (POP, 1.0))
 _DKT = np.array([k_[0] for k_ in DIV_KEYS])
 _DKV = np.array([k_[1] for k_ in DIV_KEYS])
 
 
+def unwrap(t):
+    """Film time with the last seconds before the loop point (the zoom in and the start of the division) counted as
+    negative, so the division runs on one axis."""
+    t = t % TOTAL
+    return t - TOTAL if t >= ZOOM_IN[0] else t
+
+
 def div_k(t):
     """How far the basal cell's division has got at film time t (0 resting .. 1 two cells)."""
-    return float(np.interp(t, _DKT, _DKV))
+    tu = unwrap(t)
+    if tu > POP:
+        return 1.0
+    return float(np.interp(tu, _DKT, _DKV))
 
 
-def story(t):
-    """Story time at film time t: it runs, crawls through the division while we watch it from inside, runs on."""
-    if t < SLOW[0]:
-        return t
-    if t < SLOW[1]:
-        k = div_k(t)
-        if k <= 0.0:                                     # resting, while the camera zooms in
-            f = min(1.0, max(0.0, (t - SLOW[0]) / (INSIDE[0] - SLOW[0])))
-            return SLOW_STORY[0] + (_REST_END - SLOW_STORY[0]) * f
-        return _REST_END + (SLOW_STORY[1] - _REST_END) * math.sqrt(k)
-    return t - EXTRA
+def in_division(t):
+    """The zoom in, the division and the zoom out."""
+    return unwrap(t) < POP
 
 
-def film(s):
-    """Film time of a story event (one exactly at the end of the division happens after the slow motion)."""
-    if s < SLOW_STORY[0]:
-        return s
-    if s >= SLOW_STORY[1]:
-        return s + EXTRA
-    if s <= _REST_END:
-        return SLOW[0] + (s - SLOW_STORY[0]) / (_REST_END - SLOW_STORY[0]) * (INSIDE[0] - SLOW[0])
-    k = ((s - _REST_END) / (SLOW_STORY[1] - _REST_END)) ** 2
-    return float(np.interp(k, _DKV[1:], _DKT[1:]))
+def inside_u(t):
+    """Seconds into the look inside at film time t."""
+    return (t - INSIDE[0]) % TOTAL
+
+
+def is_inside(t):
+    return inside_u(t) < INSIDE_DUR
+
 
 N = 12                     # cell heights from birth to shedding
 DAYS = 28.0
@@ -112,26 +111,29 @@ def smoothstep(e0, e1, x):
     return t * t * (3 - 2 * t)
 
 
-# ---------------------------------------------------------------- the story's times
-DIVIDE = (5.5, 6.25)       # the cell we follow is born: the basal cell stretches, then pops on beat 10
-assert DIVIDE == (_REST_END, SLOW_STORY[1])
+# ---------------------------------------------------------------- the conveyor
+EIGHTH = BEAT / 2
 SPLIT = 0.25               # a newborn is still part of its mother until p = SPLIT
-PUSH = 0.42                # each beat's push takes this long (fast, then settles)
-# conveyor advance per beat (from beat 10): the daughter rises, the climb, flattening, the top, coming to rest
-_STEPS = [(10, 13, 1.05), (13, 23, 5.5), (23, 29, 2.8), (29, 35, 1.8), (35, 40, 0.6)]
+PUSH = 0.42                # each push takes this long (fast, then settles)
+# the fast-forward: a push on every 8th note from the pop: the daughter rises, the climb, flattening, the top, rest
+_STEPS = [(3, 1.05), (10, 5.5), (6, 2.8), (6, 1.8), (2, 0.6)]
 STEPS = []
-for b0, b1, total in _STEPS:
-    for b in range(b0, b1):
-        STEPS.append((b * BEAT, total / (b1 - b0)))
+_k = 0
+for n_, total in _STEPS:
+    for i_ in range(n_):
+        STEPS.append((POP + _k * EIGHTH, total / n_))
+        _k += 1
 assert abs(SPLIT + sum(d for _, d in STEPS) - N) < 1e-9
+assert STEPS[-1][0] + PUSH < HOOK[0]
 
 
 def P(t):
-    """How far the conveyor has moved (in cell heights) at story time t."""
-    if t < DIVIDE[0]:
-        return 0.0
-    if t < DIVIDE[1]:
-        return SPLIT * ((t - DIVIDE[0]) / (DIVIDE[1] - DIVIDE[0])) ** 2
+    """How far the conveyor has moved (in cell heights) at film time t."""
+    t = t % TOTAL
+    if in_division(t):
+        return SPLIT * div_k(t)
+    if t >= HOOK[0]:
+        return 0.0                                       # = N: the same picture
     v = SPLIT
     for t0, d in STEPS:
         if t <= t0:
@@ -141,31 +143,33 @@ def P(t):
     return v
 
 
-_TT = np.arange(0.0, STORY + 1e-9, 0.0005)
-_PP = np.array([P(x) for x in _TT])
+# P on one axis from the start of the zoom in (unwrapped, negative) to the flake (where it reaches N)
+_TT = np.arange(ZOOM_IN[0] - TOTAL, HOOK[0] + 1e-9, 0.0005)
+_PP = np.array([P(x % TOTAL) if x < HOOK[0] else float(N) for x in _TT])
+_PP[_TT >= HOOK[0] - 1e-9] = float(N)
 
 
 def P_inv(p):
-    """The first story time at which the conveyor reaches p (0 < p <= N)."""
+    """The first film time at which the conveyor reaches p (0 < p <= N)."""
     i = int(np.searchsorted(_PP, p, side='left'))
     i = min(max(i, 1), len(_TT) - 1)
     a, b = _PP[i - 1], _PP[i]
     k = 0.0 if b <= a else (p - a) / (b - a)
-    return float(_TT[i - 1] + (_TT[i] - _TT[i - 1]) * k)
+    return float((_TT[i - 1] + (_TT[i] - _TT[i - 1]) * k) % TOTAL)
 
 
 def jiggle(t, delay=0.0):
     """The jelly wobble each push sends through the tissue: a damped bounce starting at the push, reaching cells
     higher up a little later (delay). Positive = squashed (shorter, wider), negative = stretched."""
     out = 0.0
-    tt = t - delay
+    tt = (t % TOTAL) - delay
     for t0, d in STEPS:
         a = tt - t0
         if a < 0:
             break
         if a < 0.9:
             out += (d / 0.55) * math.sin(2 * math.pi * a / 0.34) * math.exp(-a / 0.17)
-    a = tt - DIVIDE[1]                                   # the pop itself
+    a = tt - POP                                         # the pop itself
     if 0 <= a < 0.9:
         out += 1.4 * math.sin(2 * math.pi * a / 0.3) * math.exp(-a / 0.2)
     return out
@@ -214,7 +218,7 @@ SURFACE = Y(N) + 0.5 * 0.46 * _slot_h(N) + 0.3       # the skin's surface
 
 def base(c):
     """A column's phase: neighbours about half a cell out of step (so the dead cells lie like bricks), with a slow
-    wave along the slice. No column but ours is caught mid-division while the conveyor stands still (P = 0)."""
+    wave along the slice. No column but ours is caught mid-division while the conveyor is near 0."""
     if c == 0:
         return 0.0
     return (0.35 if c % 2 else 0.85) + 0.08 * math.sin(0.9 * c)
@@ -235,7 +239,7 @@ FLAKE = ((-1, 11), (0, 12), (1, 11), (-1, 10), (0, 11), (1, 10))
 
 
 def flake_pose(t):
-    """The flake's offset from where it lay (dx, dy), its tilt and its curl (degrees), t seconds into the loop."""
+    """The flake's offset from where it lay (dx, dy), its tilt and its curl (degrees), t seconds after it lifts."""
     if t <= 0:
         return 0.0, 0.0, 0.0
     lift = 26.0 * ease_out(t / 2.0, 2.0) + 5.0 * max(0.0, t - 2.0)
@@ -249,5 +253,3 @@ def flake_curl(t):
     return 10.0 * ease_out(t / 0.8, 2.0)
 
 
-# ---------------------------------------------------------------- captions (text, world anchor, times)
-DAY_STAMPS = ((6.35, 8.1, 1), (13.4, 15.2, 14), (22.4, 27.4, 28))   # (story time)
