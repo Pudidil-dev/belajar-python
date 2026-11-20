@@ -5,15 +5,16 @@ Chip voices: band-limited pulse waves (PolyBLEP), an NES-style triangle bass, LF
 bells (the synth core is shared with the repo's other pixel films). 96 BPM in A minor / C major, 13 bars = 32.5 s, and
 it loops: vi-IV-I-V three times (one chord per function), and a last bar that turns to E to lead back to the top.
 Bar 0 is the operating room: a heart monitor's beep on every beat over a soft pad, then a rising rush as the camera
-zooms into the lamp. The LEDs' own notes are the tune of bar 1 (one per 16th as they light up); the brightness steps
+turns to the lamp. The LEDs' own notes are the tune of bar 1 (one per 16th as they light up); the brightness steps
 are the tune of bar 5. In endo mode (bar 8) the whole mix goes dim and muffled.
 
-Every effect is timed from engine/timeline.py: a shimmer as the shell turns see-through, a rising blip per LED, a
-bright chord as the beams meet, a tick for each beam a head cuts off, the sensors' scanning pips and a two-tone beep
-when they find the head, a rising whirr as the power shifts, a switch click per brightness step and per colour step,
-the lens panel's servo whirr, a power-down glide and the monitor's ping in endo mode, the heat's soft rush, the glove's
-grip and the camera's two beeps, the arm's ratchet clicks, the spring and a soft thunk when it holds, and a falling
-rush as the camera pulls back out to the room.
+Every effect is timed from engine/timeline.py: a shimmer as the camera reaches the lamp's face, a rising blip per LED,
+a bright chord as the rays meet, a soft rush as a hand comes up over the field and a rising blip for each group of
+LEDs that comes back on (the shadow going soft), a soft rush as a head leans in, the sensors' scanning pips and a
+two-tone beep when they find the head, a rising whirr as the power shifts, a switch click per brightness step and per
+colour step, the lens panel's servo whirr, a power-down glide and the monitor's ping in endo mode, the heat's soft
+rush, the glove's grip and the camera's two beeps, the arm's ratchet clicks, the spring and a soft thunk when it
+holds, and a falling rush as the camera pulls back out to the room.
 """
 import math
 import wave
@@ -576,15 +577,15 @@ def hiss(dur, f0, f1, seed, peak=0.15, tail=2.5):
 CHORD = {'Am': (45, (0, 3, 7)), 'F': (41, (0, 4, 7)), 'C': (48, (0, 4, 7)), 'G': (43, (0, 4, 7)),
          'E': (40, (0, 4, 7))}
 BARS = [('Am', 'Am'),      # 0  the operating room (the heart monitor), then the zoom into the lamp
-        ('F', 'F'),        # 1  x-ray: the LEDs light up one by one (their notes are the tune)
-        ('C', 'C'),        # 2  all the beams meet at one spot
-        ('G', 'G'),        # 3  a head in the way: no hard shadow
-        ('Am', 'Am'),      # 4  the sensors find it and shift the power
+        ('F', 'F'),        # 1  the lamp's face: the LEDs light up one by one (their notes are the tune)
+        ('C', 'C'),        # 2  all the rays meet at one spot
+        ('G', 'G'),        # 3  a hand over the field: one LED, a hard shadow; all back on, a soft one
+        ('Am', 'Am'),      # 4  a head in the way: the sensors find it and shift the power
         ('F', 'F'),        # 5  brightness, step by step (the tune)
         ('C', 'C'),        # 6  colour: warm to cool white
         ('G', 'G'),        # 7  field size: the lenses move
         ('Am', 'Am'),      # 8  endo mode: everything dims
-        ('F', 'F'),        # 9  the heat sink
+        ('F', 'F'),        # 9  the heat goes up, the hands stay cool
         ('C', 'C'),        # 10 the sterile handle and its camera
         ('G', 'G'),        # 11 the spring arm
         ('Am', 'E')]       # 12 back out to the room; E turns back to the top
@@ -713,30 +714,33 @@ def ratchet(n_clicks, dur, seed=0):
 
 def sfx():
     from . import scenes as SC
-    from . import lamp as LP
     bus = Bus()
     # ---- the operating room: the heart monitor on every beat of bar 0 and of bar 12's second half (into the loop)
     for k in range(4):
         bus.put(monitor_beep(), bar_t(0, 4 * k), 0.09, -0.5)
     for k in (2, 3):
         bus.put(monitor_beep(), bar_t(12, 4 * k), 0.07, -0.5)
-    # the zoom into the lamp: a rising rush; the shell turns see-through: a glassy shimmer
+    # the camera turns up to the lamp: a rising rush; it reaches the lamp's face: a glassy shimmer
     bus.put(whoosh(T.ZOOM_IN[1] - T.ZOOM_IN[0] + 0.1, 300, 2600, 701, 0.9, 0.92), T.ZOOM_IN[0], 0.22, 0.0)
     for k, m in enumerate((84, 88, 91, 96)):
-        bus.put(glass_ping(mtof(m), 0.5, 702 + k), T.XRAY[0][0] + 0.08 * k, 0.05, -0.3 + 0.2 * k)
+        bus.put(glass_ping(mtof(m), 0.5, 702 + k), T.T_FACE + 0.08 * k, 0.05, -0.3 + 0.2 * k)
     # ---- bar 1: each LED lights up with a rising blip (F major pentatonic, two octaves): the bar's tune
     pent = (65, 67, 69, 72, 74, 77, 79, 81, 84, 86, 89, 91, 93, 96, 98)
     for i, t0 in enumerate(T.LED_ON):
-        bus.put(blip(mtof(pent[i]), mtof(pent[i] + 12), 0.08, 0.25), t0, 0.075, -0.6 + 1.2 * i / (T.LED_N - 1))
+        bus.put(blip(mtof(pent[i]), mtof(pent[i] + 12), 0.08, 0.25), t0, 0.075, -0.6 + 1.2 * i / (T.LED_GROUPS - 1))
     # ---- bar 2: the beams meet at the spot: a bright chord as the camera settles on them
     for k, m in enumerate((72, 76, 79, 84)):
         bus.put(bell(m, 0.9, 1.4, 2.0), bar_t(2, 4) + 0.02 * k, 0.06, -0.2 + 0.13 * k)
-    # ---- bar 3: the head leans in (a soft rush); a tick for every beam it cuts off, on the 16ths
-    bus.put(whoosh(0.7, 900, 300, 711, 0.8, 0.4), bar_t(3) + 0.15, 0.24, -0.3)
-    blocked = [i for i, o in enumerate(LP.beams(bar_t(4) - 0.2)) if o[3] < o[2]]
-    for k, i in enumerate(blocked):
-        bus.put(click(712 + k, 3200 - 150 * k, 0.02), bar_t(3, 3 + k), 0.26, -0.5 + 0.08 * k)
-        bus.put(blip(mtof(84 - 2 * k), mtof(79 - 2 * k), 0.06, 0.5), bar_t(3, 3 + k), 0.035, -0.5 + 0.08 * k)
+    # ---- bar 3: a hand comes up over the field (a soft rush); one LED alone, then a rising blip for every group of
+    # LEDs that comes back on (on the 16ths, up the G chord), as the hard shadow goes soft
+    bus.put(whoosh(0.5, 900, 2400, 711, 0.6, 0.5), bar_t(3) - 0.35, 0.34, 0.3)
+    bus.put(click(718, 1800, 0.03), bar_t(3), 0.32, 0.0)         # the other LEDs off, on the downbeat
+    for k, m in enumerate((67, 71, 74, 79, 83, 86, 91)):
+        t0 = T.SOLO_BACK + k * STEP
+        bus.put(click(712 + k, 2600 + 120 * k, 0.02), t0, 0.2, -0.45 + 0.15 * k)
+        bus.put(blip(mtof(m), mtof(m + 12), 0.07, 0.4), t0, 0.055, -0.45 + 0.15 * k)
+    # ---- bar 4: the head leans in (a soft rush)
+    bus.put(whoosh(0.7, 900, 300, 719, 0.8, 0.4), bar_t(4) - 0.3, 0.24, -0.3)
     # ---- bar 4: the sensors scan (pips on the 8ths), find the head (two-tone beep), shift the power (a rising whirr)
     for k in range(0, 3):
         bus.put(beep(1600, 0.03, 0.5), bar_t(4, k), 0.03, 0.4)

@@ -1,9 +1,10 @@
 """The film's clock (96 BPM, 32.5 s = 13 bars) and what the surgical light is doing at every moment.
 
-0-1 s the hook: the operating room from the side. 1-2.5 s the camera rises and pushes into the lamp. Then one bar per
-function: the LEDs and their lenses (bar 1), the beams meeting at one spot (2), a head in the way (3), the sensors
-(4), brightness (5), colour temperature (6), field size (7), endo mode (8), the heat sink (9), the sterile handle and
-its camera (10), the spring arm (11); bar 12 pulls back out to the operating room, and the last frame is the first.
+0-1 s the hook: the operation from the side. 1-2.5 s the camera rises and turns to face the lamp. Then one bar per
+function: the LEDs and their lenses (bar 1), the rays meeting at one spot (2), a hand's shadow, hard under one LED and
+soft once they are all back on (3), a head in the way and the sensors (4), brightness (5), colour temperature (6),
+field size (7), endo mode (8), the heat going up (9), the sterile handle and its camera (10), the spring arm (11); bar
+12 comes back to the opening shot, and the last frame is the first.
 Every function of time here is periodic over the film (or at rest at both ends), so the film loops.
 """
 import math
@@ -69,17 +70,13 @@ def pulse(t, t0, up=0.03, down=0.25):
 
 
 # ---------------------------------------------------------------- the light's state
-LED_N = 15                                   # LED modules in the cross-section
-LED_ON = tuple(bar(1) + STEP * (i + 1) for i in range(LED_N))    # in x-ray they light up one per 16th (bar 1)
-XRAY = ((2.3, 2.9), (30.0, 30.6))            # the shell turns see-through, and back
-
-
-def xray(t):
-    return smooth(u_of(t, XRAY[0])) * (1 - smooth(u_of(t, XRAY[1])))
+LED_GROUPS = 15                              # bar 1: the LEDs light up in 15 groups, inner ring first, one per 16th
+LED_ON = tuple(bar(1) + STEP * (i + 1) for i in range(LED_GROUPS))
+T_FACE = 2.3                                 # the camera reaches the lamp's face (a glassy shimmer in the sound)
 
 
 def led_on(i, t):
-    """How far LED i has lit up in the bar where they come on one by one (1 outside it)."""
+    """How far LED group i has lit up in the bar where they come on one by one (1 outside it)."""
     if bar(1) - 0.2 <= t < bar(2):
         return T_led(i, t)
     return 1.0
@@ -124,14 +121,38 @@ def field_d(t):
     return lerp(FIELD_D[0], FIELD_D[1], grow * (1 - back))
 
 
-def lens_off(t):
-    """How far the lens panel has slid towards the LEDs (cm)."""
-    return 1.4 * (field_d(t) - FIELD_D[0]) / (FIELD_D[1] - FIELD_D[0])
-
-
 def lean(t):
-    """The lead surgeon leaning in under the lamp (bar 3) and back (start of bar 5)."""
-    return smooth(u_of(t, (bar(3) + 0.15, bar(3) + 0.85))) * (1 - smooth(u_of(t, (bar(5) - 0.1, bar(5) + 0.5))))
+    """The lead surgeon leaning in under the lamp (bar 4, for the sensors) and back (start of bar 5)."""
+    return smooth(u_of(t, (bar(4) - 0.3, bar(4) + 0.3))) * (1 - smooth(u_of(t, (bar(5) - 0.1, bar(5) + 0.5))))
+
+
+SOLO_BACK = bar(3) + 7 * STEP                # bar 3: one LED alone until here, then a group back on every 16th
+SOLO_GROUPS = 7
+
+
+def solo(t):
+    """Bar 3: 0 = one LED alone (a hard shadow), 1 = all back on (one group per 16th from SOLO_BACK)."""
+    if not (bar(3) <= t < bar(4)):
+        return 1.0
+    k = (t - SOLO_BACK) / STEP
+    if k < 0:
+        return 0.0
+    return min(1.0, (math.floor(k) + 1) / SOLO_GROUPS)
+
+
+def reach(t):
+    """A gloved hand held up over the field (bar 3), so its shadow shows, and taken back."""
+    return smooth(u_of(t, (bar(3) - 0.35, bar(3) + 0.15))) * (1 - smooth(u_of(t, (bar(4) - 0.45, bar(4) - 0.05))))
+
+
+def demo(t):
+    """The shadow demo (bar 3): the room darker and the light a little lower, so every shade of the shadow shows."""
+    return smooth(u_of(t, (bar(3) - 0.2, bar(3) + 0.1))) * (1 - smooth(u_of(t, (bar(4) - 0.3, bar(4)))))
+
+
+def thermal(t):
+    """The heat view (bar 9)."""
+    return smooth(u_of(t, (bar(9) + 0.05, bar(9) + 0.35))) * (1 - smooth(u_of(t, (bar(10) - 0.3, bar(10)))))
 
 
 T_DETECT = bar(4) + 3 * STEP                 # the sensors see the head (on a 16th)
@@ -158,7 +179,7 @@ def endo(t):
 
 
 def heat(t):
-    """The heat flow shown in the x-ray (bar 9)."""
+    """The heat glowing off the top of the lamp and rising (bar 9)."""
     return smooth(u_of(t, (bar(9) + 0.1, bar(9) + 0.6))) * (1 - smooth(u_of(t, (bar(10) - 0.2, bar(10) + 0.2))))
 
 

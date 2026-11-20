@@ -1,42 +1,54 @@
 # Surgical Light, Fully Functional
 
-A 32.5-second looping, vertical short in 8-bit pixel art about how a surgical light works, with a bright, catchy
-chiptune soundtrack and sound effects tied to every event on screen. It follows the client's brief: the hook shows the
-operation for one second from the side, then the camera zooms into the lamp and goes straight into how it works, one
-function per bar of music, in an x-ray (cutaway) view of the lamp head. The camera pulls back out to the operating room
-at the end, and the last frame runs straight into the first. No game elements and no narration: clean captions in
-English name the things on screen.
+A 32.5-second looping vertical short about how a surgical light works and what its light does to an operation. It is
+built in 3D and drawn as 8-bit pixel art, with a bright, catchy chiptune soundtrack and sound effects tied to every
+event on screen. It follows the client's brief:
+- the hook shows the operation for one second from the side;
+- then the camera turns up to the lamp and goes straight into how it works, one function per bar of music;
+- each function is shown on the operation itself: the lamp's face, the rays, the hands' shadows, a head in the way, the
+  lit spot, the room, the heat, the monitor.
 
-the operation from the side (1 s) → zoom into the lamp → **LEDs, each with its own lens → all aimed at one spot →
-a head in the way: no hard shadow → sensors shift the power → brightness → colour temperature → field size → endo
-mode → the heat sink → the sterile handle and its camera → the spring arm** → back out to the operating room → the
-loop starts again.
+The camera comes back to the opening shot at the end, and the last frame runs straight into the first. No game elements
+and no narration: clean captions in English name the things on screen.
+
+the operation from the side (1 s) → up to the lamp's face → **LED lights, each with a lens → all aimed at one spot →
+hands in the light: soft shadows → sensors shift the power → brightness → warm + cool LEDs mix the colour → field size
+→ endo mode → the heat goes up, the hands stay cool → the sterile handle and its camera → the spring arm** → back to
+the opening shot → the loop starts again.
 
 ![storyboard](docs/storyboard.png)
 
 - **Format.** 1080×1920 (9:16 vertical), 30 fps, exactly 32.5 s (13 bars of 4/4 at 96 BPM), H.264 video with 48 kHz
   stereo AAC. The default export is **`out/surgical-light-animation.mp4`**, relative to this folder.
-- **Look.** Every frame is drawn in code on a 270×480 canvas and scaled exactly 4× nearest-neighbour: crisp pixels,
-  stepped 1-px outlines, a limited palette, at most a checker or ordered dither.
-  - **The room:** an operating room seen from the side. The table runs left to right with the patient under teal-blue
-    drapes, and the prepped skin shows through a window in the drape. Two surgeons in teal gowns, caps and masks (only
-    their eyes show) work at the field. A vital-signs monitor's green trace beats with the music, and a monitor hangs
-    on a ceiling boom.
-  - **The lamp:** a white dome on a suspension: ceiling mount, central axis, extension arm, spring arm and yoke. In
-    x-ray you see the LED modules, each with its own lens, on a curved circuit board; the driver board, the heat-sink
-    fins, the sensors at the rim, and a camera in the sterile handle.
-- **The light's effects.** The light is drawn as light, in every shot:
-  - every LED sends a ray, and the rays build a glowing cone that gets brighter where they cross;
-  - they meet in a bright pool on the field that lights the gloves, the skin and the drape;
-  - a head in the way cuts off only the rays it is in front of and catches the light on its cap, so the field stays
-    lit, with no hard shadow;
-  - the light turns warmer or cooler, the pool grows and shrinks, the whole room dims in endo mode, and warm specks
-    rise off the heat sink.
-  - While the film explains the light, the room is a little darker so the light stands out; it is bright again in
-    the operating-room shots at the start and the end.
+- **Look: 3D, drawn as 8-bit pixel art.**
+  - **Real 3D.** The operating room is a 3D scene, ray-cast in code: one ray per pixel of a 270×480 canvas, which is
+    then scaled exactly 4× nearest-neighbour.
+  - **Lit by the lamp itself.** Each of the lamp's 34 LEDs is a spotlight aimed at the field, with its own shadow rays,
+    so heads, arms and gloved hands cast real shadows. Soft light from the room fills in the rest.
+  - **Drawn as pixel art.** Every pixel snaps to one fixed palette of 89 colours: the nearest colour, with a light 4×4
+    ordered dither only where two shades meet. Dark 1-px outlines mark where one object meets another, as in hand-made
+    pixel art.
+  - **2D pixel effects on top:** the rays of light in the air, the glow of the LEDs and the lit field, the sensors'
+    dashed scan lines and their detection ring, the heat specks, and the captions.
+- **The room.**
+  - Two surgeons in teal gowns, caps and masks work at the patient, who lies under teal drapes with a window of
+    prepped skin.
+  - A vital-signs monitor's green trace beats with the music, and a second monitor hangs on a ceiling boom.
+  - The lamp hangs from the ceiling on its suspension: mount, axis, extension arm, spring arm and yoke. A sterile
+    handle sits in the middle of its face.
+- **The light's effects, shown on the operation.**
+  - Rays from every LED meet in one bright pool on the field.
+  - Under one LED alone, a hand held over the field throws a hard, dark shadow. As the other LEDs come back on from
+    all round the lamp, the shadow breaks up, goes pale, and almost disappears.
+  - A head in the way: the sensors' scan lines stop at it, the LEDs it blocks dim, and the others brighten.
+  - The pool brightens step by step, turns from warm to cool white, and grows from small to wide. The whole room dims
+    in endo mode while the monitor shows the keyhole camera.
+  - A heat view shows the top of the lamp hot and the hands and the field cool.
+  - The monitor shows the picture from the camera in the handle.
+  - When the lamp is pulled to a new place, the spot of light goes with it.
 - **Captions.** White pixel text with a thin line to the object it names, typed on and gone a couple of seconds
-  later; never more than one at a time, and always clear of a phone app's buttons and caption area.
-- **Loop.** The film starts and ends on the same shot of the operating room; the surgeons' hands, the heart monitor's
+  later. There is never more than one at a time, and they always stay clear of a phone app's buttons and caption area.
+- **Loop.** The film starts and ends on the same shot of the operating room. The surgeons' hands, the heart monitor's
   trace and every idle motion repeat exactly once per loop, the soundtrack wraps round, and the heart monitor beeps
   across the loop point. `python render.py --loops 3` writes the loop three times back to back (97.5 s).
 
@@ -95,8 +107,9 @@ python render.py
 ```
 
 The film is written to **`out/surgical-light-animation.mp4`**. The music, effects and mix are written next to it as
-WAV stems (`out/music.wav`, `out/sfx.wav`, `out/mix.wav`). On a 4-core machine the full render takes about 2 minutes.
-With [uv](https://docs.astral.sh/uv/) instead of pip, no install step is needed:
+WAV stems (`out/music.wav`, `out/sfx.wav`, `out/mix.wav`). Every frame is ray-cast, so the full render takes about
+8 minutes on a 4-core machine (the preview takes as long: the frames are the same, only the encode is
+smaller). With [uv](https://docs.astral.sh/uv/) instead of pip, no install step is needed:
 
 ```bash
 uv run --no-project --with numpy --with pillow --with imageio-ffmpeg python render.py
@@ -109,7 +122,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | Command | What it does |
 |---|---|
 | `python render.py --sheet 0:32.5:1` | one contact sheet of the whole film in `out/sheet.png` (start:end:step, seconds) |
-| `python render.py --stills 0.5,9.0,21.5` | full-size PNG frames in `out/stills/` |
+| `python render.py --stills 0.5,8.0,26.6` | full-size PNG frames in `out/stills/` |
 | `python render.py --from 5 --to 9` | only a slice of the film |
 | `python render.py --fps 60` | 60 fps |
 | `python render.py --scale 8` | 2160×3840 (4K vertical) |
@@ -139,38 +152,40 @@ On Windows, use `py render.py` if `python` is not on PATH.
 
 | Time | Picture | Caption | Sound |
 |---|---|---|---|
-| 0–2.5 | **The operation**, from the side, under the light for one second; then the camera rises and pushes into the lamp. | | the heart monitor's beep on every beat over a soft pad; a rising rush; a glassy shimmer as the shell turns see-through |
-| 2.5–5.0 | **LEDs.** In x-ray, the LEDs light up one after another, left to right, each with its own lens. | LEDS · EACH WITH ITS OWN LENS | a rising blip for each LED, one per 16th: the bar's tune |
-| 5.0–7.5 | **One spot.** A ray leaves every lens; all of them meet in one bright pool of light on the field. | ALL AIMED · AT ONE SPOT | a bright chord as the camera settles on the beams |
-| 7.5–10.0 | **No hard shadow.** A surgeon leans in under the lamp; the head cuts off the rays it is in front of, and the rest still light the field. | MANY ANGLES · NO HARD SHADOW | a soft rush; a tick for every ray the head cuts off |
-| 10.0–12.5 | **Sensors.** Red scanning rays find the head; the blocked LEDs dim and the others brighten, and the pool is as bright as before. | SENSORS · SHIFT THE POWER | scanning pips, a two-tone beep when they find the head, a rising whirr as the power shifts |
+| 0–2.5 | **The operation**, from the side, under the light for one second; then the camera rises and turns up to the lamp's face. | | the heart monitor's beep on every beat over a soft pad; a rising rush; a glassy shimmer as the camera reaches the lamp |
+| 2.5–5.0 | **The lamp's face**, seen from the front: rings of LEDs, each with its own lens, light up ring by ring. | LED LIGHTS · EACH WITH A LENS | a rising blip for each group of LEDs, one per 16th: the bar's tune |
+| 5.0–7.5 | **One spot.** A ray leaves every LED; all of them meet in one bright pool on the patient. | ALL AIMED · AT ONE SPOT | a bright chord as the camera settles on the rays |
+| 7.5–10.0 | **Hands in the light.** A surgeon holds a gloved hand over the field. Only one LED is left on: one ray, stopped by the hand, and a hard, dark shadow. Then the LEDs come back on, a group per 16th from all round the lamp; the shadow breaks up, goes pale and almost disappears. | HANDS IN THE LIGHT · SOFT SHADOWS | a soft rush as the hand comes up; a click as the other LEDs go off; a rising blip for every group that comes back |
+| 10.0–12.5 | **Sensors.** The other surgeon leans right in under the lamp. The sensors' dashed scan lines stop at the head, and a ring marks it. The LEDs it blocks dim and the others brighten, so the field stays as bright. | SENSORS · SHIFT THE POWER | a soft rush; scanning pips, a two-tone beep when they find the head, a rising whirr as the power shifts |
 | 12.5–15.0 | **Brightness** steps up on every beat, to full. | BRIGHTNESS · UP TO 160,000 LUX | a switch click and a rising note per step: the bar's tune |
-| 15.0–17.5 | **Colour temperature:** the white light changes from warm to cool on every beat. | COLOR · WARM TO COOL WHITE | a click and a brighter bell per step |
-| 17.5–20.0 | **Field size:** the lenses slide closer to the LEDs and the pool of light grows. | FIELD SIZE · LENSES MOVE, SPOT GROWS | the lens panel's servo whirr, a soft bloom |
+| 15.0–17.5 | **Colour:** half the LEDs are warm white, half cool white; their mix steps from warm to cool on every beat. | WARM + COOL LEDS · MIX THE COLOR | a click and a brighter bell per step |
+| 17.5–20.0 | **Field size:** seen from above and in front, the lit spot on the patient grows from small to wide. | FIELD SIZE · SMALL TO WIDE | the lens panel's servo whirr, a soft bloom |
 | 20.0–22.5 | **Endo mode:** the lamp and the room go dim; the monitor shows the keyhole camera's picture. | ENDO MODE · DIM FOR KEYHOLE SURGERY | a power-down glide, a ping as the monitor lights; the music goes dim and muffled |
-| 22.5–25.0 | **Heat sink:** heat from the LEDs flows up into the fins and rises away, while only light goes down. | HEAT SINK · LED HEAT LEAVES UP TOP | a soft rising rush and a few crackles |
-| 25.0–27.5 | **Sterile handle:** a gloved hand grips the handle; inside it a camera films the field. | STERILE HANDLE · CAMERA INSIDE | a grip click, the camera's two beeps |
-| 27.5–30.0 | **Spring arm:** the surgeon pulls the lamp to a new place; the spring inside the arm takes the weight and it stays there; then it goes back. | SPRING ARM · STAYS WHERE YOU LEAVE IT | ratchet clicks, a spring, a soft thunk as it holds; a tom run |
-| 30.0–32.5 | **Back to the room:** the camera pulls back out to the operation under the light. | | a falling rush; the heart monitor beeps again, into the loop |
+| 22.5–25.0 | **Heat view:** the top of the lamp glows hot and the heat rises away; the face of the lamp is cooler, and the hands and the field stay cool. | HEAT GOES UP · HANDS STAY COOL | a soft rising rush and a few crackles |
+| 25.0–27.5 | **Sterile handle:** a surgeon reaches up and grips the handle in the middle of the lamp; the monitor switches to the camera inside it, looking down at the hands at work. | STERILE HANDLE · CAMERA INSIDE | a grip click, the camera's two beeps |
+| 27.5–30.0 | **Spring arm:** the surgeon pulls the lamp to a new place; the spot of light goes with it and the arm holds it there; then it goes back. | SPRING ARM · STAYS PUT | ratchet clicks, a spring, a soft thunk as it holds; a tom run |
+| 30.0–32.5 | **Back to the room:** the camera comes back to the opening shot of the operation. | | a falling rush; the heart monitor beeps again, into the loop |
 
 ## The science (as drawn)
 
-- **Many sources, one spot.** A surgical light has dozens of LEDs, often grouped in modules or zones, each with its own
-  lens or reflector aimed at the same spot. The beams overlap there into one light field. One evaluated light has 72
-  LEDs (six zones of 9 plus a central ring of 18); a patent describes 108 LEDs in 54 reflectors.
-- **No hard shadow.** Because the light comes from many angles at once, a head or a hand only blocks the beams it is in
-  front of. The field keeps the light of all the others: it gets a little darker, but no hard shadow falls on it. The
-  IEC standard for surgical lights tests this ("shadow dilution") with a mask that stands in for the surgeon's head.
+- **Many sources, one spot.** A surgical light has dozens of LEDs, often grouped in modules or zones. Each has its own
+  lens or reflector, all aimed at the same spot, and the beams overlap there into one light field. One evaluated light
+  has 72 LEDs (six zones of 9 plus a central ring of 18); a patent describes 108 LEDs in 54 reflectors.
+- **Soft shadows (shadow dilution).** The light comes from a face about 70 cm wide, from many directions at once. A
+  hand or a head blocks only the beams it is in front of, and each of those is a small part of the light, so the field
+  keeps the light of all the others: no hard shadow falls on it. With a single source, the same hand would throw a hard
+  shadow, which is what the film shows first. The IEC standard for surgical lights tests this ("shadow dilution") with
+  a mask that stands in for the surgeon's head.
 - **Sensors.** Some lights have sensors that detect a head in the beam and shift power from the blocked zones to the
   others, so the light on the field stays the same.
 - **Brightness.** The standard's upper limit for the light at the centre of the field is 160,000 lux, measured 1 m from
   the lamp; lights offer several brightness steps.
-- **Colour.** The standard allows white light from 3,000 K (warm) to 6,700 K (cool). It asks for a colour rendering
-  index above 85, so tissue colours look true. Many lights let the team adjust the colour temperature within part of
-  that range.
+- **Colour.** The standard allows white light from 3,000 K (warm) to 6,700 K (cool), and asks for a colour rendering
+  index above 85 so that tissue colours look true. Patents on surgical lights describe one way to adjust the colour:
+  mixing LEDs of two different whites, warm and cold, in different proportions.
 - **Field size.** The size of the light field can be changed by moving a panel of lenses closer to or further from the
   LEDs (closer spreads the light wider). Other designs tilt the outer emitters or switch between LED groups. One
-  product's field goes from 17 to 25 cm.
+  product's field goes from 17 to 25 cm; the film shows 20 to 30 cm.
 - **Endo mode.** A dim setting for keyhole (endoscopic) surgery, when the team watches the camera's picture on a
   monitor.
 - **Heat.** LEDs put far less infrared into the beam than halogen lamps did, which means less heat and less drying of
@@ -180,11 +195,15 @@ On Windows, use `py render.py` if `python` is not on PATH.
   detachable and sterilisable, or covered with a sterile cover. A camera can sit inside it.
 - **Spring arm.** Springs in the arm balance the weight of the head, so it stays where it is left.
 - **Simplified on purpose.**
-  - The cross-section shows one row of 15 LED modules; real heads have dozens, in rings or zones.
-  - The beams are drawn as visible rays. In a real operating room the light is invisible in the air; you only see
-    where it lands.
-  - The sensors and the camera are features of some lights, not all.
-  - Sizes and distances are close to real ones (a head about 70 cm across, about 1 m above the field) but not exact.
+  - The lamp has 34 LEDs in three rings; real heads have dozens, up to more than a hundred.
+  - The rays are drawn as visible light in the air. In a real operating room the light is invisible in the air; you
+    only see where it lands.
+  - The bar-3 demonstration (one LED alone, then the groups coming back) is staged to show the principle; a real light
+    does not do this.
+  - The sensors' scan lines are drawn so you can see what the sensors do; real ones work with invisible light. The
+    sensors and the handle camera are features of some lights, not all.
+  - The heat view shows where the heat goes; it is an illustration, not a measurement.
+  - Sizes and distances are close to real ones (a head about 70 cm across, about 90 cm above the field) but not exact.
 
 Sources checked during this session (through web-search summaries; the pages themselves were not opened):
 - [Maquet/Getinge flyer on the IEC standard](https://www.getinge.com/dam/hospital/documents/english/maquet-surgical-lights-iec-standard-flyer-en-global.pdf)
@@ -199,6 +218,10 @@ Sources checked during this session (through web-search summaries; the pages the
 - Patents:
   - [obstacle sensing](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/10568181)
   - [a multi-source shadowless lamp](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/7980738)
+  - adjustable colour temperature in surgical lights:
+    [surgical lamps and methods for illuminating operating sites](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/9119668)
+    and [an operating light and a process for lighting an operating table](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/8783885)
+    (the search summary described warm-white and cold-white LEDs mixed to set the colour temperature)
   - [spot size adjustment with a moving lens panel](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/12601463)
   - [a counterbalanced arm](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/5025359)
   - [a quick-release sterile handle](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/4878156)
@@ -210,21 +233,33 @@ Sources checked during this session (through web-search summaries; the pages the
 
 ## How it is made
 
-- **Picture** (`engine/`). Every frame is drawn in code on a 270×480 canvas and scaled exactly 4×; nothing is a bitmap
-  that gets enlarged. The world is a side view in centimetres (the floor at 0, the ceiling at 300), seen by one camera
-  that is redrawn at its own scale (1.6 to 5 canvas px per cm), so zooming in shows new detail instead of bigger
-  pixels.
+- **The 3D scene** (`engine/r3d.py`).
+  - **Shapes.** Planes, boxes, spheres, ellipsoids and capsules, plus the lamp: a cylinder, a face disc and a dome,
+    in its own tilted frame so it can swing on the arm. Everything is measured in centimetres, with the floor at 0 and
+    the ceiling at 300.
+  - **Casting.** One ray per canvas pixel finds the nearest shape.
+  - **Materials** are worked out per point: floor and wall tiles, the drape's folds and its window, the surgeons'
+    caps, masks and eyes, the lamp's LEDs, lenses, sensors and fins, and the monitors' pictures (the heart trace, the
+    keyhole camera, the handle camera).
+  - **Light.** Soft light from the room, plus every LED as a spotlight. Each spotlight's cone is the size of the light
+    field, and its shadow rays test the heads, arms and gloves.
+  - **What the light is doing** comes from the clock: which LEDs are on, their brightness and colour, the solo-LED
+    demonstration, and the power shifted away from a blocked head.
+  - **The handle's camera** is a second, tiny render (48×32 pixels) shown on the monitor.
+- **The pixel-art pass** (`engine/r3d.py`).
+  - Glow (bloom) spreads only from light sources and the lit field, never from gloves or caps.
+  - Then every pixel snaps to the nearest of the 89 palette colours, with a light 4×4 ordered dither.
+  - Outlines go where the object changes and the depth jumps.
 - **One clock** (`engine/timeline.py`). Everything the light does is a function of time: which LEDs are on, the
-  brightness, the colour temperature, the field size, the lean of the surgeon's head, the sensors' power shift, endo
-  mode, the heat, the hand on the handle and the arm's swing. Every event with a sound lands on the 16th-note grid.
-- **The room** (`engine/room.py`): walls, ceiling, the monitors, the table and the drapes, the surgeons (body, head,
-  arms, gloved hands working at the field).
-- **The lamp and its light** (`engine/lamp.py`). The arm's joints, the head's outside and its x-ray (it dissolves from
-  one to the other with the ordered dither). Each LED's beam is a ray from its lens to the field centre, as wide as the
-  light field when it gets there. Where a head is in the way the ray stops at it. The rays add up into the glow in the
-  air, and the pool on the field is as bright as the rays that reach it.
-- **Camera and captions** (`engine/scenes.py`): the camera path (a monotone cubic through keyframes, in log scale for
-  the zoom), the captions (a dot on the object, a thin line, the text typed on) and frame assembly.
+  solo-LED demonstration, the brightness, the colour temperature, the field size, the hand held over the field, the
+  lean of the surgeon's head, the sensors' power shift, endo mode, the heat, the hand on the handle and the arm's
+  swing. Every event with a sound lands on the 16th-note grid.
+- **Camera, effects and captions** (`engine/scenes.py`).
+  - The camera path: one camera that never cuts, a monotone cubic through keyframes.
+  - The rays of light in the air, each stopped by the first head, arm or hand in its way.
+  - The sensors' scan lines and detection ring, the heat view and its rising specks.
+  - The captions: a dot on the object, a thin line, the text typed on.
+  - Frame assembly.
 - **Sound** (`engine/audio.py`). Everything is synthesized, with no samples.
   - **Chip voices:** band-limited pulse waves, an NES-style triangle bass, LFSR noise drums, echo and FM bells.
   - **Music:** 96 BPM in A minor / C major, 13 bars: vi–IV–I–V three times, one chord per function, and a last bar
@@ -246,12 +281,12 @@ Sources checked during this session (through web-search summaries; the pages the
 - `requirements.txt`: numpy, Pillow, imageio-ffmpeg.
 - `engine/`:
   - `timeline.py`: the clock and the light's state at every moment.
-  - `palette.py`, `gfx.py`, `pixfont.py`, `world.py`: the palette (and the light's colour at each colour
-    temperature), the pixel toolkit, the bitmap font, the camera.
-  - `room.py`: the operating room, the table and drapes, the surgeons, the monitors.
-  - `lamp.py`: the suspension, the lamp head outside and in x-ray, the light (rays, glow, pool), the sensors, the heat,
-    the camera, the hand.
-  - `scenes.py`: the camera path, the captions and frame assembly.
+  - `r3d.py`: the 3D scene (shapes, the lamp, the surgeons), the ray caster, the lighting and shadows, the materials,
+    and the pixel-art pass (palette snap, dither, outlines, glow).
+  - `scenes.py`: the camera path, the rays in the air, the sensors' scan, the heat view, the handle camera, the
+    captions and frame assembly.
+  - `palette.py`, `gfx.py`, `pixfont.py`: the colours (and the light's colour at each colour temperature), the pixel
+    toolkit (the dither matrix, the upscale), the bitmap font.
   - `audio.py`: synthesizer, score, effects, master.
 - `assets/audio/`: the original soundtrack.
 - `镜头表.md`: the shot list (style lock, palette, 13 beats).

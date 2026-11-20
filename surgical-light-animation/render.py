@@ -115,7 +115,6 @@ def render_film(a):
         for k, buf in enumerate(it):
             proc.stdin.write(buf)
             if k % (a.fps * 2) == 0:
-                done = k / max(1, n1 - n0)
                 print(f'  {k:4d}/{n1 - n0}  {time.time() - st:5.0f}s', flush=True)
     finally:
         if pool is not None:
