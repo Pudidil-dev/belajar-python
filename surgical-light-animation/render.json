@@ -1,0 +1,16 @@
+{
+  "output": "out/surgical-light-animation.mp4",
+  "fps": 30,
+  "scale": 4,
+  "crf": 16,
+  "preset": "medium",
+  "tune": "animation",
+  "audio_bitrate": "256k",
+  "loudness_lufs": -14.0,
+  "preview": {
+    "output": "out/surgical-light-animation-preview.mp4",
+    "scale": 2,
+    "crf": 20,
+    "preset": "veryfast"
+  }
+}
