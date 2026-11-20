@@ -1,0 +1,202 @@
+{
+ "project": "/home/user/belajar-python/moon-formation/engine",
+ "spec": null,
+ "segments": [
+  {
+   "id": "m01_early_earth",
+   "window_lt": [
+    0.0,
+    3.73
+   ],
+   "frames": 111,
+   "ms_mean": 158.8,
+   "ms_max": 230.3,
+   "ms_cold": 142.2,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 33.16,
+   "motion_max": 46.79,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 1.2,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m02_theia",
+   "window_lt": [
+    0.35,
+    5.605
+   ],
+   "frames": 157,
+   "ms_mean": 66.4,
+   "ms_max": 117.8,
+   "ms_cold": 123,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 7.44,
+   "motion_max": 25.31,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 6.5,
+   "spikes_at_lt": [],
+   "camera_events_lt": [
+    [
+     0.35,
+     0.99
+    ]
+   ],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m03_impact",
+   "window_lt": [
+    0.35,
+    5.605
+   ],
+   "frames": 157,
+   "ms_mean": 79.4,
+   "ms_max": 186.0,
+   "ms_cold": 78.5,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 8.71,
+   "motion_max": 21.9,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.7,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m04_ejecta",
+   "window_lt": [
+    0.35,
+    3.73
+   ],
+   "frames": 101,
+   "ms_mean": 93.7,
+   "ms_max": 557.0,
+   "ms_cold": 96.6,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 24.91,
+   "motion_max": 55.22,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.3,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m05_debris",
+   "window_lt": [
+    0.35,
+    5.605
+   ],
+   "frames": 157,
+   "ms_mean": 60.2,
+   "ms_max": 104.6,
+   "ms_cold": 54.6,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 2.93,
+   "motion_max": 5.86,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.0,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m06_accretion",
+   "window_lt": [
+    0.35,
+    5.605
+   ],
+   "frames": 157,
+   "ms_mean": 65.8,
+   "ms_max": 107.1,
+   "ms_cold": 115.1,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 7.89,
+   "motion_max": 14.85,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 1.9,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m07_moon",
+   "window_lt": [
+    0.35,
+    3.73
+   ],
+   "frames": 101,
+   "ms_mean": 80.9,
+   "ms_max": 135.5,
+   "ms_cold": 107,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 12.55,
+   "motion_max": 36.62,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 5.1,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m08_cooling",
+   "window_lt": [
+    0.35,
+    5.605
+   ],
+   "frames": 157,
+   "ms_mean": 112.4,
+   "ms_max": 196.4,
+   "ms_cold": 174.1,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 1.94,
+   "motion_max": 4.09,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.3,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  },
+  {
+   "id": "m09_earth_moon",
+   "window_lt": [
+    0.35,
+    5.605
+   ],
+   "frames": 157,
+   "ms_mean": 89.2,
+   "ms_max": 142.5,
+   "ms_cold": 81.8,
+   "deterministic": true,
+   "det_maxdiff": 0,
+   "motion_pct": 6.11,
+   "motion_max": 13.02,
+   "still_pairs_pct": 0.0,
+   "spike_ratio": 2.0,
+   "spikes_at_lt": [],
+   "camera_events_lt": [],
+   "framing": [],
+   "text_tracked": 0
+  }
+ ],
+ "transitions": [],
+ "page_errors": []
+}

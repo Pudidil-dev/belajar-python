@@ -1,0 +1,149 @@
+[
+ {
+  "scene": "s01_where",
+  "kind": "ctx",
+  "text": "Where does this tube actually go?",
+  "start": 0.3,
+  "end": 3.0
+ },
+ {
+  "scene": "s02_route",
+  "kind": "ctx",
+  "text": "Through the urethra",
+  "start": 3.3,
+  "end": 6.0
+ },
+ {
+  "scene": "s03_balloon",
+  "kind": "ctx",
+  "text": "What keeps it there?",
+  "start": 6.6,
+  "end": 9.0
+ },
+ {
+  "scene": "s04_retention",
+  "kind": "ctx",
+  "text": "Retention balloon",
+  "start": 9.3,
+  "end": 12.0
+ },
+ {
+  "scene": "s05_support",
+  "kind": "ctx",
+  "text": "Supported outside, too",
+  "start": 12.5,
+  "end": 15.0
+ },
+ {
+  "scene": "s06_kidneys",
+  "kind": "ctx",
+  "text": "Urine reaches the bladder",
+  "start": 15.3,
+  "end": 18.0
+ },
+ {
+  "scene": "s07_question",
+  "kind": "ctx",
+  "text": "How does urine get out?",
+  "start": 18.3,
+  "end": 21.0
+ },
+ {
+  "scene": "s08_eyes",
+  "kind": "ctx",
+  "text": "Drainage eyes",
+  "start": 21.3,
+  "end": 24.0
+ },
+ {
+  "scene": "s09_enter",
+  "kind": "ctx",
+  "text": "Urine enters here",
+  "start": 24.3,
+  "end": 27.0
+ },
+ {
+  "scene": "s10_past",
+  "kind": "ctx",
+  "text": "An open channel through the shaft",
+  "start": 27.3,
+  "end": 30.0
+ },
+ {
+  "scene": "s11_channels",
+  "kind": "ctx",
+  "text": "One catheter. Two channels.",
+  "start": 30.3,
+  "end": 33.0
+ },
+ {
+  "scene": "s12_connection",
+  "kind": "ctx",
+  "text": "Separate balloon channel",
+  "start": 33.3,
+  "end": 36.0
+ },
+ {
+  "scene": "s13_ports",
+  "kind": "part",
+  "text": "Drainage port",
+  "start": 36.5,
+  "end": 39.0
+ },
+ {
+  "scene": "s13_ports",
+  "kind": "part",
+  "text": "Balloon valve",
+  "start": 37.1,
+  "end": 39.0
+ },
+ {
+  "scene": "s14_line",
+  "kind": "ctx",
+  "text": "Continuous drainage path",
+  "start": 39.3,
+  "end": 42.0
+ },
+ {
+  "scene": "s15_height",
+  "kind": "ctx",
+  "text": "Bag below bladder level",
+  "start": 42.4,
+  "end": 45.0
+ },
+ {
+  "scene": "s16_collect",
+  "kind": "ctx",
+  "text": "Urine collects in the bag",
+  "start": 45.3,
+  "end": 48.0
+ },
+ {
+  "scene": "s17_route",
+  "kind": "ctx",
+  "text": "From bladder to bag",
+  "start": 48.3,
+  "end": 51.0
+ },
+ {
+  "scene": "s18_compare",
+  "kind": "part",
+  "text": "Retention",
+  "start": 51.3,
+  "end": 54.0
+ },
+ {
+  "scene": "s18_compare",
+  "kind": "part",
+  "text": "Drainage",
+  "start": 51.6,
+  "end": 54.0
+ },
+ {
+  "scene": "s19_answer",
+  "kind": "ctx",
+  "text": "To the bladder",
+  "start": 54.4,
+  "end": 57.0
+ }
+]

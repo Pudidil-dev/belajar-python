@@ -1,0 +1,198 @@
+[
+ {
+  "scene": "s01_balloon",
+  "kind": "caption",
+  "text": "Why THIS balloon?",
+  "start": 0.2,
+  "end": 2.95
+ },
+ {
+  "scene": "s02_exam",
+  "kind": "caption",
+  "text": "An eye test",
+  "start": 3.5,
+  "end": 5.95
+ },
+ {
+  "scene": "s03_gaze",
+  "kind": "caption",
+  "text": "Steady gaze",
+  "start": 6.5,
+  "end": 8.95
+ },
+ {
+  "scene": "s04_fog",
+  "kind": "caption",
+  "text": "Relax focusing",
+  "start": 9.3,
+  "end": 11.95
+ },
+ {
+  "scene": "s05_infrared",
+  "kind": "caption",
+  "text": "Invisible infrared",
+  "start": 12.3,
+  "end": 14.95
+ },
+ {
+  "scene": "s06_front",
+  "kind": "caption",
+  "text": "Into the eye",
+  "start": 15.3,
+  "end": 17.95
+ },
+ {
+  "scene": "s06_front",
+  "kind": "label",
+  "text": "Cornea",
+  "start": 16.0,
+  "end": 17.85
+ },
+ {
+  "scene": "s06_front",
+  "kind": "label",
+  "text": "Pupil",
+  "start": 16.625,
+  "end": 17.85
+ },
+ {
+  "scene": "s07_bend",
+  "kind": "caption",
+  "text": "The eye bends light",
+  "start": 18.3,
+  "end": 20.95
+ },
+ {
+  "scene": "s07_bend",
+  "kind": "label",
+  "text": "Lens",
+  "start": 19.0,
+  "end": 20.85
+ },
+ {
+  "scene": "s08_return",
+  "kind": "caption",
+  "text": "Some light returns",
+  "start": 21.3,
+  "end": 23.95
+ },
+ {
+  "scene": "s08_return",
+  "kind": "label",
+  "text": "Retina",
+  "start": 22.125,
+  "end": 23.85
+ },
+ {
+  "scene": "s09_sensor",
+  "kind": "caption",
+  "text": "Back to the sensor",
+  "start": 24.3,
+  "end": 26.95
+ },
+ {
+  "scene": "s10_pattern",
+  "kind": "caption",
+  "text": "A measurement pattern",
+  "start": 27.4,
+  "end": 29.95
+ },
+ {
+  "scene": "s11_charge",
+  "kind": "caption",
+  "text": "Light → charge",
+  "start": 30.3,
+  "end": 32.95
+ },
+ {
+  "scene": "s12_data",
+  "kind": "caption",
+  "text": "Charge → data",
+  "start": 33.3,
+  "end": 35.95
+ },
+ {
+  "scene": "s13_focus",
+  "kind": "caption",
+  "text": "Where does light focus?",
+  "start": 36.3,
+  "end": 38.95
+ },
+ {
+  "scene": "s13_focus",
+  "kind": "label",
+  "text": "On retina",
+  "start": 37.6,
+  "end": 38.9
+ },
+ {
+  "scene": "s13_focus",
+  "kind": "label",
+  "text": "In front",
+  "start": 37.85,
+  "end": 38.9
+ },
+ {
+  "scene": "s14_astig",
+  "kind": "caption",
+  "text": "Astigmatism",
+  "start": 39.3,
+  "end": 41.95
+ },
+ {
+  "scene": "s15_analyze",
+  "kind": "caption",
+  "text": "Analyze the pattern",
+  "start": 42.3,
+  "end": 44.95
+ },
+ {
+  "scene": "s16_repeat",
+  "kind": "caption",
+  "text": "Repeat and check",
+  "start": 45.3,
+  "end": 47.95
+ },
+ {
+  "scene": "s17_numbers",
+  "kind": "caption",
+  "text": "Estimated refraction",
+  "start": 48.25,
+  "end": 50.95
+ },
+ {
+  "scene": "s17_numbers",
+  "kind": "label",
+  "text": "Example",
+  "start": 48.6,
+  "end": 50.95
+ },
+ {
+  "scene": "s18_print",
+  "kind": "caption",
+  "text": "A starting estimate",
+  "start": 51.5,
+  "end": 53.95
+ },
+ {
+  "scene": "s18_print",
+  "kind": "label",
+  "text": "Example",
+  "start": 52.0,
+  "end": 53.95
+ },
+ {
+  "scene": "s19_both",
+  "kind": "caption",
+  "text": "Your gaze. Its measurement.",
+  "start": 54.4,
+  "end": 56.95
+ },
+ {
+  "scene": "s19_both",
+  "kind": "label",
+  "text": "Example",
+  "start": 56.5,
+  "end": 57.0
+ }
+]
