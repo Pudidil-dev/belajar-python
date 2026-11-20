@@ -4,7 +4,7 @@
     python render.py                      # the film -> out/colony.mp4 (1080x1920, 30 fps, stereo, loops seamlessly)
     python render.py --preview            # quick half-size check -> out/preview.mp4 (540x960)
     python render.py --loops 3            # three loops back to back (60 s) -> out/colony_x3.mp4
-    python render.py --stills 0,5,9.3,13.2      # full-size PNG frames -> out/stills/
+    python render.py --stills 0,3,6.6,13.25     # full-size PNG frames -> out/stills/
     python render.py --sheet 0:20:1       # one contact sheet (canvas size) -> out/sheet.png
     python render.py --from 4 --to 10 --out out/slice.mp4   # just a slice
     python render.py --audio-only         # only the soundtrack -> out/music.wav, out/sfx.wav, out/mix.wav
@@ -154,12 +154,13 @@ def export_assets(a):
     sp = ROOT / 'assets' / 'sprites'
     sp.mkdir(parents=True, exist_ok=True)
     big = lambda im: Image.fromarray(im).resize((im.shape[1] * 4, im.shape[0] * 4), Image.NEAREST)
-    for name, t in (('swab_streak', 0.4), ('dive_lock_on', 3.0), ('one_cell', 4.6), ('dividing', 5.75),
-                    ('microcolony', 8.9), ('dome', 10.0), ('plate_overnight', 12.0), ('our_colony_glint', 13.25),
-                    ('pick_up', 17.1), ('fresh_plate', 18.9)):
+    for name, t in (('bench_pan', 0.0), ('swab_lands', 1.9), ('swab_streak', 3.0), ('dive_lock_on', 5.0),
+                    ('one_cell', 6.6), ('dividing', 7.75), ('microcolony', 10.05), ('dome', 11.0),
+                    ('plate_overnight', 12.0), ('our_colony_glint', 13.25), ('bench_burner', 18.3),
+                    ('bench_stirrer', 19.4)):
         big(scene.render_canvas(t, not a.clean)).save(sp / f'{name}.png')
     tiles = []
-    for t in (4.05, 4.6, 5.1, 5.5, 5.8, 5.95, 6.1, 6.6):          # one cell becoming two, cut out of the film
+    for t in (6.05, 6.6, 7.1, 7.5, 7.8, 7.95, 8.1, 8.6):          # one cell becoming two, cut out of the film
         im = scene.render_canvas(t, False)
         tiles.append(im[180:300, 60:210])
     big(np.concatenate(tiles, axis=1)).save(sp / 'sprite_sheet_binary_fission.png')

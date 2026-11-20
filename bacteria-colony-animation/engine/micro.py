@@ -89,9 +89,10 @@ def cells(buf, ctx):
     tau = ctx.t % T.TOTAL
     cam, D = ctx.cam, ctx.D
     zu = cam.z / 1000.0
-    if not 1.5 <= tau < 9.2 or zu < 1.3:
+    g8 = float(T.DIV[7])                                       # 256 cells: from here on the dome takes over
+    if not T.T_PASS - 0.2 <= tau < g8 + 0.22 or zu < 1.3:
         return
-    alpha = 1 - T.S(tau, 9.05, 9.22)
+    alpha = 1 - T.S(tau, g8 + 0.05, g8 + 0.22)
     cen, th, length, eps, rho, k = _cell_list(tau)
     rpx = C.R_CELL * zu
     sx, sy = cam.px(T.CELL_X + cen[:, 0] / 1000.0, T.CELL_Y + cen[:, 1] / 1000.0, C.R_CELL / 1000.0)

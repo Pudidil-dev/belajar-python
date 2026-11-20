@@ -1,10 +1,11 @@
 """Clocks, layout and the one continuous camera of the 20-second loop (120 BPM: one bar = 2 s, ten bars).
 
-World units are millimetres. Plates stand in a row along x, one every DELTA mm; plate n's agar surface is the plane
-z = 0 around (n*DELTA, 0). Every plate runs the same story on its own clock tau_n = t - n*TOTAL: plate 0 is streaked
-at t = -1.2..2, grows overnight, and at t = 17 the swab picks our colony from it and streaks plate 1, whose tau runs
-20 s behind. At t = 20 plate 1 is exactly where plate 0 was at t = 0 and the camera is exactly DELTA further along,
-so the last frame flows straight into the first: a loop with no cut.
+World units are millimetres. The lab bench is a strip along x that repeats every DELTA mm: one Petri dish and the
+same set of props (burner, flask, notebook, stirrer ...) in every stretch. Plate n's agar surface is the plane z = 0
+around (n*DELTA, 0), and every plate runs the same story on its own clock tau_n = t - n*TOTAL. In one loop the camera
+pans in from the previous plate's culture, the swab streaks plate 0, the camera dives, watches the cells, pulls out
+over plate 0's colonies, and pans off across the bench toward plate 1. At t = 20 the camera is exactly DELTA further
+along than at t = 0 and plate 1 is exactly where plate 0 was, so the last frame flows straight into the first.
 
 The camera is orthographic (2D pixel art has no perspective), described by the ground point at the centre of the
 screen (xc, yc), a zoom (pixels per mm) and an elevation e (0 = level with the bench, 90 deg = straight down):
@@ -21,7 +22,7 @@ BEAT = 60.0 / BPM
 BAR = 4 * BEAT
 
 # ------------------------------------------------------------------ the dish (mm)
-DELTA = 100.0                   # one plate every 100 mm along x
+DELTA = 320.0                   # one plate (and one set of bench props) every 320 mm along x
 R_IN, R_OUT = 42.0, 43.2        # agar radius = inner wall, outer wall
 Z_TOP = 8.8                     # rim height above the agar surface
 Z_FLOOR = -4.0                  # bottom of the 4 mm agar layer
@@ -96,12 +97,27 @@ def path_norm(p):
     return -ty, tx
 
 
-SW0, SW1 = -1.2, 2.0            # the cotton touches the agar for tau in [SW0, SW1]
-V_SW = S_TOT / (SW1 - SW0)      # streak speed, mm/s
+SW0, SW1 = 2.0, 4.0             # the cotton touches the agar for tau in [SW0, SW1]
+SW_ACC = 0.35                   # it lands, then speeds up over the first 0.35 s
+V_SW = S_TOT / (SW1 - SW0 - SW_ACC / 2)   # top streak speed, mm/s
+_S_ACC = 0.5 * V_SW * SW_ACC
 
 
 def p_of_tau(tau):
-    return (tau - SW0) / (SW1 - SW0)
+    """Arc fraction of the cotton along the streak: a soft start, then constant speed."""
+    u = tau - SW0
+    if u <= 0:
+        return 0.0
+    if u < SW_ACC:
+        return 0.5 * V_SW * u * u / SW_ACC / S_TOT
+    return (_S_ACC + V_SW * (u - SW_ACC)) / S_TOT
+
+
+def tau_of_p(p):
+    """When the cotton passed arc fraction p (array)."""
+    sd = np.asarray(p, np.float64) * S_TOT
+    return np.where(sd < _S_ACC, SW0 + np.sqrt(2 * np.maximum(sd, 0) * SW_ACC / V_SW),
+                    SW0 + SW_ACC + (sd - _S_ACC) / V_SW)
 
 
 # ------------------------------------------------------------------ the seeds: where the swab left cells
@@ -146,13 +162,13 @@ POP_T = POP0 + POP_LEN * SEEDS[:, 3]
 
 # ------------------------------------------------------------------ growth: one cell, thirty doublings
 # divisions on the beat, faster and faster: half bar, quarters, eighths, sixteenths, thirty-seconds
-DIV = np.array([6.0, 7.0, 7.5, 8.0, 8.25, 8.5, 8.75, 9.0]
-               + [9.0 + 0.125 * k for k in range(1, 9)]
-               + [10.0 + 0.0625 * k for k in range(1, 15)])
+DIV = np.array([8.0, 8.5, 9.0, 9.25, 9.5, 9.75, 10.0]
+               + [10.0 + 0.125 * k for k in range(1, 9)]
+               + [11.0 + 0.0625 * k for k in range(1, 16)])
 NGEN = len(DIV)                                     # 30 doublings: 2**30 = 1,073,741,824 cells
-CYC0 = 4.0                                          # the first cell starts to grow at 4.0
+CYC0 = 6.0                                          # the first cell starts to grow at 6.0
 STARTS = np.concatenate([[CYC0], DIV[:-1]])
-OVERNIGHT = float(DIV[-1])                          # 10.875: the clock stops (about 10 h at 37 C)
+OVERNIGHT = float(DIV[-1])                          # 11.94: the clock stops (about 10 h at 37 C)
 
 
 def gen_phase(tau):
@@ -210,51 +226,30 @@ def dome_ratio(g):
 
 
 # ------------------------------------------------------------------ the swab
-def _tau_plate(t):
-    """Which plate the swab is streaking at time t (or None) and that plate's clock."""
-    t = t % TOTAL
-    if t <= SW1 + 1.0:
-        return 0, t
-    if t >= TOTAL + SW0:
-        return 1, t - TOTAL
-    return None, None
-
-
-def _streak_tip(n, tau):
-    """Tip on plate n during the streak and the lift-off after it."""
-    if tau <= SW1:
-        x, y = path_xy(p_of_tau(tau))
-        return n * DELTA + x, y, 0.0
-    u = tau - SW1                                       # lifting away, still drifting along
-    tx, ty = path_tan(1.0)
-    d = V_SW * u * (1 - 0.35 * u / 0.9)
-    x, y = path_xy(1.0)
-    return n * DELTA + x + tx * d, y + ty * d, 34.0 * (u / 0.9) ** 2
-
-
-_T0X, _T0Y = path_tan(0.0)
-_P0 = path_xy(0.0)
-_APP = ((CELL_X + 40.0, CELL_Y + 40.0, 46.0), (-34.0, -30.0, -34.0))
-_TRV = [(17.2, (CELL_X, CELL_Y, 0.0), (10.0, 0.0, 50.0)),
-        (18.0, (CELL_X + 0.55 * (DELTA + _P0[0] - CELL_X), 0.4 * CELL_Y, 16.0), (56.0, -3.0, -6.0)),
-        (18.8, (DELTA + _P0[0], _P0[1], 0.0), (V_SW * _T0X, V_SW * _T0Y, 0.0))]
-TOUCH = 17.0                                            # the swab touches our colony
-LAND = TOTAL + SW0                                      # 18.8: it lands on the fresh plate
+X0, Y0 = path_xy(0.0)                   # where the cotton lands: the start of the streak on plate 0
+ENTER = 0.45                            # it comes in from the top of the frame ...
+_ENT = [(ENTER, (X0 + 34.0, Y0 + 108.0, 80.0), (-22.0, -110.0, -60.0)),
+        (1.35, (X0 + 8.0, Y0 + 24.0, 22.0), (-16.0, -55.0, -40.0)),
+        (SW0, (X0, Y0, 0.0), (0.0, 0.0, 0.0))]           # ... and touches down softly at 2.0
+LIFT = 0.9                              # after the streak it lifts away for 0.9 s
+T_PASS = float(tau_of_p(P_OUR))         # 3.55: the cotton passes the spot where our cell is left
 
 
 def swab_tip(t):
     """Bottom of the cotton tip (x, y, z) in world mm, or None when the swab is off the set."""
     t = t % TOTAL
-    n, tau = _tau_plate(t)
-    if n is not None and tau <= SW1 + 0.9:
-        return _streak_tip(n, tau)
-    if 15.8 <= t < TOUCH:
-        return tuple(hermite(_APP[0], _APP[1], (CELL_X, CELL_Y, 0.0), (0.0, 0.0, -6.0), 15.8, TOUCH, t))
-    if TOUCH <= t < 17.2:
-        return CELL_X, CELL_Y, -0.35 * math.sin(math.pi * (t - TOUCH) / 0.2)
-    if 17.2 <= t < LAND:
-        (ta, pa, va), (tb, pb, vb) = (_TRV[0], _TRV[1]) if t < _TRV[1][0] else (_TRV[1], _TRV[2])
+    if ENTER <= t < SW0:
+        (ta, pa, va), (tb, pb, vb) = (_ENT[0], _ENT[1]) if t < _ENT[1][0] else (_ENT[1], _ENT[2])
         return tuple(hermite(pa, va, pb, vb, ta, tb, t))
+    if SW0 <= t <= SW1:
+        x, y = path_xy(p_of_tau(t))
+        return x, y, 0.0
+    if SW1 < t < SW1 + LIFT:
+        u = t - SW1
+        tx, ty = path_tan(1.0)
+        d = V_SW * u * (1 - 0.35 * u / LIFT)
+        x, y = path_xy(1.0)
+        return x + tx * d, y + ty * d, 40.0 * (u / LIFT) ** 2
     return None
 
 
@@ -266,7 +261,7 @@ def swab_vel(t, h=1e-3):
 
 
 def swab_axis(t):
-    """Unit vector up the stick: tilted 20 deg back (square to the opening camera), leaning into the motion."""
+    """Unit vector up the stick: tilted 20 deg back, leaning a little into the motion."""
     vx = swab_vel(t)[0]
     lean = 0.05 * max(-1.5, min(1.5, vx / V_SW))
     a = np.array([lean, math.sin(math.radians(20)), math.cos(math.radians(20))])
@@ -275,33 +270,19 @@ def swab_axis(t):
 
 def swab_squash(t):
     t = t % TOTAL
-    if TOUCH <= t < 17.2:
-        return math.sin(math.pi * (t - TOUCH) / 0.2)
-    n, tau = _tau_plate(t)
-    if n is not None and SW0 <= tau <= SW1:
-        b = max(0.0, 1 - abs(tau - (SW0 + 0.1)) / 0.18)
-        return 0.25 + 0.45 * b
+    if SW0 <= t <= SW1:
+        b = max(0.0, 1 - abs(t - (SW0 + 0.06)) / 0.2)
+        return 0.25 + 0.5 * b
     return 0.0
 
 
-def swab_cream(t):
-    """How much of our colony sits on the cotton: picked up at 17.0, spread out over the first part of the streak."""
-    t = t % TOTAL
-    if TOUCH <= t < LAND:
-        return S(t, TOUCH, TOUCH + 0.15)
-    n, tau = _tau_plate(t)
-    if n is not None and tau < -0.35:
-        return 1 - S(tau, SW0, -0.35)
-    return 0.0
-
-
-# glints: bright specks drop off the fibres onto the gel and blink out (tau-based, so they cross the loop point)
+# glints: bright specks drop off the fibres onto the gel and blink out
 def _glints():
     rng = np.random.default_rng(5)
-    out, tau = [], SW0 + 0.04
+    out, tau = [], SW0 + 0.1
     while tau < SW1 - 0.05:
         out.append((tau, rng.uniform(-1.4, 1.4), rng.uniform(-0.8, 0.8), rng.uniform(0.8, 2.6), rng.random()))
-        tau += rng.uniform(0.07, 0.15)
+        tau += rng.uniform(0.06, 0.12)
     return np.array(out)
 
 
@@ -314,11 +295,18 @@ def glint_end(i):
 
 
 # ------------------------------------------------------------------ the camera
-E_HOOK, E_CELL, E_TOP, E_APP = (math.radians(a) for a in (20.0, 62.0, 90.0, 74.0))
-Z_HOOK, Z_CELL, Z_PLATE, Z_APP = 9.0, 36000.0, 2.9, 3.6
-TIP_SX, TIP_SY = 110.0, 270.0       # where the tip rides on screen in the opening (lead room to the right)
+E_RIDE, E_CELL, E_TOP = (math.radians(a) for a in (52.0, 62.0, 90.0))
+Z_RIDE, Z_CELL = 7.0, 36000.0
+Z_HOLD = 3.075                      # DELTA * Z_HOLD = 984 px: a whole number of 4-px dither tiles
+Z_PLATE = Z_HOLD / 1.06
+Z_PAN = 2.1                         # the camera pulls back a little while it crosses the bench
+TIP_SX, TIP_SY = 112.0, 300.0       # where the cotton rides on screen (lead room to the right, the stick above)
 R_SCREEN = 80.0                     # colony radius on screen while it grows
-LOCK = 2.95                         # the target bracket locks onto our cell
+LOCK = 4.95                         # the target bracket locks onto our cell
+PAN0, PAN_LEN = 16.0, 5.6           # the pan: off the culture at 16.0, onto the next plate at 1.6 (next loop)
+PAN_END = PAN0 + PAN_LEN - TOTAL
+X_ARR = DELTA + X0 + (W / 2 - TIP_SX) / Z_HOLD     # where the pan stops (relative to the plate it left)
+Y_ARR = Y0 + (TIP_SY - H / 2) / Z_HOLD
 
 
 class Cam:
@@ -338,10 +326,28 @@ def cam_from_anchor(ax, ay, az, sx, sy, z, e):
     return Cam(ax - (sx - W / 2) / z, ay - ((H / 2 - sy) / z - az * c) / s, z, e)
 
 
+def in_pan(t):
+    t = t % TOTAL
+    return t >= PAN0 or t < PAN_END
+
+
+def _pan_u(t):
+    t = t % TOTAL
+    return t - PAN0 if t >= PAN0 else t + TOTAL - PAN0
+
+
+def ref_plate(t):
+    """The plate the camera is working on: from the middle of the closing pan on, already the next one. The switch
+    happens where the zoom is exactly Z_PAN and DELTA * Z_PAN = 672 px, a whole number of 4-px dither tiles."""
+    return 1 if t % TOTAL >= PAN0 + PAN_LEN / 2 else 0
+
+
 def elevation(t):
     t = t % TOTAL
-    return (E_HOOK + (E_CELL - E_HOOK) * S(t, 1.6, 3.8) + (E_TOP - E_CELL) * S(t, 10.5, 12.0)
-            + (E_APP - E_TOP) * S(t, 16.0, 17.4) + (E_HOOK - E_APP) * S(t, 17.4, 19.3))
+    if in_pan(t):
+        return E_TOP
+    return (E_TOP + (E_RIDE - E_TOP) * S(t, 1.65, 3.0) + (E_CELL - E_RIDE) * S(t, 3.6, 5.6)
+            + (E_TOP - E_CELL) * S(t, 10.3, 11.9))
 
 
 def _smin(a, b, k=0.25):
@@ -351,26 +357,70 @@ def _smin(a, b, k=0.25):
 
 def log_zoom(t):
     t = t % TOTAL
-    if t < 12.0:
-        dive = (math.log(Z_HOOK) + math.log(110 / Z_HOOK) * S(t, 1.2, 2.8) + math.log(130 / 110) * S(t, 2.65, 3.15)
-                + math.log(Z_CELL / 130) * S(t, 2.95, 4.45) + math.log(1.05) * S(t, 4.45, 6.2))
-        grow = math.log(R_SCREEN / (a_um(g_smooth(t)) / 1000.0))
-        pre = _smin(dive, grow)
-        w = S(t, 10.25, 12.0)
-        return (1 - w) * pre + w * math.log(Z_PLATE)
-    return (math.log(Z_PLATE) + math.log(1.06) * S(t, 12.0, 16.0)
-            + math.log(Z_APP / (Z_PLATE * 1.06)) * S(t, 16.0, 17.4) + math.log(Z_HOOK / Z_APP) * S(t, 17.4, 19.3))
+    if in_pan(t):
+        w = _pan_u(t) / PAN_LEN
+        return math.log(Z_HOLD) + (math.log(Z_PAN) - math.log(Z_HOLD)) * math.sin(math.pi * w) ** 2
+    if t < PULL0:
+        return _lz_pre(t)
+    if t < PULL1:                                  # the pull-out: fast while we are among the cells, then a long,
+        return _pchip(t)                           # gentle arrival on the whole dish and the bench around it
+    return math.log(Z_PLATE) + math.log(1.06) * S(t, PULL1, 16.0)
+
+
+def _lz_pre(t):
+    """Zoom before the pull-out: the ride, the dive, then the colony kept about R_SCREEN wide as it grows."""
+    dive = (math.log(Z_HOLD) + math.log(Z_RIDE / Z_HOLD) * S(t, 1.65, 3.0) + math.log(110 / Z_RIDE) * S(t, 3.6, 5.0)
+            + math.log(130 / 110) * S(t, 4.85, 5.35) + math.log(Z_CELL / 130) * S(t, 5.15, 6.5)
+            + math.log(1.05) * S(t, 6.5, 8.0))
+    return _smin(dive, math.log(R_SCREEN / (a_um(g_smooth(t)) / 1000.0)))
+
+
+PULL0, PULL1 = 9.9, 12.5                    # the pull-out; it is still settling onto the dish as the colonies pop
+
+
+def _monotone_slopes(x, y, m0, m1):
+    """Fritsch-Carlson slopes for a curve through (x, y) that never overshoots, with given end slopes."""
+    d = np.diff(y) / np.diff(x)
+    m = np.zeros(len(x))
+    m[0], m[-1] = m0, m1
+    for i in range(1, len(x) - 1):
+        if d[i - 1] * d[i] <= 0:
+            m[i] = 0.0
+        else:
+            w1, w2 = 2 * (x[i + 1] - x[i]) + (x[i] - x[i - 1]), (x[i + 1] - x[i]) + 2 * (x[i] - x[i - 1])
+            m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i])
+    return m
+
+
+_PK_T = np.array([PULL0, 10.5, 11.0, 11.5, PULL1])
+_PK_V = np.array([_lz_pre(PULL0), math.log(924.0), math.log(48.0), math.log(6.5), math.log(Z_PLATE)])
+_PK_M = _monotone_slopes(_PK_T, _PK_V, (_lz_pre(PULL0 + 1e-3) - _lz_pre(PULL0 - 1e-3)) / 2e-3, 0.0)
+
+
+def _pchip(t):
+    i = int(min(max(np.searchsorted(_PK_T, t) - 1, 0), len(_PK_T) - 2))
+    return float(hermite(_PK_V[i], _PK_M[i], _PK_V[i + 1], _PK_M[i + 1], _PK_T[i], _PK_T[i + 1], t))
 
 
 def zoom(t):
     return math.exp(log_zoom(t))
 
 
-def _hook_cam(t):
-    """Riding beside the cotton tip while it streaks (plate 0 for t in 0..2, plate 1 just before the loop)."""
-    n, tau = _tau_plate(t)
-    x, y, _ = _streak_tip(n, tau)
+def _pan_cam(t):
+    w = _pan_u(t) / PAN_LEN
+    e = w * w * w * (w * (w * 6 - 15) + 10)
+    base = 0 if t % TOTAL >= PAN0 else -1
+    xc = base * DELTA + X_ARR * e
+    yc = Y_ARR * e + 16.0 * math.sin(2 * math.pi * w) * math.sin(math.pi * w) ** 2
+    return Cam(xc, yc, zoom(t), E_TOP)
+
+
+def _ride_cam(t):
+    """Over the landing point until the cotton touches down, then riding beside the tip as it streaks."""
     z, e = zoom(t), elevation(t)
+    if t < SW0:
+        return cam_from_anchor(X0, Y0, 0.0, TIP_SX, TIP_SY, z, e)
+    x, y, _ = swab_tip(t)
     return cam_from_anchor(x, y, 0.0, TIP_SX, TIP_SY - 0.5 * y * math.sin(e) * z, z, e)
 
 
@@ -388,76 +438,80 @@ def _colony_z(t):
 
 
 _CELL = lambda tt: (CELL_X, CELL_Y, 0.0)
-_D_P0, _D_V0 = _screen_of(_hook_cam, _CELL, 1.2)
+_D_P0, _D_V0 = _screen_of(_ride_cam, _CELL, 3.6)
 
 
-def _cam_dive(t):
-    p = hermite(_D_P0, _D_V0, (W / 2, H / 2), (0.0, 0.0), 1.2, 2.7, t)
+def _dive_cam(t):
+    p = hermite(_D_P0, _D_V0, (W / 2, H / 2), (0.0, 0.0), 3.6, 5.0, t)
     return cam_from_anchor(CELL_X, CELL_Y, 0.0, p[0], p[1], zoom(t), elevation(t))
 
 
-def _cam_grow(t):
+def _grow_cam(t):
     return cam_from_anchor(CELL_X, CELL_Y, _colony_z(t), W / 2, H / 2, zoom(t), elevation(t))
 
 
 _P_END = (W / 2 + CELL_X * Z_PLATE, H / 2 - CELL_Y * Z_PLATE)
 
 
-def _cam_pull(t):
-    p = hermite((W / 2, H / 2), (0.0, 0.0), _P_END, (0.0, 0.0), 10.4, 12.0, t)
+def _pull_cam(t):
+    p = hermite((W / 2, H / 2), (0.0, 0.0), _P_END, (0.0, 0.0), PULL0, PULL1, t)
     return cam_from_anchor(CELL_X, CELL_Y, _colony_z(t), p[0], p[1], zoom(t), elevation(t))
 
 
-def _cam_hold(t):
+def _hold_cam(t):
     return cam_from_anchor(0.0, 0.0, 0.0, W / 2, H / 2, zoom(t), elevation(t))
-
-
-_A_P0, _A_V0 = _screen_of(_cam_hold, lambda tt: (CELL_X, CELL_Y, _colony_z(tt)), 16.0)
-_A_P1 = (150.0, 272.0)
-
-
-def _cam_approach(t):
-    p = hermite(_A_P0, _A_V0, _A_P1, (0.0, 0.0), 16.0, 17.4, t)
-    return cam_from_anchor(CELL_X, CELL_Y, _colony_z(t), p[0], p[1], zoom(t), elevation(t))
-
-
-def _tip_ground(t):
-    x, y, _ = swab_tip(t)
-    return x, y, 0.0
-
-
-_F_P0, _F_V0 = _screen_of(_cam_approach, _tip_ground, 17.4)
-_F_P1, _F_V1 = _screen_of(_hook_cam, _tip_ground, 19.3)
-
-
-def _cam_follow(t):
-    p = hermite(_F_P0, _F_V0, _F_P1, _F_V1, 17.4, 19.3, t)
-    x, y, _ = _tip_ground(t)
-    return cam_from_anchor(x, y, 0.0, p[0], p[1], zoom(t), elevation(t))
 
 
 def camera(t):
     t = t % TOTAL
-    if t < 1.2 or t >= 19.3:
-        return _hook_cam(t)
-    if t < 4.45:
-        return _cam_dive(t)
-    if t < 10.4:
-        return _cam_grow(t)
-    if t < 12.0:
-        return _cam_pull(t)
-    if t < 16.0:
-        return _cam_hold(t)
-    if t < 17.4:
-        return _cam_approach(t)
-    return _cam_follow(t)
+    if in_pan(t):
+        return _pan_cam(t)
+    if t < 3.6:
+        return _ride_cam(t)
+    if t < 6.5:
+        return _dive_cam(t)
+    if t < PULL0:
+        return _grow_cam(t)
+    if t < PULL1:
+        return _pull_cam(t)
+    return _hold_cam(t)
+
+
+# ------------------------------------------------------------------ where the dither pattern is pinned
+def _origin(cam, ax, ay):
+    sx, sy = cam.px(ax, ay, 0.0)
+    return int(round(float(sx))), int(round(float(sy)))
+
+
+def _matched_switch(t0, t1, a, b):
+    """First frame in [t0, t1] where pinning the dither to point a or to point b gives the same 4x4 phase, so
+    changing the pin there changes nothing on screen."""
+    for k in range(int(math.ceil(t0 * FPS)), int(t1 * FPS) + 1):
+        cam = camera(k / FPS)
+        oa, ob = _origin(cam, *a), _origin(cam, *b)
+        if (oa[0] - ob[0]) % 4 == 0 and (oa[1] - ob[1]) % 4 == 0:
+            return k / FPS
+    return 0.5 * (t0 + t1)
+
+
+DITHER_IN = _matched_switch(3.6, 4.4, (0.0, 0.0), (CELL_X, CELL_Y))       # from the dish to our cell
+DITHER_OUT = _matched_switch(11.3, PULL1, (CELL_X, CELL_Y), (0.0, 0.0))   # and back to the dish
+
+
+def dither_anchor(t):
+    """The world point the Bayer pattern is pinned to, so dithered surfaces move with the world instead of
+    crawling: our cell while the camera is down at cell size, otherwise the dish the camera is working on."""
+    t = t % TOTAL
+    if DITHER_IN <= t < DITHER_OUT:
+        return CELL_X, CELL_Y
+    return ref_plate(t) * DELTA, 0.0
 
 
 # ------------------------------------------------------------------ on-screen helpers
 def hud_on(t):
-    return 3.0 <= t % TOTAL < 15.6
+    return 5.0 <= t % TOTAL < 15.6
 
 
 def bracket_on(t):
     t = t % TOTAL
-    return 2.62 <= t < 6.4 or 10.9 <= t < TOUCH + 0.06
+    return LOCK - 0.33 <= t < DIV[0] + 0.4 or 10.95 <= t < 15.6

@@ -49,9 +49,6 @@ class Ctx:
 
 
 # ------------------------------------------------------------------ base: bench, dishes, agar
-_BOKEH = [(k * 90 + int(hash2(k, 3) * 50), 26 + int(hash2(k, 5) * 60), 9 + int(hash2(k, 9) * 9)) for k in range(3)]
-
-
 def base(buf, cam, t):
     s, c = cam.s, cam.c
     cs = max(c, 1e-6)
@@ -61,41 +58,26 @@ def base(buf, cam, t):
     ctx = Ctx()
     ctx.cam, ctx.t, ctx.D, ctx.x, ctx.Ys = cam, t, D, x, Ys
 
-    # ---- the bench: dark teal, a faint grid, the dishes' shadows, fog far away
+    # ---- the bench: dark teal, a faint 20 mm grid (DELTA is a whole number of squares), the dishes' shadows
     yb = cam.yc + (Ys - T.Z_BENCH * c) / s                     # (H, 1)
     n = np.round(x / T.DELTA)                                  # nearest plate for every column
     dx = x - n * T.DELTA
     lv = np.full((H, W), 3.0)
-    lv -= 1.0 * T.S_arr(yb, 60.0, 170.0)
-    gx = np.abs((x + 12.5) % 25.0 - 12.5) * cam.z               # px to the nearest grid line
-    gy = np.abs((yb + 12.5) % 25.0 - 12.5) * cam.z * s
+    vx = ((XX - W / 2) / (W * 0.62))[None, :]
+    vy = ((YY - H / 2) / (H * 0.62))[:, None]
+    lv -= 0.8 * T.S_arr(np.hypot(vx, vy), 0.55, 1.0)            # a soft vignette
+    gx = np.abs((x + 10.0) % 20.0 - 10.0) * cam.z               # px to the nearest grid line
+    gy = np.abs((yb + 10.0) % 20.0 - 10.0) * cam.z * s
     cov = np.maximum(np.clip(0.9 - gx, 0, 1)[None, :], np.clip(0.9 - gy, 0, 1))
-    lv += 0.6 * cov * (1 - T.S_arr(yb, 60.0, 150.0))
+    lv += 0.55 * cov
     rs = np.hypot(dx[None, :] - 3.5, yb + 5.0)                 # cast shadow, toward the front right
     lv -= 0.9 * (1 - T.S_arr(rs, T.R_OUT - 0.5, T.R_OUT + 2.5))
     ra = np.hypot(dx[None, :], yb)                             # contact shadow under the rim
     lv -= 0.6 * (1 - T.S_arr(ra, T.R_OUT, T.R_OUT + 1.6))
     idx = np.clip(np.floor(lv + D * 0.98), 0, 7).astype(np.int64)
     buf[...] = P.TEAL[idx]
-
-    low = 1.0 - T.S(cam.e, math.radians(32), math.radians(52))   # far lab lights, only seen from low down
-    if low > 0.01:
-        sh = 0.3 * cam.xc * T.Z_HOOK                            # parallax layer: 270 px per plate = 3 lights
-        for bx, by, br in _BOKEH:
-            for rep in (-1, 0, 1, 2):
-                cx = (bx - sh) % 270.0 + rep * 270.0 - 30
-                if not -br < cx < W + br:
-                    continue
-                y0, y1 = max(0, by - br - 1), min(H, by + br + 2)
-                xs0, xs1 = max(0, int(cx - br - 1)), min(W, int(cx + br + 2))
-                if y0 >= y1 or xs0 >= xs1:
-                    continue
-                yy, xx = np.mgrid[y0:y1, xs0:xs1]
-                d = np.hypot(xx + 0.5 - cx, yy + 0.5 - by) / br
-                m = (d < 1.0) & (D[y0:y1, xs0:xs1] < 0.55 * low * (1 - d ** 3))
-                sub = buf[y0:y1, xs0:xs1]
-                sub[m] = P.TEAL[5]
-                sub[m & (d < 0.45) & (D[y0:y1, xs0:xs1] < 0.5 * low)] = P.TEAL[6]
+    low = 1.0 - T.S(cam.e, math.radians(32), math.radians(52))
+    ctx.yb = np.broadcast_to(yb, (H, W))
 
     # ---- the dish: per column the wall's half-chords, per pixel where the ray meets each surface
     hw_o = np.sqrt(np.clip(T.R_OUT ** 2 - dx ** 2, 0, None))
@@ -143,15 +125,11 @@ def base(buf, cam, t):
         db = np.hypot(pxl - bx, py - by)
         bub = (hb < 0.13) & (db < 0.17) & (D < fade + 0.01)
         lv = np.where(bub & (py - by > pxl - bx), 6.0, np.where(bub, 3.0, lv))
-    for pn in (0, 1):                                          # the wet trail the cotton leaves, drying fast
-        tau = t % T.TOTAL - pn * T.TOTAL
-        if not T.SW0 < tau < 4.2:
-            continue
-        cols = (np.abs(dx) < T.R_IN) & (n == pn) & (np.abs(dx) < 33.5)
-        if not np.any(cols):
-            continue
+    tau = t % T.TOTAL                                          # the wet trail the cotton leaves, drying fast
+    cols = (np.abs(dx) < 33.5) & (n == 0)
+    if T.SW0 < tau < T.SW1 + 2.5 and np.any(cols):
         yp, slope, pp = T.path_at_x(dx[cols])
-        age = tau - (T.SW0 + pp * (T.SW1 - T.SW0))
+        age = tau - T.tau_of_p(pp)
         dist = np.abs(py[:, cols] - yp[None, :]) / np.sqrt(1 + slope * slope)[None, :]
         wv = (1 - T.S_arr(dist, 1.1, 2.3)) * (np.exp(-np.clip(age, 0, None) / 1.1) * T.S_arr(age, 0.0, 0.06))[None, :]
         lv[:, cols] += 1.15 * wv
@@ -164,6 +142,7 @@ def base(buf, cam, t):
     ctx.top, ctx.px, ctx.py, ctx.plate = top, pxl, py, np.broadcast_to(n[None, :], (H, W))
     ctx.front, ctx.zfo, ctx.dx, ctx.yr, ctx.hw_o, ctx.hw_i = front, zfo, dx, yr, hw_o, hw_i
     ctx.near_ring = ring & (yr <= 0)
+    ctx.bench = ~(top | ring | side | floor | back | front)
     ctx.plate_area = (top | ring | side) & dish
     ctx.swab_depth = np.full((H, W), np.inf)
     return ctx
@@ -216,10 +195,7 @@ def colony_radius(i, tau):
 
 
 def colony_height(i, tau, a):
-    h = T.dome_ratio(T.g_pop(tau)) * a
-    if i == T.OUR and tau >= T.TOUCH:
-        h *= 1 - 0.25 * T.S(tau, T.TOUCH, T.TOUCH + 0.12)
-    return max(h, 1e-6)
+    return max(T.dome_ratio(T.g_pop(tau)) * a, 1e-6)
 
 
 def colonies(buf, ctx, tex=None):
@@ -229,7 +205,7 @@ def colonies(buf, ctx, tex=None):
     out = np.zeros((H, W), np.int16) - 1
     flash = np.zeros((H, W), bool)
     x_lo, x_hi = cam.xc - (W / 2 + 4) / cam.z, cam.xc + (W / 2 + 4) / cam.z
-    for n in (0, 1):
+    for n in (-1, 0, 1):
         tau = t % T.TOTAL - n * T.TOTAL
         if T.g_pop(tau) < 7.95:
             continue
@@ -317,9 +293,6 @@ def _cap(ctx, buf, zb, out, flash, x0, y0, a, h, i, tau, tex):
     lv = 2.2 + 4.2 * np.clip(shade, 0, 1) + 1.6 * spec
     if tex is not None:
         lv = tex.dome_texture(ctx, lv, uu, v, w, nx, ny, nz, X0, Y0, hit, a, h, tau)
-    if i == T.OUR and tau >= T.TOUCH:                          # where the swab took some away: a dull dent
-        dent = (uu ** 2 + v ** 2) < (0.38 * a) ** 2
-        lv = np.where(dent, np.minimum(lv, 4.2), lv)
     k = np.clip(np.floor(lv + (D[Y0:Y1, X0:X1] - 0.5) * 0.9), 2, 7).astype(np.int64)
     pu = (tau - T.POP_T[i]) / 0.3
     sub = buf[Y0:Y1, X0:X1]
@@ -349,7 +322,7 @@ def _star(buf, x, y, arm, core=P.WHITE, rays=P.COTTON[4], diag=False):
 def glints(buf, ctx):
     """Specks flick off the cotton fibres, drop onto the gel, twinkle for a moment and blink out."""
     cam, t = ctx.cam, ctx.t
-    for n in (0, 1):
+    for n in (0,):
         tau = t % T.TOTAL - n * T.TOTAL
         if not T.SW0 - 0.1 <= tau <= T.SW1 + 0.6:
             continue
@@ -384,9 +357,9 @@ def markers(buf, ctx):
     """While the camera dives, the cells the swab left along the trail twinkle; ours is the brightest."""
     cam, t = ctx.cam, ctx.t
     tau = t % T.TOTAL
-    if not 1.5 <= tau <= 4.3:
+    if not T.T_PASS - 0.2 <= tau <= 6.6:
         return
-    zf = T.S(cam.z, 9.0, 20.0)
+    zf = T.S(cam.z, 9.0, 20.0) * T.S(tau, T.T_PASS - 0.2, T.T_PASS + 0.3)
     for i in range(len(T.SEEDS)):
         if T.SEEDS[i, 3] < 0.45:
             continue
@@ -418,7 +391,6 @@ def swab(buf, ctx):
     cam, D = ctx.cam, ctx.D
     a = T.swab_axis(t)
     sq = T.swab_squash(t)
-    cream = T.swab_cream(t)
     tip = np.array(tip, float)
     re = R_E * (1 + 0.07 * sq)
     centre = tip + a * L_E - np.array([0, 0, 0.45 * sq])
@@ -437,7 +409,7 @@ def swab(buf, ctx):
             m = (d < 1) & ctx.top[Y0:Y1, X0:X1] & (D[Y0:Y1, X0:X1] < 0.7 * fade)
             buf[Y0:Y1, X0:X1][m] = P.AGAR[3]
     _stick(buf, ctx, centre, a)
-    _cotton(buf, ctx, centre, a, re, cream)
+    _cotton(buf, ctx, centre, a, re)
 
 
 def _ray_origin(cam, X0, X1, Y0, Y1):
@@ -449,7 +421,7 @@ def _ray_origin(cam, X0, X1, Y0, Y1):
     return ox, oy, oz
 
 
-def _cotton(buf, ctx, C, a, re, cream):
+def _cotton(buf, ctx, C, a, re):
     cam, D = ctx.cam, ctx.D
     sx, sy = cam.px(*C)
     r = (L_E + 0.5) * cam.z
@@ -496,10 +468,6 @@ def _cotton(buf, ctx, C, a, re, cream):
     lv = 1.9 + 2.9 * np.clip(shade, 0, 1) + 0.5 * fib
     k = np.clip(np.floor(lv + (D[Y0:Y1, X0:X1] - 0.5) * 0.8), 0, 4).astype(np.int64)
     col = P.COTTON[k]
-    if cream > 0.02:                                           # a dab of our colony on the bottom of the tip
-        cm = (pa < -L_E * (1 - 0.42 * cream)) & (hash2(np.floor(ang * 5), np.floor(pa * 3), 43) < 0.55 + 0.45 * cream)
-        ck = np.clip(np.floor(3.2 + 3.0 * np.clip(shade, 0, 1) + (D[Y0:Y1, X0:X1] - 0.5) * 0.8), 2, 7).astype(np.int64)
-        col = np.where(cm[..., None], P.CREAM[ck], col)
     sub = buf[Y0:Y1, X0:X1]
     sub[hit] = col[hit]
     sub[fuzz] = P.COTTON[3]

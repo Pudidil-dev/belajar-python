@@ -42,9 +42,9 @@ def _target(t, cam):
     """Screen centre and half-size of whatever the bracket is locked on."""
     tau = t % T.TOTAL
     zu = cam.z / 1000.0
-    if tau < 6.5:
+    if tau < T.DIV[0] + 0.5:
         cen, th, length, eps, rho, k = M._cell_list(tau)
-        if tau < 6.0:
+        if tau < T.DIV[0]:
             ends = np.array([[0.0, 0.0]])
             ext = length / 2
         else:
@@ -66,22 +66,24 @@ def bracket(buf, t, cam):
         return
     sx, sy, half = _target(tau, cam)
     col = P.MINT[2]
-    if tau < 6.5:
-        u = T.S(tau, 2.62, T.LOCK)
+    if tau < T.DIV[0] + 0.5:
+        u = T.S(tau, T.LOCK - 0.33, T.LOCK)
         half = half + (46 - half) * (1 - u)
         if T.LOCK <= tau < T.LOCK + 0.07:
             col, half = P.MINT[4], half + 2
-        if tau > 6.2 and int((tau - 6.2) / 0.05) % 2 == 0:
+        if tau > T.DIV[0] + 0.2 and int((tau - T.DIV[0] - 0.2) / 0.05) % 2 == 0:
             return
     else:
-        u = T.S(tau, 10.9, 11.2)
+        u = T.S(tau, 10.95, 11.25)
         half = half + (30 - half) * (1 - u)
-        if 13.2 <= tau < 13.45:                               # our colony pops: the bracket pulses
-            half += 3 * math.sin(math.pi * (tau - 13.2) / 0.25)
+        tp = T.POP_T[T.OUR]
+        if tp <= tau < tp + 0.25:                              # our colony pops: the bracket pulses
+            half += 3 * math.sin(math.pi * (tau - tp) / 0.25)
             col = P.MINT[3]
-        if tau >= T.TOUCH - 0.02:
-            col, half = P.MINT[4], half + 2
-    beat = 1 if (tau % T.BEAT) < 0.08 and 3.1 < tau < 6.0 else 0
+        left = 15.6 - tau
+        if left < 0.25 and int(left / 0.05) % 2 == 0:
+            return
+    beat = 1 if (tau % T.BEAT) < 0.08 and T.LOCK + 0.15 < tau < T.DIV[0] else 0
     half = int(round(half + beat))
     cx, cy = int(round(sx)), int(round(sy))
     arm = int(min(10, max(3, half * 0.38)))
@@ -152,8 +154,8 @@ def counter(buf, t):
         buf[cy_, cx_] = (buf[cy_, cx_].astype(np.float32) * 0.4 + np.float32(P.TEAL[2]) * 0.6).astype(np.uint8)
     _hline(buf, x0 + 1, x0 + w - 2, y0 + h - 1, P.MINT[1])
     _clock(buf, x0 + 10, y0 + 11, tau)
-    if tau >= 3.9:
-        n = int((tau - 3.9) * 60) + 1
+    if tau >= T.CYC0 - 0.1:
+        n = int((tau - T.CYC0 + 0.1) * 60) + 1
         gfx.fill(buf, pixfont.text_mask(label[:n], x0 + 20, y0 + 9, '3x5'), P.INK)
     if tau >= T.OVERNIGHT:
         pop = min(1.0, (tau - T.OVERNIGHT) / 0.12)

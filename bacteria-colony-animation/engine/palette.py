@@ -20,6 +20,7 @@ COTTON = ramp('#8c826d', '#b3a78e', '#d9cfba', '#f1ebdc', '#fffdf6')            
 STICK = ramp('#4c5d61', '#7f9296', '#b5c3c6', '#dfe7e9', '#f6fafb')                                  # swab shaft
 MINT = ramp('#1d6a48', '#3fae78', '#6bd59b', '#b6f2cf', '#e9fff2')                                   # target bracket
 DNA = ramp('#164b48', '#22706b', '#3a9a90')                                                          # nucleoid
+METAL = ramp('#1f2a2c', '#3b4a4c', '#5f7174', '#8ea1a3', '#c3d1d2', '#eef5f5')                       # lab hardware
 WHITE = (255, 255, 255)
 INK = hx('#f3f7f2')
 OUTLINE = hx('#06161a')
