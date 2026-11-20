@@ -75,10 +75,13 @@ LED_ON = tuple(bar(1) + STEP * (i + 1) for i in range(LED_GROUPS))
 T_FACE = 2.3                                 # the camera reaches the lamp's face (a glassy shimmer in the sound)
 
 
+LED_STANDBY = 0.1                            # bar 1: from the downbeat the LEDs drop to a standby glow, then pop on
+
+
 def led_on(i, t):
     """How far LED group i has lit up in the bar where they come on one by one (1 outside it)."""
-    if bar(1) - 0.2 <= t < bar(2):
-        return T_led(i, t)
+    if bar(1) <= t < bar(2):
+        return LED_STANDBY + (1.0 - LED_STANDBY) * T_led(i, t)
     return 1.0
 
 
