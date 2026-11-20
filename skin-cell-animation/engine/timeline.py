@@ -9,7 +9,8 @@ the slice looks the same after the conveyor has moved exactly N = 12 cells: that
 P(t) is how far the conveyor has moved. It stands still during the hook and the dive, then advances in pushes, one
 per beat (each push fast, then settling), so divisions, ticks and the cell's rise all land on the beat; after 25 s of
 story it has moved exactly 12 cells and has come to rest, so the last frame is the first frame. The film is 35 s:
-for 4 bars (10-20 s) the story stands still while the camera looks inside the cell; story(t) and film(s) convert.
+the basal cell's division is watched from inside, in slow motion (film 5-16.25 s, 4 extra bars); story(t) and
+film(s) convert.
 The cell we follow is the one born in column 0 at P = 0: its height is p = P(t) (t in story time). About 28 days
 pass on its way up (2.33 days per cell height).
 """
@@ -21,27 +22,54 @@ BEAT = 60.0 / BPM          # 0.625 s
 BAR = 4 * BEAT             # 2.5 s
 STEP = BEAT / 4            # one 16th
 STORY = 25.0               # the cell's life, from the hook back to the hook
-TOTAL = 35.0               # the film: 14 bars (the story plus a 4-bar look inside the cell)
+TOTAL = 35.0               # the film: 14 bars (the story, with its cell division watched from inside in slow motion)
 
-# 4 bars where the story stands still and the camera goes inside the cell we follow (film time)
-INSERT = (10.0, 20.0)
-ZOOM_IN = (10.0, 11.25)
-INSIDE = (11.25, 18.75)
-ZOOM_OUT = (18.75, 20.0)
+# The basal cell's division in slow motion (film time): the camera zooms into the basal cell at the end of the dive,
+# watches it divide from the inside, and comes back out as the two new cells pop apart. Story time crawls through it:
+# the cell rests (story 5.0-5.5), then divides (5.5-6.25, the span the tissue's own division takes), while 11.25 s of
+# film pass. The extra 10 s are 4 bars.
+SLOW = (5.0, 16.25)
+ZOOM_IN = (5.0, 6.25)
+INSIDE = (6.25, 15.0)
+ZOOM_OUT = (15.0, 16.25)
+SLOW_STORY = (5.0, 6.25)
+EXTRA = (SLOW[1] - SLOW[0]) - (SLOW_STORY[1] - SLOW_STORY[0])
+_REST_END = 5.5            # story time the division starts (DIVIDE[0])
+# how far the division has got (0 resting .. 1 two cells; the tissue draws it as P = SPLIT * k) at film times
+DIV_KEYS = ((5.0, 0.0), (6.25, 0.0), (7.85, 0.12), (9.45, 0.25), (10.85, 0.38), (12.25, 0.62), (13.65, 0.85),
+            (15.0, 0.97), (16.25, 1.0))
+_DKT = np.array([k_[0] for k_ in DIV_KEYS])
+_DKV = np.array([k_[1] for k_ in DIV_KEYS])
+
+
+def div_k(t):
+    """How far the basal cell's division has got at film time t (0 resting .. 1 two cells)."""
+    return float(np.interp(t, _DKT, _DKV))
 
 
 def story(t):
-    """Story time at film time t: it runs, stands still while we are inside the cell, then runs on."""
-    if t < INSERT[0]:
+    """Story time at film time t: it runs, crawls through the division while we watch it from inside, runs on."""
+    if t < SLOW[0]:
         return t
-    if t < INSERT[1]:
-        return INSERT[0]
-    return t - (INSERT[1] - INSERT[0])
+    if t < SLOW[1]:
+        k = div_k(t)
+        if k <= 0.0:                                     # resting, while the camera zooms in
+            f = min(1.0, max(0.0, (t - SLOW[0]) / (INSIDE[0] - SLOW[0])))
+            return SLOW_STORY[0] + (_REST_END - SLOW_STORY[0]) * f
+        return _REST_END + (SLOW_STORY[1] - _REST_END) * math.sqrt(k)
+    return t - EXTRA
 
 
 def film(s):
-    """Film time of a story event (one exactly at the freeze happens after the look inside)."""
-    return s if s < INSERT[0] else s + (INSERT[1] - INSERT[0])
+    """Film time of a story event (one exactly at the end of the division happens after the slow motion)."""
+    if s < SLOW_STORY[0]:
+        return s
+    if s >= SLOW_STORY[1]:
+        return s + EXTRA
+    if s <= _REST_END:
+        return SLOW[0] + (s - SLOW_STORY[0]) / (_REST_END - SLOW_STORY[0]) * (INSIDE[0] - SLOW[0])
+    k = ((s - _REST_END) / (SLOW_STORY[1] - _REST_END)) ** 2
+    return float(np.interp(k, _DKV[1:], _DKT[1:]))
 
 N = 12                     # cell heights from birth to shedding
 DAYS = 28.0
@@ -86,6 +114,7 @@ def smoothstep(e0, e1, x):
 
 # ---------------------------------------------------------------- the story's times
 DIVIDE = (5.5, 6.25)       # the cell we follow is born: the basal cell stretches, then pops on beat 10
+assert DIVIDE == (_REST_END, SLOW_STORY[1])
 SPLIT = 0.25               # a newborn is still part of its mother until p = SPLIT
 PUSH = 0.42                # each beat's push takes this long (fast, then settles)
 # conveyor advance per beat (from beat 10): the daughter rises, the climb, flattening, the top, coming to rest

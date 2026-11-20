@@ -3,17 +3,17 @@
 A 35-second looping, vertical short in 8-bit pixel art about how your skin replaces itself, with a calm, catchy
 chiptune soundtrack and sound effects tied to every event on screen. The structure follows the client's scenario: a
 flake of dead skin lifts off into flowing water (the hook); the camera dives back into the skin to where it came
-from; a cell is born in the bottom layer and is pushed up. Part way up, the slice holds still and the camera zooms
-into the cell to show, in four quick steps, how it does its job. Then the camera comes back out, and the cell is
-pushed on up through every layer, changes, dies and becomes a flat tile. The bonds holding the top tiles break, and
-the camera settles back on the opening shot, where our cell is now the flake about to lift off, so the last frame
-runs straight into the first. No game elements and no narration: clean captions in English name the things on
-screen.
+from, down to the bottom layer, where a basal cell is about to divide. That division is the highlight: the camera
+zooms into the basal cell and watches it, in slow motion, become two cells, one above the other. The bottom one stays
+in the basal layer; the top one is the cell we follow. It pops up on the beat and is pushed up through every layer,
+changes, dies and becomes a flat tile. The bonds holding the top tiles break, and the camera settles back on the
+opening shot, where our cell is now the flake about to lift off, so the last frame runs straight into the first. No
+game elements and no narration: clean captions in English name the things on screen.
 
-dead skin flake lifts off into the water → the camera dives back into the skin → a basal cell stretches and pops in
-two (NEW CELL, DAY 1) → it is pushed up on the beat → **the camera zooms into it: the DNA holds the recipe for
-keratin → an RNA copy carries it out of the nucleus → ribosomes build keratin → keratin fibres grip the neighbouring
-cells → mitochondria power it all → back out** → it grows spines and keratin, then dark granules → its nucleus
+dead skin flake lifts off into the water → the camera dives back into the skin to a basal cell about to divide →
+**the camera zooms into it: the copied DNA packs into chromosomes → the spindle catches them → they line up → each
+splits and one copy goes each way → the cell pinches into two cells, one above the other → back out** → the top cell
+pops up (NEW CELL, DAY 1) → it is pushed up on every beat, grows spines and keratin, then dark granules → its nucleus
 disappears (DAY 14) → it flattens into a dead tile full of keratin, held by lipid "glue" → the bonds break and the
 tiles above it peel away → it is the top of the skin (DAY 28), ready to lift off → the loop starts again.
 
@@ -35,11 +35,14 @@ tiles above it peel away → it is the top of the skin (DAY 28), ready to lift o
     round it.
 - **The cell we follow** has no face and no tag: it is just a little warmer than its neighbours, with a light rim,
   and the camera keeps it in view.
-- **Inside the cell** (10–20 s). The camera pushes into the cell and through its membrane in a short white flash.
-  Inside, the cell fills the frame, with its neighbours just beyond the membrane on both sides, held on by
-  desmosomes. There is a big nucleus with clumped chromatin, a nucleolus and pores. Around it sit rough ER, a small
-  Golgi stack, vesicles, free ribosomes, a faint keratin network and orange mitochondria with folded inner
-  membranes. The camera tours the cell, following each step, then comes back out the same way.
+- **Inside the dividing cell** (5–16.25 s). The dive runs straight into the basal cell and through its membrane in
+  a short white flash. Inside, the cell fills the frame. It sits on the basement membrane, with the dermis below,
+  held down by hemidesmosomes. Its neighbours are just beyond the membrane on both sides, held on by desmosomes, and
+  the cell born before it is above. It has a big nucleus with clumped chromatin, free ribosomes and orange
+  mitochondria. The four chromosomes each have their own colour (maroon, gold, teal, green), and both copies of a
+  chromosome share it. The spindle is drawn in cream, with a pair of centrioles at each pole, and a pink ring pinches
+  the cell in two. The camera follows the division and pulls back as the cell stretches, then comes back out of the
+  two new cells as the top one pops up.
 - **Motion.** The tissue is a slow conveyor that advances in one push per beat: each push sends a jelly-like
   squash-and-stretch up through the cells, divisions pop below, and the cell we follow rises in time with the music.
   Membranes wobble gently all the time.
@@ -150,17 +153,14 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | Time | Picture | Captions | Sound |
 |---|---|---|---|
 | 0–2.6 | **The hook.** Water flows over the skin; a flake of dead cells (three wide, two deep) peels off, curls and drifts away, leaving a hole. The camera drifts after it. | DEAD SKIN CELL · DAY 28 | a whoosh and a crackle on the downbeat, the flake fluttering off to the right, the water's hush, the hook phrase over F |
-| 2.6–5.4 | **The dive.** The camera stops and dives back into the skin where the flake came from, down through every layer to the bottom. | | a falling bloop and bubbles; the music goes muffled, as if underwater |
-| 5.4–8.0 | **Birth.** A basal cell stretches; its chromosomes line up on a spindle, split to the poles; it pinches in two and pops on the beat. The top cell is ours. | BASAL CELL · NEW CELL · DAY 1 | a rubbery stretch that snaps into a juicy pop on beat 3 |
-| 8.0–10.0 | **The climb begins.** The cells born below push ours up on every beat. | NUCLEUS · LOOK INSIDE | a soft pop on every push; a rising tick each time it climbs a cell height (a scale) |
-| 10.0–11.25 | **Zoom in.** The slice holds still and the camera pushes into our cell, through its membrane. | | a rising rush, the music going muffled; a deep bloop and a soft kick through the membrane |
-| 11.25–12.85 | **The recipe.** In the nucleus the keratin gene glows and its double helix unzips. | DNA · THE RECIPE | the music opens up: a music-box bell over Bb–F; a little zipper |
-| 12.85–14.4 | **The copy.** A gold RNA copy grows along the gene, then slides out through a pore in the nucleus and lies down in the cell. | RNA COPY · CARRIES IT OUT | a rising blip per 16th as the copy grows; a slurp and a plip out of the pore |
-| 14.4–15.8 | **Building.** Three ribosomes clamp onto the RNA and run along it, each spinning out a chain of protein beads. | RIBOSOME · BUILDS KERATIN | a clack as each ribosome clamps on (the last on the downbeat); a soft mallet note per bead, rising |
-| 15.8–17.25 | **Holding on.** The protein joins into fibres that grow across the cell and hook onto the desmosomes on both walls. | KERATIN FIBERS · GRIP THE NEIGHBORS | a stretching tone; six hooks, one per 16th, up the chord |
-| 17.25–18.75 | **Power.** The mitochondria light up and send sparks of energy to the ribosomes. | MITOCHONDRIA · POWER IT ALL | a warm swell; soft pings on the 8ths |
-| 18.75–20.0 | **Zoom out.** Back out through the membrane to the slice. | | a falling bloop and rush; a tom run into the climb, a crash as the story moves again |
-| 20.0–23.4 | **The climb.** The slice moves again: ours is pushed up on every beat, grows spines and keratin filaments, then dark granules. | GRANULES · KERATOHYALIN | the pops and the rising scale again; a crackle as granules form |
+| 2.6–5.0 | **The dive.** The camera stops and dives back into the skin where the flake came from, down through every layer to a basal cell about to divide. | BASAL CELL · ABOUT TO DIVIDE | a falling bloop and bubbles; the music goes muffled, as if underwater |
+| 5.0–6.25 | **Zoom in.** The dive runs straight into the basal cell, through its membrane. | | a rising rush; a deep bloop and a soft kick through the membrane |
+| 6.25–8.0 | **Packing up.** Inside, the copied DNA packs into four X-shaped chromosomes, each its own colour; the two centrosomes move to the top and the bottom. | CHROMOSOMES · DNA COPIED AND PACKED | the music opens up: a music-box bell over Bb; a quick twist as each chromosome appears; two tones parting |
+| 8.0–10.8 | **Caught and lined up.** The nuclear envelope breaks up; fibres from both poles catch each chromosome and line them up across the middle. | SPINDLE · CATCHES EACH ONE · LINED UP | a crackle as the envelope breaks; a pluck for each fibre that catches (top pole an octave above the bottom); a soft chord on the downbeat of bar 4 as they line up |
+| 10.8–12.8 | **Pulled apart.** Each X splits; one copy is pulled up, the other down, and the cell stretches. | PULLED APART · ONE COPY EACH WAY | a snap, then two tones moving apart |
+| 12.8–15.0 | **Two cells.** A nucleus forms round each set of copies and a ring pinches the cell into two cells, one above the other; the bottom one's anchors glint. | TWO NEW CELLS · ONE STAYS, ONE GOES UP | two bloops on the downbeat of bar 5 (top, then bottom); a rubbery creak as the ring tightens; a plip as they come apart |
+| 15.0–18.0 | **Out, and up.** Back out through the membrane to the slice; on beat 3 the top cell, ours, pops up into the layer above. | NEW CELL · DAY 1 | a falling bloop and rush, a rubbery stretch that snaps into a juicy pop on beat 3; then a soft pop on every push and a rising tick each time it climbs a cell height |
+| 18.0–23.4 | **The climb.** The cells born below push ours up on every beat. It grows spines and keratin filaments, then dark granules. | GRANULES · KERATOHYALIN | the pops and the rising scale; a crackle as granules form |
 | 23.4–25.4 | **The change.** Its nucleus shrinks, darkens and breaks up; lipid sacs empty into the gaps. | NUCLEUS GONE · DAY 14 | a falling bloop |
 | 25.4–28.9 | **Dead.** It flattens into a thin tile full of keratin; lipid fills the gaps between the tiles like mortar. | DEAD CELL · FULL OF KERATIN · LIPID GLUE | a squish; a sticky blob |
 | 28.9–32.0 | **Shedding.** The little bonds between the top tiles switch off one by one, and the tiles above ours peel away into the water. | BONDS BREAK | tiny bell tinks as bonds break; soft flicks as tiles peel; the hook phrase returns |
@@ -171,9 +171,21 @@ On Windows, use `py render.py` if `python` is not on PATH.
 - **Layers.** Thin skin, seen in section: the basal layer on the wavy junction with the dermis, the spinous layer,
   the granular layer and the stratum corneum (the stratum lucidum is only in thick skin, on palms and soles, so it
   is left out).
-- **Birth.** Cells in the basal layer divide. A common model, drawn here, has one daughter stay in the basal layer
-  while the other leaves it and starts to differentiate; the research also shows other patterns, so this is one
-  typical case.
+- **Birth: the basal cell divides (mitosis).** As drawn, in order:
+  - Before the division the cell has copied its DNA. Each chromosome now packs up tight and becomes two identical
+    copies (sister chromatids) joined in the middle: the X shape.
+  - The two centrosomes become the poles of the spindle. The nuclear envelope breaks up and spindle fibres from both
+    poles attach to each chromosome (at its kinetochore), one from each side.
+  - The chromosomes line up across the middle (the metaphase plate).
+  - The copies separate at the centromere and are pulled to opposite poles.
+  - A nucleus forms around each set, and the chromosomes unpack.
+  - A ring of actin and myosin at the old middle line pinches the cell in two.
+- **One stays, one goes up.** Basal cells are anchored to the basement membrane by hemidesmosomes (integrin α6β4
+  holding on to laminin-332). When the spindle stands upright, perpendicular to the basement membrane, the bottom
+  cell keeps that anchorage and stays a dividing basal cell. The top one is pushed out of the basal layer and starts
+  to become a skin cell; Lechler and Fuchs found most divisions in developing mouse skin to be upright like this.
+  Basal cells also divide side by side, making two basal cells, and later work suggests each cell can choose either
+  way at each division; the film shows the upright kind because that is how the cell we follow is born.
 - **The climb.** The cell does not swim up: it is pushed up by the cells born below it. On the way it builds keratin
   filaments anchored at desmosomes (the "spines"), then keratohyalin granules; its nucleus and organelles break
   down, lipids are released between the cells, and it becomes a flat, dead corneocyte full of keratin.
@@ -181,27 +193,14 @@ On Windows, use `py render.py` if `python` is not on PATH.
   outermost cells are shed. Washing and friction help loosen them.
 - **Time.** From division to shedding takes about four weeks in a young adult (about 28 days; longer with age, and
   estimates vary with the method); the captions' DAY 1, DAY 14 and DAY 28 follow that.
-- **Inside the cell.** How a skin cell (a keratinocyte) does its main job, making keratin, in four steps:
-  - **DNA, the recipe.** The DNA stays in the nucleus. To make a protein, the stretch of DNA that codes for it (a
-    gene) is opened and read.
-  - **RNA copy.** An enzyme builds an RNA copy of the gene (messenger RNA), which leaves the nucleus through a nuclear
-    pore.
-  - **Ribosomes build keratin.** In the cytoplasm, ribosomes read the RNA and join amino acids into a protein chain;
-    several ribosomes work on one RNA at once. Keratin is made on free ribosomes like these, not on the rough ER.
-  - **Keratin fibres grip the neighbours.** In the spinous layer the cell switches to keratins 1 and 10, which form
-    filaments anchored at the desmosomes (via desmoplakin). This network is what makes the layer strong and holds
-    the cells together.
-  - **Mitochondria power it all.** They make ATP, the cell's energy currency, which building proteins uses up;
-    their folded inner membranes (cristae) give them more surface for it.
 - **Simplified on purpose.**
   - Cells are drawn in tidy columns that move like a conveyor, in one push per beat; real cells are not that
     orderly.
-  - About four weeks are squeezed into about 19 seconds of the story (the look inside the cell is extra time, while
-    the story stands still).
-  - Inside the cell, one gene stands for the many the cell reads. The enzyme that copies it is a blob, and the
-    transfer RNAs that bring the amino acids are left out. A chain of beads stands for the keratin protein (real
-    keratins pair up and assemble into filaments). Fibres growing across the cell in a second stand for hours of
-    work. The energy sparks only suggest ATP.
+  - About four weeks are squeezed into about 19 seconds of the story (plus the division, played in slow motion).
+  - The dividing cell has four chromosomes; a human cell has 46. The colours are only there to follow each one.
+  - The copying of the DNA happens before the division and is not shown; the caption only says it has happened.
+  - The two new cells are drawn as big as the cell they came from (the tissue model needs that); real daughter
+    cells start smaller and grow.
   - Normally dead cells are shed one by one, too small to see; the flake in the film is a small clump, drawn large.
   - Proportions are not to scale, and the melanocytes, fibroblasts and the capillary are reduced to a few.
 
@@ -210,23 +209,24 @@ Sources checked during this session (through web-search summaries; the pages the
   and [turnover time of the epidermis](https://bionumbers.hms.harvard.edu/bionumber.aspx?id=109215)
 - [Keratinocyte Biology and Stratum Corneum Formation](https://jddonline.com/articles/dermatology/S1545961616P1047X)
   (about 28 days from the basal layer to shedding)
-- Lechler and Fuchs, [Nature 2005](https://www.nature.com/articles/nature03922) (asymmetric divisions in the basal
-  layer), and a [2020 bioRxiv preprint](https://www.biorxiv.org/content/10.1101/2020.07.24.219493v1.full.pdf) (the
-  pattern is not universal)
+- Lechler and Fuchs, [Nature 2005](https://www.nature.com/articles/nature03922) (upright, asymmetric divisions in
+  the basal layer: one cell stays, one is pushed out), and a
+  [2020 bioRxiv preprint](https://www.biorxiv.org/content/10.1101/2020.07.24.219493v1.full.pdf) (the pattern is not
+  universal)
 - [The biology and regulation of corneodesmosomes](https://pubmed.ncbi.nlm.nih.gov/25407522/) (kallikreins break
   the corneodesmosomes before shedding)
 - [Multiscale modelling of desquamation](https://arxiv.org/pdf/2107.08575) and
   [PMC4452581](https://pmc.ncbi.nlm.nih.gov/articles/PMC4452581) (cells shed one by one; visible clumps)
-- Inside the cell:
-  - OpenStax *Anatomy and Physiology 2e*,
-    [3.4 Protein Synthesis](https://openstax.org/books/anatomy-and-physiology-2e/pages/3-4-protein-synthesis)
-    (DNA, messenger RNA through the nuclear pores, ribosomes, polyribosomes)
-  - [PMC5453391](https://pmc.ncbi.nlm.nih.gov/articles/PMC5453391) (keratins 1 and 10 in the spinous layer, keratin
-    filaments anchored at desmosomes) and Kröger et al.,
-    [J Cell Biol 2013](https://rupress.org/jcb/article/201/5/681/37284/Keratins-control-intercellular-adhesion-involving)
-    (keratins control adhesion through desmoplakin)
-  - [PMC7919390](https://pmc.ncbi.nlm.nih.gov/articles/PMC7919390) (mitochondria make ATP by oxidative
-    phosphorylation; the cristae)
+- The division:
+  - OpenStax *Biology 2e*, [10.2 The Cell Cycle](https://openstax.org/books/biology-2e/pages/10-2-the-cell-cycle)
+    (prophase to telophase, the spindle and kinetochores, the metaphase plate, sister chromatids separating, the
+    actin ring of cytokinesis)
+  - [Setting the spindle's compass](https://rupress.org/jcb/article/191/5/895/36151/Setting-the-spindle-s-compass)
+    (J Cell Biol 2010: an upright spindle gives one basal and one suprabasal cell, a flat one two basal cells) and a
+    [news release on the Lechler lab's later work](https://www.eurekalert.org/news-releases/616584) (most basal cells
+    can divide either way)
+  - [A review of the hemidesmosome](https://link.springer.com/doi/10.1007/s00441-014-2061-z) (Cell and Tissue
+    Research: integrin α6β4 and laminin-332 anchor basal cells to the basement membrane)
 
 ## How it is made
 
@@ -236,27 +236,30 @@ Sources checked during this session (through web-search summaries; the pages the
 - **One conveyor, one clock** (`engine/timeline.py`). The epidermis is columns of cells; a cell's look depends only
   on its height p (0 at birth, 12 at shedding). Each column holds the same cells at the same heights, only out of
   step with its neighbours (that is what lays the dead cells like bricks). The conveyor stands still in the hook and
-  the dive, then advances in one push per beat. The story runs on its own clock, which stops for the 10 seconds
-  inside the cell (4 bars), so the film has two times: story time drives the conveyor, the captions and the
-  shedding, while film time drives the camera, the music and every idle motion. By the end the conveyor has moved
-  exactly 12 cells and come to rest, so the last frame is the first frame.
+  the dive, then advances in one push per beat. The story runs on its own clock, which crawls through the basal
+  cell's division while we watch it from inside: 1.25 s of story take 11.25 s of film (4 extra bars). So the film
+  has two times: story time drives the conveyor, the division on the tissue scale, the captions and the shedding,
+  while film time drives the camera, the music and every idle motion. By the end the conveyor has moved exactly 12
+  cells and come to rest, so the last frame is the first frame.
 - **Cells** (`engine/tissue.py`). Every cell is drawn from its height: shape and size, colour ramp, organelles,
   keratin filaments to its desmosomes, granules, nucleus (resting, condensing, breaking up, gone), lipid, the dead
   tile's woven keratin and its bonds. Details are fixed in the cell's own frame, so they move with it; its membrane
   wobbles and each push sends a squash-and-stretch up the tissue.
-- **Inside the cell** (`engine/inside.py`). Its own drawing in design pixels, seen through a camera that tours
-  the cell: it pushes onto the gene, follows the RNA out, closes in on the ribosomes, pulls back wide when the
-  fibres reach both walls, then drifts down to the mitochondria. The ribosomes clamp on, the beads appear and the
-  fibres hook on exactly on the 16th-note grid, so their sounds land on the music.
+- **Inside the dividing cell** (`engine/inside.py`). Its own drawing in design pixels (26 per tissue unit, the
+  scale the zoom reaches), driven by the same division progress as the tissue's own drawing of it, so going in and
+  coming out match. The camera pushes onto the chromosomes, pulls back to see both poles, stays close while the
+  copies are pulled apart and pulls back as the cell pinches in two. Every event with a sound (a chromosome packing
+  up, the envelope breaking, a fibre catching, the line-up, the split, the new nuclei) lands on the 16th-note grid.
 - **Captions** (`engine/scenes.py`): a dot on the object, a thin line, the text typed on.
 - **Sound** (`engine/audio.py`). Everything is synthesized, with no samples.
   - **Chip voices:** band-limited pulse waves, an NES-style triangle bass, LFSR noise drums, echo and FM bells.
   - **Music:** 96 BPM in F major, 14 bars: a hook phrase over F, a falling answer for the dive, a stretch that pops
     on the beat, I-vi-IV-V while the cell climbs (the arpeggio climbs too), and the hook phrase again at the top.
-    Inside the cell, 4 bars of Bb–F–Gm–C: the tune moves to a soft music-box bell over a pad, a light pulse and a
-    music-box arpeggio, and a tom run brings the climb back. The music is muffled while the camera is inside the
-    skin (deepest in the dive and on the way into and out of the cell), opens up inside the cell, and opens fully
-    at the surface.
+    Inside the dividing cell, 4 bars of Bb–Gm–F–C: the tune moves to a soft music-box bell over a pad, a light
+    pulse and a music-box arpeggio; it lands on the line-up and climbs as the cell pinches in two, and a tom run
+    leads out of the cell into the pop. The music is muffled while the camera is inside the skin (deepest in the
+    dive, which runs into the zoom, and on the way back out), opens up inside the cell, and opens fully at the
+    surface.
   - **Effects stay on top.** Each effect was measured against the music at that moment, band by band, and the quiet
     ones were raised until they clear it.
   - **Loudness:** the mix is −14 LUFS with true peak below −1 dBTP.
@@ -276,10 +279,10 @@ Sources checked during this session (through web-search summaries; the pages the
   - `palette.py`, `gfx.py`, `pixfont.py`, `world.py`: the palette, the pixel toolkit, the bitmap font, the camera.
   - `tissue.py`: the water, the dermis and capillary, the melanocytes, the basal cells and their divisions, every
     cell and dead tile.
-  - `scenes.py`: the camera path (and the zoom into the cell and back), the shedding tiles, the hook's flake, the
-    captions and frame assembly.
-  - `inside.py`: the inside of the cell: nucleus, DNA, RNA, ribosomes, keratin fibres, mitochondria, its camera
-    and captions.
+  - `scenes.py`: the camera path (and the zoom into the basal cell and back), the shedding tiles, the hook's flake,
+    the captions and frame assembly.
+  - `inside.py`: the dividing basal cell from inside: nucleus, chromosomes, spindle, the ring, the two new cells,
+    its surroundings, its camera and captions.
   - `audio.py`: synthesizer, score, effects, master.
 - `assets/audio/`: the original soundtrack.
 - `镜头表.md`: the shot list (style lock, palette, 12 beats).

@@ -35,10 +35,13 @@ SPARK = ramp('#FFE7A0', '#FFFFFF')
 MELANIN = ramp('#3B2016', '#6B3E26', '#9A6440')                               # melanin and the melanocytes that make it
 FIBRO = ramp('#8A3A4C', '#E6A7A4')                                             # fibroblasts in the dermis
 
-# inside the cell
+# inside the dividing basal cell
 NUC_IN = ramp('#E7A2AC', '#F4C6CB')                                            # the inside of the nucleus
-RNA = ramp('#B9771A', '#F2C14E', '#FFE89A')                                    # the RNA copy (gold)
-RIBO = ramp('#4E1C2D', '#86354F', '#BB6479')                                   # ribosomes
-PROT = ramp('#C08B6B', '#F5D5B4', '#FFF2E0')                                   # keratin protein and its fibres
+CHROMO = (ramp('#5E1E33', '#9A3556', '#D9809A'),                               # four chromosomes, each its own colour
+          ramp('#8A5A12', '#E0A930', '#FFE08A'),                               # (both copies of one share it, so you
+          ramp('#1F5F73', '#2F9AB8', '#8AD8EC'),                               # can see each new cell get one of
+          ramp('#3D6B2E', '#6FA34A', '#B7DE8C'))                               # each)
+SPINDLE = ramp('#E9CFAE', '#FFF8EC')                                           # spindle fibres, the poles' glow
+RIBO = ramp('#4E1C2D', '#86354F', '#BB6479')                                   # free ribosomes (speckles)
 MITO = ramp('#6E2618', '#B9472A', '#EC7B4E', '#FFC29C')                        # mitochondria
-ER = ramp('#D9877A', '#F7C5B4')                                                # rough endoplasmic reticulum
+RING = ramp('#A3244F', '#E0567F')                                              # the contractile ring that pinches
