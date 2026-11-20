@@ -1,21 +1,25 @@
 # The Life Cycle of a Skin Cell
 
-A 25-second looping, vertical short in 8-bit pixel art about how your skin replaces itself, with a calm, catchy
+A 35-second looping, vertical short in 8-bit pixel art about how your skin replaces itself, with a calm, catchy
 chiptune soundtrack and sound effects tied to every event on screen. The structure follows the client's scenario: a
 flake of dead skin lifts off into flowing water (the hook); the camera dives back into the skin to where it came
-from; a cell is born in the bottom layer, is pushed up through every layer, changes, dies and becomes a flat tile;
-the bonds holding the top tiles break; and the camera settles back on the opening shot, where our cell is now the
-flake about to lift off, so the last frame runs straight into the first. No game elements and no narration: clean
-captions in English name the things on screen.
+from; a cell is born in the bottom layer and is pushed up. Part way up, the slice holds still and the camera zooms
+into the cell to show, in four quick steps, how it does its job. Then the camera comes back out, and the cell is
+pushed on up through every layer, changes, dies and becomes a flat tile. The bonds holding the top tiles break, and
+the camera settles back on the opening shot, where our cell is now the flake about to lift off, so the last frame
+runs straight into the first. No game elements and no narration: clean captions in English name the things on
+screen.
 
 dead skin flake lifts off into the water → the camera dives back into the skin → a basal cell stretches and pops in
-two (NEW CELL, DAY 1) → it is pushed up on every beat, grows spines and keratin, then dark granules → its nucleus
+two (NEW CELL, DAY 1) → it is pushed up on the beat → **the camera zooms into it: the DNA holds the recipe for
+keratin → an RNA copy carries it out of the nucleus → ribosomes build keratin → keratin fibres grip the neighbouring
+cells → mitochondria power it all → back out** → it grows spines and keratin, then dark granules → its nucleus
 disappears (DAY 14) → it flattens into a dead tile full of keratin, held by lipid "glue" → the bonds break and the
 tiles above it peel away → it is the top of the skin (DAY 28), ready to lift off → the loop starts again.
 
 ![storyboard](docs/storyboard.png)
 
-- **Format.** 1080×1920 (9:16 vertical), 30 fps, exactly 25.0 s (10 bars of 4/4 at 96 BPM), H.264 video with 48 kHz
+- **Format.** 1080×1920 (9:16 vertical), 30 fps, exactly 35.0 s (14 bars of 4/4 at 96 BPM), H.264 video with 48 kHz
   stereo AAC. The default export is **`out/skin-cell-animation.mp4`**, relative to this folder.
 - **Look.** Every frame is drawn in code on a 270×480 canvas and scaled exactly 4× nearest-neighbour: crisp pixels,
   stepped 1-px outlines, a limited palette, at most a checker or ordered dither. A slice of skin seen from the side,
@@ -31,6 +35,11 @@ tiles above it peel away → it is the top of the skin (DAY 28), ready to lift o
     round it.
 - **The cell we follow** has no face and no tag: it is just a little warmer than its neighbours, with a light rim,
   and the camera keeps it in view.
+- **Inside the cell** (10–20 s). The camera pushes into the cell and through its membrane in a short white flash.
+  Inside, the cell fills the frame, with its neighbours just beyond the membrane on both sides, held on by
+  desmosomes. There is a big nucleus with clumped chromatin, a nucleolus and pores. Around it sit rough ER, a small
+  Golgi stack, vesicles, free ribosomes, a faint keratin network and orange mitochondria with folded inner
+  membranes. The camera tours the cell, following each step, then comes back out the same way.
 - **Motion.** The tissue is a slow conveyor that advances in one push per beat: each push sends a jelly-like
   squash-and-stretch up through the cells, divisions pop below, and the cell we follow rises in time with the music.
   Membranes wobble gently all the time.
@@ -38,8 +47,8 @@ tiles above it peel away → it is the top of the skin (DAY 28), ready to lift o
   later; never more than one at a time, and always clear of a phone app's buttons and caption area.
 - **Loop.** The last frame is the opening shot with our tile at the top of the skin, ready to lift off; the first
   frame is the same shot, and the flake lifts off from the next frame. Every idle motion (water, bubbles, wobble,
-  the capillary) repeats exactly every 25 s, and the soundtrack wraps round too. `python render.py --loops 3` writes
-  the loop three times back to back (75 s).
+  the capillary) repeats exactly once per loop, and the soundtrack wraps round too. `python render.py --loops 3`
+  writes the loop three times back to back (105 s).
 
 ## Render it yourself
 
@@ -96,7 +105,7 @@ python render.py
 ```
 
 The film is written to **`out/skin-cell-animation.mp4`**. The music, effects and mix are written next to it as WAV
-stems (`out/music.wav`, `out/sfx.wav`, `out/mix.wav`). On a 4-core machine the full render takes about 75 seconds.
+stems (`out/music.wav`, `out/sfx.wav`, `out/mix.wav`). On a 4-core machine the full render takes about 2 minutes.
 With [uv](https://docs.astral.sh/uv/) instead of pip, no install step is needed:
 
 ```bash
@@ -109,7 +118,7 @@ On Windows, use `py render.py` if `python` is not on PATH.
 
 | Command | What it does |
 |---|---|
-| `python render.py --sheet 0:25:1` | one contact sheet of the whole film in `out/sheet.png` (start:end:step, seconds) |
+| `python render.py --sheet 0:35:1` | one contact sheet of the whole film in `out/sheet.png` (start:end:step, seconds) |
 | `python render.py --stills 0.6,6.3,16.2` | full-size PNG frames in `out/stills/` |
 | `python render.py --from 5 --to 9` | only a slice of the film |
 | `python render.py --fps 60` | 60 fps |
@@ -143,11 +152,19 @@ On Windows, use `py render.py` if `python` is not on PATH.
 | 0–2.6 | **The hook.** Water flows over the skin; a flake of dead cells (three wide, two deep) peels off, curls and drifts away, leaving a hole. The camera drifts after it. | DEAD SKIN CELL · DAY 28 | a whoosh and a crackle on the downbeat, the flake fluttering off to the right, the water's hush, the hook phrase over F |
 | 2.6–5.4 | **The dive.** The camera stops and dives back into the skin where the flake came from, down through every layer to the bottom. | | a falling bloop and bubbles; the music goes muffled, as if underwater |
 | 5.4–8.0 | **Birth.** A basal cell stretches; its chromosomes line up on a spindle, split to the poles; it pinches in two and pops on the beat. The top cell is ours. | BASAL CELL · NEW CELL · DAY 1 | a rubbery stretch that snaps into a juicy pop on beat 3 |
-| 8.0–13.4 | **The climb.** The cells born below push ours up on every beat. It grows spines and keratin filaments, then dark granules. | NUCLEUS · GRANULES · KERATOHYALIN | a soft pop on every push; a rising tick each time it climbs a cell height (a scale); a crackle as granules form |
-| 13.4–15.4 | **The change.** Its nucleus shrinks, darkens and breaks up; lipid sacs empty into the gaps. | NUCLEUS GONE · DAY 14 | a falling bloop |
-| 15.4–18.9 | **Dead.** It flattens into a thin tile full of keratin; lipid fills the gaps between the tiles like mortar. | DEAD CELL · FULL OF KERATIN · LIPID GLUE | a squish; a sticky blob |
-| 18.9–22.0 | **Shedding.** The little bonds between the top tiles switch off one by one, and the tiles above ours peel away into the water. | BONDS BREAK | tiny bell tinks as bonds break; soft flicks as tiles peel; the hook phrase returns |
-| 22.0–25.0 | **Ready.** The camera settles on the opening shot: our tile is now the top of the skin, ready to lift off. | DEAD SKIN CELL · DAY 28 | the water's hush swells into the whoosh at the top of the loop |
+| 8.0–10.0 | **The climb begins.** The cells born below push ours up on every beat. | NUCLEUS · LOOK INSIDE | a soft pop on every push; a rising tick each time it climbs a cell height (a scale) |
+| 10.0–11.25 | **Zoom in.** The slice holds still and the camera pushes into our cell, through its membrane. | | a rising rush, the music going muffled; a deep bloop and a soft kick through the membrane |
+| 11.25–12.85 | **The recipe.** In the nucleus the keratin gene glows and its double helix unzips. | DNA · THE RECIPE | the music opens up: a music-box bell over Bb–F; a little zipper |
+| 12.85–14.4 | **The copy.** A gold RNA copy grows along the gene, then slides out through a pore in the nucleus and lies down in the cell. | RNA COPY · CARRIES IT OUT | a rising blip per 16th as the copy grows; a slurp and a plip out of the pore |
+| 14.4–15.8 | **Building.** Three ribosomes clamp onto the RNA and run along it, each spinning out a chain of protein beads. | RIBOSOME · BUILDS KERATIN | a clack as each ribosome clamps on (the last on the downbeat); a soft mallet note per bead, rising |
+| 15.8–17.25 | **Holding on.** The protein joins into fibres that grow across the cell and hook onto the desmosomes on both walls. | KERATIN FIBERS · GRIP THE NEIGHBORS | a stretching tone; six hooks, one per 16th, up the chord |
+| 17.25–18.75 | **Power.** The mitochondria light up and send sparks of energy to the ribosomes. | MITOCHONDRIA · POWER IT ALL | a warm swell; soft pings on the 8ths |
+| 18.75–20.0 | **Zoom out.** Back out through the membrane to the slice. | | a falling bloop and rush; a tom run into the climb, a crash as the story moves again |
+| 20.0–23.4 | **The climb.** The slice moves again: ours is pushed up on every beat, grows spines and keratin filaments, then dark granules. | GRANULES · KERATOHYALIN | the pops and the rising scale again; a crackle as granules form |
+| 23.4–25.4 | **The change.** Its nucleus shrinks, darkens and breaks up; lipid sacs empty into the gaps. | NUCLEUS GONE · DAY 14 | a falling bloop |
+| 25.4–28.9 | **Dead.** It flattens into a thin tile full of keratin; lipid fills the gaps between the tiles like mortar. | DEAD CELL · FULL OF KERATIN · LIPID GLUE | a squish; a sticky blob |
+| 28.9–32.0 | **Shedding.** The little bonds between the top tiles switch off one by one, and the tiles above ours peel away into the water. | BONDS BREAK | tiny bell tinks as bonds break; soft flicks as tiles peel; the hook phrase returns |
+| 32.0–35.0 | **Ready.** The camera settles on the opening shot: our tile is now the top of the skin, ready to lift off. | DEAD SKIN CELL · DAY 28 | the water's hush swells into the whoosh at the top of the loop |
 
 ## The science (as drawn)
 
@@ -164,10 +181,27 @@ On Windows, use `py render.py` if `python` is not on PATH.
   outermost cells are shed. Washing and friction help loosen them.
 - **Time.** From division to shedding takes about four weeks in a young adult (about 28 days; longer with age, and
   estimates vary with the method); the captions' DAY 1, DAY 14 and DAY 28 follow that.
+- **Inside the cell.** How a skin cell (a keratinocyte) does its main job, making keratin, in four steps:
+  - **DNA, the recipe.** The DNA stays in the nucleus. To make a protein, the stretch of DNA that codes for it (a
+    gene) is opened and read.
+  - **RNA copy.** An enzyme builds an RNA copy of the gene (messenger RNA), which leaves the nucleus through a nuclear
+    pore.
+  - **Ribosomes build keratin.** In the cytoplasm, ribosomes read the RNA and join amino acids into a protein chain;
+    several ribosomes work on one RNA at once. Keratin is made on free ribosomes like these, not on the rough ER.
+  - **Keratin fibres grip the neighbours.** In the spinous layer the cell switches to keratins 1 and 10, which form
+    filaments anchored at the desmosomes (via desmoplakin). This network is what makes the layer strong and holds
+    the cells together.
+  - **Mitochondria power it all.** They make ATP, the cell's energy currency, which building proteins uses up;
+    their folded inner membranes (cristae) give them more surface for it.
 - **Simplified on purpose.**
   - Cells are drawn in tidy columns that move like a conveyor, in one push per beat; real cells are not that
     orderly.
-  - About four weeks are squeezed into about 19 seconds.
+  - About four weeks are squeezed into about 19 seconds of the story (the look inside the cell is extra time, while
+    the story stands still).
+  - Inside the cell, one gene stands for the many the cell reads. The enzyme that copies it is a blob, and the
+    transfer RNAs that bring the amino acids are left out. A chain of beads stands for the keratin protein (real
+    keratins pair up and assemble into filaments). Fibres growing across the cell in a second stand for hours of
+    work. The energy sparks only suggest ATP.
   - Normally dead cells are shed one by one, too small to see; the flake in the film is a small clump, drawn large.
   - Proportions are not to scale, and the melanocytes, fibroblasts and the capillary are reduced to a few.
 
@@ -183,6 +217,16 @@ Sources checked during this session (through web-search summaries; the pages the
   the corneodesmosomes before shedding)
 - [Multiscale modelling of desquamation](https://arxiv.org/pdf/2107.08575) and
   [PMC4452581](https://pmc.ncbi.nlm.nih.gov/articles/PMC4452581) (cells shed one by one; visible clumps)
+- Inside the cell:
+  - OpenStax *Anatomy and Physiology 2e*,
+    [3.4 Protein Synthesis](https://openstax.org/books/anatomy-and-physiology-2e/pages/3-4-protein-synthesis)
+    (DNA, messenger RNA through the nuclear pores, ribosomes, polyribosomes)
+  - [PMC5453391](https://pmc.ncbi.nlm.nih.gov/articles/PMC5453391) (keratins 1 and 10 in the spinous layer, keratin
+    filaments anchored at desmosomes) and Kröger et al.,
+    [J Cell Biol 2013](https://rupress.org/jcb/article/201/5/681/37284/Keratins-control-intercellular-adhesion-involving)
+    (keratins control adhesion through desmoplakin)
+  - [PMC7919390](https://pmc.ncbi.nlm.nih.gov/articles/PMC7919390) (mitochondria make ATP by oxidative
+    phosphorylation; the cristae)
 
 ## How it is made
 
@@ -192,25 +236,34 @@ Sources checked during this session (through web-search summaries; the pages the
 - **One conveyor, one clock** (`engine/timeline.py`). The epidermis is columns of cells; a cell's look depends only
   on its height p (0 at birth, 12 at shedding). Each column holds the same cells at the same heights, only out of
   step with its neighbours (that is what lays the dead cells like bricks). The conveyor stands still in the hook and
-  the dive, then advances in one push per beat; after 25 s it has moved exactly 12 cells and come to rest, so the
-  last frame is the first frame.
+  the dive, then advances in one push per beat. The story runs on its own clock, which stops for the 10 seconds
+  inside the cell (4 bars), so the film has two times: story time drives the conveyor, the captions and the
+  shedding, while film time drives the camera, the music and every idle motion. By the end the conveyor has moved
+  exactly 12 cells and come to rest, so the last frame is the first frame.
 - **Cells** (`engine/tissue.py`). Every cell is drawn from its height: shape and size, colour ramp, organelles,
   keratin filaments to its desmosomes, granules, nucleus (resting, condensing, breaking up, gone), lipid, the dead
   tile's woven keratin and its bonds. Details are fixed in the cell's own frame, so they move with it; its membrane
   wobbles and each push sends a squash-and-stretch up the tissue.
+- **Inside the cell** (`engine/inside.py`). Its own drawing in design pixels, seen through a camera that tours
+  the cell: it pushes onto the gene, follows the RNA out, closes in on the ribosomes, pulls back wide when the
+  fibres reach both walls, then drifts down to the mitochondria. The ribosomes clamp on, the beads appear and the
+  fibres hook on exactly on the 16th-note grid, so their sounds land on the music.
 - **Captions** (`engine/scenes.py`): a dot on the object, a thin line, the text typed on.
 - **Sound** (`engine/audio.py`). Everything is synthesized, with no samples.
   - **Chip voices:** band-limited pulse waves, an NES-style triangle bass, LFSR noise drums, echo and FM bells.
-  - **Music:** 96 BPM in F major, 10 bars: a hook phrase over F, a falling answer for the dive, a stretch that pops
+  - **Music:** 96 BPM in F major, 14 bars: a hook phrase over F, a falling answer for the dive, a stretch that pops
     on the beat, I-vi-IV-V while the cell climbs (the arpeggio climbs too), and the hook phrase again at the top.
-    The music is muffled while the camera is inside the skin and opens up at the surface.
+    Inside the cell, 4 bars of Bb–F–Gm–C: the tune moves to a soft music-box bell over a pad, a light pulse and a
+    music-box arpeggio, and a tom run brings the climb back. The music is muffled while the camera is inside the
+    skin (deepest in the dive and on the way into and out of the cell), opens up inside the cell, and opens fully
+    at the surface.
   - **Effects stay on top.** Each effect was measured against the music at that moment, band by band, and the quiet
     ones were raised until they clear it.
   - **Loudness:** the mix is −14 LUFS with true peak below −1 dBTP.
 
 ## Assets
 
-- **Original audio** (`assets/audio/`). `music.wav`, `sfx.wav` and `mix.wav`: 48 kHz, 16-bit, stereo, exactly 25 s.
+- **Original audio** (`assets/audio/`). `music.wav`, `sfx.wav` and `mix.wav`: 48 kHz, 16-bit, stereo, exactly 35 s.
   To refresh them, run `python render.py --audio-only --out assets/audio`.
 
 ## Files
@@ -223,9 +276,12 @@ Sources checked during this session (through web-search summaries; the pages the
   - `palette.py`, `gfx.py`, `pixfont.py`, `world.py`: the palette, the pixel toolkit, the bitmap font, the camera.
   - `tissue.py`: the water, the dermis and capillary, the melanocytes, the basal cells and their divisions, every
     cell and dead tile.
-  - `scenes.py`: the camera path, the shedding tiles, the hook's flake, the captions and frame assembly.
+  - `scenes.py`: the camera path (and the zoom into the cell and back), the shedding tiles, the hook's flake, the
+    captions and frame assembly.
+  - `inside.py`: the inside of the cell: nucleus, DNA, RNA, ribosomes, keratin fibres, mitochondria, its camera
+    and captions.
   - `audio.py`: synthesizer, score, effects, master.
 - `assets/audio/`: the original soundtrack.
-- `镜头表.md`: the shot list (style lock, palette, 8 beats).
+- `镜头表.md`: the shot list (style lock, palette, 12 beats).
 - `docs/交付说明.md`: delivery notes and the quality-gate results.
 - `docs/storyboard.png`: one frame from each beat.

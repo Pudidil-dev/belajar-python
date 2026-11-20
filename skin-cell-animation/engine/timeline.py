@@ -1,4 +1,4 @@
-"""The film's clock (96 BPM, 25 s = 10 bars) and the tissue's motion, in one place.
+"""The film's clock (96 BPM, 35 s = 14 bars) and the tissue's motion, in one place.
 
 The epidermis is drawn as columns of cells on a slow conveyor. A cell is born when a basal cell divides (it starts at
 height p = 0), is pushed up by the cells born under it, and its look depends only on how far up it is: p in [1, 4.5]
@@ -7,9 +7,11 @@ p = 12 it is shed. Every column holds the same cells at the same heights, only o
 the slice looks the same after the conveyor has moved exactly N = 12 cells: that is the loop.
 
 P(t) is how far the conveyor has moved. It stands still during the hook and the dive, then advances in pushes, one
-per beat (each push fast, then settling), so divisions, ticks and the cell's rise all land on the beat; after 25 s it
-has moved exactly 12 cells and has come to rest, so the last frame is the first frame. The cell we follow is the one
-born in column 0 at P = 0: its height is p = P(t). About 28 days pass on its way up (2.33 days per cell height).
+per beat (each push fast, then settling), so divisions, ticks and the cell's rise all land on the beat; after 25 s of
+story it has moved exactly 12 cells and has come to rest, so the last frame is the first frame. The film is 35 s:
+for 4 bars (10-20 s) the story stands still while the camera looks inside the cell; story(t) and film(s) convert.
+The cell we follow is the one born in column 0 at P = 0: its height is p = P(t) (t in story time). About 28 days
+pass on its way up (2.33 days per cell height).
 """
 import math
 import numpy as np
@@ -18,7 +20,28 @@ BPM = 96
 BEAT = 60.0 / BPM          # 0.625 s
 BAR = 4 * BEAT             # 2.5 s
 STEP = BEAT / 4            # one 16th
-TOTAL = 25.0               # 10 bars
+STORY = 25.0               # the cell's life, from the hook back to the hook
+TOTAL = 35.0               # the film: 14 bars (the story plus a 4-bar look inside the cell)
+
+# 4 bars where the story stands still and the camera goes inside the cell we follow (film time)
+INSERT = (10.0, 20.0)
+ZOOM_IN = (10.0, 11.25)
+INSIDE = (11.25, 18.75)
+ZOOM_OUT = (18.75, 20.0)
+
+
+def story(t):
+    """Story time at film time t: it runs, stands still while we are inside the cell, then runs on."""
+    if t < INSERT[0]:
+        return t
+    if t < INSERT[1]:
+        return INSERT[0]
+    return t - (INSERT[1] - INSERT[0])
+
+
+def film(s):
+    """Film time of a story event (one exactly at the freeze happens after the look inside)."""
+    return s if s < INSERT[0] else s + (INSERT[1] - INSERT[0])
 
 N = 12                     # cell heights from birth to shedding
 DAYS = 28.0
@@ -75,7 +98,7 @@ assert abs(SPLIT + sum(d for _, d in STEPS) - N) < 1e-9
 
 
 def P(t):
-    """How far the conveyor has moved (in cell heights) at film time t."""
+    """How far the conveyor has moved (in cell heights) at story time t."""
     if t < DIVIDE[0]:
         return 0.0
     if t < DIVIDE[1]:
@@ -89,12 +112,12 @@ def P(t):
     return v
 
 
-_TT = np.arange(0.0, TOTAL + 1e-9, 0.0005)
+_TT = np.arange(0.0, STORY + 1e-9, 0.0005)
 _PP = np.array([P(x) for x in _TT])
 
 
 def P_inv(p):
-    """The first film time at which the conveyor reaches p (0 < p <= N)."""
+    """The first story time at which the conveyor reaches p (0 < p <= N)."""
     i = int(np.searchsorted(_PP, p, side='left'))
     i = min(max(i, 1), len(_TT) - 1)
     a, b = _PP[i - 1], _PP[i]
@@ -120,7 +143,7 @@ def jiggle(t, delay=0.0):
 
 
 def wob(k):
-    """An angular frequency that fits exactly k whole cycles into the loop (so idle motion loops seamlessly)."""
+    """An angular frequency that fits exactly k whole cycles into the film (so idle motion loops seamlessly)."""
     return 2 * math.pi * k / TOTAL
 
 
@@ -198,4 +221,4 @@ def flake_curl(t):
 
 
 # ---------------------------------------------------------------- captions (text, world anchor, times)
-DAY_STAMPS = ((6.35, 8.1, 1), (13.4, 15.2, 14), (22.4, 27.4, 28))
+DAY_STAMPS = ((6.35, 8.1, 1), (13.4, 15.2, 14), (22.4, 27.4, 28))   # (story time)

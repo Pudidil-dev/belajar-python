@@ -34,3 +34,11 @@ WARM = hx('#FFB070')                                                          # 
 SPARK = ramp('#FFE7A0', '#FFFFFF')
 MELANIN = ramp('#3B2016', '#6B3E26', '#9A6440')                               # melanin and the melanocytes that make it
 FIBRO = ramp('#8A3A4C', '#E6A7A4')                                             # fibroblasts in the dermis
+
+# inside the cell
+NUC_IN = ramp('#E7A2AC', '#F4C6CB')                                            # the inside of the nucleus
+RNA = ramp('#B9771A', '#F2C14E', '#FFE89A')                                    # the RNA copy (gold)
+RIBO = ramp('#4E1C2D', '#86354F', '#BB6479')                                   # ribosomes
+PROT = ramp('#C08B6B', '#F5D5B4', '#FFF2E0')                                   # keratin protein and its fibres
+MITO = ramp('#6E2618', '#B9472A', '#EC7B4E', '#FFC29C')                        # mitochondria
+ER = ramp('#D9877A', '#F7C5B4')                                                # rough endoplasmic reticulum

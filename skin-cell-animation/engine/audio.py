@@ -2,16 +2,20 @@
 with, built to be watched on repeat.
 
 Chip voices: band-limited pulse waves (PolyBLEP), an NES-style triangle bass, LFSR noise drums, a short echo and FM
-bells (the synth core is shared with the repo's other pixel films). 96 BPM in F major, 10 bars = 25 s, and it loops:
+bells (the synth core is shared with the repo's other pixel films). 96 BPM in F major, 14 bars = 35 s, and it loops:
 a hook phrase over F, a falling answer for the dive, a stretch that pops on the beat, then I-vi-IV-V while the cell
-climbs and the hook phrase again at the top.
+climbs and the hook phrase again at the top. Inside the cell (bars 4-7, Bb-F-Gm-C) the tune moves to a soft
+music-box bell over a pad and a light pulse.
 
 The sound follows the picture's own clock (engine/timeline.py): the whoosh of the flake lifting off on the first
 downbeat; a stretch that snaps into a juicy pop when the cell divides; a soft pop for the pushes that follow; a
 rising tick for every cell height the cell climbs (it climbs a scale); a crackle as granules form, a falling bloop as
 the nucleus goes, a squish as it flattens; little tinks as the bonds between the dead cells break, and soft flicks
-as tiles peel away; the water's hush swells at the end into the whoosh at the top of the loop. The music is muffled
-while the camera is inside the skin and opens up at the surface.
+as tiles peel away; the water's hush swells at the end into the whoosh at the top of the loop. Inside the cell every
+step has its own sound on the 16th-note grid: a zipper as the DNA opens, a rising blip per 16th as the RNA copy
+grows, a plip as it leaves the nucleus, a clack per ribosome and a mallet note per protein bead, a hook per fibre,
+and soft pings for the mitochondria's energy. The music is muffled while the camera is inside the skin (deepest in
+the dive and on the way into and out of the cell), opens up inside the cell and opens fully at the surface.
 """
 import math
 import wave
@@ -433,7 +437,7 @@ def write_wav(path, st):
         w.writeframes(pcm.tobytes())
 
 
-# ---------------------------------------------------------------- the score (F major, 13 bars, loops)
+# ---------------------------------------------------------------- the score (F major, 14 bars, loops)
 _PC = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 
 
@@ -572,19 +576,28 @@ def hiss(dur, f0, f1, seed, peak=0.15, tail=2.5):
 # ================================================================ the score
 from . import timeline as T
 
-CHORD = {'F': (41, (0, 4, 7)), 'Dm': (38, (0, 3, 7)), 'Bb': (34, (0, 4, 7)), 'C': (36, (0, 4, 7))}
+CHORD = {'F': (41, (0, 4, 7)), 'Dm': (38, (0, 3, 7)), 'Bb': (34, (0, 4, 7)), 'C': (36, (0, 4, 7)),
+         'Gm': (43, (0, 3, 7))}
 BARS = [('F', 'F'),        # 0  the hook: the flake lifts off on the downbeat
         ('Dm', 'Dm'),      # 1  the dive back into the skin
         ('Bb', 'C'),       # 2  a basal cell stretches; it pops on beat 3
         ('F', 'F'),        # 3  the climb: I
-        ('Dm', 'Dm'),      # 4  vi
-        ('Bb', 'Bb'),      # 5  IV
-        ('C', 'C'),        # 6  V: it flattens into a dead cell
-        ('F', 'F'),        # 7  the hook phrase again: at the top
-        ('Bb', 'Bb'),      # 8  the bonds break, tiles peel away
-        ('C', 'C')]        # 9  ready to lift off: back to the top of the loop
+        ('Bb', 'Bb'),      # 4  the zoom into the cell; beat 3: through the membrane, the DNA unzips
+        ('F', 'F'),        # 5  the RNA copy carries the recipe out
+        ('Gm', 'Gm'),      # 6  ribosomes build keratin; the fibres hook on to the walls
+        ('C', 'C'),        # 7  the mitochondria; beat 3: back out of the cell
+        ('Dm', 'Dm'),      # 8  the climb goes on: vi
+        ('Bb', 'Bb'),      # 9  IV
+        ('C', 'C'),        # 10 V: it flattens into a dead cell
+        ('F', 'F'),        # 11 the hook phrase again: at the top
+        ('Bb', 'Bb'),      # 12 the bonds break, tiles peel away
+        ('C', 'C')]        # 13 ready to lift off: back to the top of the loop
 N_BARS = len(BARS)
 assert abs(N_BARS * T.BAR - T.TOTAL) < 1e-9
+assert abs(T.INSERT[0] - 4 * T.BAR) < 1e-9 and abs(T.INSERT[1] - 8 * T.BAR) < 1e-9
+CELL_BARS = (4, 5, 6, 7)   # the look inside the cell
+# the story's bar (0-9: the 10 bars of the story) that each film bar plays; the cell's bars have their own music
+STORY_BAR = {0: 0, 1: 1, 2: 2, 3: 3, 8: 4, 9: 5, 10: 6, 11: 7, 12: 8, 13: 9}
 STEP = T.STEP
 
 LEAD = {
@@ -592,15 +605,23 @@ LEAD = {
     1: seq('D6 .  A5 .  F5 .  D5 -  -  -  .  .  .  .  .  .'),
     2: seq('D5 .  F5 .  Bb5 - -  -  .  .  .  .  C6 .  E6 .'),
     3: seq('A5 .  A5 C6 .  A5 F5 .  G5 .  A5 .  C6 -  -  .'),
-    4: seq('D6 .  D6 C6 .  A5 F5 .  E5 .  F5 .  A5 -  -  .'),
-    5: seq('Bb5 . Bb5 A5 . F5 D5 .  F5 .  Bb5 . D6 -  -  .'),
-    6: seq('C6 .  E6 .  G6 -  -  E6 C6 .  G5 .  C6 -  D6 .'),
-    7: seq('A5 .  C6 .  F6 -  -  E6 C6 -  A5 -  -  -  .  .'),
-    8: seq('Bb5 . D6 .  F6 -  -  D6 Bb5 - F5 -  -  -  .  .'),
-    9: seq('G5 .  C6 .  E6 -  -  G6 E6 -  C6 -  .  .  .  .'),
+    8: seq('D6 .  D6 C6 .  A5 F5 .  E5 .  F5 .  A5 -  -  .'),
+    9: seq('Bb5 . Bb5 A5 . F5 D5 .  F5 .  Bb5 . D6 -  -  .'),
+    10: seq('C6 .  E6 .  G6 -  -  E6 C6 .  G5 .  C6 -  D6 .'),
+    11: seq('A5 .  C6 .  F6 -  -  E6 C6 -  A5 -  -  -  .  .'),
+    12: seq('Bb5 . D6 .  F6 -  -  D6 Bb5 - F5 -  -  -  .  .'),
+    13: seq('G5 .  C6 .  E6 -  -  G6 E6 -  C6 -  .  .  .  .'),
 }
 _THIRD = {0: 4, 2: 3, 4: 3, 5: 4, 7: 4, 9: 3, 10: 4, 11: 3}
-HARM = {b: [(s, l, m - _THIRD.get(m % 12, 3)) for s, l, m in LEAD[b]] for b in (3, 4, 5, 6, 7, 8, 9)}
+HARM = {b: [(s, l, m - _THIRD.get(m % 12, 3)) for s, l, m in LEAD[b]] for b in (3, 8, 9, 10, 11, 12, 13)}
+# inside the cell the tune moves to a soft music-box bell, sparser, leaving room for the cell's own sounds; it rests
+# through the zoom in and the zoom out
+BELL = {
+    4: seq('.  .  .  .  .  .  .  .  D5 .  F5 .  Bb5 - -  .'),
+    5: seq('A5 .  F5 .  C5 .  .  .  A4 .  C5 .  F5 -  -  .'),
+    6: seq('G5 .  D5 .  Bb4 . .  .  D5 .  G5 .  Bb5 - -  .'),
+    7: seq('C6 .  G5 .  E5 .  .  .  .  .  .  .  .  .  .  .'),
+}
 
 
 def bar_t(b, step=0.0):
@@ -618,11 +639,17 @@ def _bass_notes(b, half, root):
         return [(0, 15.5, root, 0.3)] if half == 0 else []
     if b == 2:
         return [(base, 7.5, root, 0.3)]
+    if b in CELL_BARS:                                      # inside the cell: long, floating notes
+        return [(base, 7.5, root, 0.24)]
     return [(base + 2 * k, 1.5, root + iv, 0.26 if k % 2 else 0.32) for k, iv in enumerate((0, 12, 7, 12))]
 
 
+def in_cell(t):
+    return T.INSIDE[0] <= t < T.INSIDE[1]
+
+
 def music():
-    bus = {k: Bus() for k in ('lead', 'harm', 'arp', 'bass', 'drum', 'pad')}
+    bus = {k: Bus() for k in ('lead', 'harm', 'arp', 'bass', 'drum', 'pad', 'bell')}
     for b in range(N_BARS):
         for s, l, m in LEAD.get(b, []):
             t0 = bar_t(b, s)
@@ -630,26 +657,36 @@ def music():
             bus['lead'].put(lead(m, dur, 0.25, vib=0.14), t0, 0.17 if b not in (1,) else 0.12, 0.08)
         for s, l, m in HARM.get(b, []):
             bus['harm'].put(lead(m, l * STEP * 0.9, 0.125, vib=0.08), bar_t(b, s), 0.06, -0.3)
+        for s, l, m in BELL.get(b, []):
+            bus['bell'].put(bell(m, max(0.7, l * STEP + 0.5), 1.6, 3.5), bar_t(b, s), 0.2, 0.1)
+            bus['bell'].put(bell(m + 12, 0.3, 0.8, 2.0), bar_t(b, s), 0.035, -0.2)
+        sb = STORY_BAR.get(b)
         for half in (0, 1):
             root, iv = CHORD[BARS[b][half]]
             for st, l, m, g in _bass_notes(b, half, root):
                 bus['bass'].put(bass(m, l * STEP), bar_t(b, st), g)
             tones = [root + 36 + iv[0], root + 36 + iv[1], root + 36 + iv[2], root + 48]
             base = 8 * half
-            if 3 <= b <= 6:
-                up = 12 if b >= 5 else 0                     # the arpeggio climbs with the cell
+            if b in CELL_BARS:                               # a music-box arpeggio while we are inside the cell
+                if in_cell(bar_t(b, base)):
+                    for k, pi in enumerate((0, 2, 1, 3, 2, 1, 3, 2)):
+                        bus['arp'].put(chip_arp(tones[pi] + 12, STEP * 0.7, 0.5), bar_t(b, base + k),
+                                       0.016, 0.45 if k % 2 else -0.45)
+            elif 3 <= sb <= 6:
+                up = 12 if sb >= 5 else 0                    # the arpeggio climbs with the cell
                 for k, pi in enumerate((0, 1, 2, 3, 2, 1, 2, 3)):
                     bus['arp'].put(chip_arp(tones[pi] + up, STEP * 0.8), bar_t(b, base + k), 0.032, -0.45)
-            elif b >= 7:
+            elif sb >= 7:
                 for k in range(4):
                     bus['arp'].put(chip_arp(tones[k] + 12, STEP * 1.5, 0.25), bar_t(b, base + 2 * k), 0.026, -0.45)
-    for b in (0, 1, 2, 7, 8, 9):                              # a soft pad where the groove is not
+    for b in (0, 1, 2, 11, 12, 13) + CELL_BARS:              # a soft pad where the groove is not
         for half in (0, 1):
             root, iv = CHORD[BARS[b][half]]
-            bus['pad'].put(pad([root + 36 + i for i in iv], T.BAR / 2 - 0.05, 0.12), bar_t(b, 8 * half), 0.045)
+            g = 0.055 if b in CELL_BARS else 0.045
+            bus['pad'].put(pad([root + 36 + i for i in iv], T.BAR / 2 - 0.05, 0.12), bar_t(b, 8 * half), g)
     _drums(bus['drum'])
     mix = sum(x.x for x in bus.values())
-    lead_st = bus['lead'].x + bus['harm'].x
+    lead_st = bus['lead'].x + bus['harm'].x + 0.6 * bus['bell'].x
     mix = mix + 0.3 * np.stack([echo(lead_st.sum(0) * 0.5, 0.46875, 0.3), echo(lead_st.sum(0) * 0.5, 0.3125, 0.28)])
     mix = mix + 0.14 * reverb(mix - 0.9 * bus['bass'].x - 0.6 * bus['drum'].x)
     return mix
@@ -663,19 +700,38 @@ def _drums(d):
     d.put(K, bar_t(2, 8), 0.42)                               # with the pop
     for k in range(8, 16, 2):
         d.put(Hc, bar_t(2, k), 0.04, 0.3)
-    for b in range(3, 10):
+    for b in (3, 8, 9, 10, 11, 12, 13):
+        sb = STORY_BAR[b]
         t0 = bar_t(b)
         for k in (0, 8):
             d.put(K, t0 + k * STEP, 0.36)
-        if b in (4, 6, 8):
+        if sb in (4, 6, 8):
             d.put(K, t0 + 14 * STEP, 0.22)
-        if b >= 4:
+        if sb >= 4:
             for k in (4, 12):
                 d.put(Sn, t0 + k * STEP, 0.13, 0.08)
-        hats = range(0, 16, 1) if b in (5, 6) else range(0, 16, 2)
+        hats = range(0, 16, 1) if sb in (5, 6) else range(0, 16, 2)
         for k in hats:
             d.put(Hc, t0 + k * STEP, 0.05 if k % 4 == 2 else 0.028, 0.3)
-    d.put(C, bar_t(7), 0.07, -0.15)
+    # inside the cell: through the membrane on beat 3 of bar 4, then a soft, light pulse (kick, rim, shaker)
+    d.put(K, T.INSIDE[0], 0.3)
+    d.put(C, T.INSIDE[0], 0.045, -0.1)
+    rim = click(77, 1700, 0.03)
+    k0 = int(round(T.INSIDE[0] / STEP))
+    for k in range(k0, int(round(T.INSIDE[1] / STEP))):
+        t = k * STEP
+        j = k % 16
+        if j in (0, 8) and t > T.INSIDE[0]:
+            d.put(K, t, 0.24)
+        if j in (4, 12):
+            d.put(rim, t, 0.06, 0.15)
+        d.put(Hc, t, 0.022 if j % 2 else 0.032, -0.3 if j % 4 == 2 else 0.3)
+    # out of the cell: a tom run into the climb, and a crash as the story moves again
+    for k, m in zip((12, 13, 14, 15), (45, 48, 52, 55)):
+        d.put(tom(m), bar_t(7, k), 0.11 + 0.02 * (k - 12), -0.3 + 0.2 * (k - 12))
+    d.put(K, bar_t(8), 0.4)
+    d.put(C, bar_t(8), 0.07, 0.1)
+    d.put(C, bar_t(11), 0.07, -0.15)
 
 
 # ================================================================ sound effects
@@ -724,7 +780,7 @@ def tink(m, seed=0):
 
 
 def water_bed():
-    """The water's hush for the whole loop: bright noise with a slow swell that repeats exactly every 25 s."""
+    """The water's hush for the whole loop: bright noise with a slow swell that repeats exactly once per loop."""
     dur = T.TOTAL + 1.0
     y = bandnoise(dur, lambda tt: 900.0 + 300.0 * np.sin(2 * math.pi * 2 * tt / T.TOTAL), 1.1, 501)
     t = np.arange(len(y)) / SR
@@ -735,7 +791,7 @@ def water_bed():
 def surface_gain(t):
     """How much of the water we hear: full at the surface, a muffled trace inside the skin."""
     t = np.asarray(t)
-    inside = np.clip((t - 2.4) / 1.6, 0, 1) * np.clip((18.5 - t) / 2.0, 0, 1)
+    inside = np.clip((t - 2.4) / 1.6, 0, 1) * np.clip((T.film(18.5) - t) / 2.0, 0, 1)
     return 1.0 - 0.8 * inside
 
 
@@ -750,7 +806,7 @@ def sfx():
     g = surface_gain(tt % T.TOTAL)
     inside = lowpass(wb[:n], 700, 255)
     bed = (wb[:n] * g + inside * (1 - g) * 0.8)
-    swell = 1.0 + 1.6 * np.clip((tt - 23.2) / 1.8, 0, 1) ** 2 * (tt < T.TOTAL)
+    swell = 1.0 + 1.6 * np.clip((tt - (T.TOTAL - 1.8)) / 1.8, 0, 1) ** 2 * (tt < T.TOTAL)
     bus.put(bed * swell, 0.0, 0.13, 0.0)
     # ---- the hook: the flake tears free and flutters off to the right
     bus.put(whoosh(0.9, 420, 2600, 11, 0.8, 0.25), 0.0, 0.34, 0.1)
@@ -774,24 +830,25 @@ def sfx():
     for i, (t0, d) in enumerate(T.STEPS):
         if abs(t0 - T.DIVIDE[1]) < 1e-6:
             continue
-        root, iv = chord_at(t0 + 0.01)
+        tf = T.film(t0)
+        root, iv = chord_at(tf + 0.01)
         m = root + 48 + iv[i % 3]
         gain = 0.34 if t0 < 11.5 else (0.2 if t0 < 16.0 else 0.1)
-        bus.put(pop(mtof(m - 12), mtof(m), 30 + i, 0.2), t0 + 0.01, gain, -0.3 + 0.6 * ((i * 7) % 5) / 4)
+        bus.put(pop(mtof(m - 12), mtof(m), 30 + i, 0.2), tf + 0.01, gain, -0.3 + 0.6 * ((i * 7) % 5) / 4)
     # ---- the climb: a rising tick each time the cell moves up a whole cell height (a scale)
     scale = [65, 67, 69, 70, 72, 74, 76, 77, 79, 81, 82, 84]
     for k in range(1, T.N + 1):
-        tk = round(T.P_inv(k - 0.02) / STEP) * STEP
+        tk = T.film(round(T.P_inv(k - 0.02) / STEP) * STEP)
         bus.put(blip(mtof(scale[k - 1] + 12), mtof(scale[k - 1] + 12), 0.07, 0.5), tk, 0.07, 0.2)
     # ---- the granular layer: a faint crackle; the nucleus goes: a falling bloop; flattening: a squish
     t_gr = T.P_inv(4.6)
     rng = np.random.default_rng(15)
     for k in range(40):
         ct = t_gr + rng.uniform(0, T.P_inv(6.6) - t_gr)
-        bus.put(click(200 + k, float(rng.uniform(2200, 5200)), 0.012), ct, 0.16, rng.uniform(-0.6, 0.6))
-    bus.put(glide(620, 140, 0.45, duty=0.5), T.P_inv(6.75), 0.07, 0.0)
-    bus.put(squish(16), T.P_inv(7.1), 0.12, -0.1)
-    bus.put(blub(180.0, 0.14), 17.45, 0.12, -0.2)                         # the lipid glue
+        bus.put(click(200 + k, float(rng.uniform(2200, 5200)), 0.012), T.film(ct), 0.16, rng.uniform(-0.6, 0.6))
+    bus.put(glide(620, 140, 0.45, duty=0.5), T.film(T.P_inv(6.75)), 0.07, 0.0)
+    bus.put(squish(16), T.film(T.P_inv(7.1)), 0.12, -0.1)
+    bus.put(blub(180.0, 0.14), T.film(17.45), 0.12, -0.2)                 # the lipid glue
     # ---- the bonds break (little tinks) and tiles peel away (soft flicks), all on the 16th-note grid
     taken = set()
     notes = (89, 91, 93, 96, 98, 100)
@@ -805,33 +862,104 @@ def sfx():
                     tx = round(T.P_inv(Px) / STEP) * STEP
                     if 16.5 <= tx < 24.4 and tx not in taken:
                         taken.add(tx)
-                        bus.put(tink(notes[(col * 3 + m + i) % len(notes)]), tx, 0.17, 0.15 * col)
+                        bus.put(tink(notes[(col * 3 + m + i) % len(notes)]), T.film(tx), 0.17, 0.15 * col)
     used = set()
-    for col, m, tx in SC.SHED:
-        if abs(T.col_x(col)) <= 46.0 and 16.0 <= tx < 24.6:
+    for col, m, tx in SC.SHED:                                         # (film time)
+        if abs(T.col_x(col)) <= 46.0 and T.film(16.0) <= tx < T.film(24.6):
             q = round(tx / STEP) * STEP
             if q in used:
                 continue
             used.add(q)
             bus.put(flick(300 + col * 7 + m), q, 0.22, 0.12 * col)
+    inside_sfx(bus)
     return bus.x
+
+
+def pip(m, dur=0.16):
+    """A protein bead clicking onto the chain: a short, soft mallet note."""
+    return bell(m, dur, 0.8, 2.0)
+
+
+def inside_sfx(bus):
+    """The look inside the cell: the zoom in and out, and one sound for each thing the cell does, on the 16ths."""
+    from . import inside as IN
+    t_in = T.INSIDE[0]
+
+    def grid(t):
+        return round(t / STEP) * STEP
+
+    # the zoom in: a rising rush, then through the membrane (beat 3 of bar 4) with a deep bloop
+    bus.put(whoosh(T.ZOOM_IN[1] - T.ZOOM_IN[0] + 0.05, 260, 2400, 601, 0.9, 0.95), T.ZOOM_IN[0], 0.22, 0.0)
+    bus.put(plip(220, 640, 0.32, 0.5, 0.4, 602), t_in, 0.4, 0.0)
+    for text, sub, t0, t1, side in IN.CAPTIONS:                        # the captions' soft ticks
+        bus.put(click(620 + int(t0 * 10), 5200, 0.015), t_in + t0, 0.16, 0.25)
+    # 1. DNA: the gene unzips, a little zipper running left to right
+    z0, z1 = t_in + 0.25, t_in + 1.0
+    for i in range(18):
+        x = i / 17
+        bus.put(click(640 + i, 1700 + 1900 * x, 0.02), z0 + (z1 - z0) * x ** 0.85, 0.085, -0.35 + 0.7 * x)
+    # 2. RNA: one blip per 16th while the copy grows along the gene (a rising scale) ...
+    scale = (65, 67, 69, 72, 74, 77, 79)
+    ks = range(int(math.ceil((t_in + 1.0) / STEP)), int(math.floor((t_in + 2.0) / STEP)) + 1)
+    for j, k in enumerate(ks):
+        m = scale[min(j, len(scale) - 1)] + 12
+        bus.put(blip(mtof(m), mtof(m), 0.07, 0.25), k * STEP, 0.09, -0.2 + 0.08 * j)
+    # ... a slurp as it squeezes out through the pore, a plip as it comes free, a soft landing in the cytoplasm
+    us = np.linspace(2.0, 3.0, 2001)
+    heads = np.array([IN.rna_state(x)[1] for x in us])
+    t_pore = t_in + float(us[np.searchsorted(heads, IN.RNA_PORE_D)])
+    bus.put(glide(330, 880, 0.24, duty=0.5), t_pore - 0.2, 0.05, 0.15)
+    bus.put(plip(520, 1150, 0.14, 0.0, 0.2, 650), t_pore + 0.04, 0.22, 0.2)
+    bus.put(blub(200.0, 0.14), t_in + 3.0, 0.1, -0.1)
+    # 3. ribosomes clamp on (two 16ths apart, the last on the downbeat of bar 6), then a bead per 16th, rising
+    for i, r0 in enumerate(IN.RIBO_T0):
+        bus.put(thump(300, 130, 0.13, 0.8, 660 + i), t_in + r0, 0.2, -0.3 + 0.3 * i)
+        bus.put(click(670 + i, 1500, 0.025), t_in + r0, 0.1, -0.3 + 0.3 * i)
+    beads = sorted({grid(t_in + r0 + (j + 1) * STEP) for r0 in IN.RIBO_T0 for j in range(IN.BEADS)})
+    last = t_in + IN.FIBER_END[0] - 2 * STEP
+    notes = (77, 79, 81, 84, 86, 89, 91, 93)
+    for j, bt in enumerate(b for b in beads if b <= last):
+        bus.put(pip(notes[j % len(notes)] - (12 if (j // len(notes)) % 2 else 0)), bt, 0.07, 0.35 * math.sin(j))
+    # 4. keratin fibres stretch across the cell and hook on to the walls, one 16th apart, up the chord
+    f0 = t_in + IN.FIBER_END[0] - IN.FIBER_GROW
+    bus.put(glide(260, 620, IN.FIBER_GROW + 0.1, vib=0.01, duty=0.5), f0, 0.035, -0.4)
+    bus.put(glide(262, 627, IN.FIBER_GROW + 0.1, vib=0.01, duty=0.5), f0 + STEP, 0.035, 0.4)
+    for i, (fe, m) in enumerate(zip(IN.FIBER_END, (79, 82, 86, 91, 94, 96))):
+        side = IN.FIBERS[i][2]
+        bus.put(click(680 + i, 2000, 0.03), t_in + fe, 0.12, 0.5 * side)
+        bus.put(bell(m, 0.3, 1.2, 1.0), t_in + fe, 0.11, 0.5 * side)
+    # 5. the mitochondria light up (a warm swell) and energy sparks stream to the ribosomes (soft pings on the 8ths)
+    bus.put(warm_tone(60, 1.7), t_in + 5.9, 0.16, 0.0)
+    rng = np.random.default_rng(690)
+    pent = (84, 86, 88, 91, 93, 96)
+    for k in range(int(round((t_in + 6.25) / STEP)), int(round(T.INSIDE[1] / STEP)), 2):
+        bus.put(bell(int(rng.choice(pent)), 0.26, 1.4, 3.0), k * STEP, 0.055, float(rng.uniform(-0.6, 0.6)))
+    # the zoom out: a bloop out through the membrane (pitch falling) and a falling rush back to the tissue
+    bus.put(plip(760, 250, 0.26, 0.3, 0.35, 695), T.ZOOM_OUT[0], 0.32, 0.0)
+    bus.put(whoosh(T.ZOOM_OUT[1] - T.ZOOM_OUT[0], 2400, 300, 696, 0.9, 0.12), T.ZOOM_OUT[0], 0.18, 0.0)
 
 
 def duck_env():
     """The music steps back for the whoosh and the pop."""
     t = np.arange(N) / SR
     g = np.ones(N)
-    for t0, depth, hold in ((0.0, 0.4, 0.25), (T.DIVIDE[1], 0.35, 0.12)):
+    for t0, depth, hold in ((0.0, 0.4, 0.25), (T.DIVIDE[1], 0.35, 0.12), (T.INSIDE[0], 0.25, 0.1),
+                            (T.ZOOM_OUT[0], 0.25, 0.1)):
         a = np.clip((t - (t0 - 0.02)) / 0.02, 0, 1) * np.clip(1 - (t - t0 - hold) / 0.35, 0, 1)
         g -= depth * a * (t >= t0 - 0.02)
     return np.clip(g, 0.4, 1)
 
 
 def inside_filter(mus):
-    """Muffle the music while the camera is inside the skin: crossfade to a low-passed copy, deepest in the dive."""
+    """Muffle the music while the camera is inside the skin: crossfade to a low-passed copy, deepest in the dive and
+    on the way into and out of the cell. Inside the cell itself the music opens up again."""
     t = np.arange(mus.shape[1]) / SR % T.TOTAL
-    deep = np.clip((t - 2.5) / 1.0, 0, 1) * np.clip((5.6 - t) / 0.8, 0, 1)
-    inside = np.clip((t - 2.5) / 1.0, 0, 1) * np.clip((18.5 - t) / 2.0, 0, 1)
+    dive = np.clip((t - 2.5) / 1.0, 0, 1) * np.clip((5.6 - t) / 0.8, 0, 1)
+    z_in = np.clip((t - (T.ZOOM_IN[0] + 0.2)) / 0.9, 0, 1) * np.clip((T.ZOOM_IN[1] - t) / 0.04, 0, 1)
+    z_out = np.clip((t - T.ZOOM_OUT[0]) / 0.04, 0, 1) * np.clip((T.ZOOM_OUT[1] - t) / 1.2, 0, 1)
+    deep = np.maximum(dive, np.maximum(z_in, z_out))
+    cell = np.clip((t - T.INSIDE[0]) / 0.04, 0, 1) * np.clip((T.INSIDE[1] - t) / 0.04, 0, 1)
+    inside = np.clip((t - 2.5) / 1.0, 0, 1) * np.clip((T.film(18.5) - t) / 2.0, 0, 1) * (1 - cell)
     lo = np.stack([lowpass(mus[0], 900, 255), lowpass(mus[1], 900, 255)])
     mid = np.stack([lowpass(mus[0], 3200, 255), lowpass(mus[1], 3200, 255)])
     w_lo = 0.85 * deep

@@ -1,11 +1,16 @@
-"""What is on screen at time t: one continuous camera over a slice of skin.
+"""What is on screen at time t: one continuous camera over a slice of skin, and a look inside the cell we follow.
 
-0-2.6 s the hook: the flake of dead skin (the cell we follow, and two neighbours) lifts off into the flowing water and
-the camera drifts after it. 2.6-5.4 s it stops and dives back down into the skin to where the flake came from, all the
-way to the basal layer. 5.5-6.25 s a basal cell stretches and pops in two; the top one is ours. 6.25-22 s the camera
-rides up with it while the conveyor pushes it up on every beat: it turns spiny, then granular, loses its nucleus,
-flattens into a dead tile, and its rivets switch off as the tiles above it peel away. 22-25 s the camera settles back
-on the opening shot, where our tile is now the top of the skin, ready to lift off: the next frame is the first frame.
+Film time (the times below): 0-2.6 s the hook: the flake of dead skin (the cell we follow, and two neighbours) lifts
+off into the flowing water and the camera drifts after it. 2.6-5.4 s it stops and dives back down into the skin to
+where the flake came from, all the way to the basal layer. 5.5-6.25 s a basal cell stretches and pops in two; the top
+one is ours. 6.25-10 s the camera rides up with it while the conveyor pushes it up on every beat. 10-20 s the story
+stands still: the camera zooms into the cell, through its membrane (engine/inside.py takes over 11.25-18.75 s), and
+back out. 20-32 s it rides on up: the cell turns granular, loses its nucleus, flattens into a dead tile, and its
+rivets switch off as the tiles above it peel away. 32-35 s the camera settles back on the opening shot, where our
+tile is now the top of the skin, ready to lift off: the next frame is the first frame.
+
+Story time (timeline.story) is film time with the 10 s inside the cell taken out; the conveyor, the captions' anchors
+and the shedding run on story time, the camera and every idle motion on film time.
 
 Clean captions name the things on screen (white text, a thin line to the object, no boxes, no game marks).
 """
@@ -72,8 +77,28 @@ _KV = np.array([k[1:] for k in KEYS])
 _KM = np.stack([_pchip(_KT, _KV[:, j]) for j in range(3)], 1)
 
 
+S_IN = 26.0                                         # how close the camera gets before it goes inside
+
+
 def camera(t):
+    """The film's camera: the story's camera, and around the look inside the cell a zoom into it and back out."""
     t = t % T.TOTAL
+    if T.INSERT[0] <= t < T.INSERT[1]:
+        bx, by, bs = camera_story(T.INSERT[0])
+        hx, hy, _ = TS.cell_xy(0, 0, T.P(T.INSERT[0]))
+        if t < T.ZOOM_IN[1]:
+            k = T.ease_in(T.u_of(t, T.ZOOM_IN), 2.2)
+        elif t >= T.ZOOM_OUT[0]:
+            k = 1.0 - T.ease_out(T.u_of(t, T.ZOOM_OUT), 2.2)
+        else:
+            k = 1.0
+        g = T.smooth(min(1.0, k * 1.6))
+        return T.lerp(bx, hx, g), T.lerp(by, hy, g), bs * (S_IN / bs) ** k
+    return camera_story(T.story(t))
+
+
+def camera_story(t):
+    t = t % T.STORY
     i = int(np.clip(np.searchsorted(_KT, t, side='right') - 1, 0, len(_KT) - 2))
     h = _KT[i + 1] - _KT[i]
     u = (t - _KT[i]) / h
@@ -101,7 +126,7 @@ def _shed_events():
     return ev
 
 
-SHED = _shed_events()
+SHED = [(col, m, T.film(tx)) for col, m, tx in _shed_events()]
 SHED_LIFE = 1.6
 
 
@@ -157,17 +182,19 @@ def _anchor_flake(t):
 
 
 # (text, second line, anchor, start, end, side): side is where the text sits relative to the object
-CAPTIONS = [
+_STORY_CAPTIONS = [
     ('DEAD SKIN CELL', 'DAY 28', _anchor_flake, 22.4, 27.4, (-1, -1)),
     ('BASAL CELL', None, _anchor_mother, 4.9, 6.15, (-1, -1)),
     ('NEW CELL', 'DAY 1', _anchor_hero, 6.35, 8.1, (1, -1)),
-    ('NUCLEUS', None, _anchor_nucleus, 9.0, 10.9, (1, -1)),
     ('GRANULES', 'KERATOHYALIN', _anchor_granule, 11.4, 13.2, (-1, -1)),
     ('NUCLEUS GONE', 'DAY 14', _anchor_hero, 13.4, 15.2, (1, -1)),
     ('DEAD CELL', 'FULL OF KERATIN', _anchor_hero, 15.5, 17.3, (-1, -1)),
     ('LIPID GLUE', None, _anchor_lipid, 17.45, 18.95, (-1, -1)),
     ('BONDS BREAK', None, _anchor_rivet, 19.2, 21.3, (1, -1)),
 ]
+# (text, second line, anchor (takes story time), film start, film end, side)
+CAPTIONS = [(a, b, f, T.film(t0), T.film(t0) + (t1 - t0), sd) for a, b, f, t0, t1, sd in _STORY_CAPTIONS]
+CAPTIONS.append(('NUCLEUS', 'LOOK INSIDE', _anchor_nucleus, 8.9, 11.0, (1, -1)))
 
 
 def _line(buf, x0, y0, x1, y1, col):
@@ -214,16 +241,20 @@ def draw_captions(buf, c, t):
         for tt in (t, t + T.TOTAL):
             if t0 <= tt < t1:
                 at = tt if tt < T.TOTAL else tt - T.TOTAL
-                ax, ay = anchor(at)
+                ax, ay = anchor(T.story(at))
                 caption(buf, c, text, sub, ax, ay, tt - t0, t1 - t0, side)
 
 
 # ---------------------------------------------------------------- the frame
 def story_frame(t):
     t = t % T.TOTAL
+    if T.INSIDE[0] <= t < T.INSIDE[1]:
+        from . import inside
+        return inside.frame(t - T.INSIDE[0])
+    ts = T.story(t)
     cx, cy, s = camera(t)
     c = Wd.Cam(round(cx * s) / s, round(cy * s) / s, s)
-    P = T.P(t)
+    P = T.P(ts)
     buf = np.empty((H, W, 3), np.uint8)
     TS.draw_water(buf, c, t)
     gone = set()
@@ -241,7 +272,7 @@ def story_frame(t):
         TS.draw_melanocytes(buf, c)
     for col in range(c0, c1 + 1):
         if y_lo < TS.mother_y(col) + 20:
-            TS.draw_mother(buf, c, col, P, hero=(col == 0 and 5.0 < t < 6.3), t=t)
+            TS.draw_mother(buf, c, col, P, hero=(col == 0 and 5.0 < t < 6.3), t=t, ts=ts)
     for col in range(c0, c1 + 1):
         b = T.base(col) + P
         for m in range(math.ceil(b - T.N), math.floor(b - T.SPLIT) + 1):
@@ -250,7 +281,7 @@ def story_frame(t):
             x, y, p = TS.cell_xy(col, m, P)
             if not (y_lo < y < y_hi):
                 continue
-            TS.draw_cell(buf, c, x, y, p, hero=(col == 0 and m % T.N == 0), cid=(col, m % T.N), t=t)
+            TS.draw_cell(buf, c, x, y, p, hero=(col == 0 and m % T.N == 0), cid=(col, m % T.N), t=t, ts=ts)
     # the pop when a cell splits off (ours gets a ring of light)
     if 6.25 <= t < 6.6:
         TS.pop_ring(buf, c, 0.0, TS.mother_y(0) + 6.5, t - 6.25)
@@ -260,7 +291,7 @@ def story_frame(t):
             if 0 <= age < SHED_LIFE:
                 x, y, p = TS.cell_xy(col, m, T.N + m - T.base(col))
                 dx, dy, tilt = shed_pose(age, col)
-                TS.draw_cell(buf, c, x + dx, y + dy, T.N, ang=tilt, cid=(col, m % T.N), t=t,
+                TS.draw_cell(buf, c, x + dx, y + dy, T.N, ang=tilt, cid=(col, m % T.N), t=t, ts=ts,
                              fade=1.0 - T.clamp01((age - 0.8) / (SHED_LIFE - 0.8)))
     # the hook's flake lifting off (the cell we follow is its middle tile)
     if 1e-6 < t < 4.5:
@@ -276,6 +307,8 @@ def story_frame(t):
             y2 = fy0 + dy + rx * math.sin(a) + ry * math.cos(a) + abs(col) * curl * 0.25
             TS.draw_cell(buf, c, x2, y2, p, ang=ang, hero=(col == 0 and ahead == T.N), cid=(col, (-ahead) % T.N), t=t)
     draw_captions(buf, c, t)
+    if T.ZOOM_OUT[0] <= t < T.ZOOM_OUT[0] + 0.1:          # back out through the membrane
+        buf = gfx.whiten(buf, 0.45 * (1 - (t - T.ZOOM_OUT[0]) / 0.1))
     return buf
 
 

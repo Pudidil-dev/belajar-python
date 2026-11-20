@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Render "The Life Cycle of a Skin Cell": a 25-second looping 8-bit pixel-art animation with a chiptune soundtrack,
+"""Render "The Life Cycle of a Skin Cell": a 35-second looping 8-bit pixel-art animation with a chiptune soundtrack,
 1080x1920 (9:16), 30 fps, H.264 + stereo AAC.
 
     python render.py                       # the film -> out/skin-cell-animation.mp4 (+ music/sfx/mix wav stems)
     python render.py --preview             # quick look: 540x960, fast encode -> out/skin-cell-animation-preview.mp4
-    python render.py --sheet 0:25:1        # one contact sheet of the whole film -> out/sheet.png
+    python render.py --sheet 0:35:1        # one contact sheet of the whole film -> out/sheet.png
     python render.py --stills 0.6,6.3,16   # full-size PNGs of single frames -> out/stills/
     python render.py --from 5 --to 9       # just a slice
     python render.py --fps 60              # smoother motion (twice the frames)
     python render.py --audio-only          # only the soundtrack (music.wav, sfx.wav, mix.wav)
-    python render.py --loops 3             # also out/skin-cell-animation-loop3x.mp4: the loop 3 times (75 s)
+    python render.py --loops 3             # also out/skin-cell-animation-loop3x.mp4: the loop 3 times (105 s)
 
 Defaults (output path, fps, pixel scale, x264 quality, audio bitrate and loudness, preview settings) come from
 render.json next to this file; command-line flags override them.

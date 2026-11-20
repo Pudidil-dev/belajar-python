@@ -74,7 +74,7 @@ def sd_rrect(u, v, hw, hh, r):
 
 
 def blob(u, v, hw, hh, r, t, seed, amp):
-    """A rounded cell outline whose membrane gently wobbles (two travelling ripples, looping every 25 s)."""
+    """A rounded cell outline whose membrane gently wobbles (two travelling ripples, looping once per film loop)."""
     th = np.arctan2(v / max(hh, 1e-6), u / max(hw, 1e-6))
     p1, p2 = seed * 6.28, seed * 11.3
     rip = 0.6 * np.sin(2 * th + p1 + T.wob(19) * t) + 0.4 * np.sin(3 * th + p2 - T.wob(27) * t)
@@ -225,16 +225,16 @@ def desmosome_points(hw, hh):
     return pts
 
 
-def draw_cell(buf, c, x, y, p, ang=0.0, hero=False, cid=(0, 0), fade=1.0, t=0.0):
+def draw_cell(buf, c, x, y, p, ang=0.0, hero=False, cid=(0, 0), fade=1.0, t=0.0, ts=None):
     """One cell (or dead tile) centred at world (x, y), turned ang degrees, at height p, at film time t (for its
-    wobble and the jelly bounce of each push). Returns its canvas box."""
+    wobble) and story time ts (for the jelly bounce of each push; ts = t when not given). Returns its canvas box."""
     hw, hh, rr = dims(p)
     living = p < 6.9
     if living:                                           # no two cells quite alike
         hw *= 1 + 0.07 * (hsh(cid[0], cid[1], 11) - 0.5)
         hh *= 1 + 0.09 * (hsh(cid[0], cid[1], 12) - 0.5)
         ang += 7.0 * (hsh(cid[0], cid[1], 13) - 0.5) * (1 - float(T.smoothstep(4.5, 6.9, p)))
-    j = T.jiggle(t, 0.022 * p) * (0.35 if not living else 1.0)
+    j = T.jiggle(t if ts is None else ts, 0.022 * p) * (0.35 if not living else 1.0)
     hh *= 1 - 0.11 * j                                   # squash and stretch, roughly keeping its area
     hw *= 1 + 0.07 * j
     y += 0.5 * j * (0.3 if not living else 1.0)
@@ -358,7 +358,7 @@ def cell_xy(c, m, P):
     return x, y, p
 
 
-def draw_mother(buf, c, col, P, hero=False, t=0.0):
+def draw_mother(buf, c, col, P, hero=False, t=0.0, ts=None):
     """A column's basal cell, anchored to the basement membrane. While its newest daughter is between p = 0 and
     SPLIT the two are dividing: the chromosomes condense on a spindle, line up, split to the poles, two nuclei form
     and the cell pinches in two."""
@@ -380,7 +380,7 @@ def draw_mother(buf, c, col, P, hero=False, t=0.0):
     rp = BASAL
     if hero:
         rp = [tuple(int(round(a_ + (b_ - a_) * 0.25)) for a_, b_ in zip(cc, WARM)) for cc in rp]
-    j = T.jiggle(t, 0.0)
+    j = T.jiggle(t if ts is None else ts, 0.0)
     hh *= 1 - 0.08 * j
     hw *= 1 + 0.05 * j
     sd_ = hsh(col, 15)
