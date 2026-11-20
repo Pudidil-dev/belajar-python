@@ -108,7 +108,7 @@ python render.py
 
 The film is written to **`out/surgical-light-animation.mp4`**. The music, effects and mix are written next to it as
 WAV stems (`out/music.wav`, `out/sfx.wav`, `out/mix.wav`). Every frame is ray-cast, so the full render takes about
-8 minutes on a 4-core machine (the preview takes as long: the frames are the same, only the encode is
+9 minutes on a 4-core machine (the preview takes as long: the frames are the same, only the encode is
 smaller). With [uv](https://docs.astral.sh/uv/) instead of pip, no install step is needed:
 
 ```bash
