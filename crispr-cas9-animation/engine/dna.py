@@ -123,7 +123,7 @@ class Cam:
 
 
 # ---------------------------------------------------------------- drawing
-def _disc(buf, cx, cy, r, ramp, lit=0.45, outline=True, glow=0.0):
+def _disc(buf, cx, cy, r, ramp, lit=0.45, outline=True, glow=0.0, flat=False):
     """One 8-bit bead: a flat filled circle, a hard highlight arc at the top left, a darker arc at the bottom right
     and a 1-px outline. `lit` (0..1) picks how bright the body is (used for depth in the helix)."""
     r = float(r)
@@ -150,6 +150,11 @@ def _disc(buf, cx, cy, r, ramp, lit=0.45, outline=True, glow=0.0):
         return
     n = len(ramp)
     body = min(n - 2, max(1, int(round(1 + lit * (n - 3)))))        # which ramp step the body uses
+    if flat:                                                         # a flat, light tile, ready for a letter
+        sub[inside] = ramp[n - 1]
+        if outline:
+            sub[inside & (d > r - 1.0)] = ramp[1]                    # a coloured rim, so the base keeps its hue
+        return
     sub[inside] = ramp[body]
     if r >= 1.6:                                                     # the lit shoulder and the shaded one
         k = -(dx * 0.6 + dy * 0.8) / max(r, 1e-6)
@@ -214,11 +219,12 @@ def draw(buf, cam, shape, t, glow_pairs=None, dim=0.0, letters=True, cut_flash=0
             letter = seq_at(i, strand)
             ramp = P.BASES[letter]
             _stick(buf, sx, sy, bsx, bsy, 1 if s < 2.2 else 2, ramp[1])
+            lettered = letters and base_r >= 3.9       # only where a letter is big enough to read
             _disc(buf, bsx, bsy, base_r * (0.85 + 0.15 * (dep + 1) / 2), ramp, 0.35 + 0.3 * (dep + 1) / 2,
-                  glow=g * 0.9)
-            if letters and s > 5.5 and base_r > 2.6:
+                  glow=g * 0.9, flat=lettered)
+            if lettered:                                         # the base's letter, stamped on its bead
                 from . import pixfont as PF
-                PF.draw_text(buf, letter, bsx, bsy, ramp[3], font='3x5', anchor='mm', outline=ramp[0])
+                PF.draw_text(buf, letter, bsx, bsy, ramp[0], font='3x5', anchor='mm', outline=None)
     if dim > 0:
         gfx.blend(buf, gfx.Mask(0, 0, np.ones((H, W), bool)), P.NAVY[2], dim)
 

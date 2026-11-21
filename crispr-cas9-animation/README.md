@@ -30,7 +30,10 @@ them → the DNA is two base pairs shorter → on to the next target: the last f
   little double helices, and a soup of nucleosome beads, free proteins and specks. Every drift is a whole number of
   laps per loop.
 - **The DNA** is one molecule the whole film: 62 base pairs of real sequence that repeats along the strand, each
-  base a coloured bead (A green, T red, G gold, C blue) hanging from a teal backbone. It winds as a double helix,
+  base a coloured bead (A green, T red, G gold, C blue) hanging from a teal backbone. Once the camera is close
+  enough for a letter to be readable, each bead turns into a flat tile with a coloured rim and its letter stamped
+  on it — A, G, C, T on the DNA and A, G, C, U on the guide RNA — so you can read the code off the molecule in the
+  cut and repair scenes; further out the beads stay solid, because a letter that small is just mush. It winds as a double helix,
   straightens into a ladder for the search, opens into an R-loop where the guide RNA pairs, is cut, and winds back
   up two base pairs shorter.
 - **Captions that track what they name.** Nineteen small captions, each a dot pinned on the object, a thin elbow

@@ -238,7 +238,8 @@ def draw_grna(buf, cam, pose, paired, t, alpha=1.0):
         if j < paired:
             tt = t - T.pair_time(j)
             glow = max(0.0, 1.0 - tt / 0.4) if tt >= 0 else 0.0
-        D._disc(buf, sx, sy, max(0.8, D.BASE_R * cam.s * 1.15), ramp, 0.5, glow=glow)
-        if cam.s > 5.5 and D.BASE_R * cam.s > 2.6:
+        lettered = D.BASE_R * cam.s >= 3.9
+        D._disc(buf, sx, sy, max(0.8, D.BASE_R * cam.s * 1.15), ramp, 0.5, glow=glow, flat=lettered)
+        if lettered:                                             # the guide RNA's letters, same as the DNA's
             from . import pixfont as PF
-            PF.draw_text(buf, letter, sx, sy, ramp[3], font='3x5', anchor='mm', outline=ramp[0])
+            PF.draw_text(buf, letter, sx, sy, ramp[0], font='3x5', anchor='mm', outline=None)
