@@ -3,7 +3,7 @@
 A 22-second looping, vertical short in 8-bit pixel art about how CRISPR-Cas9 finds one sequence in a genome, cuts
 both strands of the DNA, and leaves the cell to repair the break. Drawn in the same 16-bit ink palette and with the
 same effects as this repo's blood centrifuge film, inside a cell nucleus full of other DNA, chromatin and drifting
-proteins. No narration and no subtitles; four tiny labels and nothing else.
+proteins. No narration and no subtitles: small captions that track the thing they name, and nothing else.
 
 **the hook: Cas9 cuts the DNA → rewind → it hunts along the helix for a PAM → the guide RNA pairs base by base and
 locks on → the two cutting domains cut both strands → the cell's repair proteins grab the ends, trim them and seal
@@ -33,8 +33,17 @@ them → the DNA is two base pairs shorter → on to the next target: the last f
   base a coloured bead (A green, T red, G gold, C blue) hanging from a teal backbone. It winds as a double helix,
   straightens into a ladder for the search, opens into an R-loop where the guide RNA pairs, is cut, and winds back
   up two base pairs shorter.
-- **Labels.** Four, each a dot on the thing, a thin elbow line and 5×7 pixel text typed on: CAS9, GUIDE RNA, PAM,
-  REPAIR, plus the one small banner DNA EDITED. Nothing else is written anywhere.
+- **Captions that track what they name.** Nineteen small captions, each a dot pinned on the object, a thin elbow
+  line and one or two lines of 5×7 pixel text typed on. The dot is recomputed every frame from the object itself,
+  so a caption follows Cas9 as it slides, the cutting domains as they swing and the break as the ends drift apart.
+  Each picks the side with room, is clamped out of the bands a phone app covers, and sits on a dark plate so it
+  reads over the protein. Never more than two at once.
+  - They show the genetic code where the code is the point: **DNA · ATCCGG** at the start, **PAM · CGG** at the
+    site Cas9 reads, and at the end **BEFORE · CC<span>GG</span>AGG** (the two doomed bases in red) beside
+    **AFTER · CCAGG**, so you can read the deletion itself.
+  - The full list, in order: DNA, CAS9, CUT!, CAS9, GUIDE RNA, NO MATCH, PAM, MATCHING, LOCKED, HNH, RUVC,
+    CUT BOTH STRANDS, CAS9 LEAVES, REPAIR, LOST 2 PAIRS, SEALED, BEFORE, AFTER, NEXT TARGET, plus the one small
+    banner DNA EDITED.
 - **Loop.** The camera flies on to the next target site, which is 62 base pairs along, where the sequence repeats:
   the last frame is the opening frame, pixel for pixel, and the soundtrack wraps round too.
   `python render.py --loops 3` writes the loop three times back to back (66 s).
@@ -219,7 +228,7 @@ clock that drives the picture.
   - `repair.py`: the repair rings, the ligase, the crumbs.
   - `bg.py`: the nucleus: chromatin, other DNA, the soup.
   - `fx.py`: sparkles, bursts, ring waves, light rays, glows (shared with the blood centrifuge film).
-  - `hud.py`: the four tiny labels and the one banner.
+  - `hud.py`: the tracking captions (anchor dot, elbow line, typed text, safe zones) and the one banner.
   - `scenes.py`: the cameras, the five scenes, the rewind, the loop, frame assembly.
   - `audio.py`: synthesizer, score, effects, master.
 - `assets/audio/`: the original soundtrack.

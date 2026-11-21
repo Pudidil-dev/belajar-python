@@ -54,7 +54,7 @@ def hook_state(t, site=D.PAM_I, phase=0.0, del_=0.0, junction=None):
     return D.Cam(cx, cy, s), shape, pose
 
 
-def draw_hook(buf, t, tdraw, site=D.PAM_I, phase=0.0, del_=0.0, blend=None):
+def draw_hook(buf, t, tdraw, site=D.PAM_I, phase=0.0, del_=0.0, blend=None, caps=False):
     """Draw the opening scene at time `t` (the rewind and the loop pass a different `tdraw` for the effects)."""
     cam, shape, pose = hook_state(t, site, phase, del_)
     if blend is not None:
@@ -71,6 +71,8 @@ def draw_hook(buf, t, tdraw, site=D.PAM_I, phase=0.0, del_=0.0, blend=None):
         fx.ring_wave(buf, t, T.SNIP1, bx, by, 150, 0.45, P.FLASH[0])
         fx.burst(buf, t, T.SNIP1, bx, by, 77, n=26, speed=(140, 300), life=0.55,
                  cols=(P.WHITE, P.FLASH[0], P.HNH[4], P.RUVC[6]))
+    if caps:
+        captions(buf, cam, shape, pose, t, CAPS_HOOK)
     return cam, shape, pose
 
 
@@ -214,6 +216,7 @@ def draw_loop(buf, t):
         jx, jy = cam.to(*shape.axis(D.CUT_I))
         fx.twinkles(buf, t, jx - 10, jy - 14, jx + 10, jy + 14, 5, 97, (P.LIG[3], P.WHITE),
                     a=1 - T.u(t, (T.LOOP[0], T.LOOP[0] + 0.9)))
+    captions(buf, cam, shape, pose, t, CAPS_LOOP)
     return cam
 
 
@@ -338,21 +341,101 @@ def draw_result(buf, cam, st, t):
     hud.arrow(buf, jx, jy + 10, t, P.LIG[3], 4, dirn=1)
 
 
-# ---------------------------------------------------------------- labels
+# ---------------------------------------------------------------- captions
+# Every caption is pinned to a thing on screen and follows it while it moves: (time, how long, which thing, text,
+# colour, which side, how far out). Never more than two at once, and each gets long enough to read.
+# the few bases round the cut, so the captions can show the change in the code itself
+SEQ_PRE = ''.join(D.TOP[D.CUT_I - 3:D.CUT_I - 1])            # kept, before the lost pair
+SEQ_LOST = ''.join(D.TOP[D.CUT_I - 1:D.CUT_I + 1])           # the two base pairs the repair loses
+SEQ_POST = ''.join(D.TOP[D.CUT_I + 1:D.CUT_I + 4])           # kept, after it
+PAM_SEQ = ''.join(D.seq_at(D.PAM_I + k, 1) for k in range(3))
+
+CAPS_HOOK = [
+    (0.40, 1.15, 'dna_top', 'seq', P.BACK[4], 0, 20),
+    (1.60, 0.95, 'break', ['CUT!'], P.HNH[4], 0, 20),
+]
+CAPS = [
+    (3.80, 1.05, 'cas', ['CAS9'], P.UI_TEXT, 0, 26),
+    (4.12, 1.15, 'grna', ['GUIDE RNA'], P.RNA[6], 0, 22),
+    (4.62, 1.05, 'decoy', ['NO', 'MATCH'], P.BAD[2], 0, 20),
+    (5.52, 1.45, 'pam', ['PAM', PAM_SEQ], P.PI[4], 0, 22),
+    (6.05, 0.90, 'pairing', ['MATCHING'], P.GOOD[2], 0, 20),
+    (7.05, 1.05, 'cas', ['LOCKED'], P.RNA[6], 0, 26),
+    (8.95, 1.25, 'hnh', ['HNH'], P.HNH[5], 0, 20),
+    (9.35, 1.25, 'ruvc', ['RUVC'], P.RUVC[7], 0, 20),
+    (10.15, 1.60, 'break', ['CUT BOTH', 'STRANDS'], P.UI_TEXT, 0, 22),
+    (13.30, 1.20, 'cas', ['CAS9', 'LEAVES'], P.UI_TEXT, 0, 22),
+    (14.05, 1.35, 'ring', ['REPAIR'], P.KU[4], 0, 22),
+    (15.20, 0.82, 'break', ['LOST', '2 PAIRS'], P.BAD[2], 0, 22),
+    (16.10, 1.15, 'break', ['SEALED'], P.LIG[3], 0, 22),
+    (18.10, 1.70, 'ghost', ['BEFORE', [(SEQ_PRE, P.UI_TEXT), (SEQ_LOST, P.BAD[2]), (SEQ_POST, P.UI_TEXT)]],
+     P.BAD[2], 1, 14),
+    (18.45, 1.50, 'edited', ['AFTER', [(SEQ_PRE, P.UI_TEXT), (SEQ_POST, P.UI_TEXT)]], P.GOOD[2], -1, 14),
+]
+CAPS_LOOP = [
+    (20.70, 1.25, 'next_site', ['NEXT', 'TARGET'], P.UI_TEXT, 0, 20),
+]
+
+
+def _anchor(key, cam, shape, pose, t):
+    """Where a caption's dot sits this frame, in canvas pixels: worked out from the thing itself, so it tracks."""
+    if key == 'dna_top':
+        i = int(cam.cx / D.RISE) - 6
+        return cam.to(*shape.base_xy(i, 0, 1.0)[:2])
+    if key == 'cas' and pose is not None:
+        return cam.to(*C.local_to_world(pose, -C.SPAN * 0.52, 34.0))
+    if key == 'grna' and pose is not None:
+        return cam.to(*C.local_to_world(pose, -C.SPAN * 0.80, C.SC_Y))
+    if key == 'hnh' and pose is not None:
+        k = pose.get('hnh', 0.0)
+        lx = C.HNH_HOME[0] + (C.HNH_CUT[0] - C.HNH_HOME[0]) * k
+        ly = C.HNH_HOME[1] + (C.HNH_CUT[1] - C.HNH_HOME[1]) * k
+        return cam.to(*C.local_to_world(pose, lx, ly))
+    if key == 'ruvc' and pose is not None:
+        k = pose.get('ruvc', 0.0)
+        lx = C.RUVC_HOME[0] + (C.RUVC_CUT[0] - C.RUVC_HOME[0]) * k
+        ly = C.RUVC_HOME[1] + (C.RUVC_CUT[1] - C.RUVC_HOME[1]) * k
+        return cam.to(*C.local_to_world(pose, lx, ly))
+    if key == 'pam':
+        return cam.to(*shape.base_xy(D.PAM_I + 1, 1, 1.0)[:2])
+    if key == 'decoy':
+        return cam.to(*shape.base_xy(D.DECOY_I + 1, 1, 1.0)[:2])
+    if key == 'pairing':
+        j = max(0, paired_count(t) - 1)
+        return cam.to(*shape.base_xy(D.PAM_I - 1 - j, 0, 1.0)[:2])
+    if key == 'break':
+        return cam.to(*shape.axis(D.CUT_I))
+    if key == 'ring':
+        return cam.to(*shape.axis(D.CUT_I - 2))
+    if key == 'ghost':
+        return cam.to(*D.Shape(twist=shape.twist, yoff=-38.0).axis(D.CUT_I + 5))
+    if key == 'edited':
+        return cam.to(*shape.axis(D.CUT_I - 4))
+    if key == 'next_site':
+        return cam.to(*shape.axis(D.NEXT_I - 1))
+    return None
+
+
+def dna_lines(cam):
+    """The opening caption shows the code itself: the six bases the camera is looking at."""
+    i = int(cam.cx / D.RISE) - 6
+    return ['DNA', [(''.join(D.seq_at(i + k, 0) for k in range(6)), P.UI_TEXT)]]
+
+
+def captions(buf, cam, shape, pose, t, table):
+    for t0, life, key, lines, col, side, reach in table:
+        if not (t0 <= t < t0 + life):
+            continue
+        a = _anchor(key, cam, shape, pose, t)
+        if a is None:
+            continue
+        if lines == 'seq':
+            lines = dna_lines(cam)
+        hud.label(buf, t, t0, a[0], a[1], lines, col=col, side=side, life=life, reach=reach)
+
+
 def labels(buf, cam, st, t):
-    shape = st['shape']
-    pose = st['pose']
-    if T.LABEL_CAS <= t < T.LABEL_CAS + 2.0 and pose is not None:
-        px, py = cam.to(*C.local_to_world(pose, -C.SPAN * 0.5, 34.0))
-        hud.label(buf, t, T.LABEL_CAS, px, py, ['CAS9'], side=1, life=2.0, reach=16)
-        gx, gy = cam.to(*C.local_to_world(pose, -C.SPAN * 0.80, C.SC_Y))
-        hud.label(buf, t, T.LABEL_CAS + 0.5, gx, gy, ['GUIDE RNA'], col=P.RNA[6], side=1, life=1.6, reach=14)
-    if T.LABEL_PAM <= t < T.LABEL_PAM + 1.6:
-        px, py = cam.to(*shape.base_xy(D.PAM_I + 1, 1, 1.0)[:2])
-        hud.label(buf, t, T.LABEL_PAM, px, py, ['PAM'], col=P.PI[4], side=-1, life=1.6, reach=18)
-    if T.LABEL_REPAIR <= t < T.LABEL_REPAIR + 1.8:
-        px, py = cam.to(*shape.axis(D.CUT_I - 2))
-        hud.label(buf, t, T.LABEL_REPAIR, px, py, ['REPAIR'], col=P.KU[3], side=-1, life=1.8, reach=20)
+    captions(buf, cam, st['shape'], st['pose'], t, CAPS)
     if T.LABEL_EDITED <= t:
         hud.banner(buf, t, T.LABEL_EDITED, 'DNA EDITED', life=1.5, y=H // 2 + 150)
 
@@ -362,7 +445,7 @@ def frame(t):
     t = t % T.TOTAL
     buf = np.zeros((H, W, 3), np.uint8)
     if t < T.HOOK[1]:
-        draw_hook(buf, t, t)
+        draw_hook(buf, t, t, caps=True)
         return buf
     if t < T.REWIND[1]:
         draw_hook(buf, rewind_time(t), t)
